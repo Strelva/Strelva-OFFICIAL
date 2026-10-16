@@ -52,7 +52,6 @@ function localTransport(workspaceId: string): TrackerTransport {
 export function LocalTrackerPreview({ workspaceId, readOnly, templateId }: { workspaceId: string; readOnly: boolean; templateId?: TrackerTemplateId }) {
   const transport = useMemo(() => localTransport(workspaceId), [workspaceId]);
   return <>
-    <p className="mx-auto max-w-5xl px-4 pt-4 text-sm text-gray-muted sm:px-8" role="note">Local rehearsal. Your CSV stays in this browser view. Changes reset when you leave or reload. Saved workspace sharing and R&amp;D records require sign-in.</p>
     <TrackerExperience workspaceId={workspaceId} readOnly={readOnly} transport={transport} templateId={templateId} />
   </>;
 }

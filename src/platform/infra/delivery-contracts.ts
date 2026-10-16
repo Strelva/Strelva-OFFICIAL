@@ -13,6 +13,8 @@ export interface DeliveryLead {
   businessName: string;
   /** Absent only on historical records or intake before configuration. */
   agencyWorkspaceId?: string | null;
+  /** The serving agency's display name when the intake recorded it. The page prefers a live brand read. */
+  agencyName?: string | null;
   /** Absent on legacy website-sales records. Account access is never sales. */
   requestType?: string;
   conversion?: { idempotencyKey: string; actorId: string; fingerprint: string; input: Record<string, unknown>; businessWorkspaceId?: string };
@@ -41,7 +43,7 @@ export const deliverySteps: Array<{
   },
   {
     id: "reviewing",
-    label: "Fit review",
+    label: "Checking it's a fit",
     detail: "We check the business, the customer path, and what the site should prove.",
   },
   {

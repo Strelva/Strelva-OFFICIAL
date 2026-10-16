@@ -5,7 +5,7 @@ import { StrelvaShell } from "@/experience/app-frame/StrelvaShell";
 import { ServiceDeliveryQueue, type DeliveryQueueScope } from "@/experience/operations/ServiceDeliveryQueue";
 import { workspaceReleaseEnabled } from "@/platform/workspace-release";
 import { XaButtonLink, XaEmpty } from "@/components/ui/strelva/Xa";
-import { XaObjectPage } from "@/experience/xa-object/XaObjectPage";
+import { XaObjectPage } from "@/components/ui/strelva/Xa";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Delivery work", robots: { index: false, follow: false }, referrer: "no-referrer" };

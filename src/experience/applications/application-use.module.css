@@ -29,7 +29,9 @@
 .previewStack { display: flex; flex-direction: column; gap: 20px; }
 
 /* A released custom tool, framed as the page its users see. */
-.frame { display: block; width: 100%; min-height: 70dvh; border: 0; background: var(--st-surface); }
+.frame { display: block; width: 100%; height: 360px; border: 0; background: var(--st-surface); }
+.toolFrame { box-sizing: border-box; width: 100%; max-width: 1040px; margin: 24px auto 0; overflow: hidden; border: 1px solid var(--st-line); border-radius: var(--st-r-lg, 16px); }
+@media (max-width: 767px) { .toolFrame { margin-top: 8px; border-radius: 12px; } }
 
 @media (max-width: 767px) {
   .fields, .recordFields { grid-template-columns: minmax(0, 1fr); }
@@ -39,3 +41,6 @@
 /* The agency's draft workspace: one calm column under the permission sentence. */
 .work { box-sizing: border-box; display: flex; max-width: 1040px; flex-direction: column; gap: 28px; margin-inline: auto; padding: 48px 48px 140px; }
 @media (max-width: 767px) { .work { gap: 22px; padding: 20px 16px 132px; } }
+.quietLine { margin: -6px 0 0; font-size: 14px; }
+.reason { color: var(--st-text-2); font-size: 14px; }
+.actions[data-preview="true"] > :first-child { flex: none; }

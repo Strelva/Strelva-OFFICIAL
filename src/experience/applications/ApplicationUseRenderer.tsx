@@ -8,9 +8,9 @@
  */
 import { FormEvent, useEffect, useId, useMemo, useRef, useState } from "react";
 import {
-  XaAnswers, XaButton, XaDecision, XaField, XaHeadline, XaRow, XaRows, XaStatus, XaSystemTile, XaTextLink,
+  XaButton, XaDecision, XaField, XaHeadline, XaRow, XaRows, XaSystemTile, XaTextLink,
 } from "@/components/ui/strelva/Xa";
-import { XaBlock, XaNote, XaObjectPage } from "@/experience/xa-object/XaObjectPage";
+import { XaBlock, XaNote, XaObjectPage } from "@/components/ui/strelva/Xa";
 import styles from "./application-use.module.css";
 import type { ApplicationUseSnapshot } from "@/products/applications/client";
 
@@ -173,8 +173,8 @@ export function ApplicationUseRenderer({
       })}
     </div>
     {submitError ? <div id={`${instanceId}-application-submit-error`} role="alert"><XaNote tone="down">{submitError}</XaNote></div> : null}
-    <div className={styles.actions}>
-      <XaButton type="submit" variant={presentation === "preview" ? "secondary" : "primary"} size="lg" busy={busy} disabled={busy} aria-describedby={submitError ? `${instanceId}-application-submit-error` : undefined}>{draft.editingRecordId ? "Save correction" : "Submit record"}</XaButton>
+    <div className={styles.actions} data-preview={presentation === "preview" || undefined}>
+      <XaButton type="submit" variant={presentation === "preview" ? "secondary" : "primary"} size={presentation === "preview" ? "md" : "lg"} busy={busy} disabled={busy} aria-describedby={submitError ? `${instanceId}-application-submit-error` : undefined}>{draft.editingRecordId ? "Save correction" : "Submit record"}</XaButton>
       {draft.editingRecordId ? <XaButton type="button" variant="quiet" disabled={busy} onClick={cancelEdit}>Cancel correction</XaButton>
         : adding && snapshot.records.length > 0 && presentation !== "preview" ? <XaButton type="button" variant="quiet" disabled={busy} onClick={() => setAdding(false)}>Not now</XaButton> : null}
       {onReload && submitError ? <XaButton type="button" variant="secondary" disabled={busy} onClick={onReload}>Reload internal tool</XaButton> : null}
@@ -217,20 +217,24 @@ export function ApplicationUseRenderer({
   </XaDecision> : detail;
 
   const count = snapshot.records.length;
-  return <XaObjectPage label={snapshot.title}
+  const access = readOnly ? "You can read records; the owner makes changes"
+    : snapshot.access.recordEdit === "all" ? "You can add records and correct any of them"
+      : snapshot.access.recordEdit === "own" ? "You can add records and correct your own" : "You can add records";
+  // One quiet line for release and access; the records list is the page.
+  const quiet = `Release ${snapshot.releaseVersion} · ${access} until ${dateLabel(snapshot.access.expiresAt)}.`;
+  const opened = formShown || selectedId !== null;
+  return <XaObjectPage label={snapshot.title} phone={count && canRead ? "push" : "object-first"} open={opened} backLabel={recordsWord === "record" ? "Records" : "Documents"}
+    onBack={() => { setSelectedId(null); if (editing) cancelEdit(); else setAdding(false); }}
+    head={<div className={styles.toolHead}>
+      <XaSystemTile kind="form" size={48} label="Internal tool" />
+      <XaHeadline quiet={!canRead ? "Your answers go to the business." : count ? plural(count, recordsWord, `${recordsWord}s`) + "." : `No ${recordsWord}s yet.`}>{snapshot.title}.</XaHeadline>
+    </div>}
     story={<>
-      <XaSystemTile kind="form" size={56} label="Internal tool" />
-      <XaHeadline quiet={!canRead ? "Fill it in. Your answers go to the business." : count ? `${plural(count, recordsWord, `${recordsWord}s`)}. Open one, or add one.` : `No ${recordsWord}s yet.`}>{snapshot.title}.</XaHeadline>
       {submitMessage ? <XaNote role="status" tone="done">{submitMessage}</XaNote> : null}
-      {formView && snapshot.access.recordSubmit && !formShown ? <div><XaButton variant="primary" size="lg" onClick={() => setAdding(true)}>Add a record</XaButton></div> : null}
-      <XaAnswers labelWidth={120} rows={[
-        ["Release", `Release ${snapshot.releaseVersion}`],
-        ["You can", readOnly ? "Read records. The owner controls changes." : snapshot.access.recordEdit === "all" ? "Add records and correct any record." : snapshot.access.recordEdit === "own" ? "Add records and correct your own." : "Add records."],
-        ["Your access", <time key="t" dateTime={snapshot.access.expiresAt}>Until {dateLabel(snapshot.access.expiresAt)}</time>],
-        ["Checks", <span key="c" className={styles.checks}><XaStatus kind="draft" size="sm">Not checked</XaStatus><span>No check has run yet, so Strelva can&apos;t say it&apos;s working.</span></span>],
-      ]} />
-      {canRead ? <XaBlock label={recordsWord === "record" ? "Records" : "Documents"} id={`${instanceId}-records`}>{records}</XaBlock> : null}
-      {readOnly ? <XaNote>You have read-only access. You can open records; the owner controls changes.</XaNote> : null}
+      {canRead ? <XaBlock label={recordsWord === "record" ? "Records" : "Documents"} id={`${instanceId}-records`}
+        action={formView && snapshot.access.recordSubmit && !formShown ? <XaButton variant="primary" onClick={() => setAdding(true)}>Add a record</XaButton> : undefined}>{records}</XaBlock>
+        : formView && snapshot.access.recordSubmit && !formShown ? <div><XaButton variant="primary" size="lg" onClick={() => setAdding(true)}>Add a record</XaButton></div> : null}
+      <XaNote>{quiet}</XaNote>
     </>}
     object={object} />;
 }

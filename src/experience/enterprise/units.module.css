@@ -20,3 +20,6 @@
 .selectField select { box-sizing: border-box; width: 100%; min-height: 50px; padding: 13px 16px; border: 1px solid var(--st-line); border-radius: var(--st-r-md); background: var(--st-surface); color: var(--st-text); font: inherit; font-size: 15px; }
 .selectField select:focus-visible { outline: none; border-color: var(--st-accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--st-accent) 16%, transparent); }
 @media (max-width: 767px) { .tree > li { padding-left: calc(var(--depth, 0) * 18px); } }
+.objectLine { margin: 0; color: var(--st-text); font-size: 15px; line-height: 1.5; }
+.links { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; margin: 0; color: var(--st-text-3); font-size: 15px; }
+.node[data-archived="true"] .nodeName { color: var(--st-text-3); }

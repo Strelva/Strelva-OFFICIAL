@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { CareReportDocument } from "@/experience/care-reports/CareReportDocument";
-import { XaOutside } from "@/experience/xa-object/XaObjectPage";
+import { XaOutside } from "@/components/ui/strelva/Xa";
 import { resolveOwnerBrand } from "@/platform/agency-brand/server";
 import { careReportReleaseSnapshotSchema } from "@/platform/care-reports/contracts";
 import { careReportShareLinksEnabled } from "@/platform/care-reports/release";

@@ -1,20 +1,21 @@
 /**
- * The page someone opens from a contribution link (XA, lane xs-apps-care):
- * the work as it was shared with them, then their proposal and its review.
- * Only this work is shared; nothing else in the business is.
+ * The page someone opens from a contribution link (XA): the work itself as a
+ * plain document (no browser chrome), the one sentence of what is shared under
+ * it, then their proposal and its review.
  */
 import type { ReactNode } from "react";
-import { XaButtonLink, XaEmpty, XaHeadline, XaPage } from "@/components/ui/strelva/Xa";
-import { XaNote } from "@/experience/xa-object/XaObjectPage";
+import { XaButtonLink, XaEmpty, XaHeadline } from "@/components/ui/strelva/Xa";
+import { XaNote } from "@/components/ui/strelva/Xa";
 import styles from "./work-authority.module.css";
 
 export function ContributionPage({ title, text, children }: { title: string; text?: string; children: ReactNode }) {
   return <>
     <div className={styles.page}>
-      <XaHeadline quiet="Shared with you to propose changes. Only this work is shared.">{title}</XaHeadline>
-      {text !== undefined ? <XaPage address={title} label="The current document" flat>
-        <p className={styles.document}>{text || "This document is empty."}</p>
-      </XaPage> : <XaNote>Your access and what you have sent are below.</XaNote>}
+      <XaHeadline quiet="Suggest your changes below. The business decides.">{title}.</XaHeadline>
+      {text !== undefined ? <>
+        <article className={styles.sheet} aria-label={`${title}, as it is now`}><p className={styles.document}>{text || "Nothing is written yet."}</p></article>
+        <XaNote>Only this is shared with you, nothing else in the business.</XaNote>
+      </> : <XaNote>What you can do and what you&apos;ve sent are below.</XaNote>}
     </div>
     {children}
   </>;

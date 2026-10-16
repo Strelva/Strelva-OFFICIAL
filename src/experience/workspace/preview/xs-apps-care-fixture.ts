@@ -79,7 +79,7 @@ export const WEBSITE_STATE = {
 
 export const HOME_FINDER_BINDING = {
   id: "5c000000-0000-4000-8000-000000000201", systemId: "5c000000-0000-4000-8000-000000000202", workspaceId: "5c000000-0000-4000-8000-000000000203",
-  agencyId: NORTH_ID, externalInstallationId: "lakeshore-homes-01", brokerageName: "Lakeshore Homes", approvedOrigin: "https://lakeshorehomes.example",
+  agencyId: NORTH_ID, externalInstallationId: "lakeshore-homes-01", brokerageName: "Lakeshore Homes", approvedOrigin: "https://lakeshorehomes.com",
   licenseReference: "Signed license LH-2026-10", licenseExpiresAt: "2027-06-30T00:00:00.000Z", sourceName: "Western New York listings feed",
   revision: 3, status: "active", lifecycle: "draft", qualifiedAt: null, runtimeAllowed: false, changeNumber: 5,
   readiness: [
@@ -113,7 +113,12 @@ export const UNITS = [
 /* ---------- Delivery ---------- */
 
 const at = (iso: string) => iso;
-export function deliveryRequest(stage: "proposed" | "accepted" | "running" | "submitted" | "done" | "blocked"): ServiceRequest {
+/** Who is who on the fixture delivery, as the API's `people` answers it. */
+export function deliveryPeople(viewerIsAgencyOperator: boolean) {
+  return { askedBy: "Dr. Amy Lin", operator: "Maya Okafor", agency: "North Studio", viewerIsAgencyOperator };
+}
+
+export function deliveryRequest(stage: "proposed" | "accepted" | "running" | "submitted" | "done" | "blocked", due = "2026-10-16T21:00:00Z"): ServiceRequest {
   const base = {
     id: REQUEST_ID, businessId: HARBOR_ID, status: "requested" as const,
     request: "Add a new-patient page with insurance, first-visit steps and a booking button.", outcome: "New-patient page",
@@ -126,10 +131,10 @@ export function deliveryRequest(stage: "proposed" | "accepted" | "running" | "su
     version: 1 as const, status: stage === "done" ? "accepted" as const : stage === "blocked" ? "running" as const : stage, operatorId: MAYA_ID,
     termsReference: "North Studio care plan, October", deliveryDefinition: "A new-patient page at harbordental.com/new-patients with insurance, what to bring, and the booking button.",
     scope: ["website_delivery"], proposedAt: at("2026-10-14T15:00:00Z"),
-    startedAt: stage === "proposed" ? null : at("2026-10-15T09:00:00Z"), dueAt: stage === "proposed" ? null : at("2026-10-16T09:00:00Z"),
-    customerAcceptedBy: stage === "proposed" ? null : AMY_ID, customerAcceptedAt: stage === "proposed" ? null : at("2026-10-15T09:00:00Z"),
+    startedAt: stage === "proposed" ? null : at("2026-10-15T21:00:00Z"), dueAt: stage === "proposed" ? null : at(due),
+    customerAcceptedBy: stage === "proposed" ? null : AMY_ID, customerAcceptedAt: stage === "proposed" ? null : at("2026-10-15T21:00:00Z"),
     blocker: stage === "blocked" ? { note: "Waiting on the insurance list from the front desk", actorId: MAYA_ID, at: at("2026-10-15T16:00:00Z") } : null,
-    result: stage === "submitted" || stage === "done" ? { websiteBindingId: BINDING_ID, repository: "north-studio/harbor-dental", commitSha: "4f2a9c1e8b7d6a5f4e3d2c1b0a9f8e7d6c5b4a39", reviewUrl: "https://harbor-dental-preview.example/new-patients", desktopChecked: true, mobileChecked: true, primaryActionChecked: true, submittedAt: at("2026-10-15T20:00:00Z"), submittedBy: MAYA_ID } : null,
+    result: stage === "submitted" || stage === "done" ? { websiteBindingId: BINDING_ID, repository: "north-studio/harbor-dental", commitSha: "4f2a9c1e8b7d6a5f4e3d2c1b0a9f8e7d6c5b4a39", reviewUrl: "https://preview.harbordental.com/new-patients", desktopChecked: true, mobileChecked: true, primaryActionChecked: true, submittedAt: at("2026-10-15T20:00:00Z"), submittedBy: MAYA_ID } : null,
     decision: stage === "done" ? { kind: "accepted" as const, note: "Looks right. Thank you, Maya.", actorId: AMY_ID, at: at("2026-10-16T08:10:00Z") } : null,
   };
   return { ...base, deliveryCommitment: commitment } as unknown as ServiceRequest;

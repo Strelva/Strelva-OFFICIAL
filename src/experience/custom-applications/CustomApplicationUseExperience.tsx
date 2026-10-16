@@ -1,16 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { XaHeadline, XaPage, XaSystemTile } from "@/components/ui/strelva/Xa";
 import { StandaloneApplicationShell } from "@/experience/applications/StandaloneApplicationShell";
 import { useWorkspaceRequest } from "@/experience/workspace/WorkspaceRequest";
 import styles from "@/experience/applications/application-use.module.css";
 import { ToolClosed, ToolOpening } from "@/experience/applications/ToolStates";
-import { XaObjectPage } from "@/experience/xa-object/XaObjectPage";
 import { CUSTOM_APPLICATION_PARENT_CSP, customApplicationSandboxHtml } from "@/products/custom-applications/client";
 
 type UseState = "loading" | "ready" | "denied" | "error";
-type Snapshot = { workId: string; title: string; releaseVersion: number; artifactDigest: string; html: string; grant: { expiresAt: string } };
+type Snapshot = { workId: string; title: string; releaseVersion: number; artifactDigest: string; html: string; grant: { expiresAt: string }; businessName?: string | null };
 
 function message(body: unknown, fallback: string): string {
   return body && typeof body === "object" && typeof (body as { error?: unknown }).error === "string"
@@ -52,24 +50,31 @@ export function CustomApplicationUseExperience({ workId }: { workId: string }) {
   }
 
   const until = new Date(snapshot.grant.expiresAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+  // The tool is the page: its own heading is the one title. The frame grows to the tool's height.
   return <>
     <meta httpEquiv="Content-Security-Policy" content={CUSTOM_APPLICATION_PARENT_CSP} />
-    <StandaloneApplicationShell><XaObjectPage wide label={snapshot.title} story={<>
-      <div className={styles.toolHead}>
-        <XaSystemTile kind="form" size={48} label="Internal tool" />
-        <XaHeadline size="sm" quiet={<>Release {snapshot.releaseVersion}. Your access lasts until <time dateTime={snapshot.grant.expiresAt}>{until}</time>.</>}>{snapshot.title}</XaHeadline>
+    <StandaloneApplicationShell from={snapshot.businessName ?? undefined} meta={<>Release {snapshot.releaseVersion} · Yours until <time dateTime={snapshot.grant.expiresAt}>{until}</time></>}>
+      <div className={styles.toolFrame} data-artifact-digest={snapshot.artifactDigest}>
+        <iframe
+          title={snapshot.title}
+          srcDoc={customApplicationSandboxHtml(snapshot.html)}
+          sandbox="allow-scripts allow-forms"
+          className={styles.frame}
+          referrerPolicy="no-referrer"
+          onLoad={event => fit(event.currentTarget)}
+        />
       </div>
-      <div data-artifact-digest={snapshot.artifactDigest}>
-        <XaPage address={`${snapshot.title} · Release ${snapshot.releaseVersion}`} label={`${snapshot.title}, the released internal tool`}>
-          <iframe
-            title={`${snapshot.title} released internal tool`}
-            srcDoc={customApplicationSandboxHtml(snapshot.html)}
-            sandbox="allow-scripts allow-forms"
-            className={styles.frame}
-            referrerPolicy="no-referrer"
-          />
-        </XaPage>
-      </div>
-    </>} /></StandaloneApplicationShell>
+    </StandaloneApplicationShell>
   </>;
+}
+
+/**
+ * Size the frame to the tool. The sandbox has no same-origin access, so the
+ * height can't always be read; then the frame keeps a calm default height.
+ */
+function fit(frame: HTMLIFrameElement) {
+  try {
+    const height = frame.contentDocument?.documentElement.scrollHeight;
+    if (height && height > 0) frame.style.height = `${Math.min(Math.max(height, 240), 4000)}px`;
+  } catch { /* cross-origin sandbox: keep the default height */ }
 }

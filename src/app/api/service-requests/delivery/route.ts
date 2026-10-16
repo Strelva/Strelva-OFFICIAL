@@ -5,6 +5,7 @@ import { workspaceReleaseEnabled } from "@/platform/workspace-release";
 import { oauthEnabled, resourceUrl } from "@/platform/agent-channel/oauth";
 import { sitesByCodeReleased } from "@/products/websites/server";
 import { readWorkspaceBody } from "@/platform/workspaces/http";
+import { readAskedByNames, readDeliveryPeople } from "@/platform/service-requests/delivery-people";
 import {
   DeliveryCommitmentService, mutateServiceRequestCommitment, readServiceDeliveryWork, readServiceDeliveryPermissions,
   PostgresServiceRequestStore, ServiceRequestService, ServiceRequestAccessError, ServiceRequestConflictError,
@@ -42,11 +43,14 @@ export async function GET(request: Request) {
       // A website Request with sites_by_code on can be handed to the agency's coding agent. Otherwise the key is absent.
       const codeAgent = saved.context.source === "website_change" && oauthEnabled() && await sitesByCodeReleased(saved.businessId).catch(() => false)
         ? { mcpUrl: resourceUrl(), requestId: saved.id } : null;
-      return json({ actorId: current.userId, request: saved, permissions, ...(codeAgent ? { codeAgent } : {}) });
+      // Names are presentation only; if they can't be read the page says less and hides repository details.
+      const people = await readDeliveryPeople(current, saved).catch(() => ({ askedBy: null, operator: null, agency: null, viewerIsAgencyOperator: false }));
+      return json({ actorId: current.userId, request: saved, permissions, people, ...(codeAgent ? { codeAgent } : {}) });
     }
     const providerWorkspaceId = params.get("providerWorkspaceId");
     if (!providerWorkspaceId && params.get("providerKind") !== "strelva") throw new ServiceRequestValidationError();
-    return json({ requests: await readServiceDeliveryWork(current, providerWorkspaceId ? z.string().uuid().parse(providerWorkspaceId) : undefined) });
+    const requests = await readServiceDeliveryWork(current, providerWorkspaceId ? z.string().uuid().parse(providerWorkspaceId) : undefined);
+    return json({ requests, askedBy: await readAskedByNames(requests).catch(() => ({})) });
   } catch (error) { return failure(error); }
 }
 export async function POST(request: Request) {

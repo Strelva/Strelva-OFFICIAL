@@ -102,12 +102,12 @@ describe("managed website agency draft authority", () => {
     });
 
     const { container, root } = await render(createElement(AgencyManagedWebsiteDraftExperience, { bindingId, section: "hero" }));
-    expect(container.textContent).toContain("Prepare a website update");
+    expect(container.textContent).toContain("Update the top of the home page.");
     const headline = container.querySelector<HTMLInputElement>("#managed-website-hero-headline");
     expect(headline).toBeTruthy();
     const nextData = { ...state.data, headline: "Prepared by the named operator" };
     changeInput(headline!, nextData.headline);
-    const save = [...container.querySelectorAll("button")].find((button) => button.textContent?.includes("Prepare and save draft"));
+    const save = [...container.querySelectorAll("button")].find((button) => button.textContent?.includes("Send to"));
     expect(save).toBeTruthy();
     await act(async () => save?.dispatchEvent(new MouseEvent("click", { bubbles: true })));
     expect(requests[1]?.body).toMatchObject({
@@ -115,8 +115,8 @@ describe("managed website agency draft authority", () => {
     });
     expect(requests[2]?.body).toEqual({ action: "run", assignmentId });
     expect(requests[2]?.body).not.toHaveProperty("input");
-    expect(container.textContent).toContain("Saved hero draft Release 1");
-    expect(container.textContent).toContain("The client reviews and publishes your draft");
+    expect(container.textContent).toContain("Saved. The client sees it on Today.");
+    expect(container.textContent).toContain("Nothing on the live site changes until the client says yes.");
     expect(container.querySelector<HTMLAnchorElement>('a[href="/client/website-draft-a/dashboard/site"]')).toBeTruthy();
     act(() => root.unmount());
     container.remove();

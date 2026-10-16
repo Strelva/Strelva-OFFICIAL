@@ -54,7 +54,7 @@ describe("fictional owner canon previews", () => {
     await act(async () => root.render(createElement(OwnerRequestPreview, { state: "ready", dark: false })));
     await vi.waitFor(() => expect(container.textContent).toContain("Rebuild the Fictional Workshop website"));
     expect(container.textContent).toContain("Outside this request");
-    expect(container.textContent).toContain("Scope and date agreed");
+    expect(container.textContent).toContain("Scope agreed");
     await act(async () => root.render(createElement(OwnerRequestPreview, { state: "permission", dark: false })));
     await vi.waitFor(() => expect(container.textContent).toContain("This request is unavailable to your account."));
     expect(container.textContent).not.toContain("Outside this request");

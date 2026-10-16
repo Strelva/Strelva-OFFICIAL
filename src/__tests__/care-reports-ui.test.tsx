@@ -19,34 +19,38 @@ describe("Care plan report document", () => {
     snapshot: PREVIEW_SNAPSHOT, brand: PREVIEW_BRAND, releaseNumber: 2, audience: "owner", releases: PREVIEW_RELEASES, releaseHref: n => `/r?release=${n}`, ...props,
   }));
 
-  it("credits the agency, shows the Release and tells checked from unchecked", () => {
+  it("credits the agency once, shows the Release and marks only the unchecked change", () => {
     const html = render();
-    for (const text of ["Prepared by North Studio", "Runs on Strelva", "Release 2", "Checked on the live site", "Not checked on the live site", "not continuous uptime", "Print or save as PDF",
-      "A note from North Studio", "Earlier Releases", "1 change wasn&#x27;t checked on the live site", "Done Sep 4", "3 h 5 min"]) {
+    for (const text of ["North Studio", "Runs on Strelva", "Release 2", "Not checked", "Print or save as PDF", "We moved your booking button", "Earlier releases", "Sep 4", "3 h 5 min", "harbordental.com passed all 30 checks."]) {
       expect(html, text).toContain(text);
     }
+    expect(html).not.toContain("Checked on the live site");
+    expect(html).not.toContain("wasn&#x27;t checked on the live site");
+    expect(html.match(/Runs on Strelva/g)).toHaveLength(1);
   });
 
   it("never shows a price or the word Version", () => {
     const html = render();
     expect(html).not.toContain("$");
     expect(html).not.toContain("Version");
-    expect(html).toContain("42 Ask Strelva and drafting runs");
+    expect(html).not.toContain("Ask Strelva");
   });
 
   it("shows an unavailable agency identity as it is, never as Strelva Agency", () => {
     const html = render({ brand: PREVIEW_BRAND_UNAVAILABLE });
-    expect(html).toContain("Prepared by Agency identity unavailable");
+    expect(html).toContain("Agency identity unavailable");
     expect(html).not.toContain("Strelva Agency");
   });
 
   it("labels the draft that is not shared", () => {
-    expect(render({ releaseNumber: null, audience: "agency", releases: undefined })).toContain("Draft, not shared");
+    const draft = render({ releaseNumber: null, audience: "agency", releases: undefined });
+    expect(draft).not.toContain("Release 2");
+    expect(draft).toContain("Harbor Dental");
   });
 
   it("says plainly when nothing happened", () => {
     const html = render({ snapshot: { ...PREVIEW_FACTS, changes: { total: 0, confirmed: 0, notConfirmed: 0, notChecked: 0, items: [] }, requests: { doneCount: 0, openCount: 0, askedCount: 0, done: [] }, time: { minutes: 0, entries: 0, byCategory: {} } } });
-    for (const text of ["No Releases were recorded this month.", "No Requests were done this month.", "No time recorded by North Studio this month."]) expect(html).toContain(text);
+    for (const text of ["Nothing changed on Harbor Dental&#x27;s Systems this month.", "No Requests were finished this month.", "North Studio didn&#x27;t record time this month."]) expect(html).toContain(text);
   });
 
   it("hides the controls when printed", () => {
@@ -130,37 +134,42 @@ describe("CareReportEditor", () => {
       emailOn: props.emailOn ?? false, shareLinksOn: props.shareLinksOn ?? false, origin: "https://app.example.test", request: vi.fn<typeof fetch>(),
     }));
 
-  it("disables the email button and says why when email is off", async () => {
+  it("says once that email is off, with no email control", async () => {
     await mountEditor();
-    expect(button("Email to Harbor Dental")).toBeDefined();
-    expect((button("Email to Harbor Dental") as HTMLButtonElement).disabled).toBe(true);
-    expect(node.textContent).toContain("Not sent: email is off. Copy the link and send it yourself.");
+    expect(button("Email it to Harbor Dental")).toBeUndefined();
+    expect(node.textContent!.split("Not sent: email is off. Copy the link and send it yourself.")).toHaveLength(2);
   });
 
-  it("enables the email button when email is on", async () => {
+  it("offers email for the newest unsent Release when email is on", async () => {
     await mountEditor({ emailOn: true });
-    expect((button("Email to Harbor Dental") as HTMLButtonElement).disabled).toBe(false);
+    expect(button("Email it to Harbor Dental")).toBeDefined();
+  });
+
+  it("has one ink yes, and share links as text", async () => {
+    await mountEditor({ shareLinksOn: true });
+    expect(node.querySelectorAll("[data-xa-primary]")).toHaveLength(1);
+    expect(button("Copy the link for Harbor Dental")).toBeDefined();
   });
 
   it("offers a link anyone can open only when share links are on", async () => {
     await mountEditor();
-    expect(button("Create a link anyone can open")).toBeUndefined();
-    expect(button("Copy link for signed-in owners")).toBeDefined();
+    expect(button("Make a link anyone can open")).toBeUndefined();
+    expect(button("Copy the link for Harbor Dental")).toBeDefined();
     await act(async () => root.unmount());
     root = createRoot(node);
     await mountEditor({ shareLinksOn: true, shareLink: true });
-    expect(button("Create a link anyone can open")).toBeDefined();
-    expect(button("Turn off the link")).toBeDefined();
-    expect(node.textContent).toContain("A link is on since Oct 2. Create a new link to copy it again; the old one stops working.");
+    expect(button("Make a new open link")).toBeDefined();
+    expect(button("Turn the open link off")).toBeDefined();
+    expect(node.textContent).toContain("An open link has been on since Oct 2. A new one turns the old one off.");
   });
 
   it("gives staff a read-only report: no note, share or send", async () => {
     await mountEditor({ canWrite: false, emailOn: true, shareLinksOn: true });
     expect(node.querySelector("textarea")).toBeNull();
-    expect(button("Save note")).toBeUndefined();
-    expect(button("Refresh the numbers")).toBeUndefined();
-    expect(button("Email to Harbor Dental")).toBeUndefined();
-    expect(button("Create a link anyone can open")).toBeUndefined();
+    expect(button("Save without sharing")).toBeUndefined();
+    expect(button("Count the month again")).toBeUndefined();
+    expect(button("Email it to Harbor Dental")).toBeUndefined();
+    expect(button("Make a link anyone can open")).toBeUndefined();
     expect(node.textContent).not.toContain("Share Release");
     expect(node.textContent).toContain("You can read this report.");
   });
@@ -171,18 +180,25 @@ describe("CareReportEditor", () => {
     expect(node.querySelector("textarea")).not.toBeNull();
   });
 
-  it("holds sharing while the note is typed but not saved", async () => {
-    await mountEditor();
-    const hold = () => button("Share Release 3") as HTMLButtonElement;
-    expect(hold().disabled).toBe(false);
-    expect(node.textContent).not.toContain("Save the note before sharing.");
+  it("shares a typed note with the Release: saves the note first, then shares", async () => {
+    const request = vi.fn<typeof fetch>(async (_input, init) => {
+      const body = JSON.parse(String(init?.body ?? "{}")) as { action?: string };
+      if (body.action === "note") return Response.json({ ...previewAgencyView({ canWrite: true, shared: true }), report: { ...previewAgencyView({ canWrite: true, shared: true }).report, revision: 4, agencyNote: "A new note" } });
+      return Response.json({ error: "held in test" }, { status: 400 });
+    });
+    await mount(createElement(CareReportEditor, { initial: previewAgencyView({ canWrite: true, shared: true }), brand: PREVIEW_BRAND, emailOn: false, shareLinksOn: false, origin: "https://app.example.test", request }));
     const area = node.querySelector("textarea")!;
     await act(async () => {
-      Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")!.set!.call(area, "A note that is not saved yet");
+      Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")!.set!.call(area, "A new note");
       area.dispatchEvent(new Event("input", { bubbles: true }));
     });
-    expect(hold().disabled).toBe(true);
-    expect(node.textContent).toContain("Save the note before sharing.");
+    expect(button("Save without sharing")).toBeDefined();
+    const share = button("Share Release 3") as HTMLButtonElement;
+    expect(share.disabled).toBe(false);
+    await act(async () => { share.click(); });
+    const actions = request.mock.calls.map(([, init]) => (JSON.parse(String(init?.body ?? "{}")) as { action?: string; expectedRevision?: number }));
+    expect(actions[0]).toMatchObject({ action: "note" });
+    expect(actions[1]).toMatchObject({ action: "publish", expectedRevision: 4 });
   });
 });
 

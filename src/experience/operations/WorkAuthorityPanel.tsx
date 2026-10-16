@@ -7,7 +7,7 @@
  */
 import { useEffect, useState } from "react";
 import { XaButton, XaField, XaInitial, XaStatus, XaTextArea, XaTextLink } from "@/components/ui/strelva/Xa";
-import { XaBlock, XaNote } from "@/experience/xa-object/XaObjectPage";
+import { XaBlock, XaNote } from "@/components/ui/strelva/Xa";
 import { PersonalAiAccessControl } from "@/experience/operations/PersonalAiAccessControl";
 import type { WorkParticipation } from "@/platform/work-participation/service";
 import type { WorkContextView } from "@/platform/work-context/service";
@@ -65,6 +65,7 @@ function AuthorityEditor({ workId, canManage: requestedManage, sources, transpor
     finally { setBusy(false); }
   }
   const canManage = requestedManage && participation?.canManage === true;
+  const [costOpen, setCostOpen] = useState(false);
   const ownGrant = participation?.grants.find(grant => grant.participantEmail === participation.currentActorEmail && grant.scope.includes("propose") && grant.status === "active" && Date.parse(grant.expiresAt) > Date.now());
   const sevenDays = () => new Date(Date.now() + 7 * 86400000).toISOString();
   const activeGrants = participation?.grants.filter(g => g.status === "active" && Date.parse(g.expiresAt) > Date.now()) ?? [];
@@ -84,9 +85,10 @@ function AuthorityEditor({ workId, canManage: requestedManage, sources, transpor
       }}>
         <XaField label="What changed?" name="summary" maxLength={500} required placeholder="Shorter opening paragraph" />
         <XaTextArea label="Your proposal" name="content" rows={6} maxLength={20000} required />
-        <XaField label="What it cost you, in dollars" name="cost" type="number" min={0} max={ownGrant.budgetMinor / 100} step="0.01" defaultValue="0" required hint={`Up to ${(ownGrant.budgetMinor / 100).toFixed(2)}. The person who shared this with you is named as its sponsor.`} />
-        <div className={styles.row}><XaButton type="submit" variant="primary" size="lg" busy={busy} disabled={busy || Boolean(retryContribution)}>Submit for review</XaButton></div>
-        <XaNote>It is reviewed before the work changes.</XaNote>
+        {costOpen && ownGrant.budgetMinor > 0 ? <XaField label="What it cost you, in dollars" name="cost" type="number" min={0} max={ownGrant.budgetMinor / 100} step="0.01" defaultValue="0" hint={`Up to $${(ownGrant.budgetMinor / 100).toFixed(2)}.`} />
+          : ownGrant.budgetMinor > 0 ? <p className={styles.quiet}>No cost to report. <XaTextLink onClick={() => setCostOpen(true)}>It cost me something</XaTextLink></p> : null}
+        <div className={styles.row}><XaButton type="submit" variant="primary" size="lg" busy={busy} disabled={busy || Boolean(retryContribution)}>Send for review</XaButton></div>
+        <XaNote>Nothing in the letter changes until it&apos;s accepted.</XaNote>
       </form>
     </XaBlock> : null}
 
@@ -94,7 +96,7 @@ function AuthorityEditor({ workId, canManage: requestedManage, sources, transpor
       <ul className={styles.list} aria-label="Contributions">{participation.contributions.map(contribution => <li key={contribution.id} className={styles.contribution}>
         <div className={styles.contributionHead}>
           <XaInitial name={contribution.actorEmail} shape="round" size={28} />
-          <div className={styles.grow}><p className={styles.title}>{contribution.summary}</p><p className={styles.meta}>{contribution.actorEmail} · Reported cost {contribution.costMinor === null ? "unknown" : `${(contribution.costMinor / 100).toFixed(2)} ${contribution.currency}`}</p></div>
+          <div className={styles.grow}><p className={styles.title}>{contribution.summary}</p><p className={styles.meta}>{contribution.actorEmail}{contribution.costMinor ? ` · cost $${(contribution.costMinor / 100).toFixed(2)}` : ""}</p></div>
           {contribution.status === "pending" ? <XaStatus kind="waits" size="sm">{CONTRIBUTION_WORD.pending}</XaStatus> : <span className={styles.meta}>{CONTRIBUTION_WORD[contribution.status]}</span>}
         </div>
         <p className={styles.content}>{contribution.content}</p>

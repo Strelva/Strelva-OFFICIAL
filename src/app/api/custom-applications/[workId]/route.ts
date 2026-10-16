@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { workspaceReleaseEnabled } from "@/platform/workspace-release";
 import { workspaceHttpActor } from "@/platform/workspaces/http";
+import { getSupabase } from "@/platform/infra/db/client";
 import {
   createCustomApplicationService,
   CustomApplicationAccessError,
@@ -23,6 +24,15 @@ function failure(error: unknown) {
   return json({ error: "This internal tool could not be confirmed." }, 503);
 }
 
+async function workspaceName(id: string): Promise<string | null> {
+  try {
+    const db = getSupabase();
+    if (!db) return null;
+    const { data } = await db.from("workspaces").select("name").eq("id", id).maybeSingle();
+    return data && typeof data.name === "string" && data.name.trim() ? data.name.trim() : null;
+  } catch { return null; }
+}
+
 async function workId(params: Promise<{ workId: string }>) {
   return z.string().uuid().parse((await params).workId);
 }
@@ -32,7 +42,9 @@ export async function GET(_request: Request, { params }: { params: Promise<{ wor
   try {
     const actor = await workspaceHttpActor();
     if (!actor) return json({ error: "Sign in with a confirmed email to use this internal tool." }, 401);
-    return json(await createCustomApplicationService().use(actor, await workId(params)));
+    const used = await createCustomApplicationService().use(actor, await workId(params));
+    // The business's name for the page header; the grant was checked by use() above.
+    return json({ ...used, businessName: await workspaceName(used.grant.workspaceId) });
   } catch (error) {
     return failure(error);
   }

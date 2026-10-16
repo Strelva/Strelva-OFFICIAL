@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useContext, type ReactNode } from "react";
-import { XaOutside } from "@/experience/xa-object/XaObjectPage";
+import { XaOutside } from "@/components/ui/strelva/Xa";
 
 export const StandaloneApplicationModeContext = createContext<"light" | "dark">("light");
 

@@ -1,6 +1,6 @@
 "use client";
 /**
- * XA object pages (October 16, 2026, lane xs-apps-care).
+ * XA object pages (October 16, 2026; promoted into the kit from lane xs-apps-care).
  *
  * The XA-4 and XA-6 screens (S4 form in Draft, S6 Versions, AG4 prepare and
  * send) share one composition: what this is and what it means on the left,
@@ -8,20 +8,37 @@
  * XaOutside is the paper frame for pages people open from a link, outside the
  * workspace (a shared report, a buyer's home search, a delivery status).
  *
- * Candidates for the kit in src/components/ui/strelva/Xa once a second lane
- * needs them. They only arrange; every visible part is an Xa* kit part.
+ * They only arrange; every visible part is an Xa* kit part.
  */
 import Link from "next/link";
 import { Check } from "lucide-react";
 import type { ReactNode } from "react";
-import { XaInitial, XaMark } from "@/components/ui/strelva/Xa";
-import styles from "./object-page.module.css";
+import { ArrowLeft } from "lucide-react";
+import { XaInitial, XaMark } from "./state";
+import styles from "./object.module.css";
 
-/** Story left, object right (sticky on desktop). On a phone the object follows the story. */
-export function XaObjectPage({ story, object, label, objectFirstOnPhone = false, wide = false }: { story: ReactNode; object?: ReactNode; label?: string; objectFirstOnPhone?: boolean; wide?: boolean }) {
-  return <div className={styles.page} data-single={!object || undefined} data-wide={wide || undefined} data-object-first={objectFirstOnPhone || undefined} aria-label={label}>
-    <div className={styles.story}>{story}</div>
-    {object ? <div className={styles.object}>{object}</div> : null}
+/**
+ * Story left, object right (sticky on desktop). `head` is the headline and
+ * crumbs: on a phone it stays on top and the rest of the story collapses
+ * under the object or behind it.
+ *
+ * Phone modes (never stacked desktop):
+ * - "follow": head, story, then the object (short stories only).
+ * - "object-first": head, the object, then the rest of the story.
+ * - "push": a list in the story opens the object as a pushed page. The
+ *   caller owns `open` and `onBack`; the back link returns to the list.
+ */
+export function XaObjectPage({ head, story, object, label, phone = "follow", open = false, onBack, backLabel = "Back", wide = false }: {
+  head?: ReactNode; story?: ReactNode; object?: ReactNode; label?: string;
+  phone?: "follow" | "object-first" | "push"; open?: boolean; onBack?: () => void; backLabel?: string; wide?: boolean;
+}) {
+  return <div className={styles.page} data-single={!object || undefined} data-wide={wide || undefined} data-phone={phone} data-open={open || undefined} data-headless={!head || undefined} aria-label={label}>
+    {head ? <div className={styles.head}>{head}</div> : null}
+    {story ? <div className={styles.story}>{story}</div> : null}
+    {object ? <div className={styles.object}>
+      {phone === "push" && onBack ? <button type="button" className={styles.back} onClick={onBack}><ArrowLeft size={16} aria-hidden="true" />{backLabel}</button> : null}
+      {object}
+    </div> : null}
   </div>;
 }
 

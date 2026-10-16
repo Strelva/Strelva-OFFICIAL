@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { serviceRequestSchema } from "@/platform/service-requests/types";
 import { deliveryCommitmentCommandSchema } from "@/platform/service-requests/delivery-commitment";
+import { deliveryPeopleSchema } from "@/platform/service-requests/delivery-people-contracts";
 
 export const deliveryInspectionSchema = z.object({
   actorId: z.string().uuid(),
@@ -9,6 +10,8 @@ export const deliveryInspectionSchema = z.object({
     canManage: z.boolean(), canOperate: z.boolean(), stopped: z.boolean(),
     websiteBindings: z.array(z.object({ id: z.string().uuid(), name: z.string().nullable(), tenantId: z.string() })),
   }),
+  /** Who is who, by name. Older responses without it read as unknown, and repository details stay hidden. */
+  people: deliveryPeopleSchema.default({ askedBy: null, operator: null, agency: null, viewerIsAgencyOperator: false }),
   /** Present only for a website Request with sites_by_code on: what to give the agency's coding agent. */
   codeAgent: z.object({ mcpUrl: z.string().url(), requestId: z.string().uuid() }).strict().optional(),
 });

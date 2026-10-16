@@ -1,14 +1,13 @@
 "use client";
+import { XaBlock, XaButton, XaDecision, XaField, XaFold, XaHeadline, XaNote, XaObjectPage, XaStatus, XaTextArea, XaTextLink, XaWorking } from "@/components/ui/strelva/Xa";
 
 import { STATE_LABELS } from "@/platform/presentation/place-labels";
-import { actorLabel } from "@/platform/presentation/actor";
+import { actorPresentation } from "@/platform/presentation/actor";
 
 import { intentRequestFor, useWorkspaceIntent } from "./WorkspaceIntent";
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { StEmpty, StHead, StMono, StNotice, StPage, StPill, StSection, StSkeleton, StSurface, StTextButton } from "@/components/ui/strelva/Kit";
 import styles from "./document-experience.module.css";
-import { TextInput, TextArea } from "@/components/ui/TextInput";
 import { WorkPlanExperience } from "./WorkPlanExperience";
 import type { WorkspaceWork } from "./contracts";
 import { documentHistoryPageSchema, type DocumentHistoryPage, type DocumentReceipt, type WorkspaceDocument } from "@/products/documents/contracts";
@@ -86,36 +85,35 @@ function DocumentSession({ workspaceId, workId, readOnly, onSaved, transport = s
   }
   const dirty = saved ? saved.document.title !== title || saved.document.text !== text : Boolean(title.trim());
   const disabled = Boolean(readOnly || busy || (workId && !saved));
-  return <section aria-label="Workspace document" aria-busy={busy}><StPage>
-    <StHead title={saved?.document.title ?? "Write something your business can use"} crumb={{ label: "Documents" }}
-      meta={<>Private · never on the website{releaseLabel ? <> · <StMono>{releaseLabel}</StMono></> : null}</>} actions={saved && !readOnly && !editing ? <StTextButton onClick={() => setEditing(true)}>Edit document</StTextButton> : undefined} />
-    {!saved && !readOnly && transport.mode === "server" ? <div className="flex flex-wrap gap-3"><StPill type="button" variant="soft" onClick={() => setDrafting(true)}>Draft with Strelva</StPill>{drafting ? <StPill type="button" variant="soft" onClick={() => setDrafting(false)}>Write it myself</StPill> : null}</div> : null}
-    {drafting ? <WorkPlanExperience workspaceId={workspaceId} initialRequest={initialRequestText || "Draft a private document for my business."} sources={sources} presentation="document" /> : <>
-    {initialRequestText && !saved ? <aside className="space-y-2 border-y border-gray-border py-4 text-sm"><h2 className="font-medium">What you asked</h2><p className="whitespace-pre-wrap">{initialRequestText}</p><p className="text-gray-muted">Your request stays with this document. Write below or ask Strelva to prepare a draft.</p></aside> : null}
-    {error ? <div role="alert"><StNotice tone="critical">{error} {workId ? <StTextButton onClick={() => location.reload()}>Reload document</StTextButton> : null}</StNotice></div> : null}
-    {message ? <div role="status"><StNotice>{message}</StNotice></div> : null}
-    {workId && !saved && !error ? <div role="status">Loading your document…<StSkeleton width="75%" /><StSkeleton width="55%" /></div> : null}
-    {readOnly ? <StNotice>You have read-only access.</StNotice> : (!saved || editing) ? <StSurface><form className="space-y-4" onSubmit={event => { event.preventDefault(); void save(); }}>
-      <TextInput label="Document title" value={title} maxLength={160} required disabled={disabled} onChange={event => { setTitle(event.target.value); }} />
-      <TextArea label="Document text" value={text} rows={14} maxLength={50000} disabled={disabled} onChange={event => { setText(event.target.value); }} />
-      {saved && dirty ? <StPill type="button" variant="soft" disabled={disabled} onClick={() => { setTitle(saved.document.title); setText(saved.document.text); }}>Discard unsaved changes</StPill> : null}
-      {dirty ? <details className="space-y-4 border-y border-gray-border py-4"><summary className="cursor-pointer text-sm">Preview changes</summary>
-        {saved ? <details><summary>Before</summary><h3 className="mt-3 font-medium">{saved.document.title}</h3><p className="whitespace-pre-wrap text-sm">{saved.document.text || "Empty document"}</p></details> : null}
-        <article><h3 className="font-medium">{title}</h3><p className="mt-3 whitespace-pre-wrap text-sm">{text || "Empty document"}</p></article>
-      </details> : null}
-      <StPill type="submit" disabled={disabled || !dirty || !title.trim()}>{busy ? "Saving…" : "Save document"}</StPill>
-    </form></StSurface> : null}
-    {saved ? <div className={styles.historyLayout}>
-      <StSection title={STATE_LABELS.history}>
-        <DocumentHistory key={`${saved.workId}:${saved.document.revision}`} saved={saved} transport={transport} receiptLabel={receiptLabel} receiptActor={receiptActor} />
-        {saved.document.history.at(-1)?.kind === "edit" && !readOnly ? <StTextButton disabled={disabled || dirty} onClick={() => void save(true)}>Undo last edit</StTextButton> : null}
-        {dirty && saved.document.history.length ? <p className="text-sm text-gray-muted">Save or discard your unsaved text before using Undo.</p> : null}
-      </StSection>
-      {context ? <aside className={styles.context}>{context}</aside> : <StSection title="Who can open it"><p className="text-sm text-gray-muted">Workspace access controls who can open this private document. Named access and opening history are not available here yet.</p></StSection>}
-    </div> : null}
-    {saved && !editing ? <details><summary className="cursor-pointer text-sm">Read document</summary><StSurface><p className="whitespace-pre-wrap text-sm">{saved.document.text || "Empty document"}</p></StSurface></details> : null}
-    </>}
-  </StPage></section>;
+  const head = <XaHeadline quiet={saved ? `Private, never on the website${releaseLabel ? ` · ${releaseLabel}` : ""}.` : "Private. Only people in this business can open it."}>{saved?.document.title ? `${saved.document.title}.` : "A new document."}</XaHeadline>;
+  const editor = <form className={styles.editor} onSubmit={event => { event.preventDefault(); void save(); }} aria-label={saved ? "Edit the document" : "Write the document"}>
+    <XaField label="Title" value={title} maxLength={160} required disabled={disabled} onChange={event => { setTitle(event.target.value); }} />
+    <XaTextArea label="Text" value={text} rows={14} maxLength={50000} disabled={disabled} onChange={event => { setText(event.target.value); }} />
+    <div className={styles.actions}>
+      <XaButton type="submit" variant="primary" size="lg" busy={busy} disabled={Boolean(readOnly) || !dirty || !title.trim()}>{saved ? "Save changes" : "Save the document"}</XaButton>
+      {saved ? <XaTextLink onClick={() => { setTitle(saved.document.title); setText(saved.document.text); setEditing(false); }}>{dirty ? "Throw away changes" : "Done"}</XaTextLink> : null}
+    </div>
+  </form>;
+  const object = drafting ? null : readOnly || (saved && !editing)
+    ? saved ? <XaDecision label={saved.document.title} status={<span className={styles.docTitle}>{saved.document.title}</span>} meta={!readOnly ? <XaTextLink onClick={() => setEditing(true)}>Edit</XaTextLink> : undefined} yes={null}>
+      <p className={styles.docText}>{saved.document.text || "Nothing written yet."}</p>
+    </XaDecision> : null
+    : <XaDecision label={saved ? "Editing" : "New document"} status={<XaStatus kind="draft">{saved ? (dirty ? "Not saved" : "Saved") : "Not saved yet"}</XaStatus>} yes={null}>{editor}</XaDecision>;
+  const story = <>
+    {error ? <XaNote tone="down" role="alert">{error} {workId ? <XaTextLink onClick={() => location.reload()}>Try again</XaTextLink> : null}</XaNote> : null}
+    {message ? <XaNote role="status" tone="done">{message}</XaNote> : null}
+    {workId && !saved && !error ? <XaWorking title="Opening the document" steps={[{ id: "read", label: "Reading what's saved", state: "active" }]} /> : null}
+    {readOnly ? <XaNote>You can read this. Members of the business make changes.</XaNote> : null}
+    {initialRequestText && !saved ? <XaBlock label="What you asked"><p className={styles.docText}>{initialRequestText}</p></XaBlock> : null}
+    {!saved && !readOnly && transport.mode === "server" ? <XaNote>{drafting ? <XaTextLink onClick={() => setDrafting(false)}>Write it myself instead</XaTextLink> : <>Or let Strelva write a first draft. <XaTextLink onClick={() => setDrafting(true)}>Draft it with Strelva</XaTextLink></>}</XaNote> : null}
+    {drafting ? <WorkPlanExperience workspaceId={workspaceId} initialRequest={initialRequestText || "Draft a private document for my business."} sources={sources} presentation="document" /> : null}
+    {saved ? <XaBlock label={STATE_LABELS.history}>
+      <DocumentHistory key={`${saved.workId}:${saved.document.revision}`} saved={saved} transport={transport} receiptLabel={receiptLabel} receiptActor={receiptActor} />
+      {saved.document.history.at(-1)?.kind === "edit" && !readOnly ? <p className={styles.quiet}>{dirty ? "Save or throw away your changes first, then you can undo the last edit." : <XaTextLink onClick={() => void save(true)}>Undo the last edit</XaTextLink>}</p> : null}
+    </XaBlock> : null}
+    {saved ? context ? <aside className={styles.context}>{context}</aside> : <XaNote>Anyone in this business can open it.</XaNote> : null}
+  </>;
+  return <section aria-label="Workspace document" aria-busy={busy}><XaObjectPage phone="object-first" head={head} story={story} object={object ?? undefined} wide /></section>;
 }
 
 function DocumentHistory({ saved, transport, receiptLabel, receiptActor }: { saved: DocumentSaved; transport: DocumentTransport; receiptLabel?: (receipt: DocumentReceipt) => ReactNode; receiptActor?: (receipt: DocumentReceipt) => ReactNode }) {
@@ -150,9 +148,9 @@ function DocumentHistory({ saved, transport, receiptLabel, receiptActor }: { sav
   }
 
   return <>
-    {!receipts.length ? <StEmpty>Created {new Date(saved.document.createdAt).toLocaleString()}. {saved.document.revision === 0 || !saved.historyEnabled ? "No edits yet." : "Load earlier changes to read saved history."}</StEmpty> : <ol className={styles.history}>{receipts.map(receipt => <li key={receipt.revision} className={styles.historyRow}><StMono>Release {receipt.revision}</StMono><div><p><span className="sr-only">Release {receipt.revision}: </span>{receiptLabel?.(receipt) ?? (receipt.kind === "undo" ? "Undid the previous edit" : "Saved document changes")}</p><p className="text-xs text-gray-muted">{receiptActor?.(receipt) ?? actorLabel(receipt.actor)}</p><details className="mt-2"><summary>Before and after</summary><p className="mt-2 whitespace-pre-wrap">{receipt.before.title}{"\n"}{receipt.before.text}</p><hr className="my-3 border-gray-border" /><p className="whitespace-pre-wrap">{receipt.after.title}{"\n"}{receipt.after.text}</p></details></div><StMono as="time" dateTime={receipt.at}>{new Date(receipt.at).toLocaleDateString(undefined, { month: "short", day: "numeric" })}</StMono></li>)}</ol>}
-    {saved.historyEnabled && transport.history && before !== null ? <StPill type="button" variant="soft" disabled={busy} onClick={() => void loadOlder()}>{busy ? "Loading earlier changes…" : error ? "Retry earlier changes" : "Load earlier changes"}</StPill> : null}
-    {busy ? <p role="status" className="text-sm text-gray-muted">Loading document history…</p> : null}
+    {!receipts.length ? <XaNote>Started {new Date(saved.document.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}. {saved.document.revision === 0 || !saved.historyEnabled ? "No edits yet." : "Earlier changes are below."}</XaNote> : <ol className={styles.history}>{receipts.map(receipt => <li key={receipt.revision} className={styles.historyRow}><span className={styles.release}>Release {receipt.revision}</span><div><p><span className="sr-only">Release {receipt.revision}: </span>{receiptLabel?.(receipt) ?? (receipt.kind === "undo" ? "Undid the previous edit" : "Saved document changes")}</p>{receiptActor?.(receipt) ?? actorPresentation(receipt.actor).name ? <p className="text-xs text-gray-muted">{receiptActor?.(receipt) ?? actorPresentation(receipt.actor).name}</p> : null}<XaFold summary={<>Before and after</>}><p className="mt-2 whitespace-pre-wrap">{receipt.before.title}{"\n"}{receipt.before.text}</p><hr className="my-3 border-gray-border" /><p className="whitespace-pre-wrap">{receipt.after.title}{"\n"}{receipt.after.text}</p></XaFold></div><time className={styles.release} dateTime={receipt.at}>{new Date(receipt.at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}</time></li>)}</ol>}
+    {saved.historyEnabled && transport.history && before !== null && !busy ? <p><XaTextLink onClick={() => void loadOlder()}>{error ? "Try earlier changes again" : "Show earlier changes"}</XaTextLink></p> : null}
+    {busy ? <p role="status" className="text-sm text-gray-muted">Opening earlier changes</p> : null}
     {error ? <p role="alert" className="text-critical">{error}</p> : null}
   </>;
 }

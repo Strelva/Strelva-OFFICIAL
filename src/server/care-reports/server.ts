@@ -141,5 +141,6 @@ export async function sendCareReport(actor: WorkspaceActor, reportId: string, re
     releaseId: release.id,
     facts: snapshot,
     link,
+    agencyNote: snapshot.agencyNote ?? null,
   });
 }

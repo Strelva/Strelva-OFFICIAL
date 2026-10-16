@@ -1,14 +1,14 @@
 import type { ReactNode } from "react";
-import { XaAnswers, XaHeadline, XaInitial, XaLabel, XaTextLink } from "@/components/ui/strelva/Xa";
+import { XaHeadline, XaInitial, XaStatus, XaTextLink } from "@/components/ui/strelva/Xa";
 import type { OwnerBrand } from "@/platform/infra/agency-brand";
 import { BUSINESS_EFFORT_CATEGORY_LABELS, type BusinessEffortCategory } from "@/platform/business-effort/types";
 import type { CareReportFacts } from "@/platform/care-reports/contracts";
 import {
-  CARE_CHECK_LABEL, careChangeTitle, careHeadline, careOutcomeLine, careReleaseLabel, careReportTitle, careShortDate, careSiteCheckLines, careTimeLabel, careUsageLine,
+  careCheckException, careHeadline, careOutcomeLine, careReleaseLabel, careReportTitle, careShortDate, careSiteCheckSentence, careTimeLabel,
 } from "@/platform/care-reports/model";
 import { PrintDocumentButton } from "@/experience/workspace/billing/PrintDocumentButton";
 import { DOCUMENT_PRINT_CSS } from "@/experience/workspace/billing/print";
-import { XaBlock, XaChanges, XaFigure, XaNote } from "@/experience/xa-object/XaObjectPage";
+import { XaBlock, XaChanges, XaFigure, XaNote } from "@/components/ui/strelva/Xa";
 import styles from "./care-report.module.css";
 
 const plural = (n: number, one: string, many: string) => `${n.toLocaleString("en-US")} ${n === 1 ? one : many}`;
@@ -27,7 +27,7 @@ export function CareReportColumn({ children }: { children: ReactNode }) {
   return <div className={styles.column}>{children}</div>;
 }
 
-export function CareReportDocument({ snapshot, brand, releaseNumber, releases, releaseHref, back, flat = false }: {
+export function CareReportDocument({ snapshot, brand, releaseNumber, releases, releaseHref, back, audience, flat = false }: {
   snapshot: CareReportDocumentSnapshot;
   brand: OwnerBrand;
   releaseNumber: number | null;
@@ -35,73 +35,66 @@ export function CareReportDocument({ snapshot, brand, releaseNumber, releases, r
   releaseHref?: (number: number) => string;
   back?: { label: string; href: string };
   audience: "agency" | "owner" | "shared";
-  /** Inside the agency's decision panel the panel is the page; no second card. */
+  /** Inside the agency's decision panel the panel is the page. */
   flat?: boolean;
 }) {
   const { changes, requests, time } = snapshot;
   const note = snapshot.agencyNote?.trim();
   const categories = Object.entries(time.byCategory).filter(([, minutes]) => minutes > 0);
-  const earlier = releases && releases.length > 1 ? releases : null;
-  const checkTone = (check: keyof typeof CARE_CHECK_LABEL) => check === "confirmed" ? undefined : "waits" as const;
+  // Only Releases shared before the one on screen; a draft lists every shared one.
+  const earlier = releases?.filter(item => releaseNumber === null || item.number < releaseNumber) ?? [];
   return <>{back ? <div data-print-hide className={styles.back}><XaTextLink href={back.href}>{back.label}</XaTextLink></div> : null}<article className={styles.report} data-flat={flat || undefined} aria-label={`${careReportTitle(snapshot)} for ${snapshot.business.name}`}>
     <style>{DOCUMENT_PRINT_CSS}</style>
     <header className={styles.head}>
-      <p className={styles.byline}>
+      {audience === "shared" ? null : <p className={styles.byline}>
         {brand.logoUrl ? <img src={brand.logoUrl} alt="" className={styles.logo} /> : <XaInitial name={brand.name} color={brand.accentColor} size={28} />}
-        <span className={styles.bylineName}>{`Prepared by ${brand.name}`}</span>
+        <span className={styles.bylineName}>{brand.name}</span>
         <span className={styles.credit}>Runs on Strelva</span>
-      </p>
-      <XaHeadline quiet={`${snapshot.business.name} · ${releaseNumber ? careReleaseLabel(releaseNumber) : "Draft, not shared"}`}>{careReportTitle(snapshot)}</XaHeadline>
+      </p>}
+      <XaHeadline quiet={releaseNumber ? `${snapshot.business.name} · ${careReleaseLabel(releaseNumber)}` : snapshot.business.name}>{careReportTitle(snapshot)}</XaHeadline>
     </header>
 
-    <XaFigure value={changes.total.toLocaleString("en-US")} label={changes.total === 1 ? "change made this month" : "changes made this month"} detail={careHeadline(snapshot)} />
+    {/* The month's number, held up by Pebble with the client's Systems (E3). */}
+    <div className={styles.figureRow}>
+      <img className={styles.lineup} src="/xa/pose-lineup.webp" width={220} height={120} alt={`Pebble and ${snapshot.business.name}'s Systems`} />
+      <XaFigure value={changes.total.toLocaleString("en-US")} label={changes.total === 1 ? "change made this month" : "changes made this month"} detail={careHeadline(snapshot)} />
+    </div>
 
-    {note ? <XaBlock label={`A note from ${brand.name}`}>
-      <div className={styles.note}><XaInitial name={brand.name} color={brand.accentColor} size={28} shape="round" /><p>{note}</p></div>
-    </XaBlock> : null}
+    {note ? <div className={styles.note}><XaInitial name={brand.name} color={brand.accentColor} size={28} shape="round" /><p><span className={styles.noteFrom}>{brand.name}</span> {note}</p></div> : null}
 
-    <XaBlock label="Checked changes">
-      {changes.items.length ? <XaChanges label="Changes" rows={changes.items.map(item => ({
-        key: `${item.systemId}-${item.release}`, when: careShortDate(item.at), dateTime: item.at,
-        text: <>{item.summary || careChangeTitle(item)}<span className={styles.sub}>{careChangeTitle(item)}</span></>,
-        who: CARE_CHECK_LABEL[item.check], tone: checkTone(item.check),
-      }))} /> : <XaNote>No Releases were recorded this month.</XaNote>}
-      {changes.notChecked > 0 ? <XaNote tone="waits">{plural(changes.notChecked, "change wasn't", "changes weren't")} checked on the live site.</XaNote> : null}
+    <XaBlock label="What changed">
+      {changes.items.length ? <XaChanges label="What changed" rows={changes.items.map(item => {
+        const exception = careCheckException(item.check);
+        return { key: `${item.systemId}-${item.release}`, when: careShortDate(item.at), dateTime: item.at,
+          text: item.summary || item.systemName,
+          who: exception ? <XaStatus kind="waits" size="sm">{exception}</XaStatus> : undefined, tone: exception ? "waits" as const : undefined };
+      })} /> : <XaNote>Nothing changed on {snapshot.business.name}&apos;s Systems this month.</XaNote>}
     </XaBlock>
 
     <XaBlock label="Requests">
-      {requests.done.length ? <XaChanges label="Requests done" rows={requests.done.map(item => ({ key: item.id, when: careShortDate(item.doneAt), dateTime: item.doneAt, text: item.request, who: `Done ${careShortDate(item.doneAt)}` }))} />
-        : <XaNote>No Requests were done this month.</XaNote>}
-      <XaNote>{requests.openCount.toLocaleString("en-US")} open · {requests.askedCount.toLocaleString("en-US")} asked this month</XaNote>
+      {requests.done.length ? <XaChanges label="Requests done" rows={requests.done.map(item => ({ key: item.id, when: careShortDate(item.doneAt), dateTime: item.doneAt, text: item.request }))} />
+        : <XaNote>No Requests were finished this month.</XaNote>}
+      {requests.openCount > 0 ? <XaNote>{plural(requests.openCount, "Request is", "Requests are")} still open.</XaNote> : null}
     </XaBlock>
 
     <XaBlock label="Inquiries and bookings"><p className={styles.sentence}>{careOutcomeLine(snapshot.outcomes)}</p></XaBlock>
 
-    <XaBlock label="Site checks">
-      <ul className={styles.plain} aria-label="Site checks">{careSiteCheckLines(snapshot.siteChecks).map(line => <li key={line}>{line}</li>)}</ul>
+    <XaBlock label="Site checks"><p className={styles.sentence}>{careSiteCheckSentence(snapshot.siteChecks, snapshot.business.name)}</p></XaBlock>
+
+    <XaBlock label="Time">
+      {time.minutes > 0 ? <p className={styles.sentence}>{brand.name} spent {careTimeLabel(time.minutes)} on {snapshot.business.name}{categories.length ? `: ${categories.map(([category, minutes]) => `${(BUSINESS_EFFORT_CATEGORY_LABELS[category as BusinessEffortCategory] ?? category).toLowerCase()} ${careTimeLabel(minutes)}`).join(", ")}` : ""}.</p>
+        : <XaNote>{brand.name} didn&apos;t record time this month.</XaNote>}
     </XaBlock>
 
-    <XaBlock label="Time recorded">
-      {time.minutes > 0 ? <>
-        <p className={styles.sentence}>{careTimeLabel(time.minutes)} across {plural(time.entries, "entry", "entries")}</p>
-        <XaAnswers labelWidth={180} rows={categories.map(([category, minutes]) => [BUSINESS_EFFORT_CATEGORY_LABELS[category as BusinessEffortCategory] ?? category, careTimeLabel(minutes)] as const)} />
-      </> : <XaNote>No time recorded by {brand.name} this month.</XaNote>}
-    </XaBlock>
-
-    <XaBlock label="Strelva assistant"><p className={styles.sentence}>{careUsageLine(snapshot.usage)}</p></XaBlock>
-
-    {earlier && releaseHref ? <div data-print-hide><XaBlock label="Earlier Releases">
-      <ul className={styles.releases} aria-label="Releases of this report">
+    {earlier.length && releaseHref ? <div data-print-hide><XaBlock label="Earlier releases">
+      <ul className={styles.releases} aria-label="Earlier releases of this report">
         {earlier.map(item => <li key={item.number}>
-          {item.number === releaseNumber ? <span aria-current="page" className={styles.current}>{careReleaseLabel(item.number)}</span> : <XaTextLink href={releaseHref(item.number)}>{careReleaseLabel(item.number)}</XaTextLink>}
+          <XaTextLink href={releaseHref(item.number)}>{careReleaseLabel(item.number)}</XaTextLink>
           <span className={styles.sub}>Shared {careShortDate(item.publishedAt)}</span>
         </li>)}
       </ul>
     </XaBlock></div> : null}
 
-    <footer className={styles.foot}>
-      <XaLabel>Counts come from records Strelva keeps. &quot;Not checked&quot; means the count was unavailable, not zero.</XaLabel>
-      <div data-print-hide><PrintDocumentButton /></div>
-    </footer>
+    <footer className={styles.foot} data-print-hide><PrintDocumentButton /></footer>
   </article></>;
 }

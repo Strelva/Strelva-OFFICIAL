@@ -23,9 +23,9 @@ export const PREVIEW_FACTS: CareReportFacts = {
   changes: {
     total: 3, confirmed: 2, notConfirmed: 0, notChecked: 1,
     items: [
-      { systemId: SYSTEM, systemName: "Harbor Dental website", systemKind: "website", release: 6, summary: "Opening hours changed.", at: "2026-09-04T14:00:00+00:00", check: "confirmed", source: "website_deploy" },
+      { systemId: SYSTEM, systemName: "Harbor Dental website", systemKind: "website", release: 6, summary: "Fall hours on the website and Google.", at: "2026-09-04T14:00:00+00:00", check: "confirmed", source: "website_deploy" },
       { systemId: SYSTEM, systemName: "Harbor Dental website", systemKind: "website", release: 7, summary: "Booking button moved above the fold.", at: "2026-09-11T16:00:00+00:00", check: "confirmed", source: "website_code" },
-      { systemId: SYSTEM, systemName: "Harbor Dental website", systemKind: "website", release: 8, summary: "Menu text updated.", at: "2026-09-19T10:00:00+00:00", check: "not_checked", source: "website_content" },
+      { systemId: SYSTEM, systemName: "Harbor Dental website", systemKind: "website", release: 8, summary: "New-patient form asks for the insurance member ID.", at: "2026-09-19T10:00:00+00:00", check: "not_checked", source: "website_content" },
     ],
   },
   requests: {
@@ -47,7 +47,7 @@ export const PREVIEW_FACTS: CareReportFacts = {
   siteChecks: {
     hosted: { checks: 30, healthy: 30, lastCheckedAt: "2026-09-30T23:00:00+00:00" },
     readBacks: { confirmed: 2, notConfirmed: 0, notChecked: 0 },
-    latest: [{ host: "harbordental.example", state: "up", checkedAt: "2026-09-30T23:00:00+00:00" }],
+    latest: [{ host: "harbordental.com", state: "up", checkedAt: "2026-09-30T23:00:00+00:00" }],
   },
   usage: { calls: 42, byPurpose: { ask: 30, report: 12 } },
   time: { minutes: 185, entries: 4, byCategory: { change: 95, delivery: 60, support: 30 } },

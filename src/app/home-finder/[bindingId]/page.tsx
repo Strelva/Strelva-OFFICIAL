@@ -1,5 +1,5 @@
 import { XaEmpty } from "@/components/ui/strelva/Xa";
-import { XaOutside } from "@/experience/xa-object/XaObjectPage";
+import { XaOutside } from "@/components/ui/strelva/Xa";
 import { headers } from "next/headers";
 import { createHomeFinderEntry } from "@/products/home-finder/server";
 import { notFound } from "next/navigation";

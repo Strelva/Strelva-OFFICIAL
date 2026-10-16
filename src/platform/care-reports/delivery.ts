@@ -1,6 +1,7 @@
 import { getSupabase } from "@/platform/infra/db/client";
 import { sendEmailWithReceipt, type SendEmailInput, type SendEmailResult } from "@/platform/infra/email/send";
 import { resolveOwnerRecipient } from "@/platform/business-record";
+import { resolveAgencyEmailIdentity } from "@/platform/agency-brand/server";
 import type { WorkspaceActor } from "@/platform/workspaces/types";
 import type { CareReportFacts } from "./contracts";
 import { renderCareReportMail } from "./mail";
@@ -22,6 +23,8 @@ export interface CareReportSendInput {
   releaseId: string;
   facts: CareReportFacts;
   link: string;
+  /** The agency's note on this Release, as the owner sees it on the page. */
+  agencyNote?: string | null;
 }
 
 export type CareReportSendResult = { status: "accepted" | "suppressed" | "unknown"; reason?: string };
@@ -30,6 +33,8 @@ export interface CareReportDeliveryDeps {
   resolveOwnerRecipient(workspaceId: string): Promise<{ email: string; verified: boolean } | null>;
   rpc(name: string, args: Record<string, unknown>): PromiseLike<{ data: unknown; error: unknown }>;
   send(input: SendEmailInput): Promise<SendEmailResult>;
+  /** The agency's name as it is now (a live brand read at send time), or null to hold the send. */
+  agencyIdentity(agencyWorkspaceId: string): Promise<{ name: string } | null>;
   reserve: typeof reserveCareReportDelivery;
   record: typeof recordCareReportDelivery;
 }
@@ -42,6 +47,7 @@ const defaultDeps: CareReportDeliveryDeps = {
     return (client as unknown as { rpc(n: string, a: Record<string, unknown>): PromiseLike<{ data: unknown; error: unknown }> }).rpc(name, args);
   },
   send: sendEmailWithReceipt,
+  agencyIdentity: resolveAgencyEmailIdentity,
   reserve: reserveCareReportDelivery,
   record: recordCareReportDelivery,
 };
@@ -67,8 +73,12 @@ export async function sendCareReportRelease(
   if (staff.error) return hold("owner_recipient_check_unavailable");
   if (typeof staff.data === "string") return hold("owner_recipient_is_staff");
 
+  // The subject and byline use the agency's name now, never the one frozen in the snapshot.
+  const identity = await deps.agencyIdentity(input.agencyWorkspaceId).catch(() => null);
+  if (!identity?.name) return hold("agency_identity_unavailable");
+
   const reserved = await deps.reserve(actor, input.releaseId);
-  const mail = renderCareReportMail({ facts: input.facts, agencyName: input.facts.agency.name, businessName: input.businessName, release: input.release, link: input.link });
+  const mail = renderCareReportMail({ facts: input.facts, agencyName: identity.name, businessName: input.businessName, release: input.release, link: input.link, agencyNote: input.agencyNote ?? null });
   let result: SendEmailResult;
   try {
     result = await deps.send({

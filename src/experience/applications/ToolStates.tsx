@@ -6,7 +6,7 @@
  */
 import type { ReactNode } from "react";
 import { XaButton, XaButtonLink, XaEmpty, XaWorking } from "@/components/ui/strelva/Xa";
-import { XaObjectPage } from "@/experience/xa-object/XaObjectPage";
+import { XaObjectPage } from "@/components/ui/strelva/Xa";
 import { StandaloneApplicationShell } from "./StandaloneApplicationShell";
 
 export function ToolOpening({ title = "Opening the internal tool", step = "Checking your access" }: { title?: string; step?: string }) {

@@ -39,8 +39,8 @@ describe("L13 Home Finder retained buyer behavior", () => {
     await act(async () => root.render(createElement(HomeFinderBuyer, { bindingId, entryToken: "fixture-entry", brokerageName: "[Brokerage]", request })));
     await fill("City, area or address", "Buffalo"); await click("Search homes");
     expect(container.textContent).toContain("[Home address]");
-    expect(container.textContent).toContain("Listing contact: Not supplied");
-    await click("Ask about [Home address]");
+    expect(container.textContent).not.toContain("Not supplied");
+    await act(async () => container.querySelector<HTMLButtonElement>("ul[aria-label='Search results'] button")!.click());
     await fill("Your name", "[Buyer]"); await fill("Email", "buyer@example.test");
     expect(Array.from(container.querySelectorAll("button")).find(item => item.textContent === "Send inquiry")?.disabled).toBe(true);
     await act(async () => container.querySelector<HTMLInputElement>('input[type="checkbox"]')!.click());
@@ -54,7 +54,7 @@ describe("L13 Home Finder retained buyer behavior", () => {
     expect(JSON.parse(String(submissions[1]![1]?.body))).toMatchObject({ consent: true, listing: { id: listing.id, inquiryToken: listing.inquiryToken }, buyer: { name: "[Buyer]", email: "buyer@example.test" } });
     expect(submissions[1]![1]).toMatchObject({ credentials: "omit", headers: { "x-home-finder-entry": "renewed-fixture-token" } });
     expect(container.textContent).toContain("Inquiry queued");
-    expect(container.textContent).toContain("Only verified delivery evidence confirms");
+    expect(container.textContent).toContain("Your reference is fixture-receipt");
     expect(container.textContent).not.toContain("Send inquiry");
   });
 
@@ -63,10 +63,10 @@ describe("L13 Home Finder retained buyer behavior", () => {
     const request = vi.fn<typeof fetch>(async input => String(input).includes("renew=1") ? Response.json({ token: "fixture-entry" }) : unavailable ? Response.json({}, { status: 503 }) : Response.json({ ...search, count: 0, listings: [] }));
     await act(async () => root.render(createElement(HomeFinderBuyer, { bindingId, entryToken: "fixture-entry", brokerageName: "[Brokerage]", request })));
     await click("Search homes");
-    expect(container.textContent).toContain("Licensed listings are currently unavailable");
-    expect(container.textContent).not.toContain("No displayable homes");
+    expect(container.textContent).toContain("The listings can't be read right now. Nothing was sent.");
+    expect(container.textContent).not.toContain("No homes match");
     unavailable = false; await click("Search homes");
-    expect(container.textContent).toContain("No displayable homes match this search");
+    expect(container.textContent).toContain("No homes match that. Try another city or area.");
     expect(container.querySelector('[role="alert"]')).toBeNull();
   });
 });

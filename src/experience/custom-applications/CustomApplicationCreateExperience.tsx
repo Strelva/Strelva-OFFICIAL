@@ -2,8 +2,8 @@
 
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import { XaAnswers, XaButton, XaDecision, XaField, XaHeadline, XaSystemTile, XaTextArea } from "@/components/ui/strelva/Xa";
-import { XaNote, XaObjectPage } from "@/experience/xa-object/XaObjectPage";
+import { XaButton, XaDecision, XaField, XaHeadline, XaStatus, XaSystemTile, XaTextArea, XaTextLink } from "@/components/ui/strelva/Xa";
+import { XaNote, XaObjectPage } from "@/components/ui/strelva/Xa";
 import styles from "@/experience/applications/application-use.module.css";
 
 const starter = `import { writeFile } from "node:fs/promises";
@@ -19,12 +19,18 @@ function cents(value: string): number | null {
   return Math.round(amount * 100);
 }
 
-export function CustomApplicationCreateExperience({ workspaceId, onSaved, request = fetch }: { workspaceId: string; onSaved?: (workId: string, recovery?: { maxAuthorizedCents: number; estimateCents: number | null }) => void; request?: typeof fetch }) {
+/**
+ * Making an internal tool from a build file. Only for the people who build:
+ * the business's agency, or an agency in its own workspace. Owners get
+ * CustomToolRequest instead, which asks their agency in plain words.
+ */
+export function CustomApplicationCreateExperience({ workspaceId, businessName = "this business", onSaved, request = fetch }: { workspaceId: string; businessName?: string; onSaved?: (workId: string, recovery?: { maxAuthorizedCents: number; estimateCents: number | null }) => void; request?: typeof fetch }) {
   const router = useRouter();
   const [title, setTitle] = useState("");
   const [source, setSource] = useState(starter);
   const [maximum, setMaximum] = useState("0");
   const [estimate, setEstimate] = useState("0");
+  const [estimateOpen, setEstimateOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
@@ -36,7 +42,7 @@ export function CustomApplicationCreateExperience({ workspaceId, onSaved, reques
     const maxAuthorizedCents = cents(maximum);
     const estimateCents = cents(estimate);
     if (maxAuthorizedCents === null || estimateCents === null || estimateCents > maxAuthorizedCents) {
-      setError("The expected cost has to be at or below the most it may cost.");
+      setError(maxAuthorizedCents === null ? "Write the stop amount as dollars, like 2.50." : "What you expect has to be at or below where the build stops.");
       setBusy(false);
       return;
     }
@@ -91,30 +97,31 @@ export function CustomApplicationCreateExperience({ workspaceId, onSaved, reques
     }
   }
 
-  return <XaObjectPage label="Make an internal tool from code"
-    story={<>
-      <XaSystemTile kind="form" size={56} label="Internal tool" />
-      <XaHeadline quiet="You review it before anyone uses it.">Make an internal tool from your own code.</XaHeadline>
-      <XaAnswers labelWidth={130} rows={[
-        ["You give it", "A name, one build file and the most the build may cost."],
-        ["Strelva runs", "Your build file on its own machine. Nothing reaches the internet."],
-        ["Who keeps it", "You, as the person signed in. You are named as the one who maintains it."],
-        ["Nothing starts", "No outside service, paid model or public page is started here."],
-      ]} />
+  const max = cents(maximum);
+  const costLine = max === null ? "Write the stop amount as dollars, like 2.50."
+    : `Strelva stops the build at ${dollars(max)}${max === 0 ? ", so it runs only if it costs nothing" : ""}. It counts toward ${businessName}'s usage this month.`;
+  const missing = !title.trim() ? "Name it first." : !source.trim() ? "Add the build file first." : "";
+  return <XaObjectPage label="Make an internal tool from code" phone="object-first"
+    head={<>
+      <XaSystemTile kind="form" size={48} label="Internal tool" />
+      <XaHeadline quiet={`${businessName} reviews it before anyone uses it.`}>A new internal tool, from your code.</XaHeadline>
     </>}
-    object={<XaDecision label="The internal tool" status={<span className={styles.recordStatus}>New internal tool</span>} meta="Draft until you review it" yes={null}>
-      <form className={styles.form} onSubmit={submit} aria-label="Make an internal tool">
+    story={<XaNote>The build runs on its own machine with no internet. It writes one page, and that page is the tool. You&apos;re named as the person who keeps it working.</XaNote>}
+    object={<XaDecision label="The internal tool" status={<XaStatus kind="draft">Draft</XaStatus>} meta={`${businessName} · Internal tool`} yes={null}>
+      <form className={styles.form} onSubmit={event => { if (missing) { event.preventDefault(); setError(missing); return; } void submit(event); }} aria-label="Make an internal tool" noValidate>
         <XaField label="Name" value={title} onChange={event => setTitle(event.target.value)} required maxLength={160} disabled={busy} placeholder="Consultation planner" />
-        <XaTextArea label="Build file (build.mjs)" value={source} onChange={event => setSource(event.target.value)} required rows={10} disabled={busy} spellCheck={false}
-          hint="It must write the finished page to /output/index.html. The build has no internet." />
-        <div className={styles.fields}>
-          <XaField label="Most it may cost, in dollars" type="number" min="0" max="10000" step="0.01" value={maximum} onChange={event => setMaximum(event.target.value)} required disabled={busy} hint="The build stops before it costs more." />
-          <XaField label="What you expect it to cost" type="number" min="0" max="10000" step="0.01" value={estimate} onChange={event => setEstimate(event.target.value)} required disabled={busy} hint="Use 0 when your build reports no cost." />
-        </div>
+        <XaTextArea label="Build file" value={source} onChange={event => setSource(event.target.value)} required rows={10} disabled={busy} spellCheck={false}
+          hint="It writes the finished page to /output/index.html." />
+        <XaField label="Stop the build at, in dollars" type="number" min="0" max="10000" step="0.01" inputMode="decimal" value={maximum} onChange={event => setMaximum(event.target.value)} required disabled={busy} hint={costLine} />
+        {estimateOpen ? <XaField label="You expect about, in dollars" type="number" min="0" max="10000" step="0.01" inputMode="decimal" value={estimate} onChange={event => setEstimate(event.target.value)} disabled={busy} hint="Shown beside the build so you can compare." />
+          : <p className={styles.quietLine}><XaTextLink onClick={() => setEstimateOpen(true)}>Add what you expect it to cost</XaTextLink></p>}
         {error ? <XaNote tone="down" role="alert">{error}</XaNote> : null}
         <div className={styles.actions}>
-          <XaButton type="submit" variant="primary" size="lg" busy={busy} disabled={!title.trim() || !source.trim()}>Make the internal tool</XaButton>
+          <XaButton type="submit" variant="primary" size="lg" busy={busy}>Make the internal tool</XaButton>
+          {missing ? <span className={styles.reason}>{missing}</span> : null}
         </div>
       </form>
     </XaDecision>} />;
 }
+
+const dollars = (value: number) => `$${(value / 100).toFixed(2)}`;

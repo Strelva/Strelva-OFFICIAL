@@ -1,12 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { XaButton, XaEmpty, XaWorking } from "@/components/ui/strelva/Xa";
-import { XaNote, XaObjectPage } from "@/experience/xa-object/XaObjectPage";
+import { XaObjectPage } from "@/components/ui/strelva/Xa";
+import { AgencyToolDraft, type AgencyToolDraftContext } from "./AgencyToolDraft";
 import { StandaloneApplicationShell } from "./StandaloneApplicationShell";
-import styles from "./application-use.module.css";
 import { useWorkspaceRequest } from "@/experience/workspace/WorkspaceRequest";
-import { BoundedWorkExperience } from "@/experience/operations/BoundedWorkExperience";
 import { agencyApplicationDraftGrantSchema, type AgencyApplicationDraftGrant } from "@/platform/offerings/agency-application-draft-contracts";
 
 function message(body: unknown): string {
@@ -14,7 +13,12 @@ function message(body: unknown): string {
   return "Draft access could not be confirmed.";
 }
 
-export function AgencyApplicationDraftExperience({ workId }: { workId: string }) {
+/**
+ * The agency's internal tool draft. With `context` (read on the server) it
+ * sits inside the agency shell and names the client, owner and person; the
+ * outside frame is only for a page whose context couldn't be confirmed.
+ */
+export function AgencyApplicationDraftExperience({ workId, context }: { workId: string; context?: AgencyToolDraftContext | null }) {
   const request = useWorkspaceRequest();
   const [grant, setGrant] = useState<AgencyApplicationDraftGrant | null>(null);
   const [busy, setBusy] = useState(true);
@@ -46,14 +50,11 @@ export function AgencyApplicationDraftExperience({ workId }: { workId: string })
   }, [request, reload, workId]);
 
   const active = now !== null && grant?.status === "active" && Number.isFinite(Date.parse(grant.expiresAt)) && Date.parse(grant.expiresAt) > now;
-  const until = grant ? new Date(grant.expiresAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : null;
-  if (busy) return <StandaloneApplicationShell><XaObjectPage story={<XaWorking title="Opening the internal tool draft" steps={[{ id: "grant", label: "Checking the client's draft permission", state: "active" }]} />} /></StandaloneApplicationShell>;
-  return <StandaloneApplicationShell><div className={styles.work}>
-    {error ? <div role="alert"><XaEmpty pose="fixing" title="Your draft permission could not be read" job="Nothing was saved. The draft is as the client left it."
-      action={<XaButton variant="primary" size="lg" onClick={() => { setBusy(true); setError(""); setReload(value => value + 1); }}>Reload permission</XaButton>}>{error}</XaEmpty></div>
-      : active
-        ? <XaNote>You prepare; the client reviews and makes it live. Your draft editing lasts until {until} and covers only the internal tool named in the accepted work.</XaNote>
-        : <XaNote tone="waits">The client has not opened this draft to you, or the permission ended or was taken back. You can read the work; you can&apos;t save a draft.</XaNote>}
-    <BoundedWorkExperience workspaceId="assigned" workId={workId} productId="applications" standaloneApplication readOnly={!active} draftEditOnly={active} canEdit={active} sources={[]} onSaved={() => undefined} />
-  </div></StandaloneApplicationShell>;
+  const until = grant ? new Date(grant.expiresAt).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : null;
+  const frame = (node: ReactNode) => context ? node : <StandaloneApplicationShell>{node}</StandaloneApplicationShell>;
+  const shown: AgencyToolDraftContext = context ?? { businessName: "your client", ownerName: null, agencyName: "your agency", personName: "you" };
+  if (busy) return frame(<XaObjectPage story={<XaWorking title="Opening the draft" steps={[{ id: "grant", label: `Checking that ${shown.businessName} opened it to you`, state: "active" }]} />} />);
+  if (error) return frame(<XaObjectPage story={<div role="alert"><XaEmpty pose="fixing" title="Your permission for this draft couldn't be read" job={`Nothing was saved. The draft is as ${shown.businessName} left it.`}
+    action={<XaButton variant="primary" size="lg" onClick={() => { setBusy(true); setError(""); setReload(value => value + 1); }}>Try again</XaButton>}>{error}</XaEmpty></div>} />);
+  return frame(<AgencyToolDraft workId={workId} context={shown} canEdit={active} until={active ? until : null} />);
 }

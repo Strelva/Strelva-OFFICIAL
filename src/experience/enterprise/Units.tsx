@@ -8,9 +8,9 @@
  */
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import {
-  XaAnswers, XaButton, XaChoices, XaDecision, XaEmpty, XaField, XaHeadline, XaInitial, XaStatus, XaTextLink, XaWorking,
+  XaButton, XaChoices, XaDecision, XaEmpty, XaField, XaHeadline, XaSelect, XaStatus, XaTextLink, XaWorking,
 } from "@/components/ui/strelva/Xa";
-import { XaBlock, XaNote, XaObjectPage } from "@/experience/xa-object/XaObjectPage";
+import { XaBlock, XaNote, XaObjectPage } from "@/components/ui/strelva/Xa";
 import { unitVersionChoicesSchema, unitsViewSchema, type Unit, type UnitCommand, type UnitsView } from "@/platform/enterprise/contracts";
 import styles from "./units.module.css";
 
@@ -32,7 +32,7 @@ function UnitsLoader({ organizationId, businesses, canManage, request }: { organ
   useEffect(() => {
     const controller = new AbortController();
     void send(`/api/workspace/units?organizationId=${encodeURIComponent(organizationId)}`, { credentials: "same-origin", signal: controller.signal }).then(async response => {
-      const value: unknown = await response.json(); if (!response.ok) throw new Error("The locations could not be loaded. Your current organization and business memberships are required.");
+      const value: unknown = await response.json(); if (!response.ok) throw new Error("The locations couldn't be opened for your account.");
       const result = unitsViewSchema.parse(value); if (result.organizationId !== organizationId) throw new Error("The organization changed.");
       if (!controller.signal.aborted) { setView(result); setError(""); }
     }).catch(cause => { if (!controller.signal.aborted) setError(cause instanceof Error ? cause.message : "Locations are unavailable."); });
@@ -46,7 +46,7 @@ function UnitsLoader({ organizationId, businesses, canManage, request }: { organ
       const value: unknown = await response.json();
       if (!response.ok) throw new Error(value && typeof value === "object" && "error" in value && typeof value.error === "string" ? value.error : "The change could not be confirmed. Reload the locations before trying again.");
       command.current = null;
-      setNotice(input.action === "archive" ? "Archived. Its people, records and Versions are kept." : input.action === "bind_version" ? "Version attached. It grants no new access." : input.action === "put" && input.expectedRevision === 0 ? `${input.name} added.` : "Saved.");
+      setNotice(input.action === "archive" ? "Archived. Its people, records and Versions are kept." : input.action === "bind_version" ? "Version attached." : input.action === "put" && input.expectedRevision === 0 ? `${input.name} added.` : "Saved.");
       setAttempt(value => value + 1); setName(""); setMode("view"); setVersions(null); setVersionId(null);
     } catch (cause) { setError(cause instanceof Error ? cause.message : "The change could not be confirmed."); }
     finally { inflight.current = false; setPending(false); }
@@ -67,11 +67,11 @@ function UnitsLoader({ organizationId, businesses, canManage, request }: { organ
   const failure = error ? <div role="alert" className={styles.stack}>
     <XaNote tone="down">{error}</XaNote>
     <div className={styles.row}>
-      {command.current ? <XaButton variant="secondary" size="sm" disabled={pending} onClick={() => command.current && void change(command.current)}>Retry the same change</XaButton> : null}
-      <XaButton variant="quiet" size="sm" disabled={pending} onClick={() => { command.current = null; setAttempt(value => value + 1); }}>Reload the locations</XaButton>
+      {command.current ? <XaButton variant="secondary" size="sm" disabled={pending} onClick={() => command.current && void change(command.current)}>Send the same change again</XaButton> : null}
+      <XaButton variant="quiet" size="sm" disabled={pending} onClick={() => { command.current = null; setAttempt(value => value + 1); }}>Check again</XaButton>
     </div>
   </div> : null;
-  const notManager = !canManage ? <XaNote>Only an organization owner or administrator with current access to the business can change its locations.</XaNote> : null;
+  const notManager = !canManage ? <XaNote>You can look. The owner changes locations.</XaNote> : null;
 
   if (!view) return <XaObjectPage story={error
     ? <><XaEmpty pose="fixing" title="The locations couldn't be read" job="Nothing changed in any location.">{error}</XaEmpty>{failure}{notManager}</>
@@ -80,57 +80,55 @@ function UnitsLoader({ organizationId, businesses, canManage, request }: { organ
   const form = mode === "add" || mode === "edit" ? <form className={styles.stack} aria-label={mode === "edit" ? `Edit ${selected?.name ?? "location"}` : "Add a location"} onSubmit={event => { event.preventDefault(); if (!pending && businessId && name.trim()) void change({ action: "put", id: mode === "edit" && selected ? selected.id : crypto.randomUUID(), organizationId, businessId, parentId: parentId || null, name: name.trim(), kind, expectedRevision: mode === "edit" && selected ? selected.revision : 0 }); }}>
     {mode === "add" ? (managed.length > 1 ? <XaChoices label="Business that owns it" value={businessId} onChange={setBusinessId} options={managed.map(b => ({ value: b.id, label: b.name }))} /> : managed[0] ? <XaNote>Owned by {managed[0].name}</XaNote> : null) : <XaNote>Owned by {businessName(businessId ?? "")}</XaNote>}
     <XaField label="Name" value={name} maxLength={160} required disabled={pending} onChange={e => setName(e.target.value)} placeholder="Elmwood" />
-    <div className={styles.selectField}><label htmlFor="unit-kind">Kind</label><select id="unit-kind" value={kind} disabled={pending} onChange={e => setKind(e.target.value as Unit["kind"])}>{(Object.keys(KIND_WORD) as Unit["kind"][]).map(value => <option key={value} value={value}>{KIND_WORD[value]}</option>)}</select></div>
-    <div className={styles.selectField}><label htmlFor="unit-parent">Sits under</label><select id="unit-parent" value={parentId} disabled={pending} onChange={e => setParentId(e.target.value)}><option value="">The organization itself</option>{units.filter(u => u.id !== (mode === "edit" ? selected?.id : undefined) && u.status === "active" && managed.some(b => b.id === u.businessId)).map(u => <option key={u.id} value={u.id}>{u.name}</option>)}</select></div>
+    <XaSelect label="It's a" value={kind} disabled={pending} onChange={e => setKind(e.target.value as Unit["kind"])} options={(Object.keys(KIND_WORD) as Unit["kind"][]).map(value => ({ value, label: KIND_WORD[value].toLowerCase() }))} />
+    <XaSelect label="Under" value={parentId} disabled={pending} onChange={e => setParentId(e.target.value)} options={[{ value: "", label: "Nothing, it's at the top" }, ...units.filter(u => u.id !== (mode === "edit" ? selected?.id : undefined) && u.status === "active" && managed.some(b => b.id === u.businessId)).map(u => ({ value: u.id, label: u.name }))]} />
     <div className={styles.row}>
       <XaButton type="submit" variant="primary" size="lg" busy={pending} disabled={pending || Boolean(command.current) || !businessId || !name.trim()}>{mode === "edit" ? "Save location" : "Add location"}</XaButton>
-      <XaButton variant="quiet" size="lg" disabled={pending} onClick={() => setMode("view")}>Cancel</XaButton>
+      <XaTextLink onClick={() => setMode("view")}>Not now</XaTextLink>
     </div>
   </form> : null;
 
-  const object = !canManage && !selected ? null : form ? <XaDecision label={mode === "edit" ? "Edit a location" : "Add a location"} status={<XaStatus kind="draft">{mode === "edit" ? `Editing ${selected?.name}` : "New location"}</XaStatus>} meta="Structure grants no access" yes={null}>{form}</XaDecision>
+  const object = !canManage && !selected ? null : form ? <XaDecision label={mode === "edit" ? "Edit a location" : "Add a location"} status={<XaStatus kind="draft">{mode === "edit" ? `Editing ${selected?.name}` : "New location"}</XaStatus>} yes={null}>{form}</XaDecision>
     : selected ? <XaDecision label={selected.name} status={selected.status === "archived" ? <XaStatus kind="draft">Archived</XaStatus> : <span className={styles.objectTitle}>{selected.name}</span>}
       meta={KIND_WORD[selected.kind]} yes={null}>
-      <XaAnswers labelWidth={120} rows={[
-        ["Business", businessName(selected.businessId)],
-        ["Sits under", selected.parentId ? units.find(u => u.id === selected.parentId)?.name ?? "A location you can't open" : "The organization itself"],
-        ["Versions", selected.versionIds.length ? `${selected.versionIds.length} of this business's own` : "None attached"],
-      ]} />
+      <p className={styles.objectLine}>Part of {businessName(selected.businessId)}{selected.parentId ? `, under ${units.find(u => u.id === selected.parentId)?.name ?? "a location you can't open"}` : ""}. {selected.versionIds.length ? `Uses ${selected.versionIds.length} of its ${selected.versionIds.length === 1 ? "Version" : "Versions"}.` : "No Versions attached yet."}</p>
       {mode === "version" ? <div className={styles.stack}>
         {versions === null ? <XaWorking title="Reading this business's Versions" steps={[]} />
           : versions.filter(v => !v.assigned).length ? <XaChoices label="Attach one of this business's own Versions" value={versionId} onChange={setVersionId}
             options={versions.filter(v => !v.assigned).map(v => ({ value: v.id, label: v.name, detail: `${v.context} · from Release ${v.baselineRevision}` }))} />
             : <XaNote>This business has no other Versions to attach.</XaNote>}
-        <XaNote>Attaching changes structure only. It grants no source, account or customer access.</XaNote>
+        <XaNote>Attaching doesn&apos;t give anyone new access.</XaNote>
         <div className={styles.row}>
           <XaButton variant="secondary" disabled={pending || !versionId} busy={pending} onClick={() => versionId && void change({ action: "bind_version", organizationId, id: selected.id, versionId, expectedRevision: selected.revision })}>Attach this Version</XaButton>
-          <XaButton variant="quiet" disabled={pending} onClick={() => setMode("view")}>Cancel</XaButton>
+          <XaTextLink onClick={() => setMode("view")}>Not now</XaTextLink>
         </div>
-      </div> : canChange(selected) ? <div className={styles.row}>
-        <XaButton variant="secondary" size="sm" disabled={pending} onClick={() => startEdit(selected)}>Edit <span className="sr-only">{selected.name}</span></XaButton>
-        <XaButton variant="secondary" size="sm" disabled={pending} onClick={() => void chooseVersions(selected)}>Attach a Version</XaButton>
-        <XaButton variant="quiet" size="sm" disabled={pending} onClick={() => void change({ action: "archive", organizationId, id: selected.id, expectedRevision: selected.revision })}>Archive <span className="sr-only">{selected.name}</span></XaButton>
-      </div> : null}
+      </div> : canChange(selected) ? <p className={styles.links}>
+        <XaTextLink onClick={() => startEdit(selected)} aria-label={`Rename or move ${selected.name}`}>Rename or move</XaTextLink><span aria-hidden="true">·</span>
+        <XaTextLink onClick={() => void chooseVersions(selected)}>Attach a Version</XaTextLink><span aria-hidden="true">·</span>
+        <XaTextLink onClick={() => void change({ action: "archive", organizationId, id: selected.id, expectedRevision: selected.revision })} aria-label={`Archive ${selected.name}`}>Archive</XaTextLink>
+      </p> : null}
     </XaDecision> : null;
 
-  return <XaObjectPage label="Businesses and locations"
+  const parentBusiness = (unit: Unit) => units.find(item => item.id === unit.parentId)?.businessId;
+  // A row says only what differs: a kind other than location, its own business, archived, Versions.
+  const rowDetail = (unit: Unit) => [unit.kind !== "location" ? KIND_WORD[unit.kind] : null, unit.parentId && parentBusiness(unit) !== unit.businessId ? businessName(unit.businessId) : null].filter(Boolean).join(" · ");
+  const opened = mode !== "view" || selectedId !== null;
+  return <XaObjectPage label="Businesses and locations" phone="push" open={opened} backLabel="Every location" onBack={() => { setSelectedId(null); setMode("view"); }}
+    head={<XaHeadline quiet="Each keeps its own people, accounts and records.">{units.length ? `${units.length} ${units.length === 1 ? "place" : "places"}, one organization.` : "No locations yet."}</XaHeadline>}
     story={<>
-      <XaHeadline quiet="Each keeps its own people, accounts, records and Versions.">{units.length ? `${units.length} ${units.length === 1 ? "location" : "locations"}, one organization.` : "No locations yet."}</XaHeadline>
       {notice ? <XaNote role="status" tone="done">{notice}</XaNote> : null}
       {failure}
-      {canManage && mode === "view" ? <div><XaButton variant="primary" size="lg" disabled={pending || !managed.length} onClick={startAdd}>Add a location</XaButton></div> : null}
-      <XaBlock label="Every location">
-        {units.length ? <ul className={styles.tree} aria-label="Business and location tree">{units.map(unit => <li key={unit.id} style={{ "--depth": depth(unit) } as CSSProperties}>
-          <button type="button" className={styles.node} aria-pressed={selected?.id === unit.id && mode !== "add"} onClick={() => { setSelectedId(unit.id); setMode("view"); }}>
-            <XaInitial name={unit.name} size={26} color={unit.status === "archived" ? "#a3a69f" : undefined} />
-            <span className={styles.nodeText}><span className={styles.nodeName}>{unit.name}</span><span className={styles.nodeDetail}>{KIND_WORD[unit.kind]} · {businessName(unit.businessId)}</span></span>
+      <XaBlock label="Every location" action={canManage && mode === "view" && managed.length ? <XaButton variant="primary" size="sm" disabled={pending} onClick={startAdd}>Add a location</XaButton> : undefined}>
+        {units.length ? <ul className={styles.tree} aria-label="Businesses and locations">{units.map(unit => <li key={unit.id} style={{ "--depth": depth(unit) } as CSSProperties}>
+          <button type="button" className={styles.node} aria-pressed={selected?.id === unit.id && mode !== "add"} data-archived={unit.status === "archived" || undefined} onClick={() => { setSelectedId(unit.id); setMode("view"); }}>
+            <span className={styles.nodeText}><span className={styles.nodeName}>{unit.name}</span>{rowDetail(unit) ? <span className={styles.nodeDetail}>{rowDetail(unit)}</span> : null}</span>
             {unit.status === "archived" ? <span className={styles.nodeMeta}>Archived</span> : unit.versionIds.length ? <span className={styles.nodeMeta}>{unit.versionIds.length} {unit.versionIds.length === 1 ? "Version" : "Versions"}</span> : null}
           </button>
-        </li>)}</ul> : <XaNote>No locations yet. {canManage ? "Add a business or location to start the tree." : "An organization owner or administrator can add one."}</XaNote>}
-        <XaNote>{view.inaccessibleUnits ? `${view.inaccessibleUnits} ${view.inaccessibleUnits === 1 ? "location is" : "locations are"} unavailable to your account. Their names and records are left out.` : "You can see every location in this organization."} Structure grants no access.</XaNote>
+        </li>)}</ul> : <XaNote>No locations yet. {canManage ? "Add the first one." : "The owner adds them."}</XaNote>}
+        {view.inaccessibleUnits ? <XaNote>You can&apos;t see {view.inaccessibleUnits === 1 ? "one location" : `${view.inaccessibleUnits} locations`}. Ask the owner to add you.</XaNote> : null}
       </XaBlock>
       {notManager}
-      <p className={styles.quiet}><XaTextLink href={`/workspace/access-review?workspaceId=${encodeURIComponent(organizationId)}`}>Review People & access</XaTextLink></p>
+      <p className={styles.quiet}><XaTextLink href={`/workspace/access-review?workspaceId=${encodeURIComponent(organizationId)}`}>Who can open what</XaTextLink></p>
     </>}
     object={object ?? undefined} />;
 }

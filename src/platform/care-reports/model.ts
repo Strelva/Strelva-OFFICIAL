@@ -34,6 +34,28 @@ export const CARE_CHECK_LABEL: Record<CareCheck, string> = {
   not_checked: "Not checked on the live site",
 };
 
+/** Status as an exception: a checked change says nothing; the others say why in two words. */
+export function careCheckException(check: CareCheck): string | null {
+  return check === "confirmed" ? null : check === "not_confirmed" ? "Not confirmed" : "Not checked";
+}
+
+/**
+ * The site checks as one sentence, the way E3 says it: "harbordental.com
+ * passed all 30 checks." The exception, if any, follows in its own sentence.
+ */
+export function careSiteCheckSentence(siteChecks: CareReportFacts["siteChecks"], fallbackName: string): string {
+  const { hosted, latest } = siteChecks;
+  const host = latest[0]?.host ?? fallbackName;
+  const sentences: string[] = [];
+  if (hosted.checks > 0) {
+    sentences.push(hosted.healthy === hosted.checks
+      ? `${host} passed ${hosted.checks === 1 ? "its one check" : `all ${plural(hosted.checks, "check", "checks")}`}.`
+      : `${host} passed ${hosted.healthy.toLocaleString("en-US")} of ${plural(hosted.checks, "check", "checks")}.`);
+  }
+  for (const check of latest) if (check.state !== "up") sentences.push(`${check.host} ${STATE_PHRASE[check.state]} when last checked, ${shortDate(check.checkedAt)}.`);
+  return sentences.length ? sentences.join(" ") : "No site checks were recorded this month.";
+}
+
 export function careChangeTitle(item: { systemName: string; release: number }): string {
   return `${item.systemName} · ${releaseLabel(item.release)}`;
 }

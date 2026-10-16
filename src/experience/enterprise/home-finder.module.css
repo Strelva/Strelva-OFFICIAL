@@ -9,7 +9,7 @@
 /* The buyer's page, inside the setup page's object panel. */
 .pageSub { margin: -6px 0 6px; color: var(--st-text-2); font-size: 13px; }
 .fakeSearch { display: flex; align-items: center; gap: 8px; padding: 6px 6px 6px 16px; border: 1px solid var(--st-line); border-radius: 999px; color: var(--st-faint); font-size: 15px; }
-.fakeSearch span { flex: 1; }
+.fakeSearch span:first-child { flex: 1; }
 .fakeSearch b { padding: 9px 16px; border-radius: 999px; background: var(--st-action); color: var(--st-on-action); font-size: 14px; font-weight: 600; }
 .pageNote { margin: 4px 0 0; color: var(--st-text-2); font-size: 14px; line-height: 1.45; }
 
@@ -44,3 +44,13 @@
   .listing { grid-template-columns: minmax(0, 1fr); }
   .inquiry { padding: 18px 16px 20px; }
 }
+
+/* The buyer page is a picture: its button is drawn as an outline so the screen keeps one ink pill. */
+.fakeButton { flex: none; padding: 8px 16px; border: 1px solid var(--st-line-strong); border-radius: 999px; color: var(--st-text); font-size: 14px; font-weight: 500; }
+.listingButton { display: flex; width: 100%; flex-direction: column; align-items: stretch; padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; border-radius: 12px; }
+.listingButton:hover .address { text-decoration: underline; text-underline-offset: 3px; }
+.listingButton:focus-visible { outline: 2px solid var(--st-accent); outline-offset: 6px; }
+.listingButton:disabled { cursor: default; opacity: .7; }
+.listingMain > span { display: block; }
+.listingMain > .facts { display: flex; }
+.listing { grid-template-columns: minmax(0, 1fr); }

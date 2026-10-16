@@ -147,6 +147,6 @@ describe("agency v2 document drafts", () => {
     vi.stubGlobal("fetch",vi.fn(async()=>new Response(JSON.stringify({grant:initial.grant,state:{tenantId:"fixture",section:"hero",revision:0,data:{headline:"Legacy headline"},dataHash:"a".repeat(32)},customerWebsiteHref:null}))));
     await mount({read:async()=>({...initial,website:null}),save:vi.fn()});
     expect(container.querySelector<HTMLInputElement>('#managed-website-hero-headline')!.value).toBe("Legacy headline");
-    expect(container.textContent).toContain("Prepare and save draft");
+    expect(container.textContent).toContain("Send to");
   });
 });

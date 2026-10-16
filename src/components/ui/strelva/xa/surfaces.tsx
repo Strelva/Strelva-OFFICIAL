@@ -8,8 +8,8 @@
  * a confirmation. Lists are open rows with a hairline between, never cards.
  */
 import Link from "next/link";
-import { useEffect, useId, useRef, type CSSProperties, type ReactNode } from "react";
-import { Lock } from "lucide-react";
+import { useEffect, useId, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { ChevronRight, Lock } from "lucide-react";
 import { XaPebbleAvatar, XaPebbleScene, type XaPose } from "./characters";
 import styles from "./xa.module.css";
 
@@ -113,6 +113,28 @@ export function XaEmpty({ pose, job, title, children, action, secondary, size = 
     <p className={styles.emptyJob}><span className={styles.pulse} aria-hidden="true" />{job}</p>
     {action || secondary ? <div className={styles.emptyActions}>{action}{secondary}</div> : null}
   </section>;
+}
+
+/* ---------- Fold ---------- */
+
+/**
+ * More, folded away: a text control that says what it holds and opens it in
+ * place. Replaces the native <details> triangle. `open` opens it when it
+ * becomes true (a selected item that needs its form); the person can always
+ * close it again.
+ */
+export function XaFold({ summary, open = false, children, id }: { summary: ReactNode; open?: boolean; children: ReactNode; id?: string }) {
+  const generated = useId();
+  const panel = id ?? `${generated}-fold`;
+  const [shown, setShown] = useState(open);
+  const [was, setWas] = useState(open);
+  if (open !== was) { setWas(open); if (open) setShown(true); }
+  return <div className={styles.fold}>
+    <button type="button" className={styles.foldButton} aria-expanded={shown} aria-controls={panel} onClick={() => setShown(value => !value)}>
+      <ChevronRight size={16} aria-hidden="true" className={styles.foldChevron} />{summary}
+    </button>
+    <div id={panel} hidden={!shown} className={styles.foldBody}>{children}</div>
+  </div>;
 }
 
 /* ---------- Sheet ---------- */

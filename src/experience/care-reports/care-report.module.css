@@ -1,6 +1,6 @@
-/* A Care plan report (XA). The report is a Page: white, 24 radius, the small
-   shadow; it is the one object on the owner's and the shared page. */
-.report { box-sizing: border-box; display: flex; width: 100%; flex-direction: column; gap: 32px; padding: 40px 44px 36px; border-radius: var(--st-r-xl); background: var(--st-surface); box-shadow: var(--st-shadow-sm); color: var(--st-text); }
+/* A Care plan report (XA). A flat page on the paper: no card, no shadow. The
+   figure Pebble holds up is what the reader remembers. */
+.report { box-sizing: border-box; display: flex; width: 100%; flex-direction: column; gap: 32px; color: var(--st-text); }
 .report[data-flat="true"] { padding: 4px 0 0; border-radius: 0; background: none; box-shadow: none; }
 .back { margin-bottom: -8px; font-size: 14px; }
 .head { display: flex; flex-direction: column; gap: 18px; }
@@ -8,7 +8,9 @@
 .bylineName { color: var(--st-text); font-weight: 600; }
 .credit { color: var(--st-text-3); }
 .logo { width: 28px; height: 28px; border-radius: 8px; object-fit: contain; }
-.note { display: flex; align-items: flex-start; gap: 12px; }
+.note { display: flex; align-items: flex-start; gap: 12px; padding: 16px 0; border-block: 1px solid var(--st-line); }
+.noteFrom { font-weight: 600; }
+.figureRow { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 28px; }
 .note p { margin: 0; padding-top: 3px; color: var(--st-text); font-size: 16px; line-height: 1.5; white-space: pre-wrap; }
 .sub { display: block; margin-top: 2px; color: var(--st-text-3); font-size: 13px; line-height: 18px; }
 .sentence { margin: 0; color: var(--st-text); font-size: 15px; line-height: 1.5; }
@@ -31,10 +33,14 @@
 .releaseLine { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 14px; }
 
 @media (max-width: 767px) {
-  .report { gap: 26px; padding: 24px 18px 22px; border-radius: 20px; }
-  .column { padding: 16px 12px 120px; }
+  .report { gap: 26px; }
+  .column { padding: 20px 16px 120px; }
+  .figureRow { gap: 4px; }
 }
 @media print {
-  .report { padding: 0; box-shadow: none; }
   .column { padding: 0; }
 }
+.links { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; margin: 0; color: var(--st-text-3); font-size: 15px; }
+.shareYes { display: flex; flex-direction: column; gap: 8px; }
+.lineup { display: block; width: 220px; height: auto; }
+@media (max-width: 767px) { .lineup { width: 180px; } }

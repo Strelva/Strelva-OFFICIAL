@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { XaButton } from "@/components/ui/strelva/Xa";
-import { XaBlock } from "@/experience/xa-object/XaObjectPage";
+import { XaBlock } from "@/components/ui/strelva/Xa";
 import styles from "./delivery-panel.module.css";
 
 /** One line to copy and what it is for, with an honest result of the copy. */

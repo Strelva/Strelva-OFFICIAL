@@ -107,7 +107,7 @@ describe("workspace exit presentation", () => {
       onSaved: () => undefined,
     }));
 
-    expect(html).toContain("Work in this workspace has stopped. Existing records remain available for review.");
+    expect(html).toContain("Work in this business has stopped. What&#x27;s already here stays readable.");
     expect(html).not.toContain("Changes require workspace membership.");
   });
 });

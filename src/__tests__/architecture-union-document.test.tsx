@@ -50,7 +50,7 @@ async function fillTitle(node: HTMLElement, title: string) {
   });
 }
 async function saveDocument(node: HTMLElement) {
-  const button = [...node.querySelectorAll<HTMLButtonElement>("button")].find(item => item.textContent === "Save document");
+  const button = [...node.querySelectorAll<HTMLButtonElement>("button")].find(item => item.textContent === "Save the document");
   expect(button).toBeDefined();
   expect(button!.disabled).toBe(false);
   await act(async () => button!.click());
@@ -142,13 +142,13 @@ it("a departed real document POST cannot navigate a replacement at the same crea
   expect(new URLSearchParams(window.location.search).get("work")).toBe(REPLACEMENT_WORK);
   expect(new URLSearchParams(window.location.search).get("view")).toBe("document");
   expect(window.history.length).toBe(historyLength);
-  expect(node.querySelector('section[aria-label="Workspace document"] h1')?.textContent).toBe("Replacement fictional document");
+  expect(node.querySelector('section[aria-label="Workspace document"] h1')?.textContent?.startsWith("Replacement fictional document.")).toBe(true);
   // Saved documents open in reading mode; the retained edit control must
   // reopen this document's saved input rather than the departed draft.
   expect(node.querySelector('section[aria-label="Workspace document"] input')).toBeNull();
-  const edit = [...node.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "Edit document");
+  const edit = [...node.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "Edit");
   expect(edit).toBeDefined();
   await act(async () => edit!.click());
   expect(titleInput(node).value).toBe("Replacement fictional document");
-  expect([...node.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "Save document")?.disabled).toBe(true);
+  expect([...node.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "Save changes")?.disabled).toBe(true);
 });

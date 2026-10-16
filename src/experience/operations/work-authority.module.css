@@ -29,3 +29,4 @@
 .page { box-sizing: border-box; display: flex; width: 100%; max-width: 820px; flex-direction: column; gap: 24px; margin: 0 auto; padding: 56px 48px 24px; }
 .document { margin: 0; color: var(--st-text); font-size: 16px; line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; }
 @media (max-width: 767px) { .page { padding: 20px 16px 16px; } }
+.sheet { padding: 24px 0; border-block: 1px solid var(--st-line); }

@@ -9,7 +9,7 @@
 import { useId, useRef, useState } from "react";
 import { z } from "zod";
 import { XaButton, XaField, XaHeadline, XaStatus, XaTextArea, XaTextLink, XaWorking } from "@/components/ui/strelva/Xa";
-import { XaNote, XaOutside } from "@/experience/xa-object/XaObjectPage";
+import { XaNote, XaOutside } from "@/components/ui/strelva/Xa";
 import { homeFinderSearchResultSchema, type HomeFinderInquiry } from "@/products/home-finder/contracts";
 import type { HomeFinderDeliveryDetail } from "@/platform/customers/home-finder-port";
 import styles from "./home-finder.module.css";
@@ -33,11 +33,11 @@ function BuyerSearch({ bindingId, entryToken, brokerageName, request, mode }: Bu
   async function currentEntry() { const response = await request(`${endpoint}?renew=1`, { credentials: "omit", headers: { "x-home-finder-entry": token.current } }); const value = z.object({ token: z.string() }).parse(await response.json()); if (!response.ok) throw new Error("Reopen Home Finder on the brokerage website."); token.current = value.token; return value.token; }
   async function search() {
     if (busy) return; setBusy(true); setError("");
-    try { const response = await request(`${endpoint}?${new URLSearchParams({ q: query, limit: "20" })}`, { credentials: "omit", headers: { "x-home-finder-entry": await currentEntry() } }); const body: unknown = await response.json(); if (!response.ok) throw new Error("Licensed listings are currently unavailable. Your inquiry has not been started."); setResult(homeFinderSearchResultSchema.parse(body)); setSelected(null); }
+    try { const response = await request(`${endpoint}?${new URLSearchParams({ q: query, limit: "20" })}`, { credentials: "omit", headers: { "x-home-finder-entry": await currentEntry() } }); const body: unknown = await response.json(); if (!response.ok) throw new Error("The listings can't be read right now. Nothing was sent."); setResult(homeFinderSearchResultSchema.parse(body)); setSelected(null); }
     catch (cause) { setError(cause instanceof Error ? cause.message : "Search is unavailable."); } finally { setBusy(false); }
   }
   return <XaOutside from={brokerageName} mode={mode} meta="Home search" label={`${brokerageName} Home Finder`}>
-    <XaHeadline size="lg" quiet="Ask about any home and the brokerage answers you.">Find your home</XaHeadline>
+    <XaHeadline size="lg" quiet={`Choose a home to ask ${brokerageName} about it.`}>Find your home.</XaHeadline>
     <form className={styles.search} role="search" onSubmit={event => { event.preventDefault(); void search(); }}>
       <div className={styles.searchField}>
         <label htmlFor={searchId}>City, area or address</label>
@@ -48,19 +48,25 @@ function BuyerSearch({ bindingId, entryToken, brokerageName, request, mode }: Bu
     {error ? <div role="alert"><XaNote tone="down">{error}</XaNote></div> : null}
     {busy && !selected ? <XaWorking title="Reading current listings" steps={[{ id: "feed", label: `Asking ${brokerageName}'s listing feed`, state: "active" }]} /> : null}
     {result ? <section className={styles.results} aria-label="Homes">
-      <p className={styles.resultsHead}><span>{result.count.toLocaleString("en-US")} {result.count === 1 ? "home" : "homes"}</span><span>{result.source.name} · checked <time dateTime={result.sourceCheckedAt}>{new Date(result.sourceCheckedAt).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</time></span></p>
-      {result.listings.length ? <ul className={styles.listings} aria-label="Search results">{result.listings.map(listing => <li key={listing.id} className={styles.listing} data-selected={selected?.id === listing.id || undefined}>
-        <div className={styles.listingMain}>
-          <p className={styles.address}>{listing.address.line}</p>
-          <p className={styles.place}>{listing.address.city}, {listing.address.state} {listing.address.postalCode}</p>
-          <p className={styles.facts}><b>{price(listing.price)}</b><span>{listing.bedrooms ?? "Not listed"} beds</span><span>{listing.bathrooms ?? "Not listed"} baths</span>{listing.status !== "active" ? <XaStatus kind="waits" size="sm">{listing.status === "coming-soon" ? "Coming soon" : "Under contract"}</XaStatus> : null}</p>
-          {listing.publicRemarks ? <p className={styles.remarks}>{listing.publicRemarks}</p> : null}
-          <p className={styles.provenance}>Listing brokerage: {listing.listOfficeName ?? "Not supplied"} · Listing contact: {listing.listAgentName ?? "Not supplied"} · MLS source: {listing.sourceSystemName ?? result.source.name}</p>
-        </div>
-        {selected?.id === listing.id ? null : <XaButton variant="secondary" size="sm" disabled={Boolean(selected)} onClick={() => setSelected(listing)}>Ask about {listing.address.line}</XaButton>}
-        {selected?.id === listing.id ? <BuyerInquiry key={selected.id} bindingId={bindingId} brokerageName={brokerageName} listing={selected} currentEntry={currentEntry} request={request} onClose={() => setSelected(null)} /> : null}
-      </li>)}</ul> : <XaNote>No displayable homes match this search. Try a different city or area.</XaNote>}
-    </section> : !error && !busy ? <XaNote>Choose an area to see current, permitted listings.</XaNote> : null}
+      <p className={styles.resultsHead}><span>{result.count.toLocaleString("en-US")} {result.count === 1 ? "home" : "homes"}</span><span>From {result.source.name} · checked <time dateTime={result.sourceCheckedAt}>{new Date(result.sourceCheckedAt).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }).replace(":00", "")}</time></span></p>
+      {result.listings.length ? <ul className={styles.listings} aria-label="Search results">{result.listings.map(listing => {
+        const open = selected?.id === listing.id;
+        // Listed by another brokerage: say who, once, on that home. The searching brokerage is already on top.
+        const listedBy = listing.listOfficeName && listing.listOfficeName !== brokerageName ? `Listed by ${listing.listOfficeName}${listing.listAgentName ? `, ${listing.listAgentName}` : ""}` : null;
+        const body = <>
+          <span className={styles.address}>{listing.address.line}</span>
+          <span className={styles.place}>{listing.address.city}, {listing.address.state} {listing.address.postalCode}</span>
+          <span className={styles.facts}><b>{price(listing.price)}</b>{listing.bedrooms !== null && listing.bedrooms !== undefined ? <span>{listing.bedrooms} beds</span> : null}{listing.bathrooms !== null && listing.bathrooms !== undefined ? <span>{listing.bathrooms} baths</span> : null}{listing.status !== "active" ? <XaStatus kind="waits" size="sm">{listing.status === "coming-soon" ? "Not on the market yet" : "Under contract"}</XaStatus> : null}</span>
+          {listing.publicRemarks ? <span className={styles.remarks}>{listing.publicRemarks}</span> : null}
+          {listedBy ? <span className={styles.provenance}>{listedBy}</span> : null}
+        </>;
+        return <li key={listing.id} className={styles.listing} data-selected={open || undefined}>
+          {open ? <div className={styles.listingMain}>{body}</div>
+            : <button type="button" className={`${styles.listingMain} ${styles.listingButton}`} disabled={Boolean(selected)} onClick={() => setSelected(listing)} aria-label={`${listing.address.line}, ${price(listing.price)}. Ask ${brokerageName} about it`}>{body}</button>}
+          {open ? <BuyerInquiry key={listing.id} bindingId={bindingId} brokerageName={brokerageName} listing={listing} currentEntry={currentEntry} request={request} onClose={() => setSelected(null)} /> : null}
+        </li>;
+      })}</ul> : <XaNote>No homes match that. Try another city or area.</XaNote>}
+    </section> : !error && !busy ? <XaNote>Search an area to see homes for sale.</XaNote> : null}
   </XaOutside>;
 }
 
@@ -85,8 +91,8 @@ function BuyerInquiry({ bindingId, brokerageName, listing, onClose, currentEntry
     {error ? <div role="alert"><XaNote tone="down">{error}</XaNote></div> : null}
     {receipt ? <div className={styles.stack}>
       <div role="status"><XaStatus kind={state === "delivered" ? "live" : state === "failed" || state === "bounced" || state === "unavailable" ? "down" : "waits"}>{delivery ? DELIVERY_WORD[delivery.state] : receipt.message}</XaStatus></div>
-      <XaNote>Queued means it is on its way to {brokerageName}. Only verified delivery evidence confirms it arrived. Your reference is {receipt.reference}.</XaNote>
-      <div className={styles.row}><XaButton variant="secondary" size="sm" disabled={busy} busy={busy} onClick={() => void checkReceipt()}>Check delivery</XaButton><XaTextLink onClick={onClose}>Done</XaTextLink></div>
+      <XaNote>It&apos;s on its way to {brokerageName}. Your reference is {receipt.reference}.</XaNote>
+      <div className={styles.row}><XaButton variant="secondary" size="sm" disabled={busy} busy={busy} onClick={() => void checkReceipt()}>Did it arrive?</XaButton><XaTextLink onClick={onClose}>Done</XaTextLink></div>
     </div> : <form className={styles.stack} onSubmit={event => { event.preventDefault(); if (consent) void send(); }}>
       <div className={styles.grid}>
         <XaField label="Your name" required maxLength={120} value={name} disabled={locked} onChange={e => setName(e.target.value)} autoComplete="name" />

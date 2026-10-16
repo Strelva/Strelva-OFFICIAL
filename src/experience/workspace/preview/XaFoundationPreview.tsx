@@ -119,7 +119,7 @@ export function XaFoundationPreview({ screen: initialScreen, state, mode }: { sc
           <XaSystemTile kind="bookings" size={56} label="Bookings" />
           {yes === "undone" ? <XaHeadline quiet="Your booking page shows normal hours.">You took it back.</XaHeadline>
             : live ? <XaHeadline quiet="Strelva read the page back at 8:11.">Thanksgiving hours are live.</XaHeadline>
-              : <XaHeadline quiet="Your yes puts it live.">Maya at North Studio closed online booking for Thanksgiving.</XaHeadline>}
+              : <XaHeadline quiet="Your yes makes it live.">Maya at North Studio closed online booking for Thanksgiving.</XaHeadline>}
           <XaAnswers rows={[["Patients see", "No times on Thu and Fri, Nov 26 and 27."], ["Anything else", "Saturday stays 9 to 1. Nothing else moves."], ["Already booked", "No one is booked on those days."], ["Take it back", "One click, any time, from Minutes."]]} />
         </div>
         <XaDecision label="The change to your booking page" status={yes === "undone" ? <XaStatus kind="live">Back to normal hours</XaStatus> : live ? <XaStatus kind="live" breathe>Live · read back 8:11</XaStatus> : yes === "going" ? <XaStatus kind="working">Going live</XaStatus> : <XaStatus kind="waits">Waits for you</XaStatus>} meta="Prepared by Maya, yesterday 4:12 pm"

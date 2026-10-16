@@ -42,7 +42,7 @@ it("does not expose app lifecycle controls until the workspace accepts the saved
     form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
   });
   expect(onSaved).toHaveBeenCalledExactlyOnceWith(savedId);
-  expect(node.textContent).toContain("Saved. Opening your work before the next change.");
+  expect(node.textContent).toContain("Saved. Opening it now.");
   expect(node.textContent).not.toContain("Review and publish");
   expect(node.textContent).not.toContain("Check proposed change");
   expect(node.querySelector("a")?.getAttribute("href")).toContain(`work=${savedId}`);
@@ -85,5 +85,5 @@ it("does not offer application creation to a manager without maker authority", a
   const node = document.createElement("div"); document.body.append(node); root = createRoot(node);
   await act(async () => root!.render(createElement(BoundedWorkExperience, { workspaceId: "workspace-a", productId: "applications", initialRequest: "A team tool", canManage: true, canEdit: false, sources: [], onSaved: () => undefined })));
   expect(node.querySelector('form[aria-label="Internal tool setup"]')).toBeNull();
-  expect(node.textContent).toContain("Ask your agency to create or copy an internal tool.");
+  expect(node.textContent).toContain("Ask your agency for a new internal tool.");
 });

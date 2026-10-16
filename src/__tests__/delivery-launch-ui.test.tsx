@@ -23,12 +23,12 @@ afterEach(async()=>{await act(async()=>root.unmount());container.remove();sessio
 describe("agency and native entry interfaces",()=>{
  it("keeps an unsent draft before Asked",()=>{
   const steps=requestProgress({...saved,status:"draft",deliveryCommitment:null} as ServiceRequest);
-  expect(steps[0]).toMatchObject({state:"pending",detail:"Draft request. It has not been asked yet."});
+  expect(steps[0]).toMatchObject({state:"pending",detail:"Not sent yet."});
   expect(steps[0]!.time).toBeUndefined();
  });
  it("keeps a proposed scope before the agreed and in-progress stages",()=>{
   const steps=requestProgress(saved as ServiceRequest);
-  expect(steps.map(step=>step.title)).toEqual(["Asked","Scope and date agreed","In progress","Ready for review","Done"]);
+  expect(steps.map(step=>step.title)).toEqual(["Asked","Scope agreed","In progress","Ready to review","Done"]);
   expect(steps.map(step=>step.state)).toEqual(["done","active","pending","pending","pending"]);
   expect(steps[1]!.time).toBeUndefined();
  });
@@ -37,7 +37,8 @@ describe("agency and native entry interfaces",()=>{
   const steps=requestProgress(request);
   expect(steps.map(step=>step.state)).toEqual(["done","done","active","pending","pending"]);
   expect(steps[1]!.time).toBeTruthy();
-  expect(steps[1]!.detail).toContain("Original deadline:");
+  // The deadline is said once, beside the decision, not repeated on the step.
+  expect(steps[1]!.detail).toBeUndefined();
  });
  it("closes a request without inventing agreement or a start date",()=>{
   const steps=requestProgress({...saved,status:"withdrawn"} as ServiceRequest);
@@ -47,23 +48,23 @@ describe("agency and native entry interfaces",()=>{
 
  it("retains and replays exactly one unconfirmed delivery decision across remounts",async()=>{
   await render(createElement(DeliveryCommitmentPanel,{requestId}));await resolve(0,inspection());
-  expect(container.textContent).toContain("Quote 42");expect(container.querySelector('dl')?.textContent).toContain("Website delivery");expect(button("Propose 24-hour delivery")).toBeUndefined();
-  expect(button("Accept scope and start 24-hour delivery")).toBeDefined();
+  expect(container.textContent).toContain("Quote 42");expect(container.textContent).toContain("Tested review website");expect(container.querySelectorAll("[data-xa-primary]")).toHaveLength(1);
+  expect(button("Agree and start")).toBeDefined();
   // The one yes: ⌘↵ presses it from anywhere on the screen, exactly once.
   await act(async()=>document.dispatchEvent(new KeyboardEvent("keydown",{key:"Enter",metaKey:true,bubbles:true})));
   expect(calls).toHaveLength(2);
   const command=JSON.parse(String(calls[1]!.init?.body));expect(command).toMatchObject({requestId,expectedRevision:3,change:{kind:"agree"}});
   await resolve(1,{error:{message:"Response lost"}},503);
-  expect(container.textContent).toContain("previous command is not confirmed");
+  expect(container.textContent).toContain("Your last change wasn't confirmed");
   await render(null);await render(createElement(DeliveryCommitmentPanel,{requestId}));await resolve(2,inspection());
-  await act(async()=>button("Retry retained command").click());expect(JSON.parse(String(calls[3]!.init?.body))).toEqual(command);
+  await act(async()=>button("Send the same change again").click());expect(JSON.parse(String(calls[3]!.init?.body))).toEqual(command);
   await resolve(3,{error:{message:"Revision changed"}},409);
-  expect(container.textContent).toContain("Revision changed");expect(button("Retry retained command")).toBeUndefined();
+  expect(container.textContent).toContain("Revision changed");expect(button("Send the same change again")).toBeUndefined();
  });
  it("does not reveal old delivery content after access is revoked",async()=>{
   await render(createElement(DeliveryCommitmentPanel,{requestId}));await resolve(0,inspection());
-  await act(async()=>button("Refresh saved state").click());expect(container.textContent).not.toContain("Juniper website");
-  await resolve(1,{error:{message:"No longer authorized"}},403);expect(container.textContent).not.toContain("Quote 42");expect(button("Accept scope and start 24-hour delivery")).toBeUndefined();
+  await act(async()=>button("Check again").click());expect(container.textContent).not.toContain("Juniper website");
+  await resolve(1,{error:{message:"No longer authorized"}},403);expect(container.textContent).not.toContain("Quote 42");expect(button("Agree and start")).toBeUndefined();
  });
  it("does not render another request's late response",async()=>{
   await render(createElement(DeliveryCommitmentPanel,{requestId}));
@@ -73,7 +74,7 @@ describe("agency and native entry interfaces",()=>{
  });
  it("does not offer mutations to a read-only customer member",async()=>{
   await render(createElement(DeliveryCommitmentPanel,{requestId}));await resolve(0,inspection(false,false));
-  expect(button("Accept scope and start 24-hour delivery")).toBeUndefined();expect(button("Cancel this delivery")).toBeUndefined();expect(button("Propose 24-hour delivery")).toBeUndefined();
+  expect(button("Agree and start")).toBeUndefined();expect(button("Cancel this delivery")).toBeUndefined();expect(button("Propose 24-hour delivery")).toBeUndefined();
  });
  it("keeps queue scope changes isolated and source failure distinct from empty",async()=>{
   await render(createElement(ServiceDeliveryQueue,{scope:{businessId}}));await resolve(0,{requests:[saved]});expect(container.textContent).toContain("Juniper website");

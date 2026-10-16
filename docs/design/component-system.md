@@ -2593,17 +2593,21 @@ minutes inside Responsibility and availability, each with an id made once per
 entry so a retry is recorded once. Previews: `/preview/strelva/care-report` and
 `/preview/strelva/agency-care-reports`.
 
-## XA object pages (lane xs-apps-care, October 16, 2026)
+## XA object pages (in the kit since October 16, 2026)
 
-`src/experience/xa-object/XaObjectPage.tsx`: lane-level composition built only from `Xa*` kit parts. Candidates for the kit once a second lane needs them.
+`src/components/ui/strelva/xa/object.tsx`, exported from `@/components/ui/strelva/Xa`. Compositions built only from `Xa*` parts; promoted from lane xs-apps-care so other lanes don't fork the object layout.
 
 | Part | Use |
 |---|---|
-| `XaObjectPage story object wide objectFirstOnPhone` | XA-4/XA-6 split: what it is on the left, the one object (usually `XaDecision`) on the right, sticky on desktop, stacked on phone |
-| `XaOutside from color logoUrl credit meta mode width` | Paper frame for pages opened from a link (shared report, buyer search, delivery status, internal tool by link). Names who it is from, never Strelva Agency by default |
+| `XaObjectPage head story object wide phone open onBack` | XA-4/XA-6 split: `head` (crumbs and headline), the story on the left, the one object (usually `XaDecision`) on the right, sticky on desktop. Phone never stacks the desktop: `follow` (short story first), `object-first` (headline, then the object, then the rest), `push` (a list; the chosen row opens the object as a pushed page with a back link) |
+| `XaOutside from color logoUrl credit meta mode width` | Paper frame for pages opened from a link (shared report, buyer search, delivery status, internal tool by link). Names who it is from; an unknown agency stays neutral, never Strelva |
 | `XaCrumbs`, `XaBlock`, `XaNote` | Quiet path, sentence-case section label, a status sentence instead of a banner |
 | `XaFigure` | One figure that matters (E3). Never a row of them |
-| `XaChanges` | When, what, who acted (E3 "What changed") |
-| `XaSteps` | Order-page progress from recorded dates (delivery status, Request progress) |
+| `XaChanges` | When, what, who acted (E3 "What changed"); the right column carries only exceptions |
+| `XaSteps` | Order-page progress from recorded dates; only the current step shows its time |
 
-Screens using them: internal tool in use, custom internal tool (make and use), agency internal tool draft, agency website draft, Care plan report (agency, owner, shared link), Home Finder (brokerage and buyer), businesses and locations, delivery queue, one Request's delivery, website request status, contribution page. Previews: `/preview/strelva/xa/xs-apps-care/<screen>?state=…&mode=dark`; email at `/preview/strelva/xa/xs-apps-care/care-report-email`.
+Inputs added the same day: `XaSelect` (native select in the field skin; `compact` hides the label for in-row use), `XaFileDrop` (a drop target with Pebble in place of the bare file input), `XaFold` (a text disclosure in place of `<details>`).
+
+Screens using them: internal tool in use, custom internal tool (builder and the owner's request), agency internal tool draft (AG4), agency website draft, Care plan report (agency, owner, shared link, email), Home Finder (brokerage and buyer), businesses and locations, delivery queue, one Request's delivery, website request status, contribution page, Tracker, Documents, Work plan, saved checks and research. Previews: `/preview/strelva/xa/xs-apps-care/<screen>?state=…&mode=dark`; email at `/preview/strelva/xa/xs-apps-care/care-report-email` (`?format=text` for the text part).
+
+Not rebuilt: `AgencyWebsiteDocumentDraftExperience` (the v2 document editor behind the website rebuild release) keeps St kit internals; keep that release off for agency drafts until it is rebuilt.

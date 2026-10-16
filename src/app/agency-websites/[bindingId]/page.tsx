@@ -1,6 +1,6 @@
 import { StrelvaShell } from "@/experience/app-frame/StrelvaShell";
 import { XaEmpty } from "@/components/ui/strelva/Xa";
-import { XaCrumbs, XaOutside } from "@/experience/xa-object/XaObjectPage";
+import { XaCrumbs, XaOutside } from "@/components/ui/strelva/Xa";
 import styles from "@/experience/agency-website/agency-website.module.css";
 import { readAgencyWebsiteContext } from "@/platform/offerings/agency-website-context";
 import { AgencyWebsiteDocumentDraftExperience } from "@/experience/agency-website/AgencyWebsiteDocumentDraftExperience";
@@ -16,6 +16,11 @@ import { websiteRebuildReleaseEnabled, websiteRebuildReleaseEnabledForTenant, we
  * or `workspace` with the client's business row on. Unresolvable (signed out,
  * no grant, a failed read): the env-only rule decides, and the APIs behind
  * either experience still check the grant and the flag themselves.
+ *
+ * October 16 (XA): AgencyWebsiteDocumentDraftExperience still uses St kit
+ * internals and has not been rebuilt to the XA object layout. Keep the website
+ * rebuild release off for agency drafts until it is; the XA editor is
+ * AgencyManagedWebsiteDraftExperience below.
  */
 async function documentDraftReleased(bindingId: string): Promise<boolean> {
   if (!websiteRebuildReleaseMayBeOn()) return false;

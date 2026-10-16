@@ -32,34 +32,34 @@ const mount = async (transport: DocumentTransport, readOnly = true) => act(async
 describe("shared document history", () => {
   it("opens earlier pages in read-only mode without losing recent edits", async () => {
     const transport = api(); await mount(transport);
-    expect(container.textContent).toContain("You have read-only access.");
+    expect(container.textContent).toContain("You can read this. Members of the business make changes.");
     expect(container.textContent).toContain("Release 45:"); expect(container.textContent).not.toContain("Release 25:");
-    await act(async () => button("Load earlier changes").click());
+    await act(async () => button("Show earlier changes").click());
     expect(container.textContent).toContain("Release 25:"); expect(container.textContent).toContain("Release 6:");
     expect(transport.history).toHaveBeenCalledWith(workId, 26, expect.any(AbortSignal));
-    await act(async () => button("Load earlier changes").click());
-    expect(container.textContent).toContain("Release 1:"); expect(button("Load earlier changes")).toBeUndefined();
+    await act(async () => button("Show earlier changes").click());
+    expect(container.textContent).toContain("Release 1:"); expect(button("Show earlier changes")).toBeUndefined();
     expect(container.querySelectorAll("ol > li")).toHaveLength(45); expect(transport.write).not.toHaveBeenCalled();
   });
   it("keeps earlier-change controls absent and does no history reads with the flag off", async () => {
     const transport = api({ read: vi.fn(async () => ({ ...saved, historyEnabled: undefined })) });
     await mount(transport);
-    expect(button("Load earlier changes")).toBeUndefined(); expect(transport.history).not.toHaveBeenCalled();
+    expect(button("Show earlier changes")).toBeUndefined(); expect(transport.history).not.toHaveBeenCalled();
     expect(container.querySelectorAll("ol > li")).toHaveLength(20);
   });
   it("preserves the page and offers retry after history fails", async () => {
     const history = vi.fn().mockRejectedValueOnce(new Error("History unavailable"));
     history.mockResolvedValueOnce({ workId, workspaceId, receipts: receipts.slice(5, 25).reverse(), nextBeforeRevision: 6 });
     await mount(api({ history }));
-    await act(async () => button("Load earlier changes").click());
+    await act(async () => button("Show earlier changes").click());
     expect(container.querySelector("[role=alert]")?.textContent).toContain("History unavailable");
     expect(container.querySelectorAll("ol > li")).toHaveLength(20);
-    await act(async () => button("Retry earlier changes").click());
+    await act(async () => button("Try earlier changes again").click());
     expect(container.querySelectorAll("ol > li")).toHaveLength(40); expect(container.querySelector("[role=alert]")).toBeNull();
   });
   it("rejects another document's history response", async () => {
     await mount(api({ history: vi.fn(async () => ({ workId: workspaceId, workspaceId, receipts: [receipts[0]!], nextBeforeRevision: null })) }));
-    await act(async () => button("Load earlier changes").click());
+    await act(async () => button("Show earlier changes").click());
     expect(container.textContent).toContain("Document history could not be confirmed");
     expect(container.querySelectorAll("ol > li")).toHaveLength(20);
   });
@@ -68,9 +68,9 @@ describe("shared document history", () => {
     let signal!: AbortSignal;
     const history = vi.fn((_id: string, _before: number, currentSignal: AbortSignal) => { signal = currentSignal; return new Promise<DocumentHistoryPage>(resolve => { finish = resolve; }); });
     await mount(api({ history }));
-    await act(async () => button("Load earlier changes").click());
-    expect(container.textContent).toContain("Loading document history…");
-    expect(button("Loading earlier changes…").disabled).toBe(true);
+    await act(async () => button("Show earlier changes").click());
+    expect(container.textContent).toContain("Opening earlier changes");
+    expect(button("Show earlier changes")).toBeUndefined();
     await act(async () => root.render(createElement("p", null, "Another document")));
     expect(signal.aborted).toBe(true);
     await act(async () => finish({ workId, workspaceId, receipts: [receipts[0]!], nextBeforeRevision: null }));
@@ -80,6 +80,6 @@ describe("shared document history", () => {
     const transport = api({ read: vi.fn(async () => { throw new Error("This document is unavailable to your account."); }) });
     await mount(transport);
     expect(container.querySelector("[role=alert]")?.textContent).toContain("unavailable to your account");
-    expect(button("Load earlier changes")).toBeUndefined(); expect(transport.history).not.toHaveBeenCalled();
+    expect(button("Show earlier changes")).toBeUndefined(); expect(transport.history).not.toHaveBeenCalled();
   });
 });

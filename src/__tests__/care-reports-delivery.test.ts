@@ -17,6 +17,7 @@ function deps(patch: Partial<CareReportDeliveryDeps> = {}) {
     send: vi.fn(async () => ({ status: "accepted" as const, providerMessageId: "msg_1", acceptedAt: "2026-10-15T00:00:00Z" })),
     reserve: vi.fn(async () => ({ deliveryId: "d1", token: "t1" })),
     record: vi.fn(async () => ({ status: "accepted" as const })),
+    agencyIdentity: vi.fn(async () => ({ name: "North Studio" })),
     ...patch,
   };
   return value as typeof value & CareReportDeliveryDeps;
@@ -74,6 +75,25 @@ describe("Care plan report email", () => {
         provider: { businessWorkspaceId: BUSINESS, agencyWorkspaceId: AGENCY }, subject: "North Studio: Harbor Dental · October 2026 report",
       });
       expect(d.record).toHaveBeenCalledWith(actor, RELEASE, { deliveryId: "d1", token: "t1" }, "accepted", null, "msg_1");
+    });
+
+    it("names the agency as it is now, not as the snapshot froze it, and carries the agency's note", async () => {
+      const stale = { ...input, facts: { ...input.facts, agency: { ...input.facts.agency, name: "Old Studio Name" } }, agencyNote: "We moved the booking button above the fold." };
+      const d = deps({ agencyIdentity: vi.fn(async () => ({ name: "North Studio" })) });
+      await sendCareReportRelease(actor, stale, d);
+      const sent = (d.send as unknown as ReturnType<typeof vi.fn>).mock.calls[0]![0] as { subject: string; html: string; text: string };
+      expect(d.agencyIdentity).toHaveBeenCalledWith(AGENCY);
+      expect(sent.subject).toBe("North Studio: Harbor Dental · October 2026 report");
+      expect(sent.subject).not.toContain("Old Studio Name");
+      expect(sent.text).toContain("We moved the booking button above the fold.");
+      expect(sent.html).toContain("We moved the booking button above the fold.");
+    });
+
+    it("holds the send when the agency's name can't be read now", async () => {
+      const d = deps({ agencyIdentity: vi.fn(async () => null) });
+      await expect(sendCareReportRelease(actor, input, d)).resolves.toEqual({ status: "suppressed", reason: "agency_identity_unavailable" });
+      expect(d.reserve).not.toHaveBeenCalled();
+      expect(d.send).not.toHaveBeenCalled();
     });
 
     it("settles a provider hold with its reason", async () => {

@@ -38,8 +38,8 @@ export const STRELVA_HANDLED_LABEL = PLACE_LABELS.whatChanged;
  * October 15, 2026 (XA). Words the XA board uses for places and the yes. They
  * live here so a GLOSSARY decision is one edit: "Today" is the owner's and the
  * agency's Home, "Minutes" the dated record of what happened and what is kept
- * true, and the yes button reads "Put it live" (GLOSSARY still lists "Make it
- * live"; pending Jacob's call, see design-notes/XA-FOUNDATION.md).
+ * true, and the yes button reads "Make it live" (GLOSSARY; settled October 16 over the
+ * board's "Put it live", see design-notes/XA-FOUNDATION.md).
  */
 export const XA_PLACE_LABELS = {
   today: "Today", requests: PLACE_LABELS.requests, minutes: "Minutes", newRequest: "New request", search: "Search",
@@ -50,4 +50,4 @@ export const XA_PLACE_LABELS = {
   connections: "Connections", help: PLACE_LABELS.help, account: PLACE_LABELS.account, details: PLACE_LABELS.businessDetails, agencyDetails: "Agency details",
 } as const;
 
-export const XA_YES_LABELS = { yes: "Put it live", notYet: "Not yet", undo: "Undo", tryAgain: "Try again" } as const;
+export const XA_YES_LABELS = { yes: "Make it live", notYet: "Not yet", undo: "Undo", tryAgain: "Try again" } as const;
