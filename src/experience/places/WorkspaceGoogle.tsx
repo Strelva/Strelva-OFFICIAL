@@ -1,7 +1,9 @@
 import type { ReactNode } from "react";
 import { Lock } from "lucide-react";
 import { StSkeleton } from "@/components/ui/strelva/Kit";
-import { XaButton, XaButtonLink, XaEmpty, XaField, XaSays, XaStatus, XaSystemTile, XaTextArea, XaTextLink } from "@/components/ui/strelva/Xa";
+import { XaButton, XaButtonLink, XaField, XaSays, XaStatus, XaSystemTile, XaTextArea, XaTextLink } from "@/components/ui/strelva/Xa";
+import { Clay } from "@/experience/connections/Clay";
+import { googleChangeLines } from "@/experience/connections/owner-words";
 import type { PublishingState } from "@/experience/publishing/PublishingPage";
 import styles from "@/experience/connections/xa-connections.module.css";
 import { GoogleDrafts } from "./GoogleDrafts";
@@ -11,9 +13,11 @@ import type { readWorkspaceGoogle } from "@/products/google-listing/server";
 
 /**
  * The Google listing place (XA · S1 composition): the listing's head and its
- * one waiting decision on the left, what is connected and what Strelva may do
- * on the right. Every write is the existing server action; approval is the
- * one yes (XaYes) inside GoogleDrafts.
+ * one waiting decision on the left, what Strelva may do on the right. The
+ * frame stays the same when nothing is connected or the listing can't load,
+ * so the connect action or the bad news sits where the listing will be.
+ * Every write is the existing server action; approval is the one yes (XaYes)
+ * inside GoogleDrafts.
  */
 type Listings = Awaited<ReturnType<typeof readWorkspaceGoogle>>;
 type Listing = Listings[number];
@@ -32,28 +36,60 @@ const RECEIPT_STATE: Record<string, { kind: "waits" | "down" | "draft"; text: st
 };
 function approvedBy(authority: unknown): string {
   const kind = (authority as { kind?: string } | null)?.kind;
-  return kind === "owner_approval" ? "You approved it" : kind === "auto_reply_policy" ? "Your automatic reply setting sent it" : kind === "owner_undo" ? "You undid it" : kind === "operator_instruction" || kind === "operator_undo" ? "Strelva did it on your instruction" : "Who approved it was not recorded";
+  return kind === "owner_approval" ? "You approved it" : kind === "auto_reply_policy" ? "Your automatic reply setting sent it" : kind === "owner_undo" ? "You undid it" : kind === "operator_instruction" || kind === "operator_undo" ? "Strelva did it on your instruction" : "Sent before Strelva named who approved";
+}
+
+/** What Strelva may do on Google, and who decides. Platform rules, true before and after a listing connects. */
+function NeverWithoutYou({ paused }: { paused?: boolean }) {
+  return <>
+    <p className={styles.groupLabel}>Never, without you</p>
+    <ul className={styles.group} data-locked>
+      <li className={styles.groupRow}><Lock className={styles.lock} size={14} aria-hidden="true" /><span className={styles.groupText}><span className={styles.groupTitle}>Change hours, info or posts</span></span><span className={styles.groupEnd}>Your yes</span></li>
+      <li className={styles.groupRow}><Lock className={styles.lock} size={14} aria-hidden="true" /><span className={styles.groupText}><span className={styles.groupTitle}>Reply to reviews</span></span><span className={styles.groupEnd}>{paused ? "Paused" : "Your setting"}</span></li>
+    </ul>
+  </>;
 }
 
 export function WorkspaceGoogle({ workspaceId, state, result, action, reviewId, replyText, reviews, listingPreview, reviewRequest, connect }: { workspaceId: string; state: PublishingState<Listings>; result?: string; action: (form: FormData) => Promise<void>; reviewId?: string; replyText?: string; reviews?: PublishingState<SiteReviews[]>; listingPreview?: GoogleListingPreview; reviewRequest?: typeof fetch; connect?: ReactNode }) {
   const listings = state.kind === "ready" ? state.data : [];
   const said = result ? <p role="status" className={styles.result}>{result}</p> : null;
 
-  if (state.kind === "loading") return <div className={styles.place} data-single aria-busy="true">
+  if (state.kind === "loading") return <div className={styles.place} aria-busy="true">
     <div className={styles.main}><Head title="Google listing" meta={<span>Loading Google listing</span>} /><StSkeleton label="Loading Google listing" width="65%" /><StSkeleton width="90%" /></div>
+    <aside className={styles.side} aria-label="Google listing details"><NeverWithoutYou /></aside>
   </div>;
   if (state.kind === "permission") return <div className={styles.place} data-single><div className={styles.main}>
-    <XaEmpty pose="alone" size="sm" title="This belongs to another business." job="Strelva showed nothing from it" action={<XaButtonLink href="/workspace" variant="secondary">Open your workspace</XaButtonLink>}>Your account isn&apos;t a member of this business. Ask its owner to invite you.</XaEmpty>
+    <Head title="Google listing" meta={<span>Another business</span>} />
+    <div className={styles.object}>
+      <div className={styles.objectText}><h2 className={styles.objectTitle}>This belongs to another business.</h2><p className={styles.quiet}>Your account isn&apos;t a member of it, so Strelva showed nothing from it. Ask its owner to invite you.</p>
+        <div className={styles.objectActions}><XaButtonLink href="/workspace" variant="secondary">Open your workspace</XaButtonLink></div></div>
+      <Clay pose="alone" width={200} decorative />
+    </div>
   </div></div>;
-  if (state.kind === "error") return <div className={styles.place} data-single><div className={styles.main}>
-    <XaEmpty pose="fixing" size="sm" title="Google listing couldn't load." job="Your drafts and what changed are kept" action={<XaButtonLink href="" variant="secondary">Reload the page</XaButtonLink>}>Nothing changed on Google. Reload to try again.</XaEmpty>
-  </div></div>;
+  if (state.kind === "error") return <div className={styles.place}>
+    <div className={styles.main}>
+      <Head title="Google listing" meta={<XaStatus kind="down" size="sm">Couldn&apos;t load</XaStatus>} />
+      <div className={styles.object} role="alert">
+        <div className={styles.objectText}><p className={styles.objectLabel}>Google listing</p><h2 className={styles.objectTitle}>Your listing couldn&apos;t load.</h2>
+          <p className={styles.quiet}>Nothing changed on Google. Your drafts and what changed are kept; Pebble is checking the connection.</p>
+          <div className={styles.objectActions}><XaButtonLink href="" variant="secondary">Reload the page</XaButtonLink></div></div>
+        <Clay pose="fixing" width={240} label="Pebble checking the Google connection" />
+      </div>
+    </div>
+    <aside className={styles.side} aria-label="Google listing details"><NeverWithoutYou /></aside>
+  </div>;
 
-  if (!listings.length) return <div className={styles.place} data-single><div className={styles.main}>
-    <Head title="Google listing" meta={<XaStatus kind="draft" size="sm">Not connected</XaStatus>} />
-    {said}
-    {connect ?? <XaSays>No Google listing is connected here yet. The business owner connects it with their own Google account.</XaSays>}
-  </div></div>;
+  if (!listings.length) return <div className={styles.place}>
+    <div className={styles.main}>
+      <Head title="Google listing" meta={<XaStatus kind="draft" size="sm">Not connected</XaStatus>} />
+      {said}
+      {connect ?? <XaSays>No Google listing is connected here yet. The business owner connects it with their own Google account.</XaSays>}
+    </div>
+    <aside className={styles.side} aria-label="Google listing details">
+      <NeverWithoutYou />
+      <XaSays>Once it&apos;s connected, every change waits for your yes, except replies your automatic reply setting covers.</XaSays>
+    </aside>
+  </div>;
 
   return <>{listings.map(listing => {
     const blocked = listing.control.paused || !listing.connected || listing.control.accessPending;
@@ -111,8 +147,11 @@ export function WorkspaceGoogle({ workspaceId, state, result, action, reviewId, 
           <h2 id={`google-changed-${listing.locationId}`} className={styles.sectionTitle}>What changed on Google</h2>
           {listing.receipts.length ? <ul className={styles.group} aria-label="Google changes">{listing.receipts.map(receipt => {
             const exception = RECEIPT_STATE[receipt.status];
+            const changed = googleChangeLines(receipt.before, receipt.after);
             return <li key={receipt.id} id={`google-receipt-${receipt.id}`} className={styles.groupRow}>
-              <span className={styles.groupText}><span className={styles.groupTitle}>{receipt.headline}</span><span className={styles.groupDetail}>{approvedBy(receipt.authority)}{receipt.readback === "matched" ? " · Strelva read it back on Google" : receipt.readback === "differs" ? " · Google shows something different" : ""}</span></span>
+              <span className={styles.groupText}><span className={styles.groupTitle}>{receipt.headline}</span>
+                {changed.map(line => <span key={line} className={styles.changeLine}>{line}</span>)}
+                <span className={styles.groupDetail}>{approvedBy(receipt.authority)}{receipt.readback === "matched" ? " · it shows on Google" : receipt.readback === "differs" ? " · Google shows something different" : ""}</span></span>
               <span className={styles.groupEnd}>{exception ? <XaStatus kind={exception.kind} size="sm">{exception.text}</XaStatus> : null}
                 {receipt.undo && listing.canManage ? <form action={action}><Context workspaceId={workspaceId} listing={listing} /><input type="hidden" name="receiptId" value={receipt.id} /><button type="submit" className={styles.textButton} name="action" value="undo" disabled={blocked}>Undo</button></form> : null}</span>
             </li>;
@@ -121,17 +160,10 @@ export function WorkspaceGoogle({ workspaceId, state, result, action, reviewId, 
       </div>
 
       <aside className={styles.side} aria-label="Google listing details">
-        <p className={styles.groupLabel}>Connected</p>
-        <ul className={styles.group}>
-          <li className={styles.groupRow}><span className={styles.groupText}><span className={styles.groupTitle}>Google account</span><span className={styles.groupDetail}>{!listing.connected ? "Disconnected. Your drafts and what changed stay here." : listing.control.accessPending ? "Saved. Google hasn't opened its listing tools to Strelva yet; an owner approves again when it does." : "Your business"}</span></span></li>
-          {listingPreview ? <li className={styles.groupRow}><span className={styles.groupText}><span className={styles.groupTitle}>Hours on Google</span><span className={styles.groupDetail} data-tone="waits">{listingPreview.googleHours}</span><span className={styles.groupDetail}>Your record says {listingPreview.recordHours}</span></span></li> : null}
-        </ul>
+        {blocked && blockedReason ? <XaSays>{blockedReason}</XaSays> : null}
+        {listingPreview ? <ul className={styles.group}><li className={styles.groupRow}><span className={styles.groupText}><span className={styles.groupTitle}>Hours on Google</span><span className={styles.groupDetail} data-tone="waits">{listingPreview.googleHours}</span><span className={styles.groupDetail}>Your record says {listingPreview.recordHours}</span></span></li></ul> : null}
         {listingPreview && listing.canManage ? <form action={action}><Context workspaceId={workspaceId} listing={listing} /><XaButton size="sm" block type="submit" name="action" value="hours" disabled={blocked}>{listingPreview.fixLabel}</XaButton></form> : null}
-        <p className={styles.groupLabel}>Never, without you</p>
-        <ul className={styles.group} data-locked>
-          <li className={styles.groupRow}><Lock className={styles.lock} size={14} aria-hidden="true" /><span className={styles.groupText}><span className={styles.groupTitle}>Change hours, info or posts</span></span><span className={styles.groupEnd}>Your yes</span></li>
-          <li className={styles.groupRow}><Lock className={styles.lock} size={14} aria-hidden="true" /><span className={styles.groupText}><span className={styles.groupTitle}>Reply to reviews</span></span><span className={styles.groupEnd}>{listing.control.paused ? "Paused" : "Your setting"}</span></li>
-        </ul>
+        <NeverWithoutYou paused={listing.control.paused} />
         {listing.canManage ? <form id={`google-pause-${listing.locationId}`} action={action} hidden><Context workspaceId={workspaceId} listing={listing} /></form> : null}
         {listing.canManage ? <XaSays links={[<button key="pause" type="submit" form={`google-pause-${listing.locationId}`} className={styles.textButton} name="action" value={listing.control.paused ? "resume" : "pause"}>{listing.control.paused ? "Resume Google listing" : "Pause Google listing"}</button>]}>
           {listing.control.paused ? "Paused. Reviews still sync; I stop drafting replies and changing Google." : "Every change waits for your yes, except replies your automatic reply setting covers."}

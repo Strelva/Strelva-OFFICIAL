@@ -1,12 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { StSkeleton } from "@/components/ui/strelva/Kit";
 import { XaButton, XaSays, XaStatus, XaTextLink, XaWorking } from "@/components/ui/strelva/Xa";
 import { CopyButton } from "@/experience/connections/CopyButton";
 import styles from "@/experience/connections/xa-connections.module.css";
 import type { ForwardingView } from "@/products/inquiry-forwarding/contracts";
-import { FORWARDING_HOSTS, hostSteps, type ForwardingHostId } from "@/products/inquiry-forwarding/contracts";
+import { FORWARDING_HOSTS, type ForwardingHostId } from "@/products/inquiry-forwarding/contracts";
 import { whenLabel } from "./WorkspacePlace";
 
 /**
@@ -33,6 +33,15 @@ function arrivedLabel(view: ForwardingView): string {
   if (!latest) return "Nothing has arrived yet.";
   const held = latest.intakeState === "held_as_spam" ? " It looked like spam, so it's held for you below." : "";
   return `Last arrived ${whenLabel(latest.capturedAt, true)}: ${latest.name}${latest.subject ? `, “${latest.subject}”` : ""}.${held}`;
+}
+
+/**
+ * A host step with "{address}" read as "your forwarding address (Copy)": the
+ * full address shows once, above; each step points back to it with a copy.
+ */
+function stepWords(step: string, email: string): ReactNode {
+  const parts = step.split("{address}");
+  return parts.map((part, index) => <Fragment key={index}>{part}{index < parts.length - 1 ? <>your forwarding <span className={styles.nowrap}>address (<CopyButton value={email} label="your forwarding address" variant="text" inline />)</span></> : null}</Fragment>);
 }
 
 /** `fixture` (preview only) renders a fixed state and makes no requests. */
@@ -136,8 +145,16 @@ export function ForwardInquiries({ workspaceId, fixture }: { workspaceId: string
       <div className={styles.section}>
         <label className={styles.fieldLabel}>Where your email is<select className={styles.select} value={host} onChange={event => setHost(event.target.value as ForwardingHostId)}>{FORWARDING_HOSTS.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}</select></label>
         <p className={styles.quiet}>{guide.summary}</p>
-        <ol className={styles.steps}>{hostSteps(guide, email).map(step => <li key={step} className={styles.step}><span>{step}</span></li>)}</ol>
-        {guide.notes.length ? <ul className={styles.plainList}>{guide.notes.map(note => <li key={note} className={styles.small}>{note}</li>)}</ul> : null}
+        {added ? <details className={styles.disclosure}>
+          <summary>Show the steps</summary>
+          <div className={styles.disclosureBody}>
+            <ol className={styles.steps}>{guide.steps.map(step => <li key={step} className={styles.step}><span>{stepWords(step, email)}</span></li>)}</ol>
+            {guide.notes.length ? <ul className={styles.plainList}>{guide.notes.map(note => <li key={note} className={styles.small}>{note}</li>)}</ul> : null}
+          </div>
+        </details> : <>
+          <ol className={styles.steps}>{guide.steps.map(step => <li key={step} className={styles.step}><span>{stepWords(step, email)}</span></li>)}</ol>
+          {guide.notes.length ? <ul className={styles.plainList}>{guide.notes.map(note => <li key={note} className={styles.small}>{note}</li>)}</ul> : null}
+        </>}
         {waitingOnGmail && !view.address.providerConfirmation ? <p className={styles.small}>After you add the address in Gmail, choose I added it in Gmail and the confirmation code shows here.</p> : null}
       </div>
       {polling ? <XaWorking title={waitingOnGmail ? "Watching for Gmail's confirmation" : "Watching for your test"} steps={[{ id: "watch", label: "Checking every few seconds for 10 minutes", state: "active" }]} />

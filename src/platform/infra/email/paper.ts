@@ -50,7 +50,7 @@ function actions(items: readonly PaperAction[], full = false): string {
     const primary = a.style === "primary";
     const quiet = a.style === "text";
     const date = a.style === "date";
-    const bg = primary ? t.accent : quiet ? "transparent" : date ? t.surface : t.inset;
+    const bg = primary ? t.text : quiet ? "transparent" : date ? t.surface : t.inset;
     return `<td ${full ? `width="${100 / items.length}%"` : ""} style="${i ? "padding-left:10px;" : ""}vertical-align:middle;">${table(`<tr><td align="center" bgcolor="${bg}" style="background:${bg};border-radius:${date ? "8px" : "999px"};${date ? `border:1px solid ${t.line};` : ""}"><a href="${url(a.url)}" style="display:block;padding:${quiet ? "8px 4px" : "12px 16px"};font-size:${quiet ? "14px" : "15px"};line-height:24px;font-weight:${quiet ? "400" : "600"};color:${primary ? t.onAccent : quiet ? t.muted : t.text};text-decoration:none;border-radius:999px;">${e(a.label)}</a></td></tr>`, "", full ? "100%" : "")}</td>`;
   }).join("")}</tr>`, "", full ? "100%" : "");
 }
@@ -82,7 +82,7 @@ export function renderPaperEmailBody(email: PaperEmail): string {
 }
 
 export function renderPaperEmailHtml(email: PaperEmail): string {
-  return `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light"><title>${e(email.subject)}</title></head><body style="margin:0;padding:0;background:${email.white ? t.surface : t.canvas};">${email.preheader ? `<div style="display:none;max-height:0;overflow:hidden;">${e(email.preheader)}</div>` : ""}${renderPaperEmailBody(email)}</body></html>`;
+  return `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600&display=swap" rel="stylesheet"><title>${e(email.subject)}</title></head><body style="margin:0;padding:0;background:${email.white ? t.surface : t.canvas};">${email.preheader ? `<div style="display:none;max-height:0;overflow:hidden;">${e(email.preheader)}</div>` : ""}${renderPaperEmailBody(email)}</body></html>`;
 }
 
 export function renderPaperEmailText(email: PaperEmail): string {

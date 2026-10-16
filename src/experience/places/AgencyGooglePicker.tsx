@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import { z } from "zod";
+import { Lock } from "lucide-react";
 import { XaButton, XaHeadline, XaSays, XaTextLink } from "@/components/ui/strelva/Xa";
 import type { GoogleConnectChoice } from "./GoogleConnect";
 import styles from "@/experience/connections/xa-connections.module.css";
@@ -51,10 +52,16 @@ export function AgencyGooglePicker({ workspaceId, choices, result, request = fet
   const notice = failure === "signin" ? "Sign in again before connecting Google. Nothing was connected." : failure ? messages[failure] : result ? messages[result] : null;
   const showing = Boolean(choices && !closed);
   return <div className={styles.section}>
-    <XaHeadline quiet={showing ? "Google asks you to confirm access once more. Nothing on the listing changes." : "Nothing on the listing changed."}>{showing ? "Choose this business’s listing." : "This Google sign-in stopped."}</XaHeadline>
+    <XaHeadline quiet={showing ? "Nothing on the listing changes." : "Nothing on the listing changed."}>{showing ? "Choose this business’s listing." : "This Google sign-in stopped."}</XaHeadline>
     {notice ? <div role="alert"><XaSays>{notice}</XaSays></div> : null}
     {choices && !closed ? <section className={styles.section} aria-labelledby="agency-google-listings">
-      <div className={styles.sectionHead}><h2 id="agency-google-listings" className={styles.groupLabel}>Listings your agency’s Google account manages</h2><span className={styles.sectionMeta}>{choices.googleEmail}</span></div>
+      <div className={styles.phoneOnly}>
+        <ul className={styles.lines} aria-label="How a Google connection works in Strelva">
+          <li className={styles.line}><span className={styles.lineText}>Strelva reads the listing with the account you choose.</span></li>
+          <li className={styles.line}><Lock size={14} aria-hidden="true" /><span className={styles.lineText}>Anything that changes on Google</span><span className={styles.lineEnd}>The owner’s yes</span></li>
+        </ul>
+      </div>
+      <div className={styles.sectionHead}><h2 id="agency-google-listings" className={styles.groupLabel}>Listings your agency’s Google account manages</h2><span className={styles.sectionMeta}>{choices.googleEmail} · Google asks you to confirm once more</span></div>
       <ul className={styles.group} aria-label="Listings managed by your agency’s Google account">{choices.listings.map(listing => {
         const key = `${listing.accountId}/${listing.locationId}`;
         return <li key={key} className={styles.groupRow}>
@@ -62,7 +69,7 @@ export function AgencyGooglePicker({ workspaceId, choices, result, request = fet
           <span className={styles.groupEnd}><XaButton size="sm" disabled={busy !== null} busy={busy === key} onClick={() => void choose(listing)} aria-label={`Connect ${listing.title}`}>Connect this listing</XaButton></span>
         </li>;
       })}</ul>
-      {choices.more ? <p className={styles.small}>Only the first {choices.listings.length} listings are shown. Use another account if this business is missing.</p> : null}
+      <p className={styles.small}>No message is sent to the owner.{choices.more ? ` Only the first ${choices.listings.length} listings are shown; use another account if this business is missing.` : ""}</p>
     </section> : null}
     <div className={styles.actions}>
       {result !== "forbidden" && failure !== "forbidden" && failure !== "signin" ? <XaTextLink href={restart}>{choices && !closed ? "Use a different Google account" : "Find your agency’s listings again"}</XaTextLink> : null}

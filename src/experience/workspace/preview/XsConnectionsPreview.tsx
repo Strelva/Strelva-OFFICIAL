@@ -75,14 +75,21 @@ const PREVIEW_FACTS: NonNullable<GoogleConnectProps["foundFacts"]> = [
   { id: "f-cat", key: "categories", value: ["Dentist", "Pediatric dentist"], foundAt: "2026-10-15T08:02:00Z" },
 ];
 
+/** Google's regularHours shape: Mon to Fri from `opens` to 5, Sat 9 to 1. */
+const HOURS = (opens: number) => ({ regularHours: { periods: [
+  ...["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY"].map(day => ({ openDay: day, openTime: { hours: opens }, closeDay: day, closeTime: { hours: 17 } })),
+  { openDay: "SATURDAY", openTime: { hours: 9 }, closeDay: "SATURDAY", closeTime: { hours: 13 } },
+] } });
+
 function GooglePreview({ state, mode }: { state: string; mode: "light" | "dark" }) {
   const [drafts, setDrafts] = useState(state === "waiting" || state === "pending" || state === "disconnected" ? [
     { id: "draft-thanksgiving", title: "Thanksgiving hours", body: "Closed Thursday and Friday, Nov 26 and 27. Back Saturday, Nov 28, 9 to 1." },
-    { id: "draft-info", title: "Business info", body: "Phone (716) 555-0142 · harbordental.com · Family dentistry on Elmwood, cleanings to crowns." },
+    // The real projection's shape: the event title and Google's own JSON body.
+    { id: "draft-info", title: "Review your Google info", body: JSON.stringify({ phoneNumbers: { primaryPhone: "(716) 555-0142" }, websiteUri: "https://harbordental.com", profile: { description: "Family dentistry on Elmwood, cleanings to crowns." } }, null, 2) },
   ] : []);
   const [receipts, setReceipts] = useState<Receipt[]>([
-    { id: "r-halloween", headline: "Halloween hours went live", before: null, after: null, authority: { kind: "owner_approval", actor: "owner" }, readback: "matched", status: "posted", undo: true },
-    { id: "r-tom", headline: "Replied to Tom B.'s review", before: null, after: null, authority: { kind: "auto_reply_policy", rating: 5 }, readback: "matched", status: "posted", undo: false },
+    { id: "r-halloween", headline: "Strelva updated your hours on Google.", before: HOURS(9), after: HOURS(8), authority: { kind: "owner_approval", actor: "owner" }, readback: "matched", status: "posted", undo: true },
+    { id: "r-tom", headline: "Strelva replied to Tom B.'s review on Google.", before: { reply: null }, after: { reply: "Thank you, Tom. We appreciate you." }, authority: { kind: "auto_reply_policy", rating: 5 }, readback: "matched", status: "posted", undo: false },
   ]);
   const [result, setResult] = useState("");
   const action = useCallback(async (form: FormData) => {
@@ -92,7 +99,7 @@ function GooglePreview({ state, mode }: { state: string; mode: "light" | "dark" 
       const id = String(form.get("eventId"));
       const draft = drafts.find(item => item.id === id);
       setDrafts(list => list.filter(item => item.id !== id));
-      if (kind === "approve" && draft) setReceipts(list => [{ id: `r-${id}`, headline: `${draft.title} went live`, before: null, after: null, authority: { kind: "owner_approval", actor: "owner" }, readback: "matched", status: "posted", undo: true } satisfies Receipt, ...list]);
+      if (kind === "approve" && draft) setReceipts(list => [{ id: `r-${id}`, headline: "Strelva updated your listing on Google.", before: null, after: draft.body.startsWith("{") ? JSON.parse(draft.body) as Record<string, unknown> : { summary: draft.body }, authority: { kind: "owner_approval", actor: "owner" }, readback: "matched", status: "posted", undo: true } satisfies Receipt, ...list]);
       setResult(kind === "approve" ? "Google accepted the change. It's under What changed." : "Declined. Nothing was sent.");
     } else if (kind === "undo") { setReceipts(list => list.map(item => item.id === form.get("receiptId") ? { ...item, status: "undone", undo: false, headline: `${item.headline}, then undone` } : item)); setResult("Undone on Google. Your listing shows what it had before."); }
     else setResult(kind === "hours" || kind === "info" || kind === "post" ? "Draft kept. Review the exact change before approving." : "Preview: recorded locally. Nothing changed on Google.");
@@ -173,8 +180,9 @@ function DomainPreview({ state, mode }: { state: string; mode: "light" | "dark" 
         <header className={xs.head}><XaSystemTile kind="website" size={56} /><div className={xs.headText}><h1 className={xs.headTitle}>harbordental.com</h1><p className={xs.headMeta}>Your website · Release 12</p></div></header>
         {state === "request" ? <section className={xs.section} aria-labelledby="request-heading"><h2 id="request-heading" className={xs.sectionTitle}>A domain for Harbor Dental</h2>
           <WebsiteDomainRequest workId="5e000000-0000-4000-8000-0000000000aa" workspaceId={WS} request={requestFixture} /></section>
-          : <WebsiteDomainPanel publishedUrl="https://harbor-dental.strelva.site/" readBack="verified" domain={domain}>
-            <WebsiteDomainForm value={value} onChange={setValue} hasDomain={Boolean(domain)} busy={busy} disabled={busy} onSubmit={() => { setBusy(true); window.setTimeout(() => { setBusy(false); setDomain(domain ? { ...domain, checkedAt: new Date().toISOString() } : { ...DOMAIN_PENDING, hostname: value.trim() || "harbordental.com" }); setValue(""); }, 800); }} />
+          : <WebsiteDomainPanel publishedUrl="https://harbor-dental.strelva.site/" readBack="verified" domain={domain}
+            manage={domain ? { busy, disabled: busy, onCheck: () => { setBusy(true); window.setTimeout(() => { setBusy(false); setDomain(current => current ? { ...current, checkedAt: new Date().toISOString() } : current); }, 800); } } : undefined}
+            form={<WebsiteDomainForm value={value} onChange={setValue} hasDomain={Boolean(domain)} busy={busy} disabled={busy} onSubmit={() => { setBusy(true); window.setTimeout(() => { setBusy(false); setDomain({ ...DOMAIN_PENDING, hostname: value.trim() || "harbordental.com", checkedAt: null }); setValue(""); }, 800); }} />}>
           </WebsiteDomainPanel>}
       </div>
     </div>

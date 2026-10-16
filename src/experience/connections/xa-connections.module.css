@@ -38,6 +38,7 @@
 .figure { font-variant-numeric: tabular-nums; }
 .actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
 .inline { display: inline; }
+.nowrap { white-space: nowrap; }
 .result { margin: 0; color: var(--st-text); font-size: 15px; line-height: 22px; }
 
 /* ---------- The white group (R4 "They can") ---------- */
@@ -96,10 +97,64 @@ a.addressValue:focus-visible { border-radius: 4px; outline: 2px solid var(--st-a
 .recordCell small { color: var(--st-text-3); font-size: 12px; line-height: 16px; }
 .recordCell span { color: var(--st-text); font-size: 15px; line-height: 21px; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 
+/* ---------- Clay standing free (C2): no disc, a floor shadow under the feet ---------- */
+.clay { position: relative; display: block; flex-shrink: 0; width: var(--clay, 280px); aspect-ratio: 704 / 384; }
+.clay img { position: relative; z-index: 1; display: block; width: 100%; height: 100%; object-fit: contain; }
+.clay::after { position: absolute; left: 24%; top: 80%; width: 52%; height: 7%; border-radius: 50%; background: radial-gradient(closest-side, #16171522, #16171500); content: ""; }
+@media (prefers-reduced-motion: no-preference) { .clay img { animation: xsSettle var(--motion-slow) var(--ease-settle) both; } }
+@keyframes xsSettle { from { opacity: 0; translate: 0 4px; } to { opacity: 1; translate: 0 0; } }
+
+/* ---------- Plain lines on the felt or the page: lock, sentence, who decides ---------- */
+.lines { display: flex; width: min(420px, 100%); flex-direction: column; margin: 0; padding: 0; list-style: none; }
+.line { position: relative; display: flex; min-width: 0; align-items: baseline; gap: 12px; padding: 12px 0; color: var(--st-text); font-size: 15px; line-height: 21px; }
+.line + .line::before { position: absolute; top: 0; right: 0; left: 0; height: 1px; background: color-mix(in srgb, var(--st-text) 10%, transparent); content: ""; }
+.line > svg { flex-shrink: 0; align-self: center; color: var(--st-text-3); }
+.lineText { display: flex; min-width: 0; flex: 1; flex-direction: column; gap: 2px; overflow-wrap: anywhere; }
+.lineDetail { color: var(--st-text-2); font-size: 13px; line-height: 19px; }
+.lineEnd { flex-shrink: 0; color: var(--st-text-3); font-size: 14px; line-height: 20px; text-align: right; }
+.linesLabel { width: min(420px, 100%); margin: 8px 0 -4px; color: var(--st-text-3); font-size: 13px; font-weight: 500; line-height: 18px; }
+.indent { margin: 4px 0 0 0; padding: 14px 0 4px 16px; border-left: 2px solid var(--st-line); }
+.sentences { display: flex; flex-direction: column; gap: 6px; margin: 0; padding: 0; list-style: none; color: var(--st-text-body); font-size: 14px; line-height: 21px; }
+
+/* ---------- One object on the page (listing frame, assistants key) ---------- */
+.object { position: relative; box-sizing: border-box; display: grid; min-width: 0; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 16px 24px; padding: 26px 28px 28px; border-radius: var(--st-r-xl); background: var(--st-surface); box-shadow: var(--st-shadow-lg); }
+.objectText { display: flex; min-width: 0; flex-direction: column; gap: 10px; }
+.objectTitle { margin: 0; color: var(--st-text); font-size: 24px; font-weight: 500; letter-spacing: -0.5px; line-height: 30px; }
+.objectLabel { margin: 0; color: var(--st-text-3); font-size: 13px; font-weight: 500; line-height: 18px; }
+.objectActions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px; margin-top: 8px; }
+.felted { background: var(--st-felt-to); box-shadow: none; }
+
+/* The address an assistant needs, as the one thing Pebble hands over */
+.key { display: inline-flex; align-self: flex-start; max-width: 100%; flex-wrap: wrap; align-items: center; gap: 10px 14px; padding: 10px 10px 10px 18px; border-radius: 999px; background: var(--st-surface); box-shadow: var(--st-shadow-sm); }
+.keyValue { min-width: 0; color: var(--st-text); font-size: 17px; font-weight: 500; line-height: 24px; font-variant-numeric: tabular-nums; overflow-wrap: normal; word-break: keep-all; user-select: all; }
+
+/* The decision itself (S1): source label, title and sentence, the yes */
+.draftTitle { margin: 0; color: var(--st-text); font-size: 22px; font-weight: 500; letter-spacing: -0.4px; line-height: 28px; }
+.changeLine { color: var(--st-text-body); font-size: 14px; line-height: 20px; overflow-wrap: anywhere; }
+.draftLines { display: flex; flex-direction: column; gap: 4px; margin: 0; padding: 0; list-style: none; color: var(--st-text-body); font-size: 15px; line-height: 23px; overflow-wrap: anywhere; }
+
+/* A DNS record as the sentence to act on */
+.recordLine { display: flex; min-width: 0; flex: 1; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; color: var(--st-text-2); font-size: 14px; line-height: 21px; }
+.recordLine strong { color: var(--st-text); font-weight: 500; }
+.recordValue { color: var(--st-text); font-size: 15px; font-weight: 500; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+
+/* A destructive confirmation (R5): red pill, the only primary in its sheet */
+.destructive { box-sizing: border-box; display: inline-flex; height: 52px; flex: 1; align-items: center; justify-content: center; gap: 8px; padding: 0 24px; border: 0; border-radius: 999px; background: var(--st-critical); color: var(--st-canvas); font: inherit; font-size: 17px; font-weight: 600; cursor: pointer; transition: filter var(--motion-fast) var(--ease-settle); }
+.destructive:hover:not(:disabled) { filter: brightness(0.94); }
+.destructive:active:not(:disabled) { scale: var(--motion-press-scale); }
+.destructive:focus-visible { outline: 2px solid var(--st-critical); outline-offset: 3px; }
+.destructive:disabled { cursor: not-allowed; opacity: .55; }
+.sheetLede { margin: -14px 0 0; color: var(--st-text-3); font-size: 20px; font-weight: 500; letter-spacing: -0.4px; line-height: 26px; }
+
 /* ---------- Plain select, the kit field's look ---------- */
 .select { box-sizing: border-box; width: 100%; height: 44px; padding: 0 12px; border: 1px solid var(--st-line); border-radius: 12px; background: var(--st-surface); color: var(--st-text); font: inherit; font-size: 15px; }
 .select:focus-visible { border-color: var(--st-accent); outline: 2px solid color-mix(in srgb, var(--st-accent) 30%, transparent); outline-offset: 1px; }
 .fieldLabel { display: flex; flex-direction: column; gap: 8px; color: var(--st-text); font-size: 13px; font-weight: 500; line-height: 18px; }
+
+/* "For Harbor Dental": a labeled select that reads as part of the sentence */
+.inlineField { display: inline-flex; align-self: flex-start; align-items: center; gap: 8px; margin-top: -16px; color: var(--st-text-2); font-size: 15px; line-height: 22px; }
+.inlineSelect { box-sizing: border-box; height: 38px; padding: 0 34px 0 12px; border: 1px solid var(--st-line); border-radius: var(--st-r-md); background: var(--st-surface) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='none' stroke='%2381847d' stroke-width='1.6'%3E%3Cpath d='M3 4.5 6 7.5 9 4.5'/%3E%3C/svg%3E") no-repeat right 12px center; color: var(--st-text); font: inherit; font-size: 15px; font-weight: 500; appearance: none; cursor: pointer; }
+.inlineSelect:focus-visible { border-color: var(--st-accent); outline: 2px solid color-mix(in srgb, var(--st-accent) 30%, transparent); outline-offset: 1px; }
 
 /* ---------- Disclosure ---------- */
 .disclosure { border-top: 1px solid var(--st-line); padding-top: 14px; }
@@ -139,4 +194,9 @@ a.addressValue:focus-visible { border-radius: 4px; outline: 2px solid var(--st-a
   .record > :nth-child(2) { display: none; }
   .twoUp { grid-template-columns: minmax(0, 1fr); }
   .groupRow { flex-wrap: wrap; }
+  .object { grid-template-columns: minmax(0, 1fr); padding: 20px 18px 22px; }
+  .object > .clay { order: -1; justify-self: start; width: min(var(--clay), 168px); margin: -12px 0 -18px -8px; }
+  .objectTitle { font-size: 21px; line-height: 27px; }
+  .key { border-radius: 20px; padding: 12px 14px; }
+  .keyValue { font-size: 15px; line-height: 22px; }
 }

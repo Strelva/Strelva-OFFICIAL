@@ -1,4 +1,6 @@
-import { XaButton, XaButtonLink, XaEmpty, XaSays, XaStatus, XaTextLink } from "@/components/ui/strelva/Xa";
+import { XaButton, XaButtonLink, XaSays, XaStatus, XaTextLink } from "@/components/ui/strelva/Xa";
+import { Clay } from "@/experience/connections/Clay";
+import { weeklyHoursWords } from "@/experience/connections/owner-words";
 import styles from "@/experience/connections/xa-connections.module.css";
 import { AgencyConnectLinkButton } from "./AgencyConnectLink";
 
@@ -54,12 +56,9 @@ const FACT_MESSAGES: Record<string, { text: string; tone?: "critical" }> = {
 };
 
 const LABEL: Record<GoogleFoundFactView["key"], string> = { hours: "Hours", phone: "Phone", website: "Website", description: "Description", categories: "Categories" };
-const DAY = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+/** A found fact in owner words: hours read "Mon and Tue 8 to 5, Sat 9 to 1". */
 export function foundFactText(fact: Pick<GoogleFoundFactView, "key" | "value">): string {
-  if (fact.key === "hours") {
-    const weekly = (fact.value as { weekly?: Array<{ day: number; opens: string; closes: string }> })?.weekly ?? [];
-    return weekly.map(item => `${DAY[item.day] ?? "?"} ${item.opens}–${item.closes}`).join(" · ") || "Closed every day";
-  }
+  if (fact.key === "hours") return weeklyHoursWords((fact.value as { weekly?: Array<{ day: number; opens: string; closes: string }> })?.weekly ?? []);
   if (fact.key === "categories") return Array.isArray(fact.value) ? fact.value.join(", ") : "";
   return typeof fact.value === "string" ? fact.value : "";
 }
@@ -91,15 +90,25 @@ export function GoogleConnect({ workspaceId, viewer, enabled, hasListing, params
       <form action={actions.start}>{hidden}{back}<button type="submit" className={styles.textButton}>Use a different Google account</button></form>
     </section> : null}
 
-    {!hasListing && !enabled ? <XaEmpty pose="alone" size="sm" title="Connect Google · Coming soon" job="Your listing keeps working on Google meanwhile"
-      action={<XaButtonLink href="https://business.google.com/" variant="secondary" target="_blank" rel="noopener noreferrer">Open Google Business Profile</XaButtonLink>}
-      secondary={viewer === "owner" ? <XaTextLink href={`/workspace/business-details?${new URLSearchParams({ workspaceId })}`}>Update business details in Strelva</XaTextLink> : undefined}>
-      Connecting your Google Business Profile in Strelva is not open for this business yet. You can manage your listing directly on Google today.
-    </XaEmpty> : !hasListing && !choosing ? owner ? <XaEmpty pose="adds" title="Bring in your Google listing." job="Pebble reads hours, phone, website, description and categories once you sign in"
-      action={<form action={actions.start}>{hidden}{back}{/* One click, never a GET: link scanners and prefetch can't start a Google sign-in. */}<XaButton variant="primary" size="lg" type="submit">Connect Google</XaButton></form>}
-      secondary={returnTo ? <XaTextLink href={returnTo}>Skip for now</XaTextLink> : undefined}>
-      Sign in with the Google account that runs your Business Profile. Strelva reads your listing for you to confirm. Nothing changes on Google until you approve it.
-    </XaEmpty> : viewer === "agency" && enabled ? <section className={styles.section} aria-labelledby="google-agency">
+    {!hasListing && !enabled ? <div className={styles.object}>
+      <div className={styles.objectText}>
+        <p className={styles.objectLabel}>Google listing · Coming soon</p>
+        <h2 className={styles.objectTitle}>Connecting Google here isn&apos;t open yet.</h2>
+        <p className={styles.quiet}>Your listing keeps working on Google meanwhile. You can change it directly on Google today.</p>
+        <div className={styles.objectActions}><XaButtonLink href="https://business.google.com/" variant="secondary" target="_blank" rel="noopener noreferrer">Open Google Business Profile</XaButtonLink>
+          {viewer === "owner" ? <XaTextLink href={`/workspace/business-details?${new URLSearchParams({ workspaceId })}`}>Update business details in Strelva</XaTextLink> : null}</div>
+      </div>
+      <Clay pose="resting" width={220} decorative />
+    </div> : !hasListing && !choosing ? owner ? <div className={styles.object}>
+      <div className={styles.objectText}>
+        <p className={styles.objectLabel}>Google listing</p>
+        <h2 className={styles.objectTitle}>Bring in your Google listing.</h2>
+        <p className={styles.quiet}>Sign in with the Google account that runs your Business Profile. Pebble reads your hours, phone, website, description and categories for you to confirm. Nothing changes on Google until you say yes.</p>
+        <div className={styles.objectActions}><form action={actions.start}>{hidden}{back}{/* One click, never a GET: link scanners and prefetch can't start a Google sign-in. */}<XaButton variant="primary" size="lg" type="submit">Connect Google</XaButton></form>
+          {returnTo ? <XaTextLink href={returnTo}>Skip for now</XaTextLink> : null}</div>
+      </div>
+      <Clay pose="adds" width={260} label="Pebble adding the Google listing to your business" />
+    </div> : viewer === "agency" && enabled ? <section className={styles.section} aria-labelledby="google-agency">
       <h2 id="google-agency" className={styles.sectionTitle}>Google isn&apos;t connected yet</h2>
       <p className={styles.quiet}>Check how Google is available for this business. Your agency can connect its own account when it holds access, or copy a link for the owner. Strelva doesn&apos;t send it.</p>
       <AgencyConnectLinkButton workspaceId={workspaceId} request={agencyRequest} />

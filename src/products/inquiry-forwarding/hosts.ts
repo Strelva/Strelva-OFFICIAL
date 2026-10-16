@@ -35,7 +35,7 @@ export const FORWARDING_HOSTS: readonly ForwardingHostGuide[] = [
       "Tick Forward it to, choose {address}, then Create filter.",
     ],
     notes: [
-      "Keep Forwarding itself on Disable forwarding: the filter forwards only matching email.",
+      "Leave Gmail's Forwarding setting off. The filter sends only the email you chose.",
       "A Google Workspace admin can turn off automatic forwarding for the whole company. If the confirmation never arrives, ask whoever manages your Google Workspace.",
     ],
     confirmsAddress: true,
