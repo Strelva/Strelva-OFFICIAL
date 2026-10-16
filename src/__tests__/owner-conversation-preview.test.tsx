@@ -15,13 +15,14 @@ describe("fictional owner conversation canon", () => {
   it.each(OWNER_CONVERSATION_FRAMES)("renders %s through Ask Strelva and labels the fixture boundary", frame => {
     const html = renderToStaticMarkup(createElement(OwnerConversationPreview, { frame, state: "ready" }));
     expect(html).toContain("Fictional conversation and results");
-    expect(html).toContain("Saying yes here never approves anything");
+    // XA-5: the fixture boundary says controls change this preview only; a typed yes is answered in the thread (below).
+    expect(html).toContain("Controls change this preview only");
     expect(html).not.toMatch(/\b(AI|agent|automation|workflow|task)\b/);
   });
 
   it.each(["empty", "loading", "error", "permission"] as const)("renders the %s boundary explicitly", state => {
     const html = renderToStaticMarkup(createElement(OwnerConversationPreview, { frame: "ABt1D", state }));
-    expect(html).toContain(state === "empty" ? "Ask in your own words" : state === "loading" ? "Loading result content" : state === "error" ? "This saved result could not be read" : "You can’t ask or approve");
+    expect(html).toContain(state === "empty" ? "What should change for Fictional Firm?" : state === "loading" ? "Loading result content" : state === "error" ? "This saved result could not be read" : "You can’t ask or approve");
     if (state === "permission") expect(html).toMatch(/<textarea[^>]*disabled/);
   });
 
@@ -84,14 +85,15 @@ describe("fictional owner conversation canon", () => {
     vi.stubGlobal("fetch", outsideFetch);
     root = createRoot(node);
     await act(async () => root!.render(createElement(OwnerConversationPreview, { frame: "HQ5yA", state: "ready" })));
-    const textarea = node.querySelector<HTMLTextAreaElement>('textarea[aria-label^="Ask Strelva about"]')!;
+    const label = [...node.querySelectorAll<HTMLLabelElement>("label[for]")].find(item => item.textContent?.startsWith("Ask Strelva about"))!;
+    const textarea = document.getElementById(label.htmlFor) as HTMLTextAreaElement;
     await act(async () => {
       Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")!.set!.call(textarea, "yes, publish it");
       textarea.dispatchEvent(new Event("input", { bubbles: true }));
     });
     await act(async () => { textarea.closest("form")!.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })); });
     expect(node.textContent).toContain("Saying yes here doesn't publish or approve anything");
-    const recovery = [...node.querySelectorAll<HTMLAnchorElement>("a")].filter(link => ["Open Needs you", "Ask for help"].includes(link.textContent ?? ""));
+    const recovery = [...node.querySelectorAll<HTMLAnchorElement>("a")].filter(link => ["Go to Today", "Ask for help"].includes(link.textContent ?? ""));
     expect(recovery.map(link => link.getAttribute("href"))).toEqual(["/preview/strelva/owner-decision", "/preview/strelva/owner-conversation?frame=YsBMM"]);
     expect(node.textContent).not.toContain("Accepted in this preview. No live website changed.");
     const decision = [...node.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent?.includes("Hold to make it live"))!;

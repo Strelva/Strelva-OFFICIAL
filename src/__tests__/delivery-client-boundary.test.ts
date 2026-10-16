@@ -40,9 +40,10 @@ function browserDependencies(root: string, read: (file: string) => string | unde
       } else {
         const target = localTarget(file, specifier);
         if (target === null) continue;
-        // CSS modules are bundled assets, not executable server dependencies.
+        // CSS modules and JSON data (the Strelva lettering the XA entry frame
+        // draws) are bundled assets, not executable server dependencies.
         // Still require the actual asset so a missing import cannot pass.
-        if (target.endsWith(".css")) {
+        if (target.endsWith(".css") || target.endsWith(".json")) {
           if (read(target) === undefined) violations.push(`${file}: unresolved ${specifier}`);
           continue;
         }

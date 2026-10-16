@@ -123,7 +123,7 @@ describe("GET /biz/{handle}/llms.txt", () => {
 describe("/biz/{handle}", () => {
   it("renders every confirmed fact and its JSON-LD in the server HTML, with no JavaScript of its own", async () => {
     const html = renderToStaticMarkup(await BusinessPage(params("fictional-barber")));
-    for (const text of ["Fictional Barber &lt;Co&gt;", "Neighborhood barber.", "716-555-0100", "1 Main St, Buffalo, NY 14202", "Monday", "9 AM – 5 PM", "Haircut", "$30", "Book a time", "Updated October 3, 2026"]) {
+    for (const text of ["Fictional Barber &lt;Co&gt;", "Neighborhood barber.", "716-555-0100", "1 Main St, Buffalo, NY 14202", "Monday", "9 AM–5 PM", "Haircut", "$30", "Book a time", "confirmed these details on Oct 3, 2026."]) {
       expect(html).toContain(text);
     }
     expect(html).toContain('href="tel:7165550100"');
@@ -134,7 +134,7 @@ describe("/biz/{handle}", () => {
     const ld = JSON.parse(html.match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/)![1]!);
     expect(ld).toMatchObject({ "@type": "LocalBusiness", name: "Fictional Barber <Co>", url: "https://app.strelva.test/biz/fictional-barber", telephone: "716-555-0100" });
     expect(html).not.toContain("<Co>");
-    expect(html).toContain("Business policies");
+    expect(html).toContain("Before you book");
     expect(html).toContain("No deposit required.");
     expect(ld.additionalProperty).toEqual(expect.arrayContaining([
       expect.objectContaining({ propertyID: "strelva:policy:cancellation", value: "Give 24 hours notice. Notice: 24 hours." }),

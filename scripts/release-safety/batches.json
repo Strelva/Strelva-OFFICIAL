@@ -1498,7 +1498,7 @@
     {
       "batch": "19",
       "status": "private literal #293 AG11 preparation; unmerged; not production-authorized",
-      "note": "Exact outgoing grant/assignment cleanup, explicit owner exit-revoke provider/AOR ending with genuine exit receipt, consistent same-business provider command serialization. Applies after original33 and combined independent34–36 tails at final convergence. No notice policy, financial rate, external delivery, site state or matching activation selected. Empty-only guarded inverse preserves all accepted cleanup/ending receipts.",
+      "note": "Exact outgoing grant/assignment cleanup, explicit owner exit-revoke provider/AOR ending with genuine exit receipt, consistent same-business provider command serialization. Applies after original33 and combined independent34\u201336 tails at final convergence. No notice policy, financial rate, external delivery, site state or matching activation selected. Empty-only guarded inverse preserves all accepted cleanup/ending receipts.",
       "items": [
         {
           "file": "20261020090037_provider_completion_cleanup.sql",
@@ -2593,6 +2593,24 @@
           "rollback": "rollback-20261028100700_vertical_intake.sql",
           "rollbackSha256": "6b3036e2555c0560aaf8cfb516ea1fc4086cb0d1c9fefffaf48a9689d111977f",
           "rollbackStatus": "Refuses with app_intake_rollback_has_releases once any numbered Release exists; otherwise drops the 15 RPCs, helpers and the five app_intake tables."
+        }
+      ]
+    },
+    {
+      "id": "xa-build-2026-10-16",
+      "status": "Held and unapplied. XA build presentation reads: read_access_review returns an optional 'since' for provider entries (XA \u00b7 R4, lane XA-8), and application_action_actor_snapshot also records the acting agency member's own account name so owner screens can name the person at the agency (lane XA-3). No grant, gate or authority change; existing History is not backfilled. Not run against any database in this build. No production, provider, email or flag change authorized.",
+      "items": [
+        {
+          "file": "20261028100800_access_review_since.sql",
+          "sha256": "12abec19b1da406b4b1cdfd235e6af8f92fad011b422aa3eb8b698dd41493310",
+          "rollback": "rollback-20261028100800_access_review_since.sql",
+          "rollbackSha256": "a9813f1e72c5000138cbb2d3d41dfd319f8555424eaec9a86040c1ed29c20ff5",
+          "rollbackStatus": "Restores read_access_review from 20261021110000 (no since on provider entries)."
+        },
+        {
+          "file": "20261028110000_agency_actor_person_name.sql",
+          "sha256": "ce86ed687c9d0a1b58a102d3febfb4bfffa3112839a7e93025ada316cd266f4a",
+          "rollbackStatus": "No rollback file prepared yet; the prior application_action_actor_snapshot is in 20261021181000_application_actor_snapshots.sql. Snapshots written after apply keep personName. No production application authorized."
         }
       ]
     }

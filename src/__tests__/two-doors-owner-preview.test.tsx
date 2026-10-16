@@ -16,11 +16,12 @@ describe("owner help preview", () => {
     vi.stubGlobal("fetch", network);
     container = document.createElement("div"); document.body.append(container); root = createRoot(container);
     await act(async () => root!.render(createElement(TwoDoorsPreview, { surface: "owner", state: "with-agency" })));
-    expect(container.textContent).toContain("Tell us about it.");
-    expect(container.textContent).toContain("Saved requests");
+    expect(container.textContent).toContain("What do you need?");
+    expect(container.textContent).toContain("Your requests");
     expect(container.textContent).toContain("Bring in an agency");
     expect(container.textContent).toContain("Email platform support");
-    expect(container.querySelector<HTMLSelectElement>("#request-provider")?.options[1]?.textContent).toBe("North Studio");
+    // One agency that can take requests: the request says where it goes, with no picker (XS shell states).
+    expect(container.textContent).toContain("Goes to North Studio");
     expect(network).not.toHaveBeenCalled();
   });
 
