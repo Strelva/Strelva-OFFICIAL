@@ -139,7 +139,7 @@ export function AgencyClientXa({ clientName, workspaceId, agencyName, agencyHref
         <ul className={styles.lockList}>
           {["Put Prepare work live", "Pay for Strelva", "Add or end an agency", "Take the business and its data elsewhere"].map(text => <li key={text}><Lock size={16} aria-hidden="true" />{text}</li>)}
         </ul>
-        <p className={styles.note}>Prepare means nothing goes live without {owner}. Full control means you can put it live and {owner} sees it in Minutes.</p>
+        <p className={styles.note}>Prepare means nothing goes live without {owner}. Full control means you can put it live and {owner} sees it in What changed.</p>
       </aside>
     </div>
   </div>;
@@ -147,7 +147,7 @@ export function AgencyClientXa({ clientName, workspaceId, agencyName, agencyHref
 
 function areaSentence(level: AgencyLevel | undefined, owner: string, proposed?: boolean): string {
   const pending = proposed ? " Starts when you accept it." : "";
-  if (level === "full_control") return `You can put changes live. ${owner} sees them in Minutes.${pending}`;
+  if (level === "full_control") return `You can put changes live. ${owner} sees them in What changed.${pending}`;
   if (level === "prepare") return `You build and stage changes. ${owner} puts them live.${pending}`;
   return `${owner} keeps this one.`;
 }

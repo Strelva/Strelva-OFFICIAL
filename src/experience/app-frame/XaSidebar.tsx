@@ -145,7 +145,7 @@ export function XaSidebar(props: XaSidebarProps) {
   const agencyMain = agencyNavigation ? <XaGlideList as="nav" label="Main" className={styles.group}>
     {(["home", "queue", "library", "minutes"] as const).map(view => {
       const Icon = view === "home" ? Sun : view === "queue" ? Inbox : view === "library" ? Library : ScrollText;
-      const label = view === "home" ? XA_PLACE_LABELS.today : view === "queue" ? XA_PLACE_LABELS.queue : view === "library" ? XA_PLACE_LABELS.library : XA_PLACE_LABELS.minutes;
+      const label = view === "home" ? XA_PLACE_LABELS.today : view === "queue" ? XA_PLACE_LABELS.queue : view === "library" ? XA_PLACE_LABELS.library : XA_PLACE_LABELS.agencyMinutes;
       const current = !agencyNavigation.clients?.some(client => client.current) && agencyNavigation.active === view;
       return <Item key={view} href={agencyHref(view)} icon={Icon} label={label} current={current && !agencyNavigation.leadsCurrent} count={view === "queue" ? agencyNavigation.queueCount ?? null : null} onOpen={view === "home" ? homeInPlace : agencyGo(view)} onClose={close} />;
     })}

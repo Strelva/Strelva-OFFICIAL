@@ -43,7 +43,9 @@ export const STRELVA_HANDLED_LABEL = PLACE_LABELS.whatChanged;
  * "Minutes" are recorded as drift against GLOSSARY, not adopted.
  */
 export const XA_PLACE_LABELS = {
-  today: "Today", requests: PLACE_LABELS.requests, minutes: "Running", newRequest: "New request", search: "Search",
+  today: "Today", requests: PLACE_LABELS.requests, minutes: "Running",
+  /** The agency's own place for time recorded this month (AG6); "Running" is the business's place. */
+  agencyMinutes: "Minutes", newRequest: "New request", search: "Search",
   yourBusiness: "Your business", yourAgency: "Your agency", addToBusiness: "Add to your business",
   queue: "Queue", library: "Library", clients: "Clients", addClient: "Add a client", team: "Team", verification: "Verification",
   // GLOSSARY: "Lead" is internal inquiry storage and "Prospect" is Strelva's own sales record, so the
