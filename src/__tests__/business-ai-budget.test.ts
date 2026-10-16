@@ -77,15 +77,16 @@ describe("truthful budget pauses", () => {
     const environment = { ...on, STRELVA_FREE_MONTHLY_AI_CAP_USD: "0" };
     const reserve = vi.fn();
     await expect(assertBusinessAiBudget(context, { environment, read: async () => budget("0", null, false), reserve }))
-      .rejects.toThrow("Building is paused because this business has no included building usage. Bring in an agency to continue with help.");
+      .rejects.toThrow("Strelva can't take on new work for this business until plans open. Nothing changed. Put this business on the list for plans, or bring in an agency now.");
     expect(reserve).not.toHaveBeenCalled();
     expect(new ModelBudgetPausedError(0, 0, environment).message).not.toContain("used its available");
   });
   it("offers a plan only when checkout can actually open", () => {
     const ready = { STRELVA_SELF_SERVE_BILLING: "1", STRELVA_WORKSPACE_PRICE_ID: "price_test", STRIPE_SECRET_KEY: "test-only" };
-    expect(new ModelBudgetPausedError(0, 0, ready).message).toContain("Open Plan and billing to choose a plan.");
-    expect(new ModelBudgetPausedError(0, 0, { ...ready, STRELVA_WORKSPACE_PRICE_ID: "" }).message).toContain("Bring in an agency");
-    expect(new ModelBudgetPausedError(1, 2, {}).message).toContain("this work would exceed");
+    expect(new ModelBudgetPausedError(0, 0, ready).message).toContain("Choose a plan on Plan and usage.");
+    expect(new ModelBudgetPausedError(0, 0, { ...ready, STRELVA_WORKSPACE_PRICE_ID: "" }).message).toContain("until plans open");
+    expect(new ModelBudgetPausedError(1, 2, {}).message).toContain("This month's Strelva work for this business is used up.");
+    expect(new ModelBudgetPausedError(1, 2, {}).message).not.toMatch(/\$|budget|job/);
   });
   it("preserves an uncapped paid entitlement when the free cap is zero", async () => {
     const reserve = vi.fn();

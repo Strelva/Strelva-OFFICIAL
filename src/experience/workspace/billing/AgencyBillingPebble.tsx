@@ -36,17 +36,17 @@ export function AgencyBillingPebble({ billing }: { billing: AgencyBilling }) {
   for (const { client, invoice } of waiting)
     lines.push({
       count: 1,
-      text: `${client.name}'s ${amount(invoice!.amount_cents, invoice!.currency)}${invoice!.kind === "rebill" ? " a month" : ""} retail price waits on its owner`,
+      text: `${client.name}'s owner hasn't answered your ${amount(invoice!.amount_cents, invoice!.currency)}${invoice!.kind === "rebill" ? " a month" : ""} price`,
     });
   if (asks.length)
     lines.push({
       count: asks.length,
-      text: `${asks.length === 1 ? "owner asked" : "owners asked"} ${billing.name} to pay: ${names(asks.map((item) => item.workspaceName ?? "a business"))}`,
+      text: `${names(asks.map((item) => item.workspaceName ?? "a business"))} ${asks.length === 1 ? "asks" : "ask"} ${billing.name} to cover Strelva`,
     });
   if (agreed.length)
     lines.push({
       count: agreed.length,
-      text: `${agreed.length === 1 ? "retail price" : "retail prices"} agreed: ${names(agreed.map(({ client }) => client.name))}`,
+      text: `${names(agreed.map(({ client }) => client.name))} agreed to your price`,
     });
   const open = waiting.length + asks.length;
   return (
@@ -62,22 +62,18 @@ export function AgencyBillingPebble({ billing }: { billing: AgencyBilling }) {
           <XaPebbleAvatar size={28} />
         </span>
         {open
-          ? `Pebble is waiting on ${open === 1 ? "1 answer" : `${open} answers`} from owners.`
-          : "Pebble has nothing waiting on an owner."}
+          ? `Pebble is keeping count: ${open === 1 ? "1 answer" : `${open} answers`} still to come.`
+          : "Pebble is keeping count. Nothing waits on an owner."}
       </p>
       {lines.length ? (
         <ul className={styles.pebbleList}>
           {lines.map((line) => (
-            <li key={line.text}>
-              <b>{line.count}</b>
-              <span>{line.text}</span>
-            </li>
+            <li key={line.text}>{line.text}.</li>
           ))}
         </ul>
       ) : null}
       <p className={styles.note}>
-        Nothing is charged to a client until its owner says yes to the exact
-        price.
+        A client is charged only after its owner says yes to the exact price.
       </p>
     </section>
   );

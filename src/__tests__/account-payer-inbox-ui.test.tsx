@@ -16,10 +16,15 @@ it("lists what waits once, names who asked and gives only the first item the yes
   await act(async () => root.render(<AccountPayerInbox request={request} />));
   expect(node.textContent).toContain("3 things wait for your yes.");
   expect(node.textContent).not.toContain("Waits for you");
-  expect(node.textContent).toContain("Dr. Amy Lin asked North Studio to pay");
+  expect(node.textContent).toContain("Dr. Amy Lin asked North Studio to pay for Strelva work");
   expect(node.textContent).toContain("ruth@lakeviewmediation.com asked North Studio to pay");
   expect(node.querySelectorAll("[data-xa-primary]")).toHaveLength(1);
-  expect(node.querySelector("[data-xa-primary]")!.textContent).toContain("Accept $96.00 job limit");
-  const accepts = [...node.querySelectorAll("button")].filter(item => item.textContent === "Accept");
-  expect(accepts).toHaveLength(2);
+  // No Strelva-side figure while pricing is undecided (October 16).
+  expect(node.querySelector("[data-xa-primary]")!.textContent).toContain("Agree to pay for it");
+  expect(node.textContent).not.toMatch(/\$\d/);
+  const waiting = [...node.querySelectorAll("button")].filter(item => item.textContent === "Answer this one");
+  expect(waiting).toHaveLength(2);
+  await act(async () => waiting[1]!.click());
+  expect(node.querySelectorAll("[data-xa-primary]")).toHaveLength(1);
+  expect(node.querySelector("[data-xa-primary]")!.textContent).toContain("Agree to pay");
 });

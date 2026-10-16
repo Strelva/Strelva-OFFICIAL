@@ -129,7 +129,7 @@ export function XaDoors<T extends string>({ label, name, value, options, onChang
  * Two to four views of the same thing ("Your page now" / "After your yes").
  * The white thumb glides on Fast; arrow keys move between options.
  */
-export function XaSegmented<T extends string>({ value, options, onChange, label, block = false }: { value: T; options: readonly { value: T; label: string; disabled?: boolean }[]; onChange: (value: T) => void; label: string; block?: boolean }) {
+export function XaSegmented<T extends string>({ value, options, onChange, label, block = false, tone }: { value: T; options: readonly { value: T; label: string; disabled?: boolean }[]; onChange: (value: T) => void; label: string; block?: boolean; /** "action": the chosen option wears --st-action (a public page's own accent), for a choice that is the page's decision. */ tone?: "action" }) {
   const track = useRef<HTMLDivElement>(null);
   const [thumb, setThumb] = useState<{ x: number; width: number } | null>(null);
   useLayoutEffect(() => {
@@ -144,7 +144,7 @@ export function XaSegmented<T extends string>({ value, options, onChange, label,
     return () => observer.disconnect();
   }, [value, options.length]);
   const available = options.filter(option => !option.disabled);
-  return <div ref={track} className={styles.segmented} data-block={block || undefined} role="radiogroup" aria-label={label}>
+  return <div ref={track} className={styles.segmented} data-block={block || undefined} data-tone={tone} role="radiogroup" aria-label={label}>
     {thumb ? <span className={styles.thumb} style={{ translate: `${thumb.x}px 0`, width: thumb.width }} aria-hidden="true" /> : null}
     {options.map(option => <button key={option.value} type="button" role="radio" aria-checked={value === option.value} tabIndex={value === option.value ? 0 : -1} disabled={option.disabled} className={styles.segment}
       onClick={() => onChange(option.value)}

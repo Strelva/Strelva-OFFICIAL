@@ -117,7 +117,8 @@ export interface StrelvaClientLink {
 export interface StrelvaAgencyLink { name: string; person?: string; href?: string; color?: string }
 
 /** XA: where a person is inside the business details sidebar. */
-export type StrelvaDetailsPlace = "record" | "access" | "plan" | "export" | "connections" | "help";
+/** "elsewhere" opens Business details with no item current: a money page reached from Plan and usage that isn't Plan and usage. */
+export type StrelvaDetailsPlace = "record" | "access" | "plan" | "export" | "connections" | "help" | "elsewhere";
 
 /** Systems pinned by name, websites first, then everything else the business runs. */
 export function pinnedSystems(systems: readonly { id: string; name: string; kind: NonNullable<StrelvaPinnedItem["kind"]>; lifecycle?: string; health?: { state?: string } }[], href: (id: string) => string, open?: (id: string) => void, currentId?: string | null, limit = 8): StrelvaPinnedItem[] {

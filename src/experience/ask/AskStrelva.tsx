@@ -11,6 +11,7 @@ import { ConversationStreamDecoder } from "@/experience/conversation/stream";
 import { useWorkspaceRequest } from "@/experience/workspace/WorkspaceRequest";
 import { askIdeas } from "@/platform/ask/suggestions";
 import { actorLabel } from "@/platform/presentation/actor";
+import { PlanWaitlist } from "@/experience/workspace/billing/PlanWaitlist";
 import { XA_PLACE_LABELS } from "@/platform/presentation/place-labels";
 import {
   askErrorMessage, askHistoryFailure, latestDraft, readAskIdeas, readAskOutcomes, readAskOwner, readAskResult, readAskSuggestions, receiptLines, resultHeadline,
@@ -340,7 +341,7 @@ export function AskStrelva({ workspaceId, businessName, systemId = null, systemN
     onUndo={() => void send(undefined, `Undo this change: ${askChangeTitle(draft.item)}`)} onChange={() => focusComposer()} /> : null;
   const thread = <div ref={logRef} className={styles.log} role="log" aria-live="polite" aria-relevant="additions" aria-busy={streaming || undefined} aria-label={`Conversation about ${place}`}>
     {messages.map(message => <Message key={message.id} message={message} place={place} steps={message.pending && message === last ? steps : []}>
-      {renderResult?.(message) ?? (message.result ? <TurnResult result={message.result} message={message} latest={message === last} decider={decider} workspaceId={workspaceId} todayHref={todayHref} helpHref={helpHref}
+      {renderResult?.(message) ?? (message.result ? <TurnResult result={message.result} message={message} latest={message === last} decider={decider} workspaceId={workspaceId} businessName={businessName} todayHref={todayHref} helpHref={helpHref}
         inlineReview={compact || draft?.message !== message} onChange={() => focusComposer()}
         question={message === last && openQuestion ? <AskQuestion question={openQuestion} onAnswer={words => void send(undefined, words)} onAdd={() => inputRef.current?.focus()} /> : null} /> : null)}
     </Message>)}
@@ -400,7 +401,12 @@ function Message({ message, place, steps, children }: { message: AskMessageView;
   </article>;
 }
 
-function TurnResult({ result, message, latest, decider, workspaceId, todayHref, helpHref, question, inlineReview, onChange }: { result: AskTurnResult; message: AskMessageView; latest: boolean; decider: AskDecider; workspaceId: string; todayHref: string; helpHref: string; question: ReactNode; inlineReview: boolean; onChange: () => void }) {
+function TurnResult({ result, message, latest, decider, workspaceId, businessName, todayHref, helpHref, question, inlineReview, onChange }: { result: AskTurnResult; message: AskMessageView; latest: boolean; decider: AskDecider; workspaceId: string; businessName: string; todayHref: string; helpHref: string; question: ReactNode; inlineReview: boolean; onChange: () => void }) {
+  // Plans aren't open and nothing is included: one clear way forward, not a wall (October 16).
+  if (result.budgetRecovery === "waitlist") return <>
+    {question}
+    {latest ? <PlanWaitlist variant="inline" workspaceId={workspaceId} businessName={businessName} agencyHref={helpHref} primary={false} /> : <p className={styles.links}><XaTextLink href={`/workspace/billing?workspaceId=${encodeURIComponent(workspaceId)}`}>Plan and usage</XaTextLink></p>}
+  </>;
   const refusal = result.kind === "refusal" || Boolean(result.budgetRecovery);
   const headline = result.items.length ? null : resultHeadline(result);
   return <>

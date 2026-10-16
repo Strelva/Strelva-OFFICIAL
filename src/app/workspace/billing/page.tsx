@@ -17,6 +17,7 @@ import {
   WorkspacePlanUnavailable,
 } from "@/experience/workspace/billing/StartWorkspacePlan";
 import { selfServeBillingConfig } from "@/platform/business-billing/workspace-checkout";
+import { readPlanWaitlist } from "@/platform/business-billing/plan-waitlist";
 import { WorkspacePayerTransition } from "@/experience/workspace/WorkspacePayerTransition";
 import { listWorkspaces } from "@/platform/workspaces";
 import { workspaceReleaseEnabled } from "@/platform/workspace-release";
@@ -44,7 +45,7 @@ import { resolveOwnerBrand } from "@/platform/agency-brand/server";
 
 export const dynamic = "force-dynamic";
 
-/** Read-only billing home. No price, payment or Stripe mutation lives here. */
+/** Plan and usage. No price figure, payment or Stripe mutation lives here (October 16 money decision). */
 export default async function BusinessBillingPage({
   searchParams,
 }: {
@@ -79,8 +80,8 @@ export default async function BusinessBillingPage({
       return agencyShell(
         <div className={styles.screen}>
           <MoneyLoadFailure
-            title="Agency billing did not load."
-            quiet="Only an agency owner or admin can read its billing."
+            title="Your agency's billing couldn't be read just now."
+            quiet="Only an owner or admin of the agency can open it."
             retryHref={`/workspace/billing?workspaceId=${id}`}
           />
         </div>,
@@ -107,9 +108,9 @@ export default async function BusinessBillingPage({
                 >
                   <XaHeadline
                     id="agency-billing-heading"
-                    quiet="No client has your agency as payer yet."
+                    quiet="When an owner asks, it waits here for your answer."
                   >
-                    Agency billing
+                    No client has asked {workspace.name} to cover Strelva yet.
                   </XaHeadline>
                   <AgencyCheckoutStatus
                     availability={checkoutAvailability}
@@ -134,7 +135,7 @@ export default async function BusinessBillingPage({
                   <>
                     <span aria-hidden="true">·</span>
                     <XaTextLink href={`/workspace/payments?workspaceId=${id}`}>
-                      Agency payments
+                      Payments from your clients
                     </XaTextLink>
                   </>
                 ) : null}
@@ -154,7 +155,7 @@ export default async function BusinessBillingPage({
                     <XaTextLink
                       href={`/workspace/creator-maintenance?workspaceId=${id}`}
                     >
-                      Creator maintenance
+                      Apps you made for others
                     </XaTextLink>
                   </>
                 ) : null}
@@ -187,8 +188,8 @@ export default async function BusinessBillingPage({
       >
         <div className={styles.screen}>
           <MoneyLoadFailure
-            title="Billing could not be loaded."
-            quiet="Your sites and inquiries keep running. Confirm your access and try again."
+            title="Plan and usage couldn't be read just now."
+            quiet="Your website and inquiries keep running. Try again in a moment."
             retryHref={`/workspace/billing?workspaceId=${encodeURIComponent(workspaceId)}`}
           />
         </div>
@@ -219,6 +220,11 @@ export default async function BusinessBillingPage({
     budget !== null &&
     !budget.subscribed;
   const showStartPlan = needsPlan && selfServeBillingConfig().enabled;
+  // Plans aren't open (October 16): the honest waitlist replaces the plan section.
+  const waitlist = needsPlan && !showStartPlan;
+  const joined = waitlist
+    ? await readPlanWaitlist(workspaceId).catch(() => null)
+    : null;
   let agencyChoices: { id: string; name: string }[] = [];
   let agencyChoicesError = "";
   const agencyNames: Record<string, string> = {};
@@ -239,7 +245,7 @@ export default async function BusinessBillingPage({
         .map((item) => ({ id: item.agencyWorkspaceId, name: item.name }));
     } catch {
       agencyChoicesError =
-        "Serving agencies could not be loaded. Reload before proposing an agency payer.";
+        "Your agencies couldn't be read just now. Reload before asking one to pay.";
     }
   }
   let invoiceCheckoutAvailability: CheckoutAvailability = {
@@ -276,13 +282,25 @@ export default async function BusinessBillingPage({
       <div className={styles.screen}>
         <div className={query.invoiceId ? styles.split : styles.column}>
           <div className={styles.column}>
-            <BusinessBillingView
-              workspaceId={workspaceId}
-              canManage={canManage}
-              billing={billing}
-              businessName={workspace?.name}
-              backHref={`/workspace/business-details?workspaceId=${id}`}
-            />
+            {waitlist ? (
+              <WorkspacePlanUnavailable
+                workspaceId={workspaceId}
+                businessName={workspace?.name ?? "This business"}
+                joinedEmail={joined?.email ?? null}
+                noIncludedWork={capUsd === 0}
+                agencyHref={`/workspace?view=help&workspaceId=${id}`}
+                canJoin={canManage}
+                primary={!query.invoiceId}
+              />
+            ) : (
+              <BusinessBillingView
+                workspaceId={workspaceId}
+                canManage={canManage}
+                billing={billing}
+                businessName={workspace?.name}
+                backHref={`/workspace/business-details?workspaceId=${id}`}
+              />
+            )}
             {showStartPlan ? (
               <StartWorkspacePlan
                 primary={!query.invoiceId}
@@ -292,16 +310,13 @@ export default async function BusinessBillingPage({
                 budgetEnforced={budgetEnforced}
                 controls={controlsOn ? (budget?.controls ?? null) : null}
               />
-            ) : customerMember ? (
+            ) : customerMember && !(waitlist && capUsd === 0) ? (
               <BusinessAiBudgetSummary
                 budget={budget}
                 capUsd={capUsd}
                 enforced={budgetEnforced}
                 controls={controlsOn ? (budget?.controls ?? null) : null}
               />
-            ) : null}
-            {needsPlan && !showStartPlan ? (
-              <WorkspacePlanUnavailable workspaceId={workspaceId} />
             ) : null}
             <WorkspacePayerTransition
               key={workspaceId}
@@ -310,15 +325,16 @@ export default async function BusinessBillingPage({
               agencyChoices={agencyChoices}
               agencyChoicesError={agencyChoicesError}
               providerChangeEnabled={handoff}
+              billedTo={billing?.payerParty ?? null}
             />
             {splits || connect || handoff ? (
               <nav
-                aria-label="Payment and agency settings"
+                aria-label="More about money"
                 className={styles.links}
               >
                 {connect ? (
                   <XaTextLink href={`/workspace/payments?workspaceId=${id}`}>
-                    Deposits and payments
+                    Payments from your customers
                   </XaTextLink>
                 ) : null}
                 {splits ? (
@@ -327,13 +343,7 @@ export default async function BusinessBillingPage({
                     <XaTextLink
                       href={`/workspace/money-terms?workspaceId=${id}`}
                     >
-                      Recorded money terms
-                    </XaTextLink>
-                    <span aria-hidden="true">·</span>
-                    <XaTextLink
-                      href={`/workspace/creator-maintenance?workspaceId=${id}`}
-                    >
-                      Creator maintenance
+                      Prices you&rsquo;ve agreed to
                     </XaTextLink>
                   </>
                 ) : null}

@@ -4,6 +4,7 @@ import {
   XaLabel,
   XaRow,
   XaRows,
+  XaSays,
   XaStatus,
 } from "@/components/ui/strelva/Xa";
 import styles from "@/experience/workspace/money/money.module.css";
@@ -41,11 +42,7 @@ const PURPOSE_WORDS: Record<string, string> = {
   pay_link: "Payment link",
   agency_rebill: "Agency plan",
 };
-const purpose = (value: string) => {
-  if (PURPOSE_WORDS[value]) return PURPOSE_WORDS[value]!;
-  const words = value.replaceAll("_", " ").trim();
-  return words ? words[0]!.toUpperCase() + words.slice(1) : "Customer payment";
-};
+const purpose = (value: string) => PURPOSE_WORDS[value] ?? "Customer payment";
 const shortDay = (iso: string | null | undefined) => {
   const value = iso ? new Date(iso) : null;
   return value && Number.isFinite(value.getTime())
@@ -56,7 +53,7 @@ const shortDay = (iso: string | null | undefined) => {
     : "";
 };
 
-/** Deposits and payments for one business (XA · R1 column): its Stripe account, what customers paid, and asking for the next payment. */
+/** Payments from customers for one business (XA · R1 column): its Stripe account, what customers paid, and asking for the next payment. */
 export function PaymentsScreen({
   workspaceId,
   money,
@@ -92,6 +89,15 @@ export function PaymentsScreen({
     (p.reference_id
       ? requestFor.get(p.reference_id)?.lines?.[0]?.name?.trim()
       : "") || purpose(p.purpose);
+  // One state per payment: a request the customer already paid is listed once,
+  // under Customer payments, even while Stripe hasn't confirmed it.
+  const answered = new Set(
+    payments.map((p) => p.reference_id).filter((id): id is string => Boolean(id)),
+  );
+  const waitingRequests = requests.filter(
+    (item) => !answered.has(item.id) || item.refundRequired,
+  );
+  const unconfirmed = payments.filter((p) => !paidIds.has(p.id));
   const paidOn = (id: string) =>
     shortDay(
       (money?.events ?? []).find(
@@ -104,7 +110,7 @@ export function PaymentsScreen({
         <XaHeadline quiet="Money goes straight to your bank through Stripe. Strelva never holds it.">
           {settled.length
             ? `Customers paid ${formatMoney(total, currency)} through Strelva.`
-            : "Take deposits and payments."}
+            : "No customer has paid through Strelva yet."}
         </XaHeadline>
       </div>
       <MerchantControls
@@ -130,7 +136,7 @@ export function PaymentsScreen({
                   detail={
                     !paidIds.has(p.id) ? (
                       <XaStatus kind="waits" size="sm">
-                        Not confirmed by Stripe yet
+                        Stripe hasn’t confirmed it yet
                       </XaStatus>
                     ) : (
                       [
@@ -156,9 +162,19 @@ export function PaymentsScreen({
           </XaRows>
         ) : (
           <p className={styles.body}>
-            No customer payments yet. They appear here as Stripe confirms them.
+            Payments show up here as Stripe confirms them.
           </p>
         )}
+        {/* Bad news keeps Pebble in frame, with the next step named. */}
+        {unconfirmed.length ? (
+          <XaSays>
+            {unconfirmed.length === 1
+              ? `Stripe hasn’t confirmed ${title(unconfirmed[0]!)} yet.`
+              : `Stripe hasn’t confirmed ${unconfirmed.length} payments yet.`}{" "}
+            Strelva checks again on its own and marks it paid once Stripe
+            does. Nothing is asked of you or the customer.
+          </XaSays>
+        ) : null}
         <RefundManager
           key={`refund:${workspaceId}`}
           workspaceId={workspaceId}
@@ -176,7 +192,7 @@ export function PaymentsScreen({
         key={workspaceId}
         workspaceId={workspaceId}
         sources={sources}
-        requests={requests}
+        requests={waitingRequests}
         primary={state === "ready"}
       />
     </div>

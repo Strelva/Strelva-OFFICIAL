@@ -26,15 +26,15 @@ export function AgencyCheckoutStatus({
     <p className={styles.note}>
       {availability.status === "coming_soon"
         ? agencyName
-          ? `${agencyName} can charge this once checkout opens.`
-          : "Checkout opens later. Retail prices can be set and agreed now."
+          ? `${agencyName} can take payment once payment pages open.`
+          : "Payment pages aren't open yet. You can set prices and owners can agree to them now."
         : availability.status === "setup_required"
-          ? `Checkout waits until ${agencyName ?? "the agency"} finishes its Stripe setup.`
-          : "Payment readiness could not be confirmed, so checkout is off. Reload to check again."}
+          ? `Payment pages wait until ${agencyName ?? "the agency"} finishes setting up Stripe.`
+          : "Strelva couldn't check Stripe just now, so payment pages are off. Reload to check again."}
       {availability.status === "setup_required" && paymentsHref ? (
         <>
           {" "}
-          <XaTextLink href={paymentsHref}>Set up agency payments</XaTextLink>
+          <XaTextLink href={paymentsHref}>Finish setting up Stripe</XaTextLink>
         </>
       ) : null}
     </p>

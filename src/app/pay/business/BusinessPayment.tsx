@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { Lock } from "lucide-react";
 import { StSkeleton } from "@/components/ui/strelva/Kit";
 import { VisitorBookingShell } from "@/experience/bookings/VisitorBookingShell";
@@ -13,6 +13,13 @@ import {
   type PublicPaymentRequest,
 } from "./public-payment";
 import { formatMoney } from "@/platform/connect/money-format";
+
+/** Ink or paper on the business's accent, whichever reads. */
+function onAccent(hex: string) {
+  const [r, g, b] = [1, 3, 5].map((at) => parseInt(hex.slice(at, at + 2), 16) / 255);
+  const lum = (v: number) => (v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4);
+  return 0.2126 * lum(r!) + 0.7152 * lum(g!) + 0.0722 * lum(b!) > 0.4 ? "#161715" : "#ffffff";
+}
 
 export default function BusinessPayment({
   token,
@@ -115,13 +122,35 @@ export default function BusinessPayment({
     : "Payment request";
   const termsAvailable = request ? hasPaymentTerms(request) : false;
   const refundTerms = request ? paymentRefundTerms(request) : null;
+  const until = request
+    ? new Intl.DateTimeFormat("en-US", {
+        month: "long",
+        day: "numeric",
+        year: "numeric",
+      }).format(new Date(request.expiresAt))
+    : "";
+  // The page wears the business's own look when the payment read carries it.
+  const accent = request?.brand?.accentColor ?? null;
+  const brandStyle = accent
+    ? ({
+        "--visitor-accent": accent,
+        "--visitor-on-accent": onAccent(accent),
+      } as CSSProperties)
+    : undefined;
   return (
-    <VisitorBookingShell siteName={businessName} wide>
+    <VisitorBookingShell
+      siteName={businessName}
+      wide
+      logoUrl={request?.brand?.logoUrl ?? null}
+      style={brandStyle}
+    >
       <div className={styles.split}>
         <section className={styles.description} aria-label="Payment details">
           <h1 className={visitor.title}>{title}</h1>
           <p className={visitor.intro}>
-            Review the agreed details before paying.
+            {request?.kind === "deposit"
+              ? "Paying it keeps your appointment."
+              : "Check what was agreed, then pay by card."}
           </p>
           {loading ? (
             <div
@@ -135,26 +164,47 @@ export default function BusinessPayment({
             </div>
           ) : null}
           {request ? (
-            request.lines.length ? (
-              <dl className={`${visitor.summary} ${visitor.section}`}>
-                {request.lines.map((line, index) => (
-                  <div key={index} className={styles.line}>
-                    <dt>
-                      {line.name}
-                      <span className={visitor.muted}>
-                        Quantity {line.quantity}
-                      </span>
-                    </dt>
-                    <dd>
-                      {formatMoney(
-                        line.quantity * line.unitCents,
-                        request.currency,
-                      )}
-                    </dd>
-                  </div>
-                ))}
-              </dl>
-            ) : null
+            <dl
+              className={`${visitor.summary} ${visitor.section} ${styles.agreed}`}
+              aria-label="What was agreed"
+            >
+              {request.acceptedTerms?.trim() ? (
+                <>
+                  <dt>What it’s for</dt>
+                  <dd>{request.acceptedTerms}</dd>
+                </>
+              ) : null}
+              {request.lines.map((line, index) => (
+                <div key={index} className={styles.line}>
+                  <dt>
+                    {line.name}
+                    <span className={visitor.muted}>
+                      Quantity {line.quantity}
+                    </span>
+                  </dt>
+                  <dd>
+                    {formatMoney(
+                      line.quantity * line.unitCents,
+                      request.currency,
+                    )}
+                  </dd>
+                </div>
+              ))}
+              {refundTerms ? (
+                <>
+                  <dt>If it’s cancelled</dt>
+                  <dd>{refundTerms}</dd>
+                </>
+              ) : null}
+              {request.status === "unpaid" ? (
+                <>
+                  <dt>Pay by</dt>
+                  <dd>
+                    <time dateTime={request.expiresAt}>{until}</time>
+                  </dd>
+                </>
+              ) : null}
+            </dl>
           ) : null}
         </section>
         <div>
@@ -166,7 +216,7 @@ export default function BusinessPayment({
           {request ? (
             <section
               className={`${visitor.surface} ${styles.form}`}
-              aria-label="Payment amount and terms"
+              aria-label="Payment amount"
             >
               <h2 className={visitor.label}>
                 {request.kind === "deposit" ? "Your deposit" : "Your payment"}
@@ -174,41 +224,23 @@ export default function BusinessPayment({
               <span className={styles.amountValue}>
                 {formatMoney(request.amountCents, request.currency)}
               </span>
-              {request.acceptedTerms?.trim() ? (
-                <p className={styles.terms}>{request.acceptedTerms}</p>
-              ) : null}
-              {refundTerms ? (
-                <p className={styles.terms}>{refundTerms}</p>
-              ) : null}
               {!termsAvailable ? (
                 <p className={visitor.notice}>
-                  Refund and cancellation terms are unavailable. Ask the
-                  business for a payment link with the agreed terms before
-                  paying.
+                  This link doesn’t say what happens if you cancel, so it
+                  can’t take a payment. Ask the business for a new link.
                 </p>
               ) : null}
               {request.status === "paid" ? (
-                <p role="status">Payment received.</p>
+                <p role="status">Paid. Thank you.</p>
               ) : request.status === "expired" ? (
-                <p>This payment link has expired.</p>
+                <p>This link has run out. Ask {businessName || "the business"} for a new one.</p>
               ) : request.status === "cancelled" ? (
-                <p>This request was cancelled.</p>
-              ) : (
-                <p className={visitor.note}>
-                  Valid until{" "}
-                  <time dateTime={request.expiresAt}>
-                    {new Intl.DateTimeFormat(undefined, {
-                      dateStyle: "medium",
-                      timeStyle: "long",
-                    }).format(new Date(request.expiresAt))}
-                  </time>
-                  .
-                </p>
-              )}
+                <p>{businessName || "The business"} took this request back. Nothing is owed.</p>
+              ) : null}
               {!businessName ? (
                 <p className={visitor.notice}>
-                  The business identity is unavailable. Ask for a new payment
-                  link before paying.
+                  This link doesn’t say which business it’s for, so it
+                  can’t take a payment. Ask for a new link.
                 </p>
               ) : null}
               {preview ? (
@@ -227,7 +259,7 @@ export default function BusinessPayment({
                   aria-busy={busy}
                   onClick={pay}
                 >
-                  {busy ? "Opening secure payment…" : "Accept and pay"}
+                  {busy ? "Opening Stripe…" : "Accept and pay"}
                 </button>
               ) : null}
               <p className={`${visitor.note} ${styles.security}`}>

@@ -201,7 +201,7 @@ export async function startAskTurn(deps: AskTurnDeps, actor: WorkspaceActor, raw
       const items: AskReceiptItem[] = [];
       let resultKind: AskResultKind = "answer";
       let creationAction: { kind: "website" | "booking"; label: string; href: string } | null = null;
-      let budgetRecovery: "plan" | "agency" | null = null;
+      let budgetRecovery: "plan" | "agency" | "waitlist" | null = null;
       let question: AskQuestion | null = null;
       const onReceipt = (item: AskReceiptItem) => {
         items.push(item);
@@ -343,7 +343,9 @@ export async function startAskTurn(deps: AskTurnDeps, actor: WorkspaceActor, raw
           onReceipt({ kind: "refusal", toolId: "classifier", status: "refused", ids: [], summary: error instanceof ModelBudgetPausedError ? "budget_paused" : "budget_unavailable" });
           // An agency or operator pause or limit is lifted by the agency, never by buying a plan.
           if (error instanceof ModelAiPausedError || error instanceof ModelAgencyCapReachedError) budgetRecovery = (error instanceof ModelAiPausedError ? error.pausedBy : error.setBy)?.kind === "agency" ? "agency" : null;
-          else if (error instanceof ModelBudgetPausedError) budgetRecovery = process.env.STRELVA_BUSINESS_BILLING === "1" && role === "owner" && selfServeBillingConfig().enabled ? "plan" : "agency";
+          else if (error instanceof ModelBudgetPausedError) budgetRecovery = process.env.STRELVA_BUSINESS_BILLING === "1" && role === "owner" && selfServeBillingConfig().enabled ? "plan"
+            // Plans aren't open and nothing is included: the honest waitlist, never a dead end (October 16).
+            : error.capUsd === 0 && (role === "owner" || role === "admin") ? "waitlist" : "agency";
           try { say(`${replyText ? "\n\n" : ""}${error.message}`); } catch { /* client gone */ }
         } else if (!state.emitted) {
           replyText = NO_ANSWER;

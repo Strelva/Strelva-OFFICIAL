@@ -50,13 +50,13 @@ export default async function Payments({
       <StrelvaShell
         title=""
         workspaceId={workspaceId}
-        detailsPlace="plan"
+        detailsPlace="elsewhere"
         systemsReleased={process.env.STRELVA_SYSTEMS_RELEASE === "1"}
       >
         <div className={styles.screen}>
           <MoneyLoadFailure
-            title="Payments did not load."
-            quiet="Payments already made are safe in Stripe. Confirm your access and try again."
+            title="Payments couldn't be read just now."
+            quiet="Payments already made are safe in Stripe. Try again in a moment."
             retryHref={`/workspace/payments?workspaceId=${encodeURIComponent(id)}`}
           />
         </div>
@@ -67,7 +67,7 @@ export default async function Payments({
     <StrelvaShell
       title=""
       workspaceId={workspaceId}
-      detailsPlace="plan"
+      detailsPlace="elsewhere"
       systemsReleased={process.env.STRELVA_SYSTEMS_RELEASE === "1"}
     >
       <PaymentsScreen

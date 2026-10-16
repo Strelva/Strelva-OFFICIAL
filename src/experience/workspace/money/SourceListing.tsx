@@ -1,7 +1,10 @@
 "use client";
-import { XaButton, XaSelect } from "@/components/ui/strelva/Xa";
+import { XaButton, XaChoices, XaYes } from "@/components/ui/strelva/Xa";
 import xa from "@/experience/workspace/money/money.module.css";
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState } from "react";
+import { strelvaUndoWindowMs } from "@/platform/infra/motion";
+import { useHeldYes } from "./held-yes";
+import { OfferRows } from "./OfferRows";
 import {
   neutralCreatorListingCommandSchema,
   neutralCreatorSourcesSchema,
@@ -13,6 +16,8 @@ export function SourceListing(props: {
   graph: NeutralCreatorSources;
   actorId: string;
   request?: typeof fetch;
+  /** How long Undo stays up before the offer is sent. 0 sends at once. */
+  undoWindowMs?: number;
 }) {
   return (
     <ScopedSourceListing
@@ -24,16 +29,19 @@ export function SourceListing(props: {
 function ScopedSourceListing({
   graph: initial,
   request = fetch,
+  undoWindowMs = strelvaUndoWindowMs,
 }: {
   graph: NeutralCreatorSources;
   actorId: string;
   request?: typeof fetch;
+  undoWindowMs?: number;
 }) {
   const [graph, setGraph] = useState(initial),
     [revision, setRevision] = useState(""),
     [agreementVersion, setAgreementVersion] = useState(""),
     [busy, setBusy] = useState(false),
-    [feedback, setFeedback] = useState("");
+    [feedback, setFeedback] = useState(""),
+    [fieldError, setFieldError] = useState<{ revision?: string; agreement?: string }>({});
   const pending = useRef<{ command: Command; sourceSystemId: string } | null>(
       null,
     ),
@@ -90,7 +98,7 @@ function ScopedSourceListing({
         },
       );
       if (!response.ok)
-        throw Error("Your creator access could not be confirmed just now.");
+        throw Error("Strelva couldn't confirm you can offer apps just now.");
       const next = neutralCreatorSourcesSchema.parse(await response.json());
       if (
         next.workspaceId !== initial.workspaceId ||
@@ -100,7 +108,7 @@ function ScopedSourceListing({
             item.definitionId !== `system-source:${item.sourceSystemId}`,
         )
       )
-        throw Error("These Systems belong to another creator.");
+        throw Error("These apps belong to another agency. Sign in again.");
       const attempt = pending.current,
         source = attempt
           ? next.sources.find(
@@ -116,16 +124,16 @@ function ScopedSourceListing({
           source.listingRateReference !== attempt?.command.rateReference)
       )
         throw Error(
-          "The recorded listing does not match what you asked for. Nothing else will be listed until this is reviewed.",
+          "What was saved doesn't match what you chose. Nothing else can be offered until Strelva looks at it.",
         );
       if (controller.signal.aborted || !alive.current) return;
       setGraph(next);
       if (source?.listingId) {
         pending.current = null;
-        setFeedback(`${source.name} is listed with its creator agreement.`);
+        setFeedback(`${source.name} is offered to other businesses now.`);
       } else if (attempt)
         setFeedback(
-          "Your last listing is still not confirmed. Check again before listing anything else.",
+          "Strelva still hasn't confirmed your last app. Check again before offering another.",
         );
       if (!silent) focus(origin);
     } catch (error) {
@@ -133,7 +141,7 @@ function ScopedSourceListing({
         setFeedback(
           error instanceof Error
             ? error.message
-            : "Listing could not be confirmed.",
+            : "Strelva couldn't confirm that.",
         );
         if (!silent) focus(origin);
       }
@@ -145,23 +153,29 @@ function ScopedSourceListing({
     }
   }
   reloadRef.current = () => void reload(true);
-  async function register(event: FormEvent) {
-    event.preventDefault();
+  async function register(choice?: { revision: string; agreementVersion: string }) {
     if (inflight.current || pending.current || !graph.canRegister) return;
+    const chosenRevision = choice?.revision ?? revision,
+      chosenAgreement = choice?.agreementVersion ?? agreementVersion;
     const source = graph.sources.find(
         (item) =>
-          item.sourceRevisionId === revision &&
+          item.sourceRevisionId === chosenRevision &&
           item.qualified &&
           !item.listingId,
       ),
       agreement = graph.agreements.find(
-        (item) => item.version === agreementVersion,
+        (item) => item.version === chosenAgreement,
       );
+    const problems = {
+      revision: source ? undefined : "Choose the app to offer.",
+      agreement: agreement ? undefined : "Choose what you earn.",
+    };
+    setFieldError(problems);
     if (!source || !agreement) return;
     const origin = document.activeElement,
       command = neutralCreatorListingCommandSchema.parse({
         workspaceId: initial.workspaceId,
-        sourceRevisionId: revision,
+        sourceRevisionId: chosenRevision,
         agreementVersion: agreement.version,
         rateReference: agreement.rateReference,
       });
@@ -179,7 +193,7 @@ function ScopedSourceListing({
       });
       if (!response.ok)
         throw Error(
-          "The listing could not be confirmed. Check what was recorded.",
+          "Strelva couldn't confirm that. Check what was saved.",
         );
       const receipt = z
         .object({
@@ -197,7 +211,7 @@ function ScopedSourceListing({
       setGraph((current) => ({
         ...current,
         sources: current.sources.map((item) =>
-          item.sourceRevisionId === revision
+          item.sourceRevisionId === chosenRevision
             ? {
                 ...item,
                 listingId: receipt.id,
@@ -208,14 +222,14 @@ function ScopedSourceListing({
         ),
       }));
       pending.current = null;
-      setFeedback(`${source.name} is listed with its creator agreement.`);
+      setFeedback(`${source.name} is offered to other businesses now.`);
       focus(origin);
     } catch (error) {
       if (!controller.signal.aborted && alive.current) {
         setFeedback(
           error instanceof Error
             ? error.message
-            : "Listing remains unconfirmed.",
+            : "Strelva hasn't confirmed it yet.",
         );
         focus(origin);
       }
@@ -227,7 +241,7 @@ function ScopedSourceListing({
     }
   }
   const locked = busy || !!pending.current;
-  const percent = (bps: number) => `${bps / 100}% of each payment`;
+  const percent = (bps: number) => `You earn ${bps / 100}% of each payment`;
   const rateFor = (version: string | null | undefined) =>
     graph.agreements.find((item) => item.version === version);
   const waiting = pending.current
@@ -236,62 +250,102 @@ function ScopedSourceListing({
           item.sourceRevisionId === pending.current!.command.sourceRevisionId,
       )
     : null;
+  const offerable = graph.sources.filter(
+    (item) => item.qualified && !item.listingId,
+  );
+  const current =
+    offerable.find((item) => item.sourceRevisionId === revision) ??
+    offerable[0] ??
+    null;
+  const agreement =
+    graph.agreements.find((item) => item.version === agreementVersion) ??
+    (graph.agreements.length === 1 ? graph.agreements[0]! : null);
+  // Undo first, then send: an offer has no server reversal.
+  const held = useHeldYes(() => {
+    if (!current || !agreement) return;
+    setRevision(current.sourceRevisionId);
+    setAgreementVersion(agreement.version);
+    void register({
+      revision: current.sourceRevisionId,
+      agreementVersion: agreement.version,
+    });
+  }, undoWindowMs);
   return (
     <section className={xa.section} aria-labelledby="source-listing-heading">
       <h2 id="source-listing-heading" className={xa.heading}>
-        Systems you list for other businesses
+        Offer an app to other businesses
       </h2>
       <p className={xa.body}>
-        List a System you published, with its written creator agreement. Each
-        business that installs it gets its own Version. Listing gives you no
-        access to their records or accounts.
+        Each business that adds it gets its own copy, and you never see their
+        records.
       </p>
-      {graph.canRegister ? (
-        <div className={xa.block}>
-          <form className={xa.form} onSubmit={(event) => void register(event)}>
-            <XaSelect
-              label="System"
-              value={revision}
-              disabled={locked}
-              required
-              onChange={(event) => setRevision(event.target.value)}
-              options={[
-                { value: "", label: "Choose a published System" },
-                ...graph.sources
-                  .filter((item) => item.qualified && !item.listingId)
-                  .map((item) => ({
-                    value: item.sourceRevisionId,
-                    label: `${item.name}, Release ${item.revision}`,
-                  })),
-              ]}
-            />
-            <XaSelect
-              label="Creator agreement"
-              value={agreementVersion}
-              disabled={locked}
-              required
-              onChange={(event) => setAgreementVersion(event.target.value)}
-              options={[
-                { value: "", label: "Choose a written agreement" },
-                ...graph.agreements.map((item) => ({
-                  value: item.version,
-                  label: `${item.version}, ${percent(item.rateBps)}`,
-                })),
-              ]}
-            />
-            <XaButton
-              type="submit"
-              disabled={locked || !revision || !agreementVersion}
-            >
-              List this System
-            </XaButton>
-          </form>
-        </div>
-      ) : (
+      {!graph.canRegister ? (
         <p className={xa.body}>
-          New listings are not available for this workspace. Systems already
-          listed stay listed.
+          Your agency can’t offer new apps right now. Apps already offered
+          stay offered.
         </p>
+      ) : !offerable.length ? (
+        <p className={xa.note}>
+          Every app you published is offered. A new one shows up here once you
+          publish it.
+        </p>
+      ) : !graph.agreements.length ? (
+        <p className={xa.body}>
+          There’s no agreement yet for what you earn, so nothing can be offered.
+        </p>
+      ) : (
+        <OfferRows
+          label="Apps you can offer"
+          offers={offerable.map((item) => ({
+            key: item.sourceRevisionId,
+            sentence: `${item.name} can be offered to other businesses.`,
+          }))}
+          current={locked && !held.held ? null : (current?.sourceRevisionId ?? null)}
+          locked={locked || held.held}
+          onChoose={(key) => {
+            setRevision(key);
+            setFieldError({});
+          }}
+          yes={
+            current ? (
+              <>
+                {graph.agreements.length > 1 ? (
+                  <XaChoices
+                    label="What you earn"
+                    variant="list"
+                    value={agreement?.version ?? null}
+                    error={fieldError.agreement}
+                    onChange={(value) => {
+                      setAgreementVersion(value);
+                      setFieldError({});
+                    }}
+                    options={graph.agreements.map((item) => ({
+                      value: item.version,
+                      label: percent(item.rateBps),
+                    }))}
+                  />
+                ) : agreement ? (
+                  <p className={xa.note}>{percent(agreement.rateBps)}.</p>
+                ) : null}
+                <XaYes
+                  state={held.held ? "live" : "waiting"}
+                  yesLabel="Offer it"
+                  yesAriaLabel={`Offer ${current.name}`}
+                  block={false}
+                  disabled={locked}
+                  disabledReason={
+                    agreement ? undefined : "Choose what you earn first."
+                  }
+                  onYes={() => held.hold()}
+                  onUndo={held.undo}
+                  undoWindowMs={undoWindowMs}
+                  onUndoExpired={held.send}
+                  liveLabel={`${current.name} is offered`}
+                />
+              </>
+            ) : null
+          }
+        />
       )}
       <p
         role="status"
@@ -305,15 +359,15 @@ function ScopedSourceListing({
       {pending.current ? (
         <>
           <p className={xa.body}>
-            Your listing of {waiting?.name ?? "this System"} is not confirmed
-            yet. New listings wait until it is.
+            Strelva hasn&apos;t confirmed {waiting?.name ?? "your last app"} yet.
+            Nothing new can be offered until it does.
           </p>
           <XaButton
             variant="quiet"
             disabled={busy}
             onClick={() => void reload()}
           >
-            Check what was recorded
+            Check what was saved
           </XaButton>
         </>
       ) : null}
@@ -326,12 +380,12 @@ function ScopedSourceListing({
                 className={xa.detailsToggle}
                 href={`/workspace/source-attribution?${new URLSearchParams({ workspaceId: graph.workspaceId, systemId: item.sourceSystemId })}`}
               >
-                {item.name}, Release {item.revision}
+                {item.name}
               </a>{" "}
               <span className={xa.note}>
-                · {item.listingAgreementVersion}
+                is offered.
                 {rateFor(item.listingAgreementVersion)
-                  ? `, ${percent(rateFor(item.listingAgreementVersion)!.rateBps)}`
+                  ? ` ${percent(rateFor(item.listingAgreementVersion)!.rateBps)}.`
                   : ""}
               </span>
             </li>

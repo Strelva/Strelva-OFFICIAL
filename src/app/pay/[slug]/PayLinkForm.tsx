@@ -5,10 +5,20 @@ import { Lock } from "lucide-react";
 import { formatWholeDollarsUsd } from "@/lib/currency";
 import { formatMoney } from "@/platform/connect/money-format";
 import { payLinkReassurance } from "@/lib/pay-link-copy";
-import { XaButton, XaField } from "@/components/ui/strelva/Xa";
+import { XaButton, XaField, XaSegmented } from "@/components/ui/strelva/Xa";
 import styles from "@/experience/workspace/money/money.module.css";
 
 const STEP_DOLLARS = 50;
+const MOST_CHOICES = 6;
+
+/** Every amount a client can pick: each $50 from low to high, ends included. */
+export function amountSteps(min: number, max: number): number[] {
+  if (!(max > min)) return [min];
+  const all: number[] = [];
+  for (let value = min; value < max; value += STEP_DOLLARS) all.push(value);
+  all.push(max);
+  return all;
+}
 
 export interface PayLinkFormProps {
   slug: string;
@@ -38,6 +48,7 @@ export function PayLinkForm({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
+  const steps = isFixed ? [] : amountSteps(min, max);
   const amountCentsNow = Math.round(amount * 100);
   // Connected fixed links may carry cents; whole-dollar output stays as it was.
   const hasCents = amountCentsNow % 100 !== 0;
@@ -63,13 +74,13 @@ export function PayLinkForm({
       });
       const data = await res.json();
       if (!res.ok || !data.checkoutUrl) {
-        setError(data.error || "Could not open secure checkout.");
+        setError(data.error || "Stripe couldn't be opened. Nothing was charged.");
         return;
       }
       window.location.href = data.checkoutUrl;
     } catch {
       setError(
-        "Could not open secure checkout. Check your connection and try again.",
+        "Stripe couldn't be opened. Check your connection and try again; nothing was charged.",
       );
     } finally {
       setLoading(false);
@@ -88,21 +99,44 @@ export function PayLinkForm({
           <p className={styles.amount} aria-live="polite">
             {amountLabel}
           </p>
-          <input
-            type="range"
-            min={min}
-            max={max}
-            step={STEP_DOLLARS}
-            value={amount}
-            onChange={(event) => setAmount(Number(event.target.value))}
-            aria-label="Payment amount"
-            aria-valuetext={amountLabel}
-            className={styles.range}
-          />
-          <div className={styles.rangeEnds} aria-hidden="true">
-            <span>{formatWholeDollarsUsd(Math.round(min * 100))}</span>
-            <span>{formatWholeDollarsUsd(Math.round(max * 100))}</span>
-          </div>
+          {/* A choice of amounts in the charging agency's color, not a raw browser slider. */}
+          {steps.length <= MOST_CHOICES ? (
+            <XaSegmented
+              label="Payment amount"
+              tone="action"
+              block
+              value={String(amount)}
+              onChange={(value) => setAmount(Number(value))}
+              options={steps.map((dollars) => ({
+                value: String(dollars),
+                label: formatWholeDollarsUsd(Math.round(dollars * 100)),
+              }))}
+            />
+          ) : (
+            // Many steps: less and more, $50 at a time, so every amount stays reachable.
+            <div className={styles.actions} role="group" aria-label="Payment amount">
+              <XaButton
+                size="sm"
+                disabled={amount <= min}
+                onClick={() => setAmount(Math.max(min, amount - STEP_DOLLARS))}
+                aria-label={`$${STEP_DOLLARS} less`}
+              >
+                Less
+              </XaButton>
+              <XaButton
+                size="sm"
+                disabled={amount >= max}
+                onClick={() => setAmount(Math.min(max, amount + STEP_DOLLARS))}
+                aria-label={`$${STEP_DOLLARS} more`}
+              >
+                More
+              </XaButton>
+              <span className={styles.note}>
+                {formatWholeDollarsUsd(Math.round(min * 100))} to{" "}
+                {formatWholeDollarsUsd(Math.round(max * 100))}
+              </span>
+            </div>
+          )}
         </>
       ) : null}
       {reassurance ? <p className={styles.note}>{reassurance}</p> : null}
@@ -122,11 +156,11 @@ export function PayLinkForm({
         </p>
       ) : null}
       <XaButton type="submit" variant="primary" size="lg" block busy={loading}>
-        {loading ? "Opening secure checkout" : `Pay ${amountLabel}`}
+        {loading ? "Opening Stripe" : `Pay ${amountLabel}`}
       </XaButton>
       <p className={`${styles.panelFoot} ${styles.secure}`}>
         <Lock size={12} aria-hidden="true" />
-        Card details are entered on Stripe&apos;s secure checkout.
+        You enter your card on Stripe, not here.
       </p>
     </form>
   );

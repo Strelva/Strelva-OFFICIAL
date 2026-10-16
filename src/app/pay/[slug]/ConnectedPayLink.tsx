@@ -39,8 +39,8 @@ export function ConnectedPayLink({
         <p className={styles.publicCopy}>{link.description}</p>
       ) : null}
       <p className={styles.note}>
-        Payments go to {brand.name}&apos;s Stripe account. Strelva never holds
-        the money.
+        The money goes straight to {brand.name} through Stripe. Strelva never
+        holds the money.
       </p>
     </>
   );
@@ -52,8 +52,9 @@ export function ConnectedPayLink({
           <>
             {lead}
             <p className={styles.body}>
-              This payment link has expired. Ask {brand.name} for a new link.
-              Payments already started in Stripe may still complete.
+              This link is stopped, so it can&apos;t take a payment. Ask{" "}
+              {brand.name} for a new one. A payment already under way can still
+              finish.
             </p>
           </>
         }
@@ -69,11 +70,10 @@ export function ConnectedPayLink({
             <XaStatus kind="live">Paid</XaStatus>
             <p className={styles.amount}>{amount}</p>
             <p className={styles.body}>
-              Stripe confirmed this payment. Your payment receipt is numbered
-              and ready to print.
+              Stripe confirmed your payment. Thank you.
             </p>
             <XaTextLink href={`/pay/${link.slug}/receipt`}>
-              View payment receipt
+              See your receipt
             </XaTextLink>
           </>
         ) : (
@@ -81,20 +81,20 @@ export function ConnectedPayLink({
             <p className={styles.note}>
               {link.amountCents !== null
                 ? "Amount"
-                : "Choose an amount, in $50 steps"}
+                : "Choose what fits, in steps of 50 dollars"}
             </p>
             {link.amountCents !== null ? (
               <p className={styles.amount}>{amount}</p>
             ) : null}
             {payment === "success" ? (
               <p className={styles.body} role="status">
-                Stripe accepted your payment. It shows as paid here once Stripe
-                confirms it. Refresh in a minute.
+                Stripe took your payment. This page says paid once Stripe
+                confirms it, usually within a minute.
               </p>
             ) : null}
             {payment === "cancelled" ? (
               <p className={styles.body} role="status">
-                No charge made. You can try again below.
+                Nothing was charged. You can pay whenever you&apos;re ready.
               </p>
             ) : null}
             <PayLinkForm

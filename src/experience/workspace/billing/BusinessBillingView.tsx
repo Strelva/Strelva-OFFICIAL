@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { BusinessBilling } from "@/platform/business-billing";
 import {
+  XaAnswers,
   XaButton,
-  XaEmpty,
   XaHeadline,
   XaSays,
   XaStatus,
@@ -12,10 +12,6 @@ import {
 } from "@/components/ui/strelva/Xa";
 import styles from "@/experience/workspace/money/money.module.css";
 
-const money = (cents: number) =>
-  new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(
-    cents / 100,
-  );
 const day = (iso: string) => {
   const value = new Date(iso.length === 10 ? `${iso}T12:00:00Z` : iso);
   return Number.isFinite(value.getTime())
@@ -28,7 +24,11 @@ const day = (iso: string) => {
     : iso.slice(0, 10);
 };
 
-/** Owner billing projection (XA · R1). Card digits, next charge and receipts are absent from this read. */
+/**
+ * Owner billing (XA · R1), October 16 money decision: no price figure, ever.
+ * Card digits, amounts, next charge and receipts stay in Stripe; this page
+ * says who pays, what it covers and how to reach the card.
+ */
 type Transport = (input: string, init?: RequestInit) => Promise<Response>;
 type Props = {
   billing: BusinessBilling | null;
@@ -41,53 +41,30 @@ type Props = {
 };
 
 function planLine(billing: BusinessBilling) {
-  if (billing.state === "grandfathered") return "Your existing terms";
-  if (billing.state === "comped") return "Comped";
-  if (billing.state === "none") return "No plan price published yet";
-  if (billing.state === "custom") return "Custom agreement";
+  if (billing.state === "grandfathered") return "Your existing agreement";
+  if (billing.state === "comped") return "Covered by Strelva";
+  if (billing.state === "none") return "No plan yet";
+  if (billing.state === "custom") return "An agreement written for you";
   return "Strelva plan";
 }
-/** Who said the plan's terms (XA · R1 "Said by"). */
-function planSaidBy(billing: BusinessBilling) {
-  if (billing.state === "grandfathered" || billing.state === "custom")
-    return "Your agreement";
-  if (billing.state === "none") return "";
-  return "Strelva";
-}
-const shortDay = (iso: string | null | undefined) => {
-  const value = iso ? new Date(iso) : null;
-  return value && Number.isFinite(value.getTime())
-    ? new Intl.DateTimeFormat("en-US", {
-        month: "short",
-        day: "numeric",
-      }).format(value)
-    : "";
-};
 
-/** R1: each answer on its own line, the person or system that said it on the right. */
-function SaidList({
-  rows,
-}: {
-  rows: readonly { label: string; value: ReactNode; by: ReactNode }[];
-}) {
-  return (
-    <dl className={styles.said}>
-      <div className={styles.saidHead} aria-hidden="true">
-        <span>Detail</span>
-        <span>Said by</span>
-      </div>
-      {rows.map((row) => (
-        <div key={row.label} className={styles.saidRow}>
-          <dt>{row.label}</dt>
-          <dd>{row.value}</dd>
-          <dd className={styles.saidBy}>
-            <span className={styles.saidWord}>Said by </span>
-            {row.by}
-          </dd>
-        </div>
-      ))}
-    </dl>
-  );
+/** Stripe's status, said the way an owner would: "Harbor Dental's plan is paid up." */
+function planState(status: string) {
+  switch (status) {
+    case "active":
+      return "is paid up";
+    case "trialing":
+      return "is on a trial";
+    case "canceled":
+    case "cancelled":
+      return "has ended";
+    case "incomplete":
+      return "is waiting on its first payment";
+    case "unpaid":
+      return "is unpaid";
+    default:
+      return "is waiting on Stripe";
+  }
 }
 
 /** A payer change the owner asks for from Pebble's line; the payer section reloads and shows it waiting. */
@@ -151,57 +128,72 @@ export function BusinessBillingView({
     }
   }
 
-  if (!billing)
+  const manage =
+    canManage && workspaceId ? (
+      <WorkspaceBillingControls
+        key={workspaceId}
+        workspaceId={workspaceId}
+        transport={transport}
+        navigate={navigate}
+      />
+    ) : (
+      <p className={styles.note}>
+        Only the business owner can reach the card and receipts.
+      </p>
+    );
+
+  if (!billing || billing.state === "none")
     return (
       <section className={styles.section} aria-labelledby="plan-heading">
-        <XaHeadline id="plan-heading" quiet="One plan for the whole business.">
-          Plan and billing
-        </XaHeadline>
-        <XaEmpty
-          pose="alone"
-          size="sm"
-          title="No billing record is attached to this business yet."
-          job="Your sites and inquiries keep running while billing is recorded"
+        <div className={styles.brief}>
+          <XaHeadline
+            id="plan-heading"
+            quiet="Your website and inquiries keep running while it moves."
+          >
+            {name}’s billing isn’t set up here yet.
+          </XaHeadline>
+        </div>
+        <XaSays
+          links={[
+            <XaTextLink key="details" href={backHref}>
+              Business details
+            </XaTextLink>,
+          ]}
         >
-          The existing agreement and chosen payer need to be recorded.
-        </XaEmpty>
-        <p className={styles.note}>
-          <XaTextLink href={backHref}>Business details</XaTextLink>
-        </p>
-        {canManage && workspaceId ? (
-          <WorkspaceBillingControls
-            key={workspaceId}
-            workspaceId={workspaceId}
-            transport={transport}
-            navigate={navigate}
-          />
-        ) : (
-          <p className={styles.note}>
-            A business owner can manage payments and review cancellation here.
-          </p>
-        )}
+          Strelva is moving your existing agreement here. Until then nothing new
+          is charged, and your card stays where it is.
+        </XaSays>
       </section>
     );
 
-  const priced = billing.state !== "none";
-  const updated = shortDay(billing.paymentUpdatedAt);
+  const sites = billing.sites.length
+    ? billing.sites.map((site) => site.siteName).join(", ")
+    : "No website is listed under this plan yet.";
+  const paidThrough = billing.paidThrough ? day(billing.paidThrough) : null;
   return (
     <section className={styles.section} aria-labelledby="plan-heading">
       <div className={styles.brief}>
-        {priced ? (
+        {pastDue ? (
           <XaHeadline
             id="plan-heading"
-            quiet={`One plan for the whole business, paid by ${payer}.`}
+            quiet="Your website and inquiries keep running."
           >
-            {name} pays {money(billing.monthlyCents).replace(/\.00$/, "")} a
-            month.
+            {agencyPays
+              ? `${agencyName}’s last payment for ${name} didn’t go through.`
+              : `${name}’s last payment didn’t go through.`}
           </XaHeadline>
         ) : (
           <XaHeadline
             id="plan-heading"
-            quiet="Nothing is charged until you see a price and agree to it."
+            quiet={
+              agencyPays
+                ? `${agencyName} pays for it and keeps the receipts.`
+                : `${payer} pays, and Stripe keeps the card and receipts.`
+            }
           >
-            No plan price published yet.
+            {paidThrough
+              ? `${name} is paid through ${paidThrough}.`
+              : `${name}’s plan ${planState(billing.paymentStatus)}.`}
           </XaHeadline>
         )}
       </div>
@@ -212,7 +204,7 @@ export function BusinessBillingView({
               ? canManage && workspaceId && direct === "idle"
                 ? [
                     <XaTextLink key="direct" onClick={() => void payDirectly()}>
-                      Pay directly instead
+                      Pay for it yourself instead
                     </XaTextLink>,
                   ]
                 : undefined
@@ -224,70 +216,32 @@ export function BusinessBillingView({
           }
         >
           {agencyPays
-            ? `${agencyName}’s payment needs attention.`
-            : "Your last payment did not go through."}{" "}
-          Your sites and inquiry capture keep working.
+            ? `Stripe couldn’t take ${agencyName}'s payment for this plan.`
+            : "Stripe couldn’t take the payment from your card."}
           {agencyPays && direct === "busy" ? " Asking…" : ""}
           {agencyPays && direct === "asked"
-            ? " You asked to pay directly for future jobs; accept it under Who pays."
+            ? " You asked to pay for it yourself from now on. It waits under Who pays."
             : ""}
           {agencyPays && !["idle", "busy", "asked"].includes(direct)
             ? ` ${direct}`
             : ""}
         </XaSays>
       ) : null}
-      <SaidList
+      <XaAnswers
+        labelWidth={120}
         rows={[
-          {
-            label: "Plan",
-            value: priced ? (
-              <>
-                {planLine(billing)} ·{" "}
-                <span className={styles.figure}>
-                  {money(billing.monthlyCents).replace(/\.00$/, "")} / month
-                </span>
-              </>
-            ) : (
-              "No monthly price or plan is recorded."
-            ),
-            by: planSaidBy(billing),
-          },
-          {
-            label: "Covers",
-            value: (
-              <>
-                {name}
-                <span className={styles.figureQuiet}>
-                  {" "}
-                  ·{" "}
-                  {billing.sites.length
-                    ? billing.sites.map((site) => site.siteName).join(", ")
-                    : "No covered sites are recorded."}
-                </span>
-              </>
-            ),
-            by: "Strelva",
-          },
-          {
-            label: "Payment",
-            value: pastDue ? (
-              <XaStatus kind="waits" size="sm">
-                Needs attention
-              </XaStatus>
-            ) : billing.paidThrough ? (
-              <>Paid through {day(billing.paidThrough)}</>
-            ) : billing.paymentStatus === "active" ? (
-              "The next charge date is not available in this record."
-            ) : (
-              billing.paymentStatus.replaceAll("_", " ")
-            ),
-            by: updated ? `Stripe · ${updated}` : "Stripe",
-          },
-          {
-            label: "Paid by",
-            value: payer,
-            by: agencyPays ? agencyName : "Stripe",
-          },
+          ["Plan", planLine(billing)],
+          ["Covers", sites],
+          ...(pastDue
+            ? [
+                [
+                  "Payment",
+                  <XaStatus key="due" kind="waits" size="sm">
+                    Needs a new card
+                  </XaStatus>,
+                ] as const,
+              ]
+            : []),
         ]}
       />
       {billing.grandfatheredTerms ? (
@@ -295,20 +249,10 @@ export function BusinessBillingView({
       ) : null}
       {agencyPays ? (
         <p className={styles.note}>
-          {agencyName} manages its payment method and keeps the receipts for
-          this plan.
+          {agencyName} manages the card and receipts for this plan.
         </p>
-      ) : canManage && workspaceId ? (
-        <WorkspaceBillingControls
-          key={workspaceId}
-          workspaceId={workspaceId}
-          transport={transport}
-          navigate={navigate}
-        />
       ) : (
-        <p className={styles.note}>
-          A business owner can manage payments and review cancellation here.
-        </p>
+        manage
       )}
     </section>
   );
@@ -357,7 +301,7 @@ function WorkspaceBillingControls({
       if (!response.ok || !body?.portalUrl)
         throw new Error(
           body?.error ||
-            "Payment management could not be opened. No billing change was made.",
+            "Stripe couldn’t be opened. Nothing changed.",
         );
       const url = new URL(body.portalUrl);
       if (
@@ -367,7 +311,7 @@ function WorkspaceBillingControls({
         url.password
       )
         throw new Error(
-          "Payment management returned an invalid link. No billing change was made.",
+          "Stripe sent back a link Strelva doesn’t trust. Nothing changed.",
         );
       navigate(body.portalUrl);
     } catch (cause) {
@@ -375,7 +319,7 @@ function WorkspaceBillingControls({
       setError(
         cause instanceof Error
           ? cause.message
-          : "Payment management could not be opened. No billing change was made.",
+          : "Stripe couldn’t be opened. Nothing changed.",
       );
     } finally {
       if (pending.current === controller) {
@@ -387,17 +331,13 @@ function WorkspaceBillingControls({
 
   return (
     <div id="manage-plan" className={styles.section}>
-      <p className={styles.note}>
-        Stripe holds your payment method and receipts. Any change needs your
-        confirmation there.
-      </p>
       <div className={styles.actions}>
         <XaButton
           busy={busy === "manage"}
           disabled={Boolean(busy)}
           onClick={() => void open("manage")}
         >
-          Manage payments and receipts
+          Card and receipts
         </XaButton>
         {!reviewing ? (
           <XaButton
@@ -408,7 +348,7 @@ function WorkspaceBillingControls({
               setError("");
             }}
           >
-            Review cancellation
+            End the plan
           </XaButton>
         ) : null}
       </div>
@@ -416,12 +356,12 @@ function WorkspaceBillingControls({
         <div
           className={styles.waiting}
           role="group"
-          aria-label="Review plan cancellation"
+          aria-label="End the plan"
         >
           <p className={styles.body}>
-            Continue to Stripe to review when your subscription ends and confirm
-            cancellation. Leaving the workspace does not stop billing. Billing
-            continues until cancellation is confirmed in Stripe.
+            Stripe shows the day the plan would end, and you confirm it there.
+            Until you do, the plan keeps running. Leaving Strelva doesn’t
+            end it on its own.
           </p>
           <div className={styles.actions}>
             <XaButton
@@ -430,7 +370,7 @@ function WorkspaceBillingControls({
               disabled={Boolean(busy)}
               onClick={() => void open("cancel")}
             >
-              Continue to cancellation
+              Continue to Stripe
             </XaButton>
             <XaButton
               size="sm"

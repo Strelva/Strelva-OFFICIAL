@@ -67,7 +67,7 @@ describe("chrome completion", () => {
     expect(host.textContent).not.toContain("Business details unavailable");
     expect(host.textContent).not.toContain("Accept and pay");
     await act(async () => root.render(<BusinessPayment key="missing" token="fixture" initialRequest={{ ...businessDepositFixture, businessName: undefined }} />));
-    expect(host.textContent).toContain("business identity is unavailable");
+    expect(host.textContent).toContain("which business it");
     expect(host.textContent).not.toContain("Accept and pay");
     expect(fetcher).not.toHaveBeenCalled();
   });

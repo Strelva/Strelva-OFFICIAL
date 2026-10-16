@@ -28,19 +28,23 @@ export default function RefundManager({
   const [amount, setAmount] = useState("");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [amountError, setAmountError] = useState<string | undefined>();
   const key = useRef<string | null>(null);
   async function refund(e: React.FormEvent) {
     e.preventDefault();
+    const amountCents = Math.round(
+      Number(amount.trim().replace(/^\$/, "").replace(/,/g, "")) *
+        chargeUnits(payments.find((p) => p.id === id)?.currency ?? "usd"),
+    );
+    if (!Number.isSafeInteger(amountCents) || amountCents <= 0) {
+      setAmountError("Write how much to give back, like 50 or 50.25.");
+      return;
+    }
+    setAmountError(undefined);
     setBusy(true);
     setMessage(null);
     key.current ??= crypto.randomUUID();
     try {
-      const amountCents = Math.round(
-        Number(amount) *
-          chargeUnits(payments.find((p) => p.id === id)?.currency ?? "usd"),
-      );
-      if (!Number.isSafeInteger(amountCents) || amountCents <= 0)
-        throw Error("Enter a refund amount above zero.");
       const response = await fetch("/api/workspace/payments/refund", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -53,20 +57,24 @@ export default function RefundManager({
       });
       const result = await response.json().catch(() => ({}));
       if (!response.ok)
-        throw Error(result.error ?? "The refund could not be requested.");
+        throw Error(result.error ?? "The refund didn't go through. Nothing was sent back.");
       if (
         typeof result.refundId !== "string" ||
         !/^re_[A-Za-z0-9]+$/.test(result.refundId)
       )
         throw Error(
-          "The refund could not be confirmed. Sign in and try again.",
+          "Strelva couldn't confirm the refund. Sign in and check Stripe before trying again.",
         );
       setMessage(
-        `Refund requested. Stripe says it is ${String(result.status ?? "pending").replaceAll("_", " ")}; its final status comes from Stripe.`,
+        result.status === "succeeded"
+          ? "Stripe sent the money back to the customer's card."
+          : "Stripe is sending the money back. It shows as refunded once Stripe finishes.",
       );
     } catch (e) {
       setMessage(
-        e instanceof Error ? e.message : "The refund could not be requested.",
+        e instanceof Error
+          ? e.message
+          : "The refund didn't go through. Nothing was sent back.",
       );
     } finally {
       setBusy(false);
@@ -81,6 +89,7 @@ export default function RefundManager({
       <form
         onSubmit={refund}
         className={`${styles.form} ${styles.inlinePanel}`}
+        noValidate
         aria-label="Refund a customer payment"
       >
         <XaSelect
@@ -97,11 +106,14 @@ export default function RefundManager({
           }))}
         />
         <XaField
-          label="Refund amount"
+          label="How much to give back"
           inputMode="decimal"
-          required
           value={amount}
-          onChange={(e) => setAmount(e.target.value)}
+          error={amountError}
+          onChange={(e) => {
+            setAmount(e.target.value);
+            setAmountError(undefined);
+          }}
           disabled={busy}
         />
         <p className={styles.note}>
@@ -110,7 +122,7 @@ export default function RefundManager({
         </p>
         <div className={styles.actions}>
           <XaButton type="submit" busy={busy} disabled={busy}>
-            Request refund
+            Refund it
           </XaButton>
         </div>
         {message ? <XaSays>{message}</XaSays> : null}

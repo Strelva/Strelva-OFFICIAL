@@ -42,7 +42,7 @@ it("fails visibly instead of falling back to member agencies when serving-agency
   mocks.serving.mockRejectedValueOnce(new Error("offline"));
   const page = await BillingPage({ searchParams: Promise.resolve({ workspaceId: "business" }) });
   expect(propsFor(page, WorkspacePayerTransition)?.agencyChoices).toEqual([]);
-  expect(propsFor(page, WorkspacePayerTransition)?.agencyChoicesError).toContain("could not be loaded");
+  expect(propsFor(page, WorkspacePayerTransition)?.agencyChoicesError).toContain("couldn't be read just now");
 });
 it("does not read agency choices for a non-owner", async () => {
   mocks.list.mockResolvedValue([{ id: "business", kind: "customer", access: "member", role: "admin", name: "Client business" }]);
@@ -77,7 +77,9 @@ it("does not read merchant state from a mismatched or unauthorized invoice", asy
 it("supplies exact member-owner billing controls and one real budget summary after billing authorization", async () => {
   vi.stubEnv("STRELVA_BUSINESS_AI_BUDGET", "1");
   const page = await BillingPage({ searchParams: Promise.resolve({ workspaceId: "business" }) });
-  expect(propsFor(page, BusinessBillingView)).toMatchObject({ workspaceId: "business", canManage: true });
+  // Plans aren't open: the waitlist stands in for the plan section, with this owner able to join.
+  expect(propsFor(page, BusinessBillingView)).toBeUndefined();
+  expect(propsFor(page, WorkspacePlanUnavailable)).toMatchObject({ workspaceId: "business", canJoin: true, noIncludedWork: false, businessName: "Client business" });
   expect(propsFor(page, BusinessAiBudgetSummary)).toMatchObject({ budget: { spentUsd: "0.20", reservedUsd: "0.10" }, capUsd: 1, enforced: true });
   expect(propsFor(page, StartWorkspacePlan)).toBeUndefined();
   expect(mocks.budget).toHaveBeenCalledWith("business");
@@ -113,6 +115,12 @@ it("shows unavailable projection after budget or cap failures without breaking a
   expect(propsFor(failedCap, BusinessAiBudgetSummary)).toMatchObject({ budget: null, capUsd: null });
 });
 
+it("hides the usage line when nothing is included, since the waitlist already says so", async () => {
+  mocks.cap.mockReturnValue(0);
+  const page = await BillingPage({ searchParams: Promise.resolve({ workspaceId: "business" }) });
+  expect(propsFor(page, WorkspacePlanUnavailable)).toMatchObject({ noIncludedWork: true, joinedEmail: null });
+  expect(propsFor(page, BusinessAiBudgetSummary)).toBeUndefined();
+});
 it("offers agency help while the plan is unconfigured, without a checkout control", async () => {
   const page = await BillingPage({ searchParams: Promise.resolve({ workspaceId: "business" }) });
   expect(propsFor(page, WorkspacePlanUnavailable)).toMatchObject({ workspaceId: "business" });

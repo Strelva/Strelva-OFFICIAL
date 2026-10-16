@@ -1,7 +1,9 @@
 /** Money preview screens and their states (server-safe: imported by the preview routes). */
 export const XS_MONEY_SCREENS = {
-  billing: ["ready", "past-due", "empty", "waiting", "loading", "error"],
-  "billing-agency": ["ready", "priced", "empty", "loading", "error"],
+  billing: ["ready", "new", "new-joined", "past-due", "not-set-up", "waiting", "loading", "error"],
+  "billing-agency": ["ready", "empty", "loading", "error"],
+  "ask-paused": ["ready", "joined"],
+  "getting-started-plans": ["ready"],
   "payment-links": ["ready", "empty", "setup", "off", "loading", "error"],
   invoice: ["ready", "loading"],
   receipt: ["ready", "waiting"],

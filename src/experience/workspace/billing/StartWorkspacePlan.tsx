@@ -1,18 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import { XaButton, XaSays, XaTextLink } from "@/components/ui/strelva/Xa";
+import { XaButton, XaSays } from "@/components/ui/strelva/Xa";
+import { PlanWaitlist, type PlanWaitlistProps } from "./PlanWaitlist";
 import styles from "@/experience/workspace/money/money.module.css";
 
 import type {
   AiControlsState,
   BusinessAiBudget,
 } from "@/platform/infra/business-ai-budget";
-
-const dollars = (amount: number) =>
-  new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(
-    amount,
-  );
 
 /** A reset or change day. The period boundary is a calendar day, so it reads the same everywhere. */
 const monthDay = (iso: string) =>
@@ -21,7 +17,8 @@ const monthDay = (iso: string) =>
     day: "numeric",
     timeZone: "UTC",
   }).format(new Date(iso));
-const whole = (amount: number) => dollars(amount).replace(/\.00$/, "");
+const validDay = (iso: string | null | undefined): iso is string =>
+  Boolean(iso && Number.isFinite(Date.parse(iso)));
 
 /** What the agency or Strelva set for this business, named. Nothing renders without a controls row. */
 function AgencyUsageControlLines({
@@ -38,11 +35,11 @@ function AgencyUsageControlLines({
   const lines: string[] = [];
   if (controls.paused)
     lines.push(
-      `${agency ?? "A Strelva operator"} paused Strelva work for this business${controls.changedAt && Number.isFinite(Date.parse(controls.changedAt)) ? ` on ${monthDay(controls.changedAt)}` : ""}.`,
+      `${agency ?? "A Strelva operator"} paused Strelva work for this business${validDay(controls.changedAt) ? ` on ${monthDay(controls.changedAt)}` : ""}.`,
     );
   if (controls.monthlyCapCents !== null)
     lines.push(
-      `Usage limit ${whole(controls.monthlyCapCents / 100)} set by ${agency ?? "Strelva"}.${resetsAt && Number.isFinite(Date.parse(resetsAt)) ? ` Resets ${monthDay(resetsAt)}.` : ""}`,
+      `${agency ?? "Strelva"} set a monthly limit on Strelva work here.${validDay(resetsAt) ? ` It resets ${monthDay(resetsAt)}.` : ""}`,
     );
   return lines.length ? (
     <div className={styles.section}>
@@ -59,9 +56,10 @@ function AgencyUsageControlLines({
 }
 
 /**
- * Usage this month, in one sentence (XA · R1): what was used, what running
- * jobs hold, the limit and the reset. Server-authorized; never infer a limit
- * or a reset from the browser.
+ * This month's Strelva work, in one sentence (XA · R1). October 16 money
+ * decision: no dollar figure, so usage reads as a share of the month's limit
+ * and its reset day. Server-authorized; never infer a limit or a reset from
+ * the browser.
  */
 export function BusinessAiBudgetSummary({
   budget,
@@ -79,35 +77,34 @@ export function BusinessAiBudgetSummary({
     Number.isFinite(Number(budget.spentUsd)) &&
     Number.isFinite(Number(budget.reservedUsd)) &&
     Number.isFinite(Date.parse(budget.resetsAt));
-  const spent = known ? Number(budget.spentUsd) : null;
-  const reserved = known ? Number(budget.reservedUsd) : null;
+  const used = known ? Number(budget.spentUsd) + Number(budget.reservedUsd) : null;
   const incomplete = Boolean(known && budget.unknownCostCalls > 0);
-  const limited = capUsd !== null && Number.isFinite(capUsd);
-  const remaining =
-    spent !== null && reserved !== null && limited && !incomplete
-      ? Math.max(0, capUsd - spent - reserved)
+  const limited = capUsd !== null && Number.isFinite(capUsd) && capUsd > 0;
+  const share =
+    used !== null && limited && !incomplete
+      ? Math.min(100, Math.round((used / capUsd) * 100))
       : null;
-  const sentence = !known ? (
-    "Usage this month could not be confirmed."
-  ) : (
-    <>
-      Usage this month: <strong>{dollars(spent!)}</strong> used
-      {reserved ? `, ${dollars(reserved)} held for running jobs` : ""}
-      {limited ? `, of your ${whole(capUsd)} limit` : ""}.
-      {remaining !== null ? ` ${dollars(remaining)} left.` : ""}
-      {!limited ? " No usage limit is set." : ""} Resets{" "}
-      {monthDay(budget.resetsAt)}.
-    </>
-  );
+  const resets = known ? ` It resets ${monthDay(budget.resetsAt)}.` : "";
+  const sentence = !known
+    ? "This month’s Strelva work couldn’t be read just now."
+    : incomplete
+      ? "Some of this month’s Strelva work hasn’t been tallied yet."
+      : share === null
+        ? "There’s no monthly limit on Strelva work here."
+        : share >= 100
+          ? `This month’s Strelva work is used up.${resets}`
+          : share === 0
+            ? `No Strelva work is used yet this month.${resets}`
+            : `${share}% of this month’s Strelva work is used.${resets}`;
   const problem = !known
-    ? "Usage could not be confirmed. Budgeted building stays paused until the budget can be checked."
+    ? "Strelva holds new work until it can read this month again. Nothing already running stops."
     : incomplete
       ? capUsd === null
-        ? "Recorded spend is incomplete: some past jobs have no confirmed cost yet. No spending limit is recorded for this business."
-        : "Usage could not be confirmed. Budgeted building stays paused until the budget can be checked."
+        ? "There’s no monthly limit here, so nothing is held while it’s tallied."
+        : "Strelva holds new work until the tally is done. Nothing already running stops."
       : null;
   return (
-    <section className={styles.section} aria-label="Usage this month">
+    <section className={styles.section} aria-label="This month">
       <p className={styles.body}>{sentence}</p>
       {controls ? (
         <AgencyUsageControlLines
@@ -118,18 +115,10 @@ export function BusinessAiBudgetSummary({
       {enforced ? (
         problem ? (
           <XaSays>{problem}</XaSays>
-        ) : (
-          <p className={styles.note}>
-            Each job holds the most it could cost until it finishes.
-          </p>
-        )
+        ) : null
       ) : (
         <p className={styles.note}>
-          {enforced === false
-            ? "Usage limits are not enabled here."
-            : "Your current usage limit has not been confirmed."}{" "}
-          No plan price is published yet. Nothing is charged until you see one
-          and agree to it.
+          Nothing is charged for Strelva work until plans open.
         </p>
       )}
     </section>
@@ -176,14 +165,14 @@ export function StartWorkspacePlan({
       };
       if (!response.ok || !body.checkoutUrl)
         throw new Error(
-          body.error || "Checkout couldn't be opened. Nothing was charged.",
+          body.error || "Stripe couldn’t be opened. Nothing was charged.",
         );
       navigate(body.checkoutUrl);
     } catch (cause) {
       setError(
         cause instanceof Error
           ? cause.message
-          : "Checkout couldn't be opened. Nothing was charged.",
+          : "Stripe couldn’t be opened. Nothing was charged.",
       );
       setBusy(false);
     }
@@ -192,11 +181,11 @@ export function StartWorkspacePlan({
     <>
       <section
         className={styles.section}
-        aria-label="Run your business on Strelva"
+        aria-label="Choose a plan"
       >
         <p className={styles.body}>
-          Run your business on Strelva. Your plan’s price and included usage are
-          shown before you pay. You can bring in an agency anytime.
+          Stripe shows the plan and what it includes before anything is charged.
+          You can bring in an agency anytime.
         </p>
         <div className={styles.actions}>
           <XaButton
@@ -205,7 +194,7 @@ export function StartWorkspacePlan({
             disabled={busy}
             onClick={() => void start()}
           >
-            Start your plan
+            Choose a plan
           </XaButton>
         </div>
         {error ? (
@@ -224,22 +213,10 @@ export function StartWorkspacePlan({
   );
 }
 
-/** An unconfigured sale never renders a checkout control or an invented price. */
-export function WorkspacePlanUnavailable({
-  workspaceId,
-}: {
-  workspaceId: string;
-}) {
-  return (
-    <section className={styles.section} aria-label="Your plan">
-      <p className={styles.body}>
-        No plan price is published yet. Self-serve plans are not available yet.{" "}
-        <XaTextLink
-          href={`/workspace?view=help&workspaceId=${encodeURIComponent(workspaceId)}`}
-        >
-          Bring in an agency
-        </XaTextLink>
-      </p>
-    </section>
-  );
+/**
+ * Plans aren't open: the honest waitlist path, never a checkout control or an
+ * invented price (October 16 money decision).
+ */
+export function WorkspacePlanUnavailable(props: PlanWaitlistProps) {
+  return <PlanWaitlist {...props} />;
 }

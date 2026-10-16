@@ -44,10 +44,10 @@ export default function MerchantControls({
         throw Error(result.error ?? "Stripe status is unavailable.");
       setMessage(
         result?.state === "ready"
-          ? "Stripe account ready."
+          ? "Stripe says your account is ready."
           : result?.state === "restricted"
-            ? "Stripe still needs details. Continue Stripe setup."
-            : "Stripe setup has not started.",
+            ? "Stripe still needs a few details from you."
+            : "You haven't started on Stripe yet.",
       );
     } catch (e) {
       if (active.current)
@@ -82,7 +82,7 @@ export default function MerchantControls({
         throw Error(result.error ?? "Stripe setup is unavailable.");
       if (action === "disconnect") {
         setMessage(
-          "Strelva payments disconnected. Your Stripe account and past payments stay yours.",
+          "Payments no longer go through Strelva. Your Stripe account and past payments stay yours.",
         );
         return;
       }
@@ -104,6 +104,7 @@ export default function MerchantControls({
     }
   }
   const ready = state === "ready";
+  const [stopping, setStopping] = useState(false);
   return (
     <section className={styles.section} aria-labelledby="stripe-heading">
       <div className={styles.sectionHead}>
@@ -112,7 +113,7 @@ export default function MerchantControls({
         </XaLabel>
         {state === "disconnected" ? (
           <XaStatus kind="draft" size="sm">
-            Disconnected
+            Stopped
           </XaStatus>
         ) : ready ? null : (
           <XaStatus kind="waits" size="sm">
@@ -122,10 +123,10 @@ export default function MerchantControls({
       </div>
       <p className={styles.body}>
         {state === "disconnected"
-          ? "Strelva payments are disconnected. Your Stripe account and past payments stay yours."
+          ? "Payments don't go through Strelva any more. Your Stripe account and past payments stay yours."
           : ready
-            ? "Ready to take payments for your approved quotes and booking deposits."
-            : "Continue on Stripe to see what it still needs. Stripe decides when your account can take payments."}
+            ? "Ready to take payments for the quotes you agree and the bookings you hold."
+            : "Stripe decides when your account can take payments. Continue there to see what it still needs."}
       </p>
       {state !== "disconnected" ? (
         <div className={styles.actions}>
@@ -156,18 +157,46 @@ export default function MerchantControls({
           </XaTextLink>
           {ready ? (
             <>
-              <span className={styles.note} aria-hidden="true">
-                ·
-              </span>
               <XaTextLink
                 onClick={() => {
-                  if (!busy) void change("disconnect");
+                  if (!busy) setStopping(true);
                 }}
               >
-                Disconnect Strelva payments
+                Stop taking payments here
               </XaTextLink>
             </>
           ) : null}
+        </div>
+      ) : null}
+      {ready && stopping ? (
+        <div
+          className={styles.actions}
+          role="group"
+          aria-label="Stop taking payments here"
+        >
+          <span className={styles.body}>
+            New payments stop going through Strelva. Past payments stay in your
+            Stripe account.
+          </span>
+          <XaButton
+            size="sm"
+            busy={busy}
+            disabled={busy}
+            onClick={() => {
+              setStopping(false);
+              void change("disconnect");
+            }}
+          >
+            Stop payments
+          </XaButton>
+          <XaButton
+            size="sm"
+            variant="quiet"
+            disabled={busy}
+            onClick={() => setStopping(false)}
+          >
+            Keep them
+          </XaButton>
         </div>
       ) : null}
       {message ? <XaSays>{message}</XaSays> : null}

@@ -11,6 +11,7 @@ import {
   XaSelect,
   XaStatus,
   XaTextLink,
+  XaYes,
 } from "@/components/ui/strelva/Xa";
 import type {
   PayerTransition,
@@ -33,7 +34,7 @@ const when = (iso: string | null | undefined) => {
         day: "numeric",
         year: "numeric",
       }).format(value)
-    : "date not recorded";
+    : "an unknown day";
 };
 /** Whoever proposed, by name; the email only when no name is recorded. */
 function proposerLabel(item: PayerTransition) {
@@ -41,12 +42,37 @@ function proposerLabel(item: PayerTransition) {
 }
 const STATUS_WORDS: Record<PayerTransition["status"], string> = {
   pending: "Waiting for an answer",
-  accepted: "Accepted",
+  accepted: "Agreed",
   rejected: "Declined",
   revoked: "Withdrawn",
-  stale: "Expired",
+  stale: "Lapsed",
 };
 type Kind = "business" | "agency" | "user";
+type BilledTo = { kind: "business" | "agency"; workspaceId: string; name: string | null };
+
+/** True when a payer change names the same party as the billing record. */
+function samePayer(item: PayerTransition, billed: BilledTo) {
+  if (billed.kind === "agency")
+    return item.successorKind === "agency" && item.successorWorkspaceId === billed.workspaceId;
+  return item.successorKind === "business";
+}
+
+/**
+ * Who pays today, in one sentence. The agreed change and the billing record
+ * usually say the same thing; when they don't, the agreed change counts for
+ * new work and the sentence says so.
+ */
+function payerSentence(current: PayerTransition | null, billed: BilledTo | null): string {
+  if (current) {
+    const agreed = `${successorLabel(current)} pays for work started after ${when(current.acceptedAt)}.`;
+    if (!billed || samePayer(current, billed)) return agreed;
+    const record = billed.kind === "agency" ? (billed.name ?? "an agency") : "this business";
+    return `${agreed} The billing record still names ${record}; the agreed change is the one that counts.`;
+  }
+  if (billed?.kind === "agency")
+    return `${billed.name ?? "Your agency"} pays for this business’s Strelva work.`;
+  return "This business pays for its own Strelva work.";
+}
 
 /** Who pays for future jobs (XA · R4 language): one sentence for today, the waiting change beside it, then the choice. */
 export function WorkspacePayerTransition({
@@ -55,6 +81,7 @@ export function WorkspacePayerTransition({
   agencyChoices = [],
   agencyChoicesError = "",
   providerChangeEnabled = false,
+  billedTo = null,
   request = fetch,
 }: {
   workspaceId: string;
@@ -62,6 +89,12 @@ export function WorkspacePayerTransition({
   agencyChoices?: { id: string; name: string }[];
   agencyChoicesError?: string;
   providerChangeEnabled?: boolean;
+  /**
+   * Who the billing record says pays for this plan (BusinessBilling.payerParty).
+   * The page's headline and Pebble read the same record, so this section says
+   * the same payer; when an agreed change disagrees, it says which one counts.
+   */
+  billedTo?: { kind: "business" | "agency"; workspaceId: string; name: string | null } | null;
   request?: typeof fetch;
 }) {
   const [data, setData] = useState<PayerTransitionSnapshot | null>(null);
@@ -71,6 +104,9 @@ export function WorkspacePayerTransition({
   const [successorKind, setSuccessorKind] = useState<Kind>("business");
   const [successorAgencyWorkspaceId, setSuccessorAgencyWorkspaceId] =
     useState("");
+  const [changing, setChanging] = useState(false);
+  const [answering, setAnswering] = useState<"accept" | "reject" | null>(null);
+  const [formError, setFormError] = useState("");
   const [providerChange, setProviderChange] = useState<{
     id: string;
     status: string;
@@ -86,14 +122,14 @@ export function WorkspacePayerTransition({
         );
         const body = await response.json();
         if (!response.ok)
-          throw new Error(body.error ?? "Payer history could not be loaded.");
+          throw new Error(body.error ?? "Who pays couldn’t be read just now.");
         setData(body);
       } catch (cause) {
         if (!signal?.aborted)
           setError(
             cause instanceof Error
               ? cause.message
-              : "Payer history could not be loaded.",
+              : "Who pays couldn’t be read just now.",
           );
       }
     },
@@ -129,7 +165,7 @@ export function WorkspacePayerTransition({
       const result = await response.json();
       if (!response.ok)
         throw new Error(
-          result.error ?? "The payer change could not be confirmed.",
+          result.error ?? "That didn’t go through. Nothing changed.",
         );
       if (body.action === "accept") setProviderChange(null);
       const scoped = {
@@ -155,23 +191,24 @@ export function WorkspacePayerTransition({
           : null;
       setNotice(
         body.action === "accept" && resolved?.status === "stale"
-          ? "This proposal became stale because its proposer is no longer a business owner."
+          ? "This ask lapsed because the person who made it no longer owns the business."
           : body.action === "accept"
-            ? "You accepted responsibility for future jobs."
+            ? "You now pay for Strelva work from here on."
             : body.action === "reject"
-              ? "You declined this payer change."
+              ? "You said no. Nothing changed."
               : body.action === "revoke"
-                ? "The pending payer change was withdrawn."
-                : "Payer change proposed. Someone who can sign for the proposed payer accepts it.",
+                ? "You took the ask back. Nothing changed."
+                : "Asked. It changes once they say yes.",
       );
     } catch (cause) {
       setError(
         cause instanceof Error
           ? cause.message
-          : "The payer change could not be confirmed.",
+          : "That didn’t go through. Nothing changed.",
       );
     } finally {
       setBusy(false);
+      setChanging(false);
     }
   }
 
@@ -209,21 +246,21 @@ export function WorkspacePayerTransition({
       const result = await response.json();
       if (!response.ok)
         throw new Error(
-          result.error ?? "The agency handoff could not be confirmed.",
+          result.error ?? "The move to a new agency didn’t go through.",
         );
       setProviderChange(result);
       setNotice(
         result.status === "completed"
-          ? "The agency handoff is complete. Existing sites and money records are kept."
+          ? "The move is done. Your sites and payments stay as they were."
           : result.status === "awaiting_policy"
-            ? "Your handoff request is saved. The agency's response policy must be approved before it can go ahead."
-            : "Your handoff request is saved. The outgoing agency gets its notice and response window before it completes.",
+            ? "Your ask is saved. It goes ahead once Strelva approves how the agency answers."
+            : "Your ask is saved. Your current agency hears about it and has time to answer first.",
       );
     } catch (cause) {
       setError(
         cause instanceof Error
           ? cause.message
-          : "The agency handoff could not be confirmed.",
+          : "The move to a new agency didn’t go through.",
       );
     } finally {
       setBusy(false);
@@ -248,7 +285,7 @@ export function WorkspacePayerTransition({
       aria-labelledby="payer-transition-heading"
     >
       <XaLabel as="h2" id="payer-transition-heading">
-        Who pays for future jobs
+        Who pays for Strelva work
       </XaLabel>
       {!data && !error ? (
         <p className={styles.note} role="status">
@@ -257,15 +294,8 @@ export function WorkspacePayerTransition({
       ) : null}
       {data ? (
         <p className={styles.body}>
-          {data.current ? (
-            <>
-              {successorLabel(data.current)} pays for jobs started after{" "}
-              {when(data.current.acceptedAt)}.
-            </>
-          ) : (
-            "This business pays. No other payer has accepted future jobs."
-          )}{" "}
-          Existing budgets, holds and recorded costs keep their original payer.
+          {payerSentence(data.current, billedTo)} A change only counts from the
+          day it&rsquo;s agreed.
         </p>
       ) : null}
       {error ? (
@@ -284,10 +314,9 @@ export function WorkspacePayerTransition({
       data.current.successorKind !== "user" ? (
         <div className={styles.section}>
           <p className={styles.body}>
-            Use {successorLabel(data.current)} for an agency handoff. Strelva
-            checks again that you own the business and that this payer still
-            accepts. Existing sites and agreements stay as they are; any new
-            price needs its own yes.
+            Moving to {successorLabel(data.current)} as your agency keeps your
+            sites and agreements as they are. Any new price still needs your
+            yes.
           </p>
           <div className={styles.actions}>
             <XaButton
@@ -300,10 +329,10 @@ export function WorkspacePayerTransition({
               }
             >
               {providerChange?.status === "completed"
-                ? "Agency handoff complete"
+                ? "Moved"
                 : providerChange?.status === "notified"
-                  ? "Complete after the response window"
-                  : "Request agency handoff"}
+                  ? "Finish the move"
+                  : "Move to this agency"}
             </XaButton>
           </div>
         </div>
@@ -312,75 +341,91 @@ export function WorkspacePayerTransition({
         <div
           className={styles.waiting}
           role="group"
-          aria-label="Payer change waiting for an answer"
+          aria-label="A change to who pays, waiting for an answer"
         >
-          <p className={styles.line}>
-            <strong>{successorLabel(pending)} as payer for future jobs</strong>{" "}
-            <XaStatus kind="waits" size="sm">
-              Waiting for{" "}
-              {pending.successorKind === "business"
-                ? "a business owner"
-                : successorLabel(pending)}
-            </XaStatus>
-            <span className={styles.lineActions}>
-              {addressed ? (
-                <>
-                  <XaTextLink
-                    disabled={busy}
-                    onClick={() =>
-                      void command({
-                        action: "accept",
-                        transitionId: pending.id,
-                      })
-                    }
-                  >
-                    Accept future payer role
-                  </XaTextLink>
-                  <span aria-hidden="true">·</span>
-                  <XaTextLink
-                    disabled={busy}
-                    onClick={() =>
-                      void command({
-                        action: "reject",
-                        transitionId: pending.id,
-                      })
-                    }
-                  >
-                    Decline
-                  </XaTextLink>
-                </>
-              ) : null}
-              {addressed && canPropose ? (
-                <span aria-hidden="true">·</span>
-              ) : null}
-              {canPropose ? (
-                <XaTextLink
-                  disabled={busy}
-                  onClick={() =>
-                    void command({ action: "revoke", transitionId: pending.id })
-                  }
-                >
-                  Withdraw
-                </XaTextLink>
-              ) : null}
-            </span>
+          {/* The ask, then its state on its own line, then the answers: nothing orphans when it wraps. */}
+          <p className={styles.waitingTitle}>
+            {successorLabel(pending)} to pay from now on
           </p>
+          <XaStatus kind="waits" size="sm">
+            Waiting for{" "}
+            {pending.successorKind === "business"
+              ? "a business owner"
+              : successorLabel(pending)}
+          </XaStatus>
           <p className={styles.note}>
-            {proposerLabel(pending)} proposed it on {when(pending.proposedAt)}.{" "}
+            {proposerLabel(pending)} asked on {when(pending.proposedAt)}.{" "}
             {pending.successorKind === "agency"
-              ? "Only an owner or admin of this agency can accept."
+              ? "An owner or admin of the agency answers."
               : pending.successorKind === "business"
-                ? "A business owner accepts."
-                : "Only this person can accept, after confirming their email."}
+                ? "The business owner answers."
+                : "They answer after confirming their email."}
           </p>
+          {addressed ? (
+            <XaYes
+              state={busy && answering === "accept" ? "going" : error && answering === "accept" ? "failed" : "waiting"}
+              yesLabel="Agree to pay"
+              notYetLabel="Decline"
+              block={false}
+              onYes={() => {
+                setAnswering("accept");
+                void command({ action: "accept", transitionId: pending.id });
+              }}
+              onNotYet={busy ? undefined : () => {
+                setAnswering("reject");
+                void command({ action: "reject", transitionId: pending.id });
+              }}
+              working={{
+                title: "Saving your yes",
+                steps: [{ id: "accept", label: "Keeping your answer with your name", state: "active" }],
+              }}
+              failure={error || undefined}
+            />
+          ) : null}
+          {canPropose ? (
+            <p className={styles.links}>
+              <XaTextLink
+                disabled={busy}
+                onClick={() =>
+                  void command({ action: "revoke", transitionId: pending.id })
+                }
+              >
+                Take it back
+              </XaTextLink>
+            </p>
+          ) : null}
         </div>
+      ) : canPropose && data && !changing ? (
+        <p className={styles.note}>
+          <XaTextLink
+            onClick={() => {
+              setChanging(true);
+              setNotice("");
+            }}
+          >
+            Change who pays
+          </XaTextLink>
+        </p>
       ) : canPropose && data ? (
         <form
           className={styles.form}
+          noValidate
           onSubmit={(event) => {
             event.preventDefault();
             const form = new FormData(event.currentTarget);
-            if (successorKind === "agency" && agencyMissing) return;
+            setFormError("");
+            if (successorKind === "agency" && agencyMissing) {
+              setFormError("Choose the agency you want to ask.");
+              return;
+            }
+            const email = String(form.get("successorEmail") ?? "").trim();
+            if (
+              successorKind === "user" &&
+              !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
+            ) {
+              setFormError("Write their email, like dana@example.com.");
+              return;
+            }
             void command(
               successorKind === "agency"
                 ? {
@@ -399,13 +444,13 @@ export function WorkspacePayerTransition({
                   : {
                       action: "propose",
                       workspaceId,
-                      successorEmail: form.get("successorEmail"),
+                      successorEmail: email,
                     },
             );
           }}
         >
           <XaDoors
-            label="Change who pays for future jobs"
+            label="Who should pay from now on"
             name="payerKind"
             value={successorKind}
             onChange={setSuccessorKind}
@@ -413,19 +458,18 @@ export function WorkspacePayerTransition({
               {
                 value: "business",
                 label: "This business",
-                detail:
-                  "A business owner accepts. Existing job limits and agreements stay.",
+                detail: "The business owner says yes. Your agreements stay.",
               },
               {
                 value: "agency",
                 label: "An agency serving you",
                 detail:
-                  "The agency accepts from its billing page. You do not need to join its team.",
+                  "The agency says yes on its side. You don’t join its team.",
               },
               {
                 value: "user",
-                label: "A named person who signs for the business",
-                detail: "They accept after confirming their email.",
+                label: "Someone who signs for the business",
+                detail: "They say yes after confirming their email.",
               },
             ]}
           />
@@ -448,7 +492,7 @@ export function WorkspacePayerTransition({
                   setSuccessorAgencyWorkspaceId(event.target.value)
                 }
                 disabled={busy}
-                required
+                error={formError || undefined}
                 options={[
                   { value: "", label: "Choose your agency" },
                   ...agencyChoices.map((agency) => ({
@@ -459,12 +503,11 @@ export function WorkspacePayerTransition({
               />
             ) : (
               <p className={styles.body}>
-                No agency is serving this business yet. Bring in an agency
-                before asking it to pay.{" "}
+                No agency works with this business yet. Bring one in first.{" "}
                 <XaTextLink
                   href={`/workspace?view=help&workspaceId=${encodeURIComponent(workspaceId)}`}
                 >
-                  Choose an agency
+                  Bring in an agency
                 </XaTextLink>
               </p>
             )
@@ -474,31 +517,41 @@ export function WorkspacePayerTransition({
               name="successorEmail"
               type="email"
               maxLength={254}
-              required
+              error={formError || undefined}
             />
           ) : null}
           <div className={styles.actions}>
-            <XaButton type="submit" disabled={busy || agencyMissing}>
-              Propose this payer
+            <XaButton type="submit" busy={busy} disabled={busy}>
+              Ask them
+            </XaButton>
+            <XaButton
+              variant="quiet"
+              disabled={busy}
+              onClick={() => {
+                setChanging(false);
+                setFormError("");
+              }}
+            >
+              Not yet
             </XaButton>
           </div>
         </form>
       ) : !canPropose && data && !pending ? (
         <p className={styles.note}>
-          Only a business owner can propose a new payer.
+          Only the business owner can change who pays.
         </p>
       ) : null}
       {data?.transitions.length ? (
         <details className={styles.history}>
           <summary className={styles.detailsToggle}>
-            Earlier payer changes
+            Earlier changes to who pays
           </summary>
-          <XaRows label="Earlier payer changes">
+          <XaRows label="Earlier changes to who pays">
             {data.transitions.map((item) => (
               <XaRow
                 key={item.id}
                 title={successorLabel(item)}
-                detail={`${proposerLabel(item)} proposed it on ${when(item.proposedAt)}`}
+                detail={`${proposerLabel(item)} asked on ${when(item.proposedAt)}`}
                 meta={STATUS_WORDS[item.status]}
               />
             ))}

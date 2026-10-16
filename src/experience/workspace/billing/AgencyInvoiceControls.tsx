@@ -13,6 +13,7 @@ import {
   type XaYesState,
 } from "@/components/ui/strelva/Xa";
 import type { AgencyInvoice } from "@/platform/agency-billing/types";
+import { XA_YES_LABELS } from "@/platform/presentation/place-labels";
 import type { CheckoutAvailability } from "@/platform/connect/checkout-availability";
 import {
   AgencyCheckoutStatus,
@@ -26,12 +27,12 @@ const price = (invoice: Pick<AgencyInvoice, "amount_cents" | "currency">) =>
     currency: invoice.currency || "usd",
   }).format(invoice.amount_cents / 100);
 const STATUS_WORDS: Record<AgencyInvoice["status"], string> = {
-  proposed: "Waiting for the owner",
+  proposed: "Waiting on the owner",
   accepted: "Accepted",
   declined: "Declined",
   revoked: "Withdrawn",
   awaiting_payment: "Waiting for payment",
-  active: "Active",
+  active: "Running",
   paid: "Paid",
   cancelled: "Cancelled",
 };
@@ -40,22 +41,24 @@ function ReceiptState({ invoice }: { invoice: AgencyInvoice }) {
   if (invoice.payment_receipt_state === "review")
     return (
       <p role="alert" className={styles.critical}>
-        Payment needs review. Stripe&apos;s record could not be matched to the
-        accepted agreement. Your agency must reconcile it.
+        Stripe&apos;s payment doesn&apos;t match the price that was agreed.
+        Strelva is checking it with the agency. Nothing more is charged until
+        it&apos;s settled.
       </p>
     );
   if (invoice.payment_receipt_state === "matched")
     return (
       <p role="status" className={styles.body}>
-        Payment is confirmed for these accepted terms.
+        Stripe confirmed the payment for this price.
         {invoice.kind === "rebill" && invoice.status === "awaiting_payment"
-          ? " The subscription’s current state still needs reconciliation."
+          ? " Stripe hasn’t confirmed next month’s yet."
           : ""}
       </p>
     );
   return invoice.kind === "rebill" && invoice.status === "active" ? (
     <p role="status" className={styles.body}>
-      The subscription is active. Payment is not yet confirmed.
+      The monthly payment is set up. Stripe hasn&apos;t confirmed the first one
+      yet.
     </p>
   ) : null;
 }
@@ -89,6 +92,10 @@ function ScopedAgencyInvoiceControls({
   );
   const [idempotencyKey, setIdempotencyKey] = useState("");
   const [error, setError] = useState("");
+  const [fieldErrors, setFieldErrors] = useState<{
+    amount?: string;
+    description?: string;
+  }>({});
   const [busy, setBusy] = useState(false);
   const inflight = useRef<AbortController | null>(null);
   useEffect(() => () => inflight.current?.abort(), []);
@@ -117,7 +124,7 @@ function ScopedAgencyInvoiceControls({
       const value = await response.json();
       if (controller.signal.aborted) return;
       if (!response.ok)
-        throw new Error(value.error ?? "The agreement could not be confirmed.");
+        throw new Error(value.error ?? "That didn't go through. Nothing changed.");
       setInvoice(value);
       if (body.action === "propose") setIdempotencyKey("");
     } catch (cause) {
@@ -125,7 +132,7 @@ function ScopedAgencyInvoiceControls({
         setError(
           cause instanceof Error
             ? cause.message
-            : "The agreement could not be confirmed.",
+            : "That didn't go through. Nothing changed.",
         );
     } finally {
       if (!controller.signal.aborted) {
@@ -147,14 +154,13 @@ function ScopedAgencyInvoiceControls({
       <details className={styles.history}>
         <summary className={styles.detailsToggle}>
           {invoice
-            ? `Retail price${invoice.status === "proposed" ? " waits on the owner" : `, ${STATUS_WORDS[invoice.status].toLowerCase()}`}`
-            : "Set a retail price for this client"}
+            ? `Your price${invoice.status === "proposed" ? " waits on the owner" : `, ${STATUS_WORDS[invoice.status].toLowerCase()}`}`
+            : "Set what this client pays you"}
         </summary>
         <div className={styles.inlinePanel}>
           <p className={styles.note}>
-            The business owner sees these exact terms and says yes before any
-            checkout or subscription is made. Your wholesale bill stays
-            separate.
+            The owner sees exactly this and says yes before anything is
+            charged. Money goes to your own Stripe account.
           </p>
           <AgencyCheckoutStatus
             availability={checkoutAvailability}
@@ -162,16 +168,26 @@ function ScopedAgencyInvoiceControls({
           />
           <form
             className={styles.form}
+            noValidate
             onSubmit={(event) => {
               event.preventDefault();
               const form = new FormData(event.currentTarget);
-              const dollars = String(form.get("amount") ?? "").trim();
-              if (!/^\d+(\.\d{1,2})?$/.test(dollars) || Number(dollars) <= 0) {
-                setError(
-                  "Enter an amount above $0, with at most two decimals.",
-                );
-                return;
-              }
+              const dollars = String(form.get("amount") ?? "")
+                .trim()
+                .replace(/^\$/, "")
+                .replace(/,/g, "");
+              const description = String(form.get("description") ?? "").trim();
+              const problems = {
+                amount:
+                  !/^\d+(\.\d{1,2})?$/.test(dollars) || Number(dollars) <= 0
+                    ? "Write the amount in dollars, like 450 or 450.50."
+                    : undefined,
+                description: description
+                  ? undefined
+                  : "Say what this covers, so the owner knows what they're agreeing to.",
+              };
+              setFieldErrors(problems);
+              if (problems.amount || problems.description) return;
               void command({
                 action: "propose",
                 agencyWorkspaceId,
@@ -179,7 +195,7 @@ function ScopedAgencyInvoiceControls({
                 kind,
                 amountCents: Math.round(Number(dollars) * 100),
                 currency: "usd",
-                description: form.get("description"),
+                description,
                 idempotencyKey:
                   idempotencyKey ||
                   (() => {
@@ -209,15 +225,26 @@ function ScopedAgencyInvoiceControls({
               }
               name="amount"
               inputMode="decimal"
-              required
               disabled={busy}
+              error={fieldErrors.amount}
+              onChange={() =>
+                fieldErrors.amount &&
+                setFieldErrors((current) => ({ ...current, amount: undefined }))
+              }
             />
             <XaTextArea
               label="What this covers"
               name="description"
               maxLength={300}
-              required
               disabled={busy}
+              error={fieldErrors.description}
+              onChange={() =>
+                fieldErrors.description &&
+                setFieldErrors((current) => ({
+                  ...current,
+                  description: undefined,
+                }))
+              }
             />
             <div className={styles.actions}>
               <XaButton type="submit" disabled={busy}>
@@ -227,7 +254,7 @@ function ScopedAgencyInvoiceControls({
           </form>
           {initialInvoices.length > 1 ? (
             <XaSelect
-              label="Earlier agreements with this client"
+              label="Earlier prices for this client"
               disabled={busy}
               value={invoice?.id ?? ""}
               onChange={(event) => {
@@ -284,7 +311,7 @@ function ScopedAgencyInvoiceControls({
                       void command({ action: "fulfill", intentId: invoice.id })
                     }
                   >
-                    Create accepted checkout
+                    Make the payment page
                   </XaButton>
                 </div>
               ) : null}
@@ -307,7 +334,7 @@ type AcceptanceProps = {
   request?: typeof fetch;
   /** Agencies serving this business, by workspace id, so the agency is named. */
   agencyNames?: Readonly<Record<string, string>>;
-  /** What the business pays Strelva each month, so the owner can tell the two apart. */
+  /** Kept for callers; Strelva's own price is never shown (October 16 money decision). */
   planCents?: number | null;
 };
 /** The owner agrees to a price their agency prepared (XA · O3): the terms, then the one yes. */
@@ -319,7 +346,6 @@ function ScopedAgencyInvoiceAcceptance({
   checkoutAvailability = UNRELEASED_CHECKOUT,
   request = fetch,
   agencyNames = {},
-  planCents = null,
 }: AcceptanceProps) {
   const [invoice, setInvoice] = useState<AgencyInvoice | null>(null);
   const [error, setError] = useState("");
@@ -337,7 +363,7 @@ function ScopedAgencyInvoiceAcceptance({
       const value = await response.json();
       if (signal.aborted) return;
       if (!response.ok)
-        throw new Error(value.error ?? "The agreement could not be loaded.");
+        throw new Error(value.error ?? "This price couldn't be read just now.");
       setInvoice(value);
     },
     [invoiceId, request],
@@ -349,7 +375,7 @@ function ScopedAgencyInvoiceAcceptance({
         setError(
           cause instanceof Error
             ? cause.message
-            : "The agreement could not be loaded.",
+            : "This price couldn't be read just now.",
         );
     });
     return () => controller.abort();
@@ -374,14 +400,14 @@ function ScopedAgencyInvoiceAcceptance({
       const value = await response.json();
       if (controller.signal.aborted) return;
       if (!response.ok)
-        throw new Error(value.error ?? "Your answer could not be confirmed.");
+        throw new Error(value.error ?? "Your answer didn't go through. Nothing changed.");
       setInvoice(value);
     } catch (cause) {
       if (!controller.signal.aborted)
         setError(
           cause instanceof Error
             ? cause.message
-            : "Your answer could not be confirmed.",
+            : "Your answer didn't go through. Nothing changed.",
         );
     } finally {
       if (!controller.signal.aborted) {
@@ -392,14 +418,14 @@ function ScopedAgencyInvoiceAcceptance({
   }
   if (!invoice)
     return (
-      <section className={styles.section} aria-label="Agency retail agreement">
+      <section className={styles.section} aria-label="A price from your agency">
         {error ? (
           <p role="alert" className={styles.critical}>
             {error}
           </p>
         ) : (
           <p role="status" className={styles.note}>
-            Loading the agreement…
+            Reading the price from your agency…
           </p>
         )}
       </section>
@@ -407,15 +433,6 @@ function ScopedAgencyInvoiceAcceptance({
   const proposed = invoice.status === "proposed" && invoice.can_accept;
   const agency = agencyNames[invoice.agency_workspace_id] ?? "your agency";
   const Agency = agency.charAt(0).toUpperCase() + agency.slice(1);
-  const plan =
-    planCents && planCents > 0
-      ? new Intl.NumberFormat("en-US", {
-          style: "currency",
-          currency: "USD",
-        })
-          .format(planCents / 100)
-          .replace(/\.00$/, "")
-      : null;
   const yesState: XaYesState =
     busy === "accept" ? "going" : error && proposed ? "failed" : "waiting";
   const status =
@@ -430,23 +447,24 @@ function ScopedAgencyInvoiceAcceptance({
     );
   return (
     <XaDecision
-      label="Agency retail agreement"
+      label={`A price from ${agency}`}
       status={status}
       meta={`Prepared by ${agency}`}
       yes={
         proposed ? (
           <XaYes
             state={yesState}
-            yesLabel="Accept these terms"
+            yesLabel={XA_YES_LABELS.confirm}
+            yesAriaLabel={`Confirm ${agency}'s price`}
             notYetLabel="Decline"
             onYes={() => void respond("accept")}
             onNotYet={busy ? undefined : () => void respond("decline")}
             working={{
-              title: "Recording your yes",
+              title: "Saving your yes",
               steps: [
                 {
                   id: "accept",
-                  label: "Saving these exact terms with your name",
+                  label: "Keeping this exact price with your name",
                   state: "active",
                 },
               ],
@@ -463,9 +481,8 @@ function ScopedAgencyInvoiceAcceptance({
         </p>
         <p className={styles.body}>{invoice.description}</p>
         <p className={styles.note}>
-          {plan
-            ? `This is what ${agency} charges you, on its own Stripe account, separate from Strelva's ${plan} a month.`
-            : `This is what ${agency} charges you, on its own Stripe account, separate from what you pay Strelva.`}
+          {Agency} charges this through its own Stripe account. It&apos;s
+          separate from anything you pay Strelva.
         </p>
         <AgencyCheckoutStatus
           availability={checkoutAvailability}
@@ -479,7 +496,7 @@ function ScopedAgencyInvoiceAcceptance({
             disabled={Boolean(busy) || checkoutAvailability.status !== "ready"}
             onClick={() => void respond("fulfill")}
           >
-            Create accepted checkout
+            Make the payment page
           </XaButton>
         </div>
       ) : null}
@@ -488,8 +505,8 @@ function ScopedAgencyInvoiceAcceptance({
       (!invoice.payment_receipt_state ||
         invoice.payment_receipt_state === "unconfirmed") ? (
         <p role="status" className={styles.note}>
-          The subscription is recorded. Its payment page still needs
-          reconciliation; no new subscription is being made.
+          The monthly payment is set up. Its payment page isn&apos;t ready yet,
+          and nothing new is being charged.
         </p>
       ) : null}
       {checkoutAvailability.status === "ready" &&
@@ -497,7 +514,7 @@ function ScopedAgencyInvoiceAcceptance({
       (!invoice.payment_receipt_state ||
         invoice.payment_receipt_state === "unconfirmed") ? (
         <a className={styles.detailsToggle} href={invoice.checkout_url}>
-          Pay this agreement
+          Pay {agency}
         </a>
       ) : null}
       {error && !proposed ? (

@@ -22,7 +22,7 @@ export function SourceAttributionView({
     <div className={styles.screen}>
       <p className={styles.note}>
         <XaTextLink href={systemHref("", workspaceId, systemId)}>
-          Back to the System
+          Back
         </XaTextLink>
       </p>
       <div className={styles.brief}>
@@ -30,8 +30,8 @@ export function SourceAttributionView({
         <XaHeadline
           quiet={
             ownSource
-              ? "Every business that installs it keeps your name on it."
-              : "Your Version is yours. The credit stays with them."
+              ? "Every business that adds it keeps your name on it."
+              : "Your copy is yours to run. Their name stays on it."
           }
         >
           Made by {creator.creatorName}.
@@ -41,16 +41,16 @@ export function SourceAttributionView({
         labelWidth={140}
         rows={[
           [
-            "Your Version",
-            "Its own records, Connections and decisions about what goes live.",
+            "Your copy",
+            "Its own records, its own connections, and your say over what goes live.",
           ],
           [
             "The credit",
-            `${creator.creatorName} is named as the creator for as long as this System runs.`,
+            `${creator.creatorName} is named as its maker for as long as it runs.`,
           ],
           [
             "Money",
-            "Usage, royalties and upkeep show only when written terms are recorded. A credit alone sets none.",
+            "The credit alone costs nothing. A price shows here only once one is agreed.",
           ],
         ]}
       />
@@ -59,7 +59,7 @@ export function SourceAttributionView({
           <XaTextLink
             href={`/workspace?${new URLSearchParams({ workspaceId, agencyView: "library" })}`}
           >
-            Open Library sources
+            Open the Library
           </XaTextLink>
           {process.env.STRELVA_REVENUE_SPLITS === "1" ? (
             <>
@@ -67,7 +67,7 @@ export function SourceAttributionView({
               <XaTextLink
                 href={`/workspace/creator-maintenance?${new URLSearchParams({ workspaceId })}`}
               >
-                Listing and upkeep terms
+                Apps you made for others
               </XaTextLink>
             </>
           ) : null}

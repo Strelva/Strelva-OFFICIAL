@@ -27,11 +27,11 @@ export default async function CreatorMaintenancePage({
     sourceGraph = await readNeutralCreatorSources(actor, workspaceId);
   } catch {
     return (
-      <StrelvaShell title="" workspaceId={workspaceId} detailsPlace="plan">
+      <StrelvaShell title="" workspaceId={workspaceId} agencyNavigation={{}} detailsPlace="elsewhere">
         <div className={styles.screen}>
           <MoneyLoadFailure
-            title="Maintenance records could not be loaded."
-            quiet="Confirm owner or admin access and try again."
+            title="Your apps couldn't be read just now."
+            quiet="Only an owner or admin of the agency can open this. Try again in a moment."
             retryHref={`/workspace/creator-maintenance?workspaceId=${id}`}
           />
         </div>
@@ -39,21 +39,22 @@ export default async function CreatorMaintenancePage({
     );
   }
   return (
-    <StrelvaShell title="" workspaceId={workspaceId} detailsPlace="plan">
+    <StrelvaShell title="" workspaceId={workspaceId} agencyNavigation={{}} detailsPlace="elsewhere">
       <div className={styles.screen}>
         <nav aria-label="Back" className={styles.links}>
+          {/* Back to the agency's own billing page; agencies have no Plan and usage. */}
           <XaTextLink href={`/workspace/billing?workspaceId=${id}`}>
-            Billing
+            Clients you cover
           </XaTextLink>
           <span aria-hidden="true">·</span>
           <XaTextLink
             href={`/workspace?${new URLSearchParams({ workspaceId, agencyView: "library" })}`}
           >
-            Library sources
+            Library
           </XaTextLink>
         </nav>
-        <XaHeadline quiet="Who keeps each System you list working, and what its creator earns.">
-          Creator maintenance
+        <XaHeadline quiet="Who looks after each one, and what you earn when a business pays for it.">
+          Apps you made for others
         </XaHeadline>
         <SourceListing graph={sourceGraph} actorId={actor.userId} />
         <CreatorMaintenance
@@ -62,7 +63,7 @@ export default async function CreatorMaintenancePage({
           listingNames={Object.fromEntries(
             sourceGraph.sources.map((item) => [
               item.sourceRevisionId,
-              `${item.name}, Release ${item.revision}`,
+              item.name,
             ]),
           )}
         />
