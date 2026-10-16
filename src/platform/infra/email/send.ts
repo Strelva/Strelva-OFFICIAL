@@ -1,3 +1,4 @@
+import { readVisitorMailBrand } from "./visitor-brand-port";
 import { resolveEmailBusinessContext, type EmailBusinessContext, type EmailBusinessScope } from "@/platform/infra/email/business-context";
 import { formatEmailFrom } from "@/platform/infra/email/from";
 import { warnMissingProviderKeysOnce } from "@/platform/connections/provider-keys";
@@ -206,8 +207,12 @@ export async function sendEmailWithReceipt(input: SendEmailInput): Promise<SendE
     return { status: "suppressed", reason: "business_identity_unavailable" };
   }
   const resolvedBrand = identity && brand ? { ...brand, name: identity.name, replyTo: identity.replyTo } : brand;
+  // A business's customer mail wears that business's accent and logo unless the caller already supplied it.
+  const visitorBrand = authorship === "business" && input.audience === "customer" && input.options && !input.options.visitorBrand && !input.options.xa?.brand
+    ? await readVisitorMailBrand({ tenantId: input.tenantId, workspaceId: input.workspaceId })
+    : null;
   const options = input.options ? {
-    ...input.options, brand: resolvedBrand, businessName,
+    ...input.options, brand: resolvedBrand, businessName, ...(visitorBrand ? { visitorBrand } : {}),
     ...(bookingMail && input.options.rows ? { rows: input.options.rows.map(row => readableBookingRow(row, businessIdentity?.timeZone)) } : {}),
     ...(input.options.paper ? { paper: { ...input.options.paper, brand: resolvedBrand, businessName } } : {}),
   } : undefined;

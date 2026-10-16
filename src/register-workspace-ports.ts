@@ -11,6 +11,7 @@ import { registerListingsTenantPorts } from "@/platform/listings-sync/runtime-po
 
 import { registerCalendarBusyProviderRead, registerBookingRequestNotifier } from "@/platform/bookings/runtime-ports";
 import { registerAutoPostWithdrawal } from "@/platform/ai-controls/runtime-ports";
+import { registerVisitorMailBrandReader } from "@/platform/infra/email/visitor-brand-port";
 
 const ports: WorkspacePorts = workspacePortLoaders;
 registerWorkspacePorts(ports);
@@ -50,3 +51,11 @@ registerListingsTenantPorts(async () => ({
   },
   yelpConnection: async tenantId => (await import("@/lib/connections")).getConnection(tenantId, "yelp"),
 }));
+
+// Visitor mail wears the business's own look; which look that is belongs to the websites product.
+registerVisitorMailBrandReader(async ({ tenantId, workspaceId }) => {
+  const [{ readVisitorBrand, readVisitorBrandForWorkspace }, { visitorBrandForMail }] = await Promise.all([import("@/products/websites"), import("@/products/websites/client")]);
+  const tenant = tenantId && !tenantId.startsWith("workspace:") ? tenantId : null;
+  const workspace = workspaceId ?? (tenantId?.startsWith("workspace:") ? tenantId.slice("workspace:".length) : null);
+  return visitorBrandForMail(tenant ? await readVisitorBrand(tenant) : await readVisitorBrandForWorkspace(workspace));
+});

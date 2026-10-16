@@ -30,10 +30,12 @@ export type ManageBookingState =
   | { kind: "not_found" }
   /** The booking couldn't be read (store down). Nothing changed. */
   | { kind: "error" }
-  | { kind: "ended"; booking: ManagedBookingView }
+  | { kind: "ended"; booking: ManagedBookingView; /** Whose booking this is, so the page can wear the business's own look. Never rendered. */ tenantId?: string }
   | {
       kind: "ready";
       booking: ManagedBookingView;
+      /** Whose booking this is, so the page can wear the business's own look. Never rendered. */
+      tenantId?: string;
       /** Open times for a change, grouped by day. Empty when none are open or they couldn't be read. */
       days: Array<{ day: string; slots: Array<{ id: string; time: string }> }>;
       slotsUnavailable: boolean;
@@ -41,6 +43,11 @@ export type ManageBookingState =
       changesClosed: boolean;
       notice?: "cancelled" | "rescheduled" | "pending" | "confirmed";
       error?: string;
+      /**
+       * After a move: the time it moved from, while that time is still open,
+       * so the page can offer "Go back to …" as a plain reschedule post.
+       */
+      undo?: { slotId: string; label: string };
     };
 
 export const MANAGE_TOKEN = /^[A-Za-z0-9._~-]{8,256}$/;
@@ -109,7 +116,7 @@ export function managedView(reservation: ManagedReservation): ManagedBookingView
 
 export async function loadManageState(
   token: string,
-  query: { done?: string | null; error?: string | null },
+  query: { done?: string | null; error?: string | null; from?: string | null },
   deps: ManageDeps,
 ): Promise<ManageBookingState> {
   const hash = manageTokenHash(token);
@@ -118,10 +125,10 @@ export async function loadManageState(
   if (!reservation) return { kind: "not_found" };
   const booking = managedView(reservation);
   // The link expires once the booking has ended.
-  if (Date.parse(reservation.end) <= deps.now() || (reservation.status === "held" && (!reservation.confirmUntil || Date.parse(reservation.confirmUntil) <= deps.now()))) return { kind: "ended", booking };
+  if (Date.parse(reservation.end) <= deps.now() || (reservation.status === "held" && (!reservation.confirmUntil || Date.parse(reservation.confirmUntil) <= deps.now()))) return { kind: "ended", booking, tenantId: reservation.tenantId };
   const notice: "cancelled" | "rescheduled" | "pending" | "confirmed" | undefined =
     query.done === "cancelled" || query.done === "rescheduled" || query.done === "pending" || query.done === "confirmed" ? query.done : undefined;
-  const base = { kind: "ready" as const, booking, ...(notice ? { notice } : {}), ...(query.error ? { error: manageErrorMessage(query.error) } : {}) };
+  const base = { kind: "ready" as const, booking, tenantId: reservation.tenantId, ...(notice ? { notice } : {}), ...(query.error ? { error: manageErrorMessage(query.error) } : {}) };
   if (reservation.status === "held") return { ...base, days: [], slotsUnavailable: false, changesClosed: true };
   if (reservation.status === "cancelled") return { ...base, days: [], slotsUnavailable: false, changesClosed: false };
   const now = deps.now();
@@ -149,10 +156,22 @@ export async function loadManageState(
     if (last && last.day === when.day) last.slots.push({ id: slot.id, time: when.time });
     else days.push({ day: when.day, slots: [{ id: slot.id, time: when.time }] });
   }
-  return { ...base, days, slotsUnavailable: false, changesClosed: false };
+  // Undo a move: the previous time, only while it is still open in the same schedule.
+  const from = notice === "rescheduled" && query.from && Number.isFinite(Date.parse(query.from)) ? schedule.slots.find(slot => Date.parse(slot.start) === Date.parse(query.from!) && Date.parse(slot.start) > now) : undefined;
+  const undo = from ? { slotId: from.id, label: shortLabel(from.start, reservation.timeZone) } : undefined;
+  return { ...base, days, slotsUnavailable: false, changesClosed: false, ...(undo ? { undo } : {}) };
 }
 
-export type ManageActionResult = { done: "cancelled" | "rescheduled" | "pending" | "confirmed" } | { error: string };
+/** "Tue, Nov 24, 9:15 AM", for "Go back to …". */
+function shortLabel(iso: string, timeZone: string): string {
+  try {
+    return new Intl.DateTimeFormat("en-US", { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZone }).format(new Date(iso));
+  } catch {
+    return shortLabel(iso, "UTC");
+  }
+}
+
+export type ManageActionResult = { done: "cancelled" | "rescheduled" | "pending" | "confirmed"; /** A move's previous start, so the page can offer to go back. */ from?: string } | { error: string };
 
 /** One change from the manage page. Never throws; the page shows the outcome. */
 export async function actOnManageLink(token: string, form: { action: string | null; slotId: string | null }, deps: ManageDeps): Promise<ManageActionResult> {
@@ -181,7 +200,7 @@ export async function actOnManageLink(token: string, form: { action: string | nu
         range: { from: new Date(now).toISOString(), to: new Date(now + CHANGE_WINDOW_DAYS * 86_400_000).toISOString() },
       });
       const receipt = await deps.change({ ...ids, capabilityId: reservation.capabilityId, capabilityVersion: schedule.version, slotId: form.slotId });
-      return { done: receipt.status === "confirmed" ? "rescheduled" : "pending" };
+      return receipt.status === "confirmed" ? { done: "rescheduled", from: reservation.start } : { done: "pending" };
     }
     return { error: "invalid" };
   } catch (error) {

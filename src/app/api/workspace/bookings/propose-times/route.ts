@@ -13,6 +13,8 @@ import { nativeRpc } from "@/platform/bookings/native";
 import { cleanSubjectText } from "@/platform/infra/email/text";
 import type { InquiryProposalDelivery } from "@/products/bookings/contracts";
 import { readBookingContext } from "@/platform/bookings/store";
+import { readVisitorBrand } from "@/products/websites";
+import { visitorBrandForMail } from "@/products/websites/client";
 const schema = z.object({ workspaceId: z.string().uuid(), tenantId: z.string().regex(/^[a-z0-9-]+$/), inquiryId: z.string().min(1).max(200), serviceId: z.string().min(1).max(200), starts: z.array(z.string().datetime({ offset: true })).min(1).max(3), expectedCustomerEmail: z.string().email().max(320).optional() }).strict();
 function failure(error: unknown) {
   if (error instanceof PublicBookingError) return workspaceJson({ error: error.message }, error.code === "not_found" ? 404 : error.code === "conflict" ? 409 : error.code === "invalid" ? 400 : 503);
@@ -55,9 +57,11 @@ export async function POST(request: Request) {
       } catch { /* Saved suggestions remain available; hold mail without identity. */ }
       if (!businessName) delivery = "identity_held";
       else try {
+        // The business's own accent and logo on its email; presentation only, never a gate.
+        const visitorBrand = visitorBrandForMail(await readVisitorBrand(input.tenantId).catch(() => null));
         const sent = await sendEmailWithReceipt({ authorship: "business", businessName, fromName: businessName, audience: "customer", tenantId: input.tenantId, to: inquiry.email,
           fromAddress: "bookings@mail.strelva.com", subject: `Suggested times: ${offer.serviceName}`,
-          idempotencyKey: `inquiry-offer:${offer.id}`, options: { heading: "Choose a time to request", paragraphs: ["The business suggested these times. Choose one to request it. The business will confirm your request."], ...bookingOfferEmailOptions(offer) } });
+          idempotencyKey: `inquiry-offer:${offer.id}`, options: { heading: "Pick a time that works", paragraphs: [`${businessName} suggested these times. Tap one to request it, and ${businessName} will confirm it.`], ...bookingOfferEmailOptions(offer), ...(visitorBrand ? { visitorBrand } : {}) } });
         delivery = sent.status === "suppressed" && sent.reason === "business_identity_unavailable" ? "identity_held" : sent.status;
       } catch { delivery = "unavailable"; }
     }

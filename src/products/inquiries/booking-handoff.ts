@@ -138,6 +138,8 @@ export type InquiryBookingChoice = {
   businessPhone?: string | null;
   /** Closed days from the hours record, shown in place on the week. */
   closures?: VisitorClosure[];
+  /** Whose offer this is, so the page can wear the business's own look. Never rendered. */
+  tenantId?: string | null;
 };
 export async function loadInquiryBookingChoice(token: string, deps: InquiryBookingDependencies = defaults): Promise<InquiryBookingChoice | null> {
   if (!deps.enabled()) return null;
@@ -149,7 +151,7 @@ export async function loadInquiryBookingChoice(token: string, deps: InquiryBooki
   if (!business?.name?.trim()) throw new Error("The business identity could not be verified.");
   const context = data.context && typeof data.context === "object" ? data.context as { phone?: unknown } : null;
   return { businessName: business.name, offer: project(data.offer, deps), booking: parseStoreBooking(data.booking),
-    businessPhone: typeof context?.phone === "string" && context.phone.trim() ? context.phone.trim() : null, closures: visitorClosures(context) };
+    businessPhone: typeof context?.phone === "string" && context.phone.trim() ? context.phone.trim() : null, closures: visitorClosures(context), tenantId: data.tenantId };
 }
 export async function chooseInquiryBookingSlot(token: string, index: number, deps: InquiryBookingDependencies = defaults): Promise<StoreBooking> {
   if (!deps.enabled() || !Number.isInteger(index) || index < 0 || index > 2) throw new WorkspaceConflictError("Choose an offered time.");

@@ -46,7 +46,7 @@ export const NORTH_BRAND: OwnerBrand = {
   agencyId: XS.north,
   name: XA_NORTH.name,
   logoUrl: null,
-  accentColor: "#7a3e2b",
+  accentColor: "#2554a3",
   replyTo: null,
   credit: "runs_on_strelva",
 };

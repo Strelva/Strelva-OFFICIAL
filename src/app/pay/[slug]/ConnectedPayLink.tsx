@@ -38,10 +38,6 @@ export function ConnectedPayLink({
       {link.description ? (
         <p className={styles.publicCopy}>{link.description}</p>
       ) : null}
-      <p className={styles.note}>
-        The money goes straight to {brand.name} through Stripe. Strelva never
-        holds the money.
-      </p>
     </>
   );
   if (link.status === "expired")
@@ -64,6 +60,7 @@ export function ConnectedPayLink({
     <PublicMoneyPage
       brand={brand}
       lead={lead}
+      credit={`Payments go straight to ${brand.name} through Stripe.`}
       panel={
         link.status === "paid" ? (
           <>

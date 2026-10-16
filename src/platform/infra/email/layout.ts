@@ -1,7 +1,7 @@
 import { brandColors, BRAND_CREDIT, type OwnerBrand } from "@/platform/infra/agency-brand";
 import { escapeEmailHtml } from "./escape";
 import { renderPaperEmailHtml, renderPaperEmailText, type PaperEmail } from "./paper";
-import { renderXaMailHtml, renderXaMailText, type XaMail } from "./xa-mail";
+import { renderXaMailHtml, renderXaMailText, type XaMail, type XaMailBrand } from "./xa-mail";
 import { visitorMailFromOptions } from "./visitor-mail";
 export { escapeEmailHtml } from "./escape";
 /**
@@ -108,6 +108,8 @@ export interface EmailOptions {
   brand?: OwnerBrand;
   /** End customers see the business that is contacting them. */
   businessName?: string;
+  /** Visitor mail: the business's own accent and logo (from its website or recorded branding). Presentation only. */
+  visitorBrand?: XaMailBrand;
   /** Hidden preview text shown in the inbox list before the body. */
   preheader?: string;
   /** The one h1. */
@@ -122,6 +124,8 @@ export interface EmailOptions {
   decisions?: EmailDecision[];
   /** Optional label/value table (lead details, receipts). Values auto-escaped. */
   rows?: EmailRow[];
+  /** Customer mail: times the reader can pick, each its own link (an inquiry's suggested times). */
+  choices?: { label?: string; items: EmailButton[] };
   /** Optional primary call-to-action button. */
   button?: EmailButton;
   /** Optional secondary action, rendered as an outline pill under the primary
@@ -249,10 +253,10 @@ function footerHtml(opts: EmailOptions): string {
 
 /** Full branded HTML email document. */
 export function renderEmailHtml(opts: EmailOptions): string {
-  if (opts.xa) return renderXaMailHtml(opts.xa);
+  if (opts.xa) return renderXaMailHtml(opts.visitorBrand && !opts.xa.brand ? { ...opts.xa, brand: opts.visitorBrand } : opts.xa);
   // End customers read the business's own email in XA. Only the HTML changes:
   // the options (and so inquiry digests and the plain text) stay as they were.
-  if (opts.businessName && !opts.paper) return renderXaMailHtml(visitorMailFromOptions(opts));
+  if (opts.businessName && !opts.paper) return renderXaMailHtml({ ...visitorMailFromOptions(opts), ...(opts.visitorBrand ? { brand: opts.visitorBrand } : {}) });
   if (opts.paper) return renderPaperEmailHtml({ ...opts.paper, ...(opts.brand ? { brand: opts.brand } : {}), ...(opts.businessName ? { businessName: opts.businessName } : {}) });
   const colors = brandColors(opts.brand?.accentColor ?? TOKENS.accent);
   const preheader = opts.preheader
@@ -313,6 +317,11 @@ export function renderEmailText(opts: EmailOptions): string {
   }
   if (opts.rows) for (const r of opts.rows) parts.push(`${r.label}: ${r.value}`);
   if (opts.rows && opts.rows.length) parts.push("");
+  if (opts.choices?.items.length) {
+    if (opts.choices.label) parts.push(opts.choices.label);
+    for (const item of opts.choices.items) parts.push(`${item.label}: ${item.url}`);
+    parts.push("");
+  }
   if (opts.button) parts.push(`${opts.button.label}: ${opts.button.url}`, "");
   if (opts.secondaryButton) parts.push(`${opts.secondaryButton.label}: ${opts.secondaryButton.url}`, "");
   if (opts.footerNote) parts.push(opts.footerNote);

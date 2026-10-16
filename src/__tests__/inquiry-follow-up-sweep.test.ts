@@ -318,7 +318,7 @@ describe("default inquiry follow-up status projection", () => {
     const first = await runSweep(followUpState(undefined, true), mail, { store });
     expect(first).toMatchObject({ due: 0, attempted: 0, accepted: 0 });
     expect(mail.send).toHaveBeenCalledTimes(1);
-    expect(vi.mocked(mail.send).mock.calls[0]?.[0]).toMatchObject({ action: "reply", fromName: "Acme", disclosure: { kind: "business", name: "Acme" }, options: { businessName: "Acme", footerNote: "Automatic reply · from Acme" } });
+    expect(vi.mocked(mail.send).mock.calls[0]?.[0]).toMatchObject({ action: "reply", fromName: "Acme", disclosure: { kind: "business", name: "Acme" }, options: { businessName: "Acme", footerNote: "This is an automatic reply from Acme." } });
     expect(JSON.stringify(vi.mocked(mail.send).mock.calls[0]?.[0]?.options)).not.toContain("Strelva");
     const result = await runSweep(followUpState(undefined, true), mail, { store, now: "2026-09-11T12:04:00.000Z" });
     expect(result.accepted).toBe(1);

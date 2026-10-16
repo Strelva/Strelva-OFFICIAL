@@ -31,6 +31,8 @@ export interface InquiryBookingOffer {
   slots: Array<{ start: string; end: string }>; expiresAt: string; url: string; token: string; booked: boolean;
   /** Local dates between the first and last offered day when the business is closed, with its reason when given. Read-only presentation. */
   closedDays?: Array<{ date: string; label?: string }>;
+  /** Whose offer this is, so the page can wear the business's own look. Read-only presentation, never rendered. */
+  tenantId?: string;
 }
 function project(raw: unknown): InquiryBookingOffer | null {
   const row = rawOfferSchema.safeParse(raw);
@@ -98,7 +100,7 @@ export async function readInquiryBookingOffer(token: string): Promise<InquiryBoo
   // Closures are presentation only ("Closed" in place of "No times"); a failed read leaves them out.
   const context = offer.booked ? null : await readBookingContext(row.tenantId).catch(() => null);
   const closedDays = context ? offerClosedDays(context, offer) : [];
-  return { ...offer, businessName: business.name, ...(closedDays.length ? { closedDays } : {}) };
+  return { ...offer, businessName: business.name, tenantId: row.tenantId, ...(closedDays.length ? { closedDays } : {}) };
 }
 
 /** Days between the first and last offered day with no open hours, and the reason the business gave, if any. Pure. */
@@ -136,7 +138,8 @@ export async function chooseInquiryBookingOffer(token: string, start: string): P
   if (!booking) throw new PublicBookingError("unavailable", "The booking request receipt is unavailable.");
   return booking;
 }
-export function bookingOfferEmailOptions(offer: InquiryBookingOffer): Pick<EmailOptions, "rows" | "button"> {
-  return { rows: offer.slots.map(s => ({ label: offer.serviceName, value: formatVisitorTime(s.start, offer.timeZone) })),
-    button: { label: "Choose a time to request", url: offer.url } };
+/** Each suggested time is its own link that opens the page with that time picked (the visitor still presses Request). */
+export function bookingOfferEmailOptions(offer: InquiryBookingOffer): Pick<EmailOptions, "choices" | "button"> {
+  return { choices: { label: offer.serviceName, items: offer.slots.map(s => ({ label: formatVisitorTime(s.start, offer.timeZone), url: `${offer.url}?pick=${encodeURIComponent(s.start)}` })) },
+    button: { label: "See all open times", url: offer.url } };
 }

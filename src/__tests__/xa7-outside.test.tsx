@@ -101,7 +101,8 @@ describe("XA · E1 and E3 emails (templates only)", () => {
     const html = renderXaMailHtml(mail);
     expect(html).toContain("Maya at North Studio prepared this for Harbor Dental. Nothing goes live until you say yes.");
     expect(html).toContain("harbordental.com/hours");
-    expect(html).toContain(">H</span>Harbor Dental</p>");
+    // The business is a plain wordmark, never an initial in a tile.
+    expect(html).toContain(">Harbor Dental</p>"); expect(html).not.toContain(">H</span>");
     expect(html).toContain("Review and say yes");
     expect(html.match(/border-radius:999px;"><a /g)).toHaveLength(1);
     expect(html).toContain('color-scheme" content="light"');
@@ -167,8 +168,16 @@ describe("XA · E4 the public booking page", () => {
     expect(html).toContain("November 23 to 28");
     expect(html.match(/Closed, Thanksgiving/g)).toHaveLength(2);
     expect(html).toContain('aria-label="Monday, Nov 23, 2026, 8:00 AM Eastern Time"');
-    expect(html).toContain("Choose a time for your new-patient exam");
-    expect(html).toContain("Harbor Dental accepts it or suggests another. Choose by Sunday, Nov 22 at 8:00 PM.");
+    // The business's own booking page: its name and phone head it, the service names the week, Strelva is one quiet line.
+    expect(html).toContain("Pick a time to see Harbor Dental");
+    expect(html).toContain("Harbor Dental accepts it or suggests another");
+    expect(html).toContain(">New-patient exam<");
+    expect(html).toContain("Choose by Sunday, Nov 22 at 8:00 PM.");
+    expect(html).toContain('href="tel:7165550142"');
+    expect(html).toContain("noValidate");
+    expect(html.match(/data-xa-primary/g)).toHaveLength(1);
+    expect(visible(html).match(/Strelva/g)).toEqual(["Strelva"]);
+    expect(visible(html)).toContain("Runs on Strelva");
     expect(visible(html).match(/Eastern/g)).toHaveLength(1);
     expect(clean(html)).toEqual([]);
   });
@@ -182,7 +191,7 @@ describe("XA · E4 the public booking page", () => {
     expect(render("expired-link")).toContain("This link expired");
     const requested = render("requested");
     expect(requested).toContain("Waiting on Harbor Dental");
-    expect(requested).toContain("New-patient exam, Wednesday, Nov 25 at 10:30 AM Eastern. Harbor Dental will reply to your email.");
+    expect(requested).toContain("New-patient exam, Tuesday, Nov 24 at 9:15 AM Eastern. Harbor Dental will reply to your email.");
     expect(requested).not.toContain("<dl");
     expect(render("held")).not.toContain("<form");
     for (const state of ["empty", "error", "expired-link", "requested", "held", "confirmed"]) expect(clean(render(state))).toEqual([]);

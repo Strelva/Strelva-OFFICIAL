@@ -12,6 +12,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ tok
     if (await isRateLimitedAsync(rateLimitKey(request, "booking-inquiry-choice"), 20)) throw new Error("rate");
     if (!request.headers.get("content-type")?.startsWith("application/x-www-form-urlencoded")) throw new Error("invalid");
     const form = new URLSearchParams((await readBoundedBody(request, 2000)).toString("utf8"));
+    if (!form.get("start")) { page.searchParams.set("error", "pick"); return NextResponse.redirect(page, 303); }
     const booking = await chooseInquiryBookingOffer(token, form.get("start") ?? "");
     await notifyBookingRequestNow(booking);
     await deliverBookingUpdates(booking.id).catch(() => undefined);

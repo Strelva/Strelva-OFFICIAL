@@ -1,4 +1,4 @@
-import { readVisitorConfirmation } from "@/products/scheduling/server";
+import { readVisitorConfirmation, readVisitorPresentationTime } from "@/products/scheduling/server";
 import type { Metadata } from "next";
 import { BookingConfirmation } from "@/experience/bookings/BookingConfirmation";
 
@@ -14,5 +14,6 @@ export default async function BookingConfirmationPage({ params, searchParams }: 
   const query = await searchParams;
   const identity = await readVisitorConfirmation(token).catch(() => null);
   const path = `/booking-confirm/${encodeURIComponent(token)}`;
-  return <BookingConfirmation identity={identity} error={typeof query.error === "string" ? query.error : null} actionUrl={`${path}/action`} statusUrl={path} />;
+  // Brand and phone need the tenant, which read_public_booking_confirmation does not return yet (a migration waiting on Jacob's yes).
+  return <BookingConfirmation now={await readVisitorPresentationTime()} identity={identity} error={typeof query.error === "string" ? query.error : null} actionUrl={`${path}/action`} statusUrl={path} />;
 }

@@ -49,6 +49,8 @@ export function visitorMailFromOptions(opts: EmailOptions): XaMail {
     // The visitor's own words come back as a quote, not as a table cell.
     ...(opts.rows ?? []).filter(row => row.label === "Your message").map(row => ({ kind: "quote" as const, label: row.label, text: row.value })),
     ...(opts.rows?.some(row => row.label !== "Your message") ? [{ kind: "rows" as const, rows: opts.rows.filter(row => row.label !== "Your message") }] : []),
+    // Suggested times: each its own link in one hairline list, never label/value rows.
+    ...(opts.choices?.items.length ? [{ kind: "choices" as const, label: opts.choices.label ?? "", items: opts.choices.items }] : []),
     ...(opts.button ? [{ kind: "primary" as const, action: opts.button }] : []),
     ...(opts.secondaryButton ? [{ kind: "link" as const, action: opts.secondaryButton }] : []),
   ];

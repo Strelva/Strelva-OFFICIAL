@@ -20,6 +20,7 @@ export function BookingWidget({ services, bookingUrl, minPrice, reviewCount }: B
   const [slots, setSlots] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [invalid, setInvalid] = useState<string | null>(null);
   const [intake,setIntake]=useState<Array<{id:string;label:string;type:"text"|"textarea";required:boolean}>>([]);
   const [intakeAnswers,setIntakeAnswers]=useState<Record<string,string>>({});
   const [form, setForm] = useState({ name: "", email: "", phone: "", notes: "" });
@@ -57,9 +58,22 @@ export function BookingWidget({ services, bookingUrl, minPrice, reviewCount }: B
     }
   }
 
+  /** Says what is missing in a sentence and moves focus to that field, instead of a browser bubble or a dead button. */
+  function missingField(): boolean {
+    const missing = !form.name.trim() ? { id: "booking-name", words: "Add your name so we know who is coming." }
+      : !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim()) ? { id: "booking-email", words: form.email.trim() ? "That email doesn't look complete. Check it so your confirmation reaches you." : "Add your email so your confirmation reaches you." }
+      : (() => { const question = intake.find(q => q.required && !intakeAnswers[q.id]?.trim()); return question ? { id: `booking-intake-${question.id}`, words: `Answer "${question.label}" to finish your booking.` } : null; })();
+    if (!missing) return false;
+    setError(missing.words);
+    setInvalid(missing.id);
+    document.getElementById(missing.id)?.focus();
+    return true;
+  }
+
   async function submitBooking() {
     if (!selectedService || !selectedDate || !selectedTime) return;
-    if (intake.some(question=>question.required && !intakeAnswers[question.id]?.trim())) {setError("Please answer the required questions.");return;}
+    if (missingField()) return;
+    setInvalid(null);
     setLoading(true);
     setError("");
 
@@ -181,7 +195,7 @@ export function BookingWidget({ services, bookingUrl, minPrice, reviewCount }: B
             )}
 
             {error && (
-              <div className="mb-4 p-3 text-sm text-red-700 bg-red-50 rounded-md">
+              <div role="alert" id="booking-error" className="mb-4 p-3 text-sm text-red-700 bg-red-50 rounded-md">
                 {error}
               </div>
             )}
@@ -307,6 +321,9 @@ export function BookingWidget({ services, bookingUrl, minPrice, reviewCount }: B
                     <label htmlFor="booking-name" className="text-xs font-medium" style={{ color: "var(--bark)" }}>Name *</label>
                     <input
                       id="booking-name"
+                      aria-required="true"
+                      aria-invalid={invalid === "booking-name" || undefined}
+                      aria-describedby={invalid === "booking-name" ? "booking-error" : undefined}
                       type="text"
                       value={form.name}
                       onChange={(e) => setForm({ ...form, name: e.target.value })}
@@ -319,6 +336,9 @@ export function BookingWidget({ services, bookingUrl, minPrice, reviewCount }: B
                     <label htmlFor="booking-email" className="text-xs font-medium" style={{ color: "var(--bark)" }}>Email *</label>
                     <input
                       id="booking-email"
+                      aria-required="true"
+                      aria-invalid={invalid === "booking-email" || undefined}
+                      aria-describedby={invalid === "booking-email" ? "booking-error" : undefined}
                       type="email"
                       value={form.email}
                       onChange={(e) => setForm({ ...form, email: e.target.value })}
@@ -341,8 +361,8 @@ export function BookingWidget({ services, bookingUrl, minPrice, reviewCount }: B
                   </div>
                   {intake.map(question=><div key={question.id}>
                     <label htmlFor={`booking-intake-${question.id}`} className="text-xs font-medium" style={{color:"var(--bark)"}}>{question.label}{question.required ? "" : " (optional)"}</label>
-                    {question.type === "textarea" ? <textarea id={`booking-intake-${question.id}`} required={question.required} maxLength={2000} disabled={loading} value={intakeAnswers[question.id] ?? ""} onChange={event=>setIntakeAnswers(current=>({...current,[question.id]:event.target.value}))} className="w-full px-3 py-2 border rounded-md text-sm" />
-                      : <input id={`booking-intake-${question.id}`} required={question.required} maxLength={2000} disabled={loading} value={intakeAnswers[question.id] ?? ""} onChange={event=>setIntakeAnswers(current=>({...current,[question.id]:event.target.value}))} className="w-full px-3 py-2 border rounded-md text-sm" />}
+                    {question.type === "textarea" ? <textarea id={`booking-intake-${question.id}`} aria-required={question.required || undefined} aria-invalid={invalid === `booking-intake-${question.id}` || undefined} maxLength={2000} disabled={loading} value={intakeAnswers[question.id] ?? ""} onChange={event=>setIntakeAnswers(current=>({...current,[question.id]:event.target.value}))} className="w-full px-3 py-2 border rounded-md text-sm" />
+                      : <input id={`booking-intake-${question.id}`} aria-required={question.required || undefined} aria-invalid={invalid === `booking-intake-${question.id}` || undefined} maxLength={2000} disabled={loading} value={intakeAnswers[question.id] ?? ""} onChange={event=>setIntakeAnswers(current=>({...current,[question.id]:event.target.value}))} className="w-full px-3 py-2 border rounded-md text-sm" />}
                   </div>)}
                   <div>
                     <label htmlFor="booking-notes" className="text-xs font-medium" style={{ color: "var(--bark)" }}>Notes</label>
@@ -359,7 +379,7 @@ export function BookingWidget({ services, bookingUrl, minPrice, reviewCount }: B
                 </div>
                 <button
                   onClick={submitBooking}
-                  disabled={!form.name || !form.email || loading}
+                  disabled={loading}
                   className="w-full mt-6 px-6 py-3 text-sm font-bold tracking-widest uppercase transition-all disabled:opacity-50"
                   style={{ background: "var(--sage)", color: "var(--pure-white)" }}
                 >

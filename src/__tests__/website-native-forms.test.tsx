@@ -22,7 +22,8 @@ describe("hosted native website forms", () => {
     expect(form.querySelector("fieldset")?.disabled).toBe(true);
     expect(form.querySelector("button")?.matches(":disabled")).toBe(true);
     expect(form.querySelector('[name="name"]')?.matches(":disabled")).toBe(true);
-    expect(form.querySelector('[role="status"]')?.textContent).toBe("Loading inquiry form…");
+    expect(form.querySelector('[role="status"]')?.textContent).toBe("The form is getting ready.");
+    expect(form.noValidate).toBe(true);
   });
   it("keeps visitor input on a failed native lead write, and sends only to the bound tenant", async () => {
     const fetcher = vi.fn().mockResolvedValue(new Response(JSON.stringify({ error: "Inquiry capture unavailable" }), { status: 503, headers: { "Content-Type": "application/json" } }));
@@ -44,9 +45,24 @@ describe("hosted native website forms", () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({ ok: true }), { status: 200 })));
     await act(async () => root.render(createElement(SiteLeadForm, { tenant: "second-business" })));
     container.querySelector<HTMLInputElement>('[name="name"]')!.value = "[Visitor name]";
+    container.querySelector<HTMLInputElement>('[name="email"]')!.value = "visitor@example.test";
+    container.querySelector<HTMLTextAreaElement>('[name="message"]')!.value = "Please contact me.";
     await act(async () => container.querySelector("form")!.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })));
     expect(container.querySelector('[role="status"]')?.textContent).toBe("Your request has been received.");
     expect(container.querySelector<HTMLInputElement>('[name="name"]')!.value).toBe("");
+  });
+  it("says what is missing in a sentence instead of a browser bubble, and sends nothing", async () => {
+    const fetcher = vi.fn(); vi.stubGlobal("fetch", fetcher);
+    await act(async () => root.render(createElement(SiteLeadForm, { tenant: "second-business" })));
+    container.querySelector<HTMLInputElement>('[name="name"]')!.value = "[Visitor name]";
+    await act(async () => container.querySelector("form")!.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })));
+    expect(container.querySelector('[role="alert"]')?.textContent).toBe("Add your email so the business can reply.");
+    expect(document.activeElement?.getAttribute("name")).toBe("email");
+    container.querySelector<HTMLInputElement>('[name="email"]')!.value = "visitor@";
+    container.querySelector<HTMLTextAreaElement>('[name="message"]')!.value = "Hi";
+    await act(async () => container.querySelector("form")!.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })));
+    expect(container.querySelector('[role="alert"]')?.textContent).toBe("That email address looks incomplete.");
+    expect(fetcher).not.toHaveBeenCalled();
   });
   it("does not submit an inquiry whose public definition differs from the approved version", async () => {
     const fetcher = vi.fn().mockResolvedValue(new Response(JSON.stringify(inquiry), { status: 200 })); vi.stubGlobal("fetch", fetcher);

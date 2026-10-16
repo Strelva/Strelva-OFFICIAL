@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Lock } from "lucide-react";
 import { StSkeleton } from "@/components/ui/strelva/Kit";
 import { VisitorBookingShell } from "@/experience/bookings/VisitorBookingShell";
@@ -13,22 +13,19 @@ import {
   type PublicPaymentRequest,
 } from "./public-payment";
 import { formatMoney } from "@/platform/connect/money-format";
-
-/** Ink or paper on the business's accent, whichever reads. */
-function onAccent(hex: string) {
-  const [r, g, b] = [1, 3, 5].map((at) => parseInt(hex.slice(at, at + 2), 16) / 255);
-  const lum = (v: number) => (v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4);
-  return 0.2126 * lum(r!) + 0.7152 * lum(g!) + 0.0722 * lum(b!) > 0.4 ? "#161715" : "#ffffff";
-}
+import { visitorBrandFromAccent, type VisitorBrand } from "@/products/websites/client";
 
 export default function BusinessPayment({
   token,
   initialRequest,
   preview = false,
+  brand,
 }: {
   token: string;
   initialRequest?: PublicPaymentRequest;
   preview?: boolean;
+  /** The charging business's own look, read on the server from the request's workspace. */
+  brand?: VisitorBrand | null;
 }) {
   const active = useRef(true);
   useEffect(() => {
@@ -129,21 +126,12 @@ export default function BusinessPayment({
         year: "numeric",
       }).format(new Date(request.expiresAt))
     : "";
-  // The page wears the business's own look when the payment read carries it.
-  const accent = request?.brand?.accentColor ?? null;
-  const brandStyle = accent
-    ? ({
-        "--visitor-accent": accent,
-        "--visitor-on-accent": onAccent(accent),
-      } as CSSProperties)
-    : undefined;
+  // The business's own look: read on the server, or carried on the payment read.
+  const carried = visitorBrandFromAccent(request?.brand?.accentColor ?? null);
+  const carriedLogo = request?.brand?.logoUrl ?? null;
+  const worn = brand ?? (carried && carriedLogo ? { ...carried, logo: { url: carriedLogo, alt: businessName } } : carried);
   return (
-    <VisitorBookingShell
-      siteName={businessName}
-      wide
-      logoUrl={request?.brand?.logoUrl ?? null}
-      style={brandStyle}
-    >
+    <VisitorBookingShell siteName={businessName} wide brand={worn}>
       <div className={styles.split}>
         <section className={styles.description} aria-label="Payment details">
           <h1 className={visitor.title}>{title}</h1>

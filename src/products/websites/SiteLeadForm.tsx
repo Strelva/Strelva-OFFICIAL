@@ -17,6 +17,18 @@ export function SiteLeadForm({ tenant }: { tenant: string }) {
     if (!ready || pending) return;
     const form = event.currentTarget;
     const fields = new FormData(form);
+    // The form is noValidate: what is missing is said in one sentence beside Send, and focus goes to it.
+    const missing = (["name", "email", "message"] as const).find(name => !String(fields.get(name) ?? "").trim());
+    const email = String(fields.get("email") ?? "").trim();
+    const problem = missing === "name" ? "Add your name so the business knows who is asking."
+      : missing === "email" ? "Add your email so the business can reply."
+      : missing === "message" ? "Add a message so the business knows what you need."
+      : !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ? "That email address looks incomplete." : null;
+    if (problem) {
+      setResult({ ok: false, text: problem });
+      form.querySelector<HTMLElement>(`[name="${missing ?? "email"}"]`)?.focus();
+      return;
+    }
     setPending(true); setResult(null);
     try {
       const response = await fetch(`/api/v1/leads/${encodeURIComponent(tenant)}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: fields.get("name"), email: fields.get("email"), message: fields.get("message"), website: fields.get("website"), source: "hosted-site" }) });
@@ -26,16 +38,16 @@ export function SiteLeadForm({ tenant }: { tenant: string }) {
     } catch (error) { setResult({ ok: false, text: error instanceof Error ? error.message : "Your request was not confirmed. Please try again." }); }
     finally { setPending(false); }
   }
-  return <form method="post" onSubmit={event => void submit(event)} aria-label="Send an inquiry">
+  return <form method="post" noValidate onSubmit={event => void submit(event)} aria-label="Send an inquiry">
     <fieldset disabled={!ready || pending}>
       <label htmlFor={`${id}-name`}>Name</label><input id={`${id}-name`} name="name" autoComplete="name" required maxLength={200} />
       <label htmlFor={`${id}-email`}>Email</label><input id={`${id}-email`} name="email" type="email" autoComplete="email" required maxLength={320} />
       <label htmlFor={`${id}-message`}>Message</label><textarea id={`${id}-message`} name="message" required maxLength={5000} rows={5} />
       <div hidden><label htmlFor={`${id}-website`}>Leave this field empty</label><input id={`${id}-website`} name="website" tabIndex={-1} autoComplete="off" /></div>
-      <Button type="submit" disabled={!ready} loading={pending}>{pending ? "Sending…" : "Send request"}</Button>
+      <Button type="submit" disabled={!ready} loading={pending}>{pending ? "Sending" : "Send request"}</Button>
     </fieldset>
     <p className="site-preview-note">Strelva helps this business handle your request.</p>
-    {!ready && <p role="status">Loading inquiry form…</p>}
+    {!ready && <p role="status">The form is getting ready.</p>}
     {result && <p role={result.ok ? "status" : "alert"}>{result.text}</p>}
   </form>;
 }

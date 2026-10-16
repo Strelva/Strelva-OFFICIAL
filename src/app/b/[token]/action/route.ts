@@ -34,7 +34,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ tok
     return typeof v === "string" ? v : null;
   };
   const result = await actOnManageLink(token, { action: value("action"), slotId: value("slotId") }, manageDeps());
-  if ("done" in result) page.searchParams.set("done", result.done);
+  if ("done" in result) {
+    page.searchParams.set("done", result.done);
+    if (result.from) page.searchParams.set("from", result.from);
+  }
   else page.searchParams.set("error", result.error);
   return NextResponse.redirect(page, 303);
 }

@@ -107,7 +107,7 @@ describe("manage link actions", () => {
 
   it("changes the time against the schedule version it was offered from", async () => {
     const d = deps();
-    expect(await actOnManageLink(TOKEN, { action: "reschedule", slotId: "s-fri" }, d)).toEqual({ done: "rescheduled" });
+    expect(await actOnManageLink(TOKEN, { action: "reschedule", slotId: "s-fri" }, d)).toEqual(expect.objectContaining({ done: "rescheduled", from: expect.any(String) }));
     expect(d.change).toHaveBeenCalledWith({ tenantId: "mooney", reservationId: "r-1", managementToken: TOKEN, capabilityId: "consultations", capabilityVersion: 3, slotId: "s-fri" });
   });
 

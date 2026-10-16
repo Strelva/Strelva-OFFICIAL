@@ -25,6 +25,11 @@ describe("inquiry booking routes", () => {
     const response = await choose(selection("3"), { params: Promise.resolve({ token: "fixture" }) });
     expect(response.status).toBe(303); expect(response.headers.get("location")).toContain("error=unavailable"); expect(mocks.choose).not.toHaveBeenCalled();
   });
+  it("answers an empty pick (the form is noValidate) with a sentence on the page and no booking", async () => {
+    const empty = new Request("https://app.strelva.test/inquiry-booking/fixture/action", { method: "POST", headers: { origin: "https://app.strelva.test", "content-type": "application/x-www-form-urlencoded" }, body: "" });
+    const response = await choose(empty, { params: Promise.resolve({ token: "fixture" }) });
+    expect(response.status).toBe(303); expect(response.headers.get("location")).toContain("error=pick"); expect(mocks.choose).not.toHaveBeenCalled();
+  });
   it("redirects after explicit choice and retains failures as visible, without a second effect", async () => {
     const response = await choose(selection("1"), { params: Promise.resolve({ token: "fixture" }) });
     expect(response.status).toBe(303); expect(mocks.choose).toHaveBeenCalledExactlyOnceWith("fixture", 1);

@@ -18,5 +18,5 @@ import "./src/register-workspace-ports";
 import { vi } from "vitest";
 vi.mock("next/font/google", () => {
   const font = (name: string) => () => ({ className: `font-${name}`, variable: `font-${name}`, style: { fontFamily: name } });
-  return { DM_Sans: font("DM_Sans"), Geist: font("Geist") };
+  return { DM_Sans: font("DM_Sans"), Geist: font("Geist"), Fraunces: font("Fraunces"), Instrument_Serif: font("Instrument_Serif"), Playfair_Display: font("Playfair_Display"), DM_Serif_Display: font("DM_Serif_Display"), Inter: font("Inter"), Manrope: font("Manrope"), Work_Sans: font("Work_Sans") };
 });

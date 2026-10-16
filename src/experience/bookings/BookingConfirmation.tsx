@@ -1,7 +1,8 @@
-import { formatVisitorTime } from "@/platform/bookings/public-admission-time";
-import { VisitorBookingShell } from "./VisitorBookingShell";
+import { visitorDeadlineWords } from "@/platform/bookings/public-admission-time";
+import { VisitorBookingShell, VisitorCall } from "./VisitorBookingShell";
 import { VisitorAppointment, visitorAppointmentTime } from "./VisitorAppointment";
 import styles from "./visitor.module.css";
+import type { VisitorBrand } from "@/products/websites/client";
 
 /** What /booking-confirm/[token] reads: `readVisitorConfirmation`'s shape. */
 export interface VisitorConfirmationView {
@@ -21,19 +22,29 @@ export interface VisitorConfirmationView {
  * language). Opening the page is read-only, including for mail scanners; only
  * the one ink button posts. Every outcome keeps the time as the page's object.
  */
-export function BookingConfirmation({ identity, error, actionUrl, statusUrl, service }: {
+export function BookingConfirmation({ identity, error, actionUrl, statusUrl, service, brand, phone, business: known, now }: {
   identity: VisitorConfirmationView | null;
   /** The redirect's error code, when the post did not complete. */
   error?: string | null;
   actionUrl: string;
   statusUrl: string;
   service?: string;
+  /** The business's own look. The confirmation record names the business but not yet which one, so the live page passes none. */
+  brand?: VisitorBrand | null;
+  /** The business's phone, for the header and the way forward. Needs the tenant, like `brand`. */
+  phone?: string | null;
+  /** Who the link belongs to when the confirmation itself could not be read. */
+  business?: string | null;
+  /** When the page is read, so a deadline today says "today". */
+  now?: number;
 }) {
   const done = identity?.state === "placed";
   const confirmed = done && identity.bookingStatus === "confirmed";
   const cancelled = (done && (identity.bookingStatus === "cancelled" || identity.bookingStatus === "declined")) || identity?.state === "cancelled";
   const failed = Boolean(error) || !identity;
-  const business = identity?.businessName || "the business";
+  const name = identity?.businessName?.trim() || known?.trim() || "";
+  const business = name || "the business";
+  const contact = phone ? <VisitorCall name={name} phone={phone} lead="call" /> : <>reply to your booking email</>;
   const headline = failed ? "This confirmation could not complete"
     : cancelled ? "Your booking is no longer active"
     : confirmed ? "You’re booked"
@@ -41,26 +52,26 @@ export function BookingConfirmation({ identity, error, actionUrl, statusUrl, ser
     : identity.state === "confirming" ? "Outcome not confirmed"
     : "Confirm your booking request";
   const lede = failed
-    ? error === "rate" ? "Too many tries. Wait a minute and try again." : "The link may have expired or the time may have been taken. Contact the business before requesting again."
-    : cancelled ? "This booking was cancelled or declined. Contact the business about another time."
+    ? error === "rate" ? "Too many tries. Wait a minute and try again." : <>The link may have expired or the time may have been taken. Before requesting again, {contact}{name && !phone ? ` to reach ${name}` : ""}.</>
+    : cancelled ? <>This booking was cancelled or declined. For another time, {contact}{name && !phone ? ` to reach ${name}` : ""}.</>
     : confirmed ? "Use your booking email to change or cancel it."
     : done ? `Your email is confirmed. ${business} will reply to accept this time or suggest another. Use your booking email to check, change or cancel your request.`
-    : identity.state === "confirming" ? "Your email was received, but the booking outcome is not confirmed. Read its current status, or contact the business."
+    : identity.state === "confirming" ? <>Your email was received, but the booking outcome is not confirmed yet. Check where it stands, or {contact}.</>
     : `Nothing is booked until you confirm your email. ${business} may then need to accept your request.`;
   const when = identity ? visitorAppointmentTime(identity.start, identity.timeZone) : null;
   const canConfirm = !done && !failed && identity?.state === "held";
 
-  return <VisitorBookingShell siteName={identity?.businessName}>
+  return <VisitorBookingShell siteName={name} brand={brand} phone={phone}>
     <div className={styles.page}>
       <h1 className={styles.title}>{headline}</h1>
       <p role={failed ? "alert" : undefined} className={styles.intro}>{lede}</p>
       {identity && when ? <VisitorAppointment day={when.day} time={when.time} zone={when.zone} service={service ?? identity.serviceName} struck={cancelled}>
-        {!done && identity.expiresAt ? <p className={styles.deadline}>Confirm by {formatVisitorTime(identity.expiresAt, identity.timeZone)}.</p> : null}
+        {!done && identity.expiresAt ? <p className={styles.deadline}>Confirm by {visitorDeadlineWords(identity.expiresAt, identity.timeZone, now)}.</p> : null}
       </VisitorAppointment> : null}
       {canConfirm ? <form method="post" action={actionUrl} className={styles.actions}>
         <button type="submit" data-xa-primary className={`${styles.button} ${styles.block}`}>Confirm my email and request this time</button>
       </form> : null}
-      {identity?.state === "confirming" || failed ? <div className={styles.actions}><a className={`${styles.button} ${styles.secondary}`} href={statusUrl}>Read current status</a></div> : null}
+      {identity?.state === "confirming" || failed ? <div className={styles.actions}><a className={`${styles.button} ${styles.secondary}`} href={statusUrl}>See where my booking stands</a></div> : null}
     </div>
   </VisitorBookingShell>;
 }

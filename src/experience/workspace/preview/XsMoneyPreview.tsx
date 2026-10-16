@@ -41,7 +41,9 @@ import { SourceListing } from "@/experience/workspace/money/SourceListing";
 import styles from "@/experience/workspace/money/money.module.css";
 import { PaymentsScreen } from "@/app/workspace/payments/PaymentsScreen";
 import { ConnectedPayLink } from "@/app/pay/[slug]/ConnectedPayLink";
+import { PaidNote } from "@/app/pay/[slug]/PaidNote";
 import BusinessPayment from "@/app/pay/business/BusinessPayment";
+import { harborBrand } from "./xs-visitor-fixture";
 import CreatorMaintenance from "@/app/workspace/creator-maintenance/CreatorMaintenance";
 import ReviewQueue from "@/app/workspace/money-reconciliation/ReviewQueue";
 import { businessDepositFixture } from "./deposit-fixture";
@@ -727,7 +729,6 @@ export function XsMoneyPreview({
           brand={NORTH_BRAND}
           lead={
             <>
-              <p className={styles.publicKicker}>Payment receipt</p>
               <h1 className={styles.publicTitle}>
                 No payment is recorded for this link yet.
               </h1>
@@ -749,8 +750,8 @@ export function XsMoneyPreview({
           brand={NORTH_BRAND}
           single
           lead={
-            // The one receipt in this fixture: Fieldwork Studio's, as its client sees it.
-            <MoneyDocument
+            // The one payment in this fixture: Fieldwork Studio's, as its client sees it.
+            <PaidNote
               doc={receiptDoc}
               back={{
                 label: "Back to the payment link",
@@ -768,6 +769,7 @@ export function XsMoneyPreview({
           key={state}
           token={"0".repeat(64)}
           preview
+          brand={harborBrand}
           initialRequest={
             state === "paid"
               ? {
