@@ -1012,7 +1012,7 @@ test("saves and reopens a website audit without trusting a browser payload", asy
   await page.reload();
   await page.getByRole("button",{name:/SEO/}).click();
   await expect(page.getByText("Fictional title evidence")).toBeVisible();
-  await expect(page.getByText("Saved privately to this workspace.")).toBeVisible();
+  await expect(page.getByText("Saved privately for your business.")).toBeVisible();
   await page.setViewportSize({width:360,height:800});
   expect(await page.evaluate(() => document.documentElement.scrollWidth<=innerWidth)).toBe(true);
   await page.getByRole("button",{name:"Save as PDF"}).scrollIntoViewIfNeeded();

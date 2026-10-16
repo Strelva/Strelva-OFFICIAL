@@ -204,7 +204,7 @@
 /* ---------- Working (rYq00) and streamed words ---------- */
 .working { display: flex; flex-direction: column; gap: 12px; }
 .workingHead { display: flex; align-items: center; gap: 10px; margin: 0; color: var(--st-accent); font-size: 16px; font-weight: 500; line-height: 22px; }
-.pulse { display: inline-block; width: 10px; height: 10px; flex: 0 0 10px; border-radius: 999px; background: radial-gradient(circle, color-mix(in srgb, var(--st-accent) 55%, #ffffff) 0%, var(--st-accent) 100%); }
+.pulse { display: inline-block; width: 10px; height: 10px; flex: 0 0 10px; border-radius: 999px; background: var(--st-accent); }
 .working:not([data-state="done"], [data-state="failed"]) .pulse { animation: var(--kf-xa-pulse) var(--motion-loop) var(--ease-breathe) infinite; }
 .working[data-state="failed"] .workingHead { color: var(--st-critical); }
 .working[data-state="failed"] .pulse { background: var(--st-critical); }

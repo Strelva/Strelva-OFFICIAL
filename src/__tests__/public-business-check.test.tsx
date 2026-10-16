@@ -122,7 +122,7 @@ describe("one public business check", () => {
     const fetch = vi.fn(); vi.stubGlobal("fetch", fetch);
     await act(async () => root.render(createElement(WebsiteAuditPage, { initialResult: { ...website, grade: "B" }, saved: true })));
     expect(container.textContent).toContain("not included in this saved report");
-    expect(container.textContent).toContain("Saved privately to this workspace");
+    expect(container.textContent).toContain("Saved privately for your business");
     expect(fetch).not.toHaveBeenCalled();
   });
 });

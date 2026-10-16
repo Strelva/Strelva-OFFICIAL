@@ -72,6 +72,7 @@ function BuyerSearch({ bindingId, entryToken, brokerageName, request, mode }: Bu
 
 function BuyerInquiry({ bindingId, brokerageName, listing, onClose, currentEntry, request }: { bindingId: string; brokerageName: string; listing: Listing; currentEntry: () => Promise<string>; onClose: () => void; request: typeof fetch }) {
   const [name, setName] = useState(""), [email, setEmail] = useState(""), [phone, setPhone] = useState(""), [message, setMessage] = useState(""), [consent, setConsent] = useState(false), [busy, setBusy] = useState(false), [error, setError] = useState(""), [receipt, setReceipt] = useState<z.infer<typeof resultSchema> | null>(null), [delivery, setDelivery] = useState<HomeFinderDeliveryDetail | null>(null);
+  const [missing, setMissing] = useState<{ name?: string; email?: string; consent?: string }>({});
   const pending = useRef<HomeFinderInquiry | null>(null), inflight = useRef(false), endpoint = `/api/home-finder/${encodeURIComponent(bindingId)}`;
   async function send() {
     if (inflight.current || receipt) return; inflight.current = true; setBusy(true); setError("");
@@ -93,16 +94,27 @@ function BuyerInquiry({ bindingId, brokerageName, listing, onClose, currentEntry
       <div role="status"><XaStatus kind={state === "delivered" ? "live" : state === "failed" || state === "bounced" || state === "unavailable" ? "down" : "waits"}>{delivery ? DELIVERY_WORD[delivery.state] : receipt.message}</XaStatus></div>
       <XaNote>It&apos;s on its way to {brokerageName}. Your reference is {receipt.reference}.</XaNote>
       <div className={styles.row}><XaButton variant="secondary" size="sm" disabled={busy} busy={busy} onClick={() => void checkReceipt()}>Did it arrive?</XaButton><XaTextLink onClick={onClose}>Done</XaTextLink></div>
-    </div> : <form className={styles.stack} onSubmit={event => { event.preventDefault(); if (consent) void send(); }}>
+    </div> : <form className={styles.stack} noValidate onSubmit={event => {
+      event.preventDefault();
+      // Say what is missing in a sentence beside the field, never a browser bubble.
+      const next = {
+        ...(name.trim() ? {} : { name: "Add your name so the brokerage knows who is asking." }),
+        ...(/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()) ? {} : { email: "Add an email the brokerage can reply to." }),
+        ...(consent ? {} : { consent: `Tick the box to share your question with ${brokerageName}.` }),
+      };
+      setMissing(next);
+      if (!Object.keys(next).length) void send();
+    }}>
       <div className={styles.grid}>
-        <XaField label="Your name" required maxLength={120} value={name} disabled={locked} onChange={e => setName(e.target.value)} autoComplete="name" />
-        <XaField label="Email" type="email" required maxLength={254} value={email} disabled={locked} onChange={e => setEmail(e.target.value)} autoComplete="email" />
+        <XaField label="Your name" required maxLength={120} value={name} disabled={locked} error={missing.name} onChange={e => { setName(e.target.value); setMissing(m => ({ ...m, name: undefined })); }} autoComplete="name" />
+        <XaField label="Email" type="email" required maxLength={254} value={email} disabled={locked} error={missing.email} onChange={e => { setEmail(e.target.value); setMissing(m => ({ ...m, email: undefined })); }} autoComplete="email" />
       </div>
       <XaField label="Phone (optional)" type="tel" maxLength={40} value={phone} disabled={locked} onChange={e => setPhone(e.target.value)} autoComplete="tel" />
       <XaTextArea label="Your question" rows={3} maxLength={2000} value={message} disabled={locked} onChange={e => setMessage(e.target.value)} placeholder="When could I see it?" />
-      <label className={styles.consent}><input type="checkbox" checked={consent} required disabled={locked} onChange={e => setConsent(e.target.checked)} /><span>I agree to share this question and my contact details with {brokerageName} about this home.</span></label>
+      <label className={styles.consent}><input type="checkbox" checked={consent} required aria-invalid={missing.consent ? true : undefined} disabled={locked} onChange={e => { setConsent(e.target.checked); setMissing(m => ({ ...m, consent: undefined })); }} /><span>I agree to share this question and my contact details with {brokerageName} about this home.</span></label>
+      {missing.consent ? <XaNote tone="down">{missing.consent}</XaNote> : null}
       {pending.current ? <XaNote>Your reference is {pending.current.submissionId}. A failed answer can still mean {brokerageName} received it, so retry this same inquiry.</XaNote> : null}
-      <div className={styles.row}><XaButton type="submit" variant="primary" disabled={busy || !consent} busy={busy}>{pending.current ? "Retry the same inquiry" : "Send inquiry"}</XaButton>{!pending.current ? <XaButton variant="quiet" disabled={busy} onClick={onClose}>Cancel</XaButton> : null}</div>
+      <div className={styles.row}><XaButton type="submit" variant="primary" disabled={busy} busy={busy}>{pending.current ? "Retry the same inquiry" : "Send inquiry"}</XaButton>{!pending.current ? <XaButton variant="quiet" disabled={busy} onClick={onClose}>Cancel</XaButton> : null}</div>
     </form>}
   </section>;
 }

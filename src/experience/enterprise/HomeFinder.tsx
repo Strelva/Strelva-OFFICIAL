@@ -185,9 +185,23 @@ function RevokeControl({ binding, locked, onRevoke }: { binding: HomeFinderBindi
   </>;
 }
 
+/** "Add the license number and when the license ends first. Nothing is saved yet." Empty when nothing is missing. */
+function missingSentence(fields: [string, string][]): string {
+  const blank = fields.filter(([, value]) => !value.trim()).map(([label]) => label);
+  if (!blank.length) return "";
+  const list = blank.length === 1 ? blank[0] : `${blank.slice(0, -1).join(", ")} and ${blank[blank.length - 1]}`;
+  return `Add ${list} first. Nothing is saved yet.`;
+}
+
 function InstallForm({ workspaceId, agencies, locked, busy, onSubmit, onCancel }: { workspaceId: string; agencies: Agency[]; locked: boolean; busy: boolean; onSubmit: (input: Record<string, unknown>) => Promise<void>; onCancel?: () => void }) {
   const [agencyId, setAgencyId] = useState<string | null>(agencies.length === 1 ? agencies[0]!.id : null), [name, setName] = useState(""), [installation, setInstallation] = useState(""), [brokerage, setBrokerage] = useState(""), [origin, setOrigin] = useState(""), [license, setLicense] = useState(""), [expiry, setExpiry] = useState(""), [source, setSource] = useState("");
-  return <form className={styles.stack} aria-label="Prepare an installation" onSubmit={event => { event.preventDefault(); if (!locked && agencyId) void onSubmit({ action: "install", workspaceId, agencyId, name, externalInstallationId: installation, brokerageName: brokerage, approvedOrigin: origin, licenseReference: license, licenseExpiresAt: new Date(expiry).toISOString(), sourceName: source, commandId: crypto.randomUUID() }); }}>
+  const [missing, setMissing] = useState("");
+  return <form className={styles.stack} aria-label="Prepare an installation" noValidate onSubmit={event => {
+    event.preventDefault();
+    const blank = missingSentence([["the brokerage name", brokerage], ["a name", name], ["the brokerage website", origin], ["the listing feed name", source], ["the feed's reference", installation], ["the license number", license], ["when the license ends", Number.isFinite(new Date(expiry).valueOf()) ? expiry : ""]]);
+    setMissing(blank);
+    if (!blank && !locked && agencyId) void onSubmit({ action: "install", workspaceId, agencyId, name, externalInstallationId: installation, brokerageName: brokerage, approvedOrigin: origin, licenseReference: license, licenseExpiresAt: new Date(expiry).toISOString(), sourceName: source, commandId: crypto.randomUUID() });
+  }}>
     <p className={styles.formLede}>Use the details from the brokerage&apos;s signed agreement with its listings feed. Setting it up doesn&apos;t mean the feed has confirmed it.</p>
     {agencies.length > 1 ? <XaChoices label="Agency setting it up" value={agencyId} onChange={setAgencyId} options={agencies.map(a => ({ value: a.id, label: a.name }))} /> : <XaNote>Set up by {agencies[0]!.name}.</XaNote>}
     <div className={styles.grid}>
@@ -201,6 +215,7 @@ function InstallForm({ workspaceId, agencies, locked, busy, onSubmit, onCancel }
       <XaField label="License number" value={license} required maxLength={500} disabled={locked} onChange={e => setLicense(e.target.value)} />
       <XaField label="License ends" type="datetime-local" required value={expiry} disabled={locked} onChange={e => setExpiry(e.target.value)} />
     </div>
+    {missing ? <div role="alert"><XaNote tone="down">{missing}</XaNote></div> : null}
     <div className={styles.row}>
       <XaButton type="submit" variant="primary" size="lg" busy={busy} disabled={locked || !agencyId}>Set it up as a draft</XaButton>
       {onCancel ? <XaButton variant="quiet" size="lg" disabled={locked} onClick={onCancel}>Not now</XaButton> : null}
@@ -211,15 +226,23 @@ function InstallForm({ workspaceId, agencies, locked, busy, onSubmit, onCancel }
 function HomeFinderConfiguration({ binding, changeNumber, locked, onChange }: { binding: HomeFinderBinding; changeNumber: number; locked: boolean; onChange: (value: Record<string, unknown>) => Promise<void> }) {
   const [open, setOpen] = useState(false);
   const [brokerageName, setBrokerage] = useState(binding.brokerageName), [approvedOrigin, setOrigin] = useState(binding.approvedOrigin), [licenseReference, setLicense] = useState(binding.licenseReference), [licenseExpiresAt, setExpiry] = useState(binding.licenseExpiresAt.slice(0, 16)), [sourceName, setSource] = useState(binding.sourceName);
+  const [missing, setMissing] = useState("");
   if (!open) return <p className={styles.quiet}><XaTextLink onClick={() => setOpen(true)}>Renew the license or change its details</XaTextLink></p>;
   return <XaBlock label="Renew the license or change its details">
-    <form className={styles.stack} aria-label="Renew the license or change its details" onSubmit={event => { event.preventDefault(); const date = new Date(`${licenseExpiresAt}:00Z`); if (!locked && Number.isFinite(date.valueOf())) void onChange({ action: "configure", workspaceId: binding.workspaceId, bindingId: binding.id, expectedRevision: binding.revision, expectedChange: changeNumber, commandId: crypto.randomUUID(), brokerageName, approvedOrigin, licenseReference, licenseExpiresAt: date.toISOString(), sourceName }); }}>
+    <form className={styles.stack} aria-label="Renew the license or change its details" noValidate onSubmit={event => {
+      event.preventDefault();
+      const date = new Date(`${licenseExpiresAt}:00Z`);
+      const blank = missingSentence([["the brokerage name", brokerageName], ["the brokerage website", approvedOrigin], ["the license number", licenseReference], ["when the license ends", Number.isFinite(date.valueOf()) ? licenseExpiresAt : ""], ["the listing feed name", sourceName]]);
+      setMissing(blank);
+      if (!blank && !locked) void onChange({ action: "configure", workspaceId: binding.workspaceId, bindingId: binding.id, expectedRevision: binding.revision, expectedChange: changeNumber, commandId: crypto.randomUUID(), brokerageName, approvedOrigin, licenseReference, licenseExpiresAt: date.toISOString(), sourceName });
+    }}>
       <XaNote tone="waits">Saving pauses new inquiries until the feed confirms it again. Inquiries already received still reach the brokerage.</XaNote>
       <XaField label="Brokerage name" required value={brokerageName} maxLength={160} disabled={locked} onChange={e => setBrokerage(e.target.value)} />
       <XaField label="Brokerage website" required value={approvedOrigin} disabled={locked} onChange={e => setOrigin(e.target.value)} />
       <XaField label="License number" required value={licenseReference} maxLength={500} disabled={locked} onChange={e => setLicense(e.target.value)} />
       <XaField label="License ends (UTC)" type="datetime-local" required value={licenseExpiresAt} disabled={locked} onChange={e => setExpiry(e.target.value)} />
       <XaField label="Listing feed name" required value={sourceName} maxLength={200} disabled={locked} onChange={e => setSource(e.target.value)} />
+      {missing ? <div role="alert"><XaNote tone="down">{missing}</XaNote></div> : null}
       <div className={styles.row}><XaButton type="submit" variant="secondary" disabled={locked}>Save and ask the feed again</XaButton><XaButton variant="quiet" disabled={locked} onClick={() => setOpen(false)}>Cancel</XaButton></div>
     </form>
   </XaBlock>;

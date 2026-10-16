@@ -184,7 +184,7 @@ function RecordTimelineRail() {
   if (!selectedRecord) return null;
   const events = snapshot.state.timeline.filter((event) => event.inquiryId === selectedRecord.id).sort((left, right) => Date.parse(left.at) - Date.parse(right.at));
   return <section className={styles.recordRailContent}><h2>Record timeline</h2><p>Each event is kept with the inquiry. Each line names whoever acted.</p>
-    {snapshot.deliveryEvidence?.available === false ? <XaNote pebble>Delivery evidence is unavailable right now. Provider outcomes may be missing.</XaNote> : null}
+    {snapshot.deliveryEvidence?.available === false ? <XaNote pebble>Delivery results can&apos;t be read right now, so some may be missing.</XaNote> : null}
     {events.length > 0 ? <XaLines label="Inquiry record history" lines={events.map(event => ({ time: formatRailDate(event.at), dateTime: event.at,
       text: <>{inquiryActorLabel(event.actor)}: {event.summary}{event.outcome === "failed" || event.outcome === "blocked" ? ` (${event.outcome === "failed" ? "did not finish" : "held back"})` : ""}</> }))} />
       : <XaNote>No timeline events are recorded for this inquiry.</XaNote>}

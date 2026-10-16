@@ -348,7 +348,7 @@ export function WebsiteAuditPage({ initialUrl = "", initialBusiness = "", initia
       <p className={styles.firstTitle}>{publicCopy(aiResult.topFix)}</p>
     </section> : null}
     <div className={styles.actions}>
-      {saved ? <XaStatus kind="live">Saved privately to this workspace</XaStatus>
+      {saved ? <XaStatus kind="live">Saved privately for your business</XaStatus>
         : continueHref && (first || !result) ? <XaButtonLink variant="primary" size="lg" href={continueHref} target={continueHref.startsWith("http") ? "_blank" : undefined} rel={continueHref.startsWith("http") ? "noopener noreferrer" : undefined}>{continueLabel}</XaButtonLink> : null}
       {result ? <XaButton variant="secondary" onClick={() => void handleDownloadReport()} busy={reportLoading}>{reportLoading ? "Preparing…" : "Save as PDF"}</XaButton> : null}
     </div>

@@ -106,7 +106,7 @@ function Item({ href, icon: Icon, label, current, count, onOpen, onClose }: { hr
 export function XaSidebar(props: XaSidebarProps) {
   const { agencyNavigation, connectionsAvailable = false, ownerBrand, workspaceName, active, appBase = "", workspaceId, accountName, accountDetail, businessContext, contextualNavigation, pinned = [], mobileOpen = false, onCloseMobile, onNavigate, onSearch, onStart, startDisabled = false, signedIn = true, signInHref, signOut, standalone = false, systemsReleased = false, needsYou, allClients, agency, detailsPlace, unopened = false, navigationOnly = false, accountHref } = props;
   const contextName = plainWorkspaceName(businessContext);
-  const name = workspaceName || contextName || (agencyNavigation && ownerBrand?.agencyId ? ownerBrand.name : "Workspace");
+  const name = workspaceName || contextName || (agencyNavigation && ownerBrand?.agencyId ? ownerBrand.name : "Your business");
   const href = (section: StrelvaSection) => workspaceSectionHref(section, appBase, workspaceId);
   const go = (section: NavigableSection) => onNavigate ? () => onNavigate(section) : undefined;
   const scoped = (path: string, id = workspaceId) => `${appBase}${path}${id ? `${path.includes("?") ? "&" : "?"}workspaceId=${encodeURIComponent(id)}` : ""}`;

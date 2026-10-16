@@ -42,7 +42,10 @@ describe("L13 Home Finder retained buyer behavior", () => {
     expect(container.textContent).not.toContain("Not supplied");
     await act(async () => container.querySelector<HTMLButtonElement>("ul[aria-label='Search results'] button")!.click());
     await fill("Your name", "[Buyer]"); await fill("Email", "buyer@example.test");
-    expect(Array.from(container.querySelectorAll("button")).find(item => item.textContent === "Send inquiry")?.disabled).toBe(true);
+    // Without the consent box ticked, the page says so in a sentence and sends nothing.
+    await click("Send inquiry");
+    expect(container.textContent).toContain("Tick the box to share your question with [Brokerage].");
+    expect(request.mock.calls.filter(([, init]) => init?.method === "POST")).toHaveLength(0);
     await act(async () => container.querySelector<HTMLInputElement>('input[type="checkbox"]')!.click());
     await click("Send inquiry");
     expect(container.querySelector('[role="alert"]')?.textContent).toContain("Delivery could not be confirmed");

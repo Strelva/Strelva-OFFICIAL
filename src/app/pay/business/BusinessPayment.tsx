@@ -98,7 +98,7 @@ export default function BusinessPayment({
         throw Error("Payment could not be started. Try again.");
       const url = new URL(result.url);
       if (url.protocol !== "https:" || url.hostname !== "checkout.stripe.com")
-        throw Error("The payment provider returned an invalid link.");
+        throw Error("Stripe sent back a link that couldn't be opened. Nothing was charged.");
       window.location.assign(url.toString());
     } catch (cause) {
       setError(

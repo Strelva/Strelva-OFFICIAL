@@ -66,14 +66,14 @@ export function PossibilityTryError({ onRetry, mode }: { onRetry: () => void } &
     felt={<XaEntryFelt object={<XaEntryBrokenLink address="Your preview link" title="The preview didn’t open.">Your live site is untouched. Nothing was published, sent or booked.</XaEntryBrokenLink>} />}>
     <XaHeadline quiet="Nothing was published, sent or booked.">This Possibility could not be opened.</XaHeadline>
     <XaButton variant="primary" size="lg" block onClick={onRetry}>Try again</XaButton>
-    <XaEntryNote>Still not opening? The same Possibility waits in your workspace. <XaTextLink href={WORKSPACE_HREF}>Go to Home</XaTextLink></XaEntryNote>
+    <XaEntryNote>Still not opening? The same Possibility waits for you in Strelva. <XaTextLink href={WORKSPACE_HREF}>Go to Home</XaTextLink></XaEntryNote>
   </XaEntryFrame>;
 }
 
 /** Bad news about the link: the broken link in the felt, who sent it when known, and one way forward. */
 function Unavailable({ title, quiet, felt, from, mode }: { title: string; quiet: string; felt: string; from?: PossibilityTrySender } & Mode) {
   const sender = from?.proposer || from?.agencyName;
-  const ask = sender ? `${from?.proposer && from.agencyName ? `${from.proposer} at ${from.agencyName}` : sender} can send a fresh link.` : "The latest version waits in your workspace.";
+  const ask = sender ? `${from?.proposer && from.agencyName ? `${from.proposer} at ${from.agencyName}` : sender} can send a fresh link.` : "The latest version waits for you in Strelva.";
   return <XaEntryFrame mode={mode} phoneSays={felt}
     felt={<XaEntryFelt object={<XaEntryBrokenLink address="Your preview link" title={title}>{felt}</XaEntryBrokenLink>} />}>
     <XaHeadline quiet={quiet}>{title}</XaHeadline>

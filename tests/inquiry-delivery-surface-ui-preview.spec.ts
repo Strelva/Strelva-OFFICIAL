@@ -124,9 +124,9 @@ test("a provider timeline outage is visible and removes the unsafe Why fix", asy
   await mockSnapshot(page, current);
   const record = current.state.inquiries[0]!;
   await page.goto(entry, { waitUntil: "domcontentloaded" });
-  await expect(page.getByRole("status")).toContainText("Provider outcomes may be missing");
+  await expect(page.getByRole("status")).toContainText("so some may be missing");
   await page.getByRole("button", { name: `Inspect ${record.id}`, exact: true }).click();
-  await expect(page.locator("main").getByRole("status")).toContainText("Provider outcomes may be missing");
+  await expect(page.locator("main").getByRole("status")).toContainText("so some may be missing");
   await page.getByRole("button", { name: "Ask Why from recorded evidence", exact: true }).click();
   await expect(page.getByRole("status")).toContainText("Why cannot offer a provider-based fix");
   await expect(page.getByText("No safe fix proposal was returned for the recorded evidence.", { exact: true })).toBeVisible();
