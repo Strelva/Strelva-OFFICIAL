@@ -8,7 +8,8 @@ import { WorkspaceSearchDialog } from "@/experience/workspace/WorkspaceSearchDia
 import type { WorkspaceSearchItem } from "@/experience/workspace/workspace-search";
 import { AppFrame, useHydrationReady } from "./AppFrame";
 import { StrelvaSidebar, type AgencyNavigation } from "./StrelvaSidebar";
-import type { StrelvaPinnedItem, StrelvaSection } from "./workspace-places";
+import type { StrelvaAgencyLink, StrelvaDetailsPlace, StrelvaPinnedItem, StrelvaSection } from "./workspace-places";
+import { XaInitial, XaMark } from "@/components/ui/strelva/Xa";
 import styles from "./strelva-shell.module.css";
 
 export { isRetiredView, pinnedApps, pinnedSystems, pinnedWebsites, placeForSection, sectionFromView, sectionTitle, workspaceSectionHref, type StrelvaPinnedItem, type StrelvaSection } from "./workspace-places";
@@ -63,14 +64,23 @@ interface Props {
   needsYou?: { count: number | null; label?: string };
   allClients?: { href: string; onOpen?: () => void };
   /**
-   * October 6, 2026: the workspace is linen content beside an ink rail
-   * (the default). The tenant dashboard keeps its dark foundation.
+   * The theme switch. "linen" is the workspace: since October 15 it renders
+   * the XA look (paper, quiet rail, ink primary). "paper" keeps the October 9
+   * paper look with its dot grid and floating card. The tenant dashboard
+   * keeps its dark foundation.
    */
-  theme?: "linen" | "dashboard";
+  theme?: "linen" | "paper" | "dashboard";
+  /** Light or dark, for previews and the account's choice. */
+  mode?: "light" | "dark";
+  /** XA: the business's agency, shown under "Your agency". */
+  agency?: StrelvaAgencyLink;
+  /** XA: which business details place is open (billing, export). */
+  detailsPlace?: StrelvaDetailsPlace;
 }
 
 /** Shared presentation only. Each resource retains its server authorization. */
-export function StrelvaShell({ connectionsAvailable = false, agencyNavigation, tenantId, ownerBrand, workspaceName, brandWorkspaceId, children, active, title = "Strelva", context, businessContext, workspaceId, navigation, recentWork, pinned, searchItems, searchScopeName = "Your work", actions, notice, accountName = "Your account", accountDetail, signedIn = true, signInHref, signOut, appBase = "", onNavigate, onAccess, onSearch, onStart, startDisabled = false, contentId = "strelva-main", rightRail, rightRailId = "managed-discussion", rightRailTitle = "Ask Strelva", rightRailOpen, onCloseRightRail, rightRailTriggerRef, systemsReleased = false, needsYou, allClients, theme = "linen" }: Props) {
+export function StrelvaShell({ connectionsAvailable = false, agencyNavigation, tenantId, ownerBrand, workspaceName, brandWorkspaceId, children, active, title = "Strelva", context, businessContext, workspaceId, navigation, recentWork, pinned, searchItems, searchScopeName = "Your work", actions, notice, accountName = "Your account", accountDetail, signedIn = true, signInHref, signOut, appBase = "", onNavigate, onAccess, onSearch, onStart, startDisabled = false, contentId = "strelva-main", rightRail, rightRailId = "managed-discussion", rightRailTitle = "Ask Strelva", rightRailOpen, onCloseRightRail, rightRailTriggerRef, systemsReleased = false, needsYou, allClients, theme = "linen", mode, agency, detailsPlace }: Props) {
+  const look = theme === "paper" ? "paper" : "xa";
   const navigationName = workspaceName || plainWorkspaceName(businessContext) || undefined;
   const brandId = brandWorkspaceId || workspaceId;
   const brandScope = brandId ? `workspaceId=${encodeURIComponent(brandId)}` : tenantId ? `tenantId=${encodeURIComponent(tenantId)}` : null;
@@ -131,11 +141,11 @@ export function StrelvaShell({ connectionsAvailable = false, agencyNavigation, t
     return () => document.removeEventListener("keydown", keyboard);
   }, [canSearch, mobileOpen, onSearch, searchItems]);
 
-  return <div data-dashboard data-workspace-theme={theme === "linen" ? "linen" : undefined} className={styles.root}>
+  return <div data-dashboard data-workspace-theme={theme === "dashboard" ? undefined : "linen"} data-workspace-look={theme === "dashboard" ? undefined : look} data-workspace-mode={mode} className={styles.root}>
     <a className={styles.skip} href={`#${contentId}`}>Skip to work</a>
     <AppFrame className={styles.shell} navigationLabel={`${navigationName || "Workspace"} navigation`} navigationStorageKey="strelva:app-frame-navigation-collapsed" navigationOpen={mobileOpen} onCloseNavigation={() => setMobileOpen(false)} navigationTriggerRef={menuRef} contentId={contentId}
-      navigation={<StrelvaSidebar connectionsAvailable={connectionsAvailable} allClients={allClients} agencyNavigation={salesNavigation} ownerBrand={presentationBrand} workspaceName={navigationName} systemsReleased={systemsReleased} needsYou={needsYou} active={active} appBase={appBase} workspaceId={workspaceId} accountName={accountName} accountDetail={accountDetail} businessContext={businessContext} contextualNavigation={navigation} recentWork={recentWork} pinned={pinned} mobileOpen={mobileOpen} onCloseMobile={() => setMobileOpen(false)} onNavigate={onNavigate ? section => section === "access" && onAccess ? onAccess() : onNavigate(section) : undefined} onSearch={canSearch ? openSearch : undefined} onStart={onStart} startDisabled={startDisabled} signedIn={signedIn} signInHref={signInHref} signOut={signOut} />}
-      header={<div className={styles.header}><button ref={menuRef} className={styles.mobileMenu} disabled={!ready} onClick={() => setMobileOpen(true)} type="button" aria-label="Open navigation" aria-expanded={mobileOpen}><Menu size={20} /></button><span className={styles.title}>{title}</span>{context ? <div className={styles.context}>{context}</div> : null}{actions ? <div className={styles.actions}>{actions}</div> : null}</div>}
+      navigation={<StrelvaSidebar connectionsAvailable={connectionsAvailable} allClients={allClients} agencyNavigation={salesNavigation} ownerBrand={presentationBrand} workspaceName={navigationName} systemsReleased={systemsReleased} needsYou={needsYou} active={active} appBase={appBase} workspaceId={workspaceId} accountName={accountName} accountDetail={accountDetail} businessContext={businessContext} contextualNavigation={navigation} recentWork={recentWork} pinned={pinned} mobileOpen={mobileOpen} onCloseMobile={() => setMobileOpen(false)} onNavigate={onNavigate ? section => section === "access" && onAccess ? onAccess() : onNavigate(section) : undefined} onSearch={canSearch ? openSearch : undefined} onStart={onStart} startDisabled={startDisabled} signedIn={signedIn} signInHref={signInHref} signOut={signOut} look={look} agency={agency} detailsPlace={detailsPlace} />}
+      header={<div className={styles.header}><button ref={menuRef} className={styles.mobileMenu} disabled={!ready} onClick={() => setMobileOpen(true)} type="button" aria-label="Open navigation" aria-expanded={mobileOpen}>{look === "xa" ? <><XaMark size={22} /><span className={styles.mobileName}>{navigationName || title}</span></> : <Menu size={20} />}</button><span className={styles.title}>{title}</span>{look === "xa" && signedIn ? <span className={styles.mobileAccount} aria-hidden="true"><XaInitial name={accountName} shape="round" size={30} /></span> : null}{context ? <div className={styles.context} data-shell-extra>{context}</div> : null}{actions ? <div className={styles.actions} data-shell-extra>{actions}</div> : null}</div>}
       notice={notice} rightRail={rightRail} rightRailId={rightRailId} rightRailTitle={rightRailTitle} rightRailOpen={rightRailOpen} onCloseRightRail={onCloseRightRail} rightRailTriggerRef={rightRailTriggerRef}
     >{children}</AppFrame>
     {searchItems ? <WorkspaceSearchDialog systemsReleased={systemsReleased} key={workspaceId || searchScopeName} storageKey={workspaceId && accountDetail ? `strelva:search-query:v1:${encodeURIComponent(accountDetail)}:${workspaceId}` : undefined} open={searchOpen} items={searchItems} scopeName={searchScopeName} onClose={() => setSearchOpen(false)} /> : null}

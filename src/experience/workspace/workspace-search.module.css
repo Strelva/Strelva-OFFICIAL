@@ -25,3 +25,14 @@
 .srOnly { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
 @supports not (backdrop-filter:blur(1px)) { .dialog { background:var(--st-surface); } }
 @media(max-width:640px) { .dialog { margin:16px auto auto; max-height:calc(100dvh - 32px); } .content { max-height:calc(100dvh - 32px); } .header { padding:12px 16px; gap:8px; } .header input { min-height:32px; } .footer { display:none; } .phoneClose { display:block; } .desktopEscape,.openHint { display:none; } .result { min-height:64px; } }
+
+/* October 15 (XA motion 4, ⌘K from anywhere): arrives in Fast from .98,
+   white with the large shadow, and the results' highlight answers on Fast. */
+:global([data-workspace-look="xa"]) .dialog { border: 0; border-radius: 20px; background: var(--st-surface); box-shadow: var(--st-shadow-lg); backdrop-filter: none; }
+:global([data-workspace-look="xa"]) .dialog[open] { animation: var(--kf-xa-palette) var(--motion-fast) var(--ease-settle) both; }
+:global([data-workspace-look="xa"]) .dialog::backdrop { background: color-mix(in srgb, #161715 18%, transparent); }
+:global([data-workspace-look="xa"]) .header { padding: 16px 20px; }
+:global([data-workspace-look="xa"]) .header input { font-size: 17px; }
+:global([data-workspace-look="xa"]) .header:focus-within { box-shadow: none; }
+:global([data-workspace-look="xa"]) .result { border-radius: var(--st-r-nav, 10px); transition: background-color var(--motion-fast) var(--ease-settle); }
+:global([data-workspace-look="xa"]) .result strong { font-size: 15px; }

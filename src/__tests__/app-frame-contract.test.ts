@@ -15,12 +15,15 @@ describe("shared app frame accessibility contract", () => {
   it("places configured agency Leads next to Payment links and hides it without current admission", () => {
     const workspaceId = "11111111-1111-4111-8111-111111111111";
     const base = { workspaceId, workspaceName: "Strelva Agency", children: createElement("p", null, "Agency"), signOut: null };
-    const authorized = renderToStaticMarkup(createElement(StrelvaShell, { ...base, agencyNavigation: { leadsAvailable: true, leadsCurrent: true } }));
-    expect(authorized).toContain(`/workspace/leads?workspaceId=${workspaceId}`);
-    expect(authorized).toContain('aria-current="page"'); expect(authorized).toContain("Payment links");
-    for (const agencyNavigation of [{ leadsAvailable: false }, {}]) {
-      const html = renderToStaticMarkup(createElement(StrelvaShell, { ...base, agencyNavigation }));
-      expect(html).not.toContain("/workspace/leads?"); expect(html).toContain("Payment links");
+    for (const theme of ["paper", "linen"] as const) {
+      const authorized = renderToStaticMarkup(createElement(StrelvaShell, { ...base, theme, agencyNavigation: { leadsAvailable: true, leadsCurrent: true } }));
+      expect(authorized).toContain(`/workspace/leads?workspaceId=${workspaceId}`);
+      expect(authorized).toContain('aria-current="page"'); expect(authorized).toContain("Payment links");
+      // XA keeps Leads and Payment links in the agency details sidebar; Payment links opens it.
+      for (const agencyNavigation of theme === "paper" ? [{ leadsAvailable: false }, {}] : [{ leadsAvailable: false, paymentLinksCurrent: true }, { paymentLinksCurrent: true }]) {
+        const html = renderToStaticMarkup(createElement(StrelvaShell, { ...base, theme, agencyNavigation }));
+        expect(html).not.toContain("/workspace/leads?"); expect(html).toContain("Payment links");
+      }
     }
   });
   it("keeps collapsed navigation and mobile modal surfaces out of competing focus trees", () => {
@@ -67,12 +70,18 @@ describe("shared app frame accessibility contract", () => {
     };
     // Before Systems (STRELVA_SYSTEMS_RELEASE off, the default) the list is "Files and results".
     // The Customers page is retired in both states (October 6); its old address opens Home.
-    const before = renderToStaticMarkup(createElement(StrelvaShell, shellProps));
+    // The October 9 paper look keeps its places behind the theme switch.
+    const before = renderToStaticMarkup(createElement(StrelvaShell, { ...shellProps, theme: "paper" }));
     expect(before).toContain("Files and results");
     expect(before).not.toContain(">Customers<");
     expect(before).not.toContain('href="/workspace?view=customers"');
     expect(before).not.toContain("All systems and files");
-    const html = renderToStaticMarkup(createElement(StrelvaShell, { ...shellProps, systemsReleased: true }));
+    const html = renderToStaticMarkup(createElement(StrelvaShell, { ...shellProps, systemsReleased: true, theme: "paper" }));
+    // October 15 (XA, the default): Today, Requests and Minutes; details sit behind the business details control.
+    const xa = renderToStaticMarkup(createElement(StrelvaShell, { ...shellProps, systemsReleased: true }));
+    for (const label of ['aria-label="Workspace utilities"', 'aria-label="Main"', ">Today<", ">Requests<", ">Minutes<", 'aria-label="Business details"', ">New request<", ">Search<", "All systems and files", "Sign out"]) expect(xa).toContain(label);
+    for (const href of ['href="/workspace?view=requests"', 'href="/workspace?view=ongoing"', 'href="/workspace?view=apps"', 'href="/workspace?view=settings"', 'href="/workspace/account"']) expect(xa).toContain(href);
+    expect(xa).not.toContain(">Customers<");
 
     expect(html).toContain('aria-label="Workspace navigation"');
     expect(html).toContain('aria-label="Main"');

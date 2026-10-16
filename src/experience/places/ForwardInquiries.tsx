@@ -128,7 +128,7 @@ export function ForwardInquiries({ workspaceId, fixture }: { workspaceId: string
       : <p className="text-sm">The owner hasn&apos;t set up forwarding yet.</p>) : null}
     {view?.address && email ? <div className="mt-2 grid gap-4">
       <div className="flex flex-wrap items-center gap-3">
-        <span className="min-w-0 break-all font-mono text-base">{email}</span>
+        <span className="min-w-0 break-all tabular-nums text-base">{email}</span>
         <StTextButton onClick={() => void copy(email)} aria-label={`Copy ${email}`}>{copied ? "Copied" : "Copy"}</StTextButton>
       </div>
       <p role="status" className="text-sm">{testArrived ? `Your test arrived. Forwarding works. ${arrivedLabel(view)}` : arrivedLabel(view)}</p>

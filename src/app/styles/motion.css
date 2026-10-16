@@ -39,6 +39,18 @@
   --kf-breathe: st-breathe;
   --kf-halo: st-halo;
   --kf-spin: st-spin;
+  /* October 15 (XA): the seven moments in design/motion/xa-motion. */
+  --kf-xa-halo: st-xa-halo;     /* Live dot: 1 → 2.6, .45 → 0, on ambient */
+  --kf-xa-pulse: st-xa-pulse;   /* Working pulse dot */
+  --kf-xa-sweep: st-xa-sweep;   /* Working title shimmer */
+  --kf-xa-drain: st-xa-drain;   /* Undo window bar */
+  --kf-xa-palette: st-xa-palette; /* ⌘K arrives from .98 */
+  --kf-xa-word: st-xa-word;     /* a streamed word arrives */
+
+  /* XA durations that are not steps on the ladder: the Undo window and the
+     pace of streamed words. Both carry meaning, so reduced motion keeps them. */
+  --motion-undo-window: 5000ms;
+  --motion-word: 28ms;
 
   /* Role aliases kept for existing code. New code uses the ladder above. */
   --motion-feedback: var(--motion-fast);
@@ -97,6 +109,33 @@
 }
 @keyframes st-spin {
   to { rotate: 360deg; }
+}
+
+@keyframes st-xa-halo {
+  0% { opacity: .45; transform: scale(1); }
+  70%, 100% { opacity: 0; transform: scale(2.6); }
+}
+@keyframes st-xa-pulse {
+  50% { opacity: .6; transform: scale(.7); }
+}
+@keyframes st-xa-sweep {
+  from { background-position: 100% 0; }
+  to { background-position: -150% 0; }
+}
+@keyframes st-xa-drain {
+  from { transform: scaleX(1); }
+  to { transform: scaleX(0); }
+}
+@keyframes st-xa-palette {
+  from { opacity: 0; transform: scale(.98); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes st-xa-word {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  @keyframes st-xa-palette { from { opacity: 0; } to { opacity: 1; } }
 }
 
 /* Utilities for TSX. `st-enter` with `--i` set staggers within a group (cap 6). */

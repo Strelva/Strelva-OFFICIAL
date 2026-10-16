@@ -162,7 +162,7 @@ export function AgencyManagedWebsiteDraftExperience({ bindingId, section = "hero
           </div> : null}
           <details className="mt-5">
             <summary className="cursor-pointer text-sm font-medium text-warm-black">Advanced section data</summary>
-            <TextArea id="managed-website-draft-json" className="mt-3 font-mono text-xs" label={section === "hero" ? "Optional JSON for fields outside this editor" : "Section data"} value={draft} onChange={(event) => setDraft(event.target.value)} rows={10} spellCheck={false} helperText="Keep this data for the assigned section only. The saved result remains a draft until the client reviews and publishes it." />
+            <TextArea id="managed-website-draft-json" className="mt-3 tabular-nums text-xs" label={section === "hero" ? "Optional JSON for fields outside this editor" : "Section data"} value={draft} onChange={(event) => setDraft(event.target.value)} rows={10} spellCheck={false} helperText="Keep this data for the assigned section only. The saved result remains a draft until the client reviews and publishes it." />
           </details>
         </StSurface>
         <p className="m-0 text-sm leading-relaxed text-gray-muted">The client reviews and publishes your draft. Saving here does not change the live website.</p>

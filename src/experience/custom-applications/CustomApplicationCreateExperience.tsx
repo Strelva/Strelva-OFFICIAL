@@ -99,7 +99,7 @@ export function CustomApplicationCreateExperience({ workspaceId, onSaved }: { wo
       </header>
       <form className="space-y-6 rounded-2xl border border-gray-border bg-surface p-5 sm:p-7" onSubmit={submit}>
         <TextInput label="System name" value={title} onChange={event => setTitle(event.target.value)} required maxLength={160} disabled={busy} />
-        <TextArea label="build.mjs" value={source} onChange={event => setSource(event.target.value)} required rows={10} disabled={busy} className="font-mono text-xs leading-5" helperText="The local builder must write the final HTML to /output/index.html. Network access is disabled." />
+        <TextArea label="build.mjs" value={source} onChange={event => setSource(event.target.value)} required rows={10} disabled={busy} className="tabular-nums text-xs leading-5" helperText="The local builder must write the final HTML to /output/index.html. Network access is disabled." />
         <div className="grid gap-4 sm:grid-cols-2">
           <TextInput label="Maximum authorized budget (USD)" type="number" min="0" max="10000" step="0.01" value={maximum} onChange={event => setMaximum(event.target.value)} required disabled={busy} helperText="The build cannot exceed this amount." />
           <TextInput label="Expected build cost (USD)" type="number" min="0" max="10000" step="0.01" value={estimate} onChange={event => setEstimate(event.target.value)} required disabled={busy} helperText="Use $0 when the local build has no reported cost." />

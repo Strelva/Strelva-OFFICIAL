@@ -35,18 +35,20 @@ it("opens agency Home, preserves separate Clients navigation, and returns Home f
   await act(async () => root.render(<WorkspaceApp request={request} />));
   await settle();
   const mainNav = () => node.querySelector('aside nav[aria-label="Main"]')!;
-  const selected = () => mainNav().querySelector('a[aria-current="page"]')?.textContent?.trim();
-  expect(selected()).toBe("Home");
-  const homeLink = [...mainNav().querySelectorAll<HTMLAnchorElement>("a")].find(link => link.textContent?.trim() === "Home")!;
+  // October 15 (XA): Today in Main; the Clients page opens from "All clients" beside the clients list.
+  const selected = () => node.querySelector('aside a[aria-current="page"]')?.textContent?.trim();
+  expect(selected()).toBe("Today");
+  const homeLink = [...mainNav().querySelectorAll<HTMLAnchorElement>("a")].find(link => link.textContent?.trim() === "Today")!;
   expect(new URL(homeLink.href).searchParams.has("agencyView")).toBe(false);
-  const clients = [...mainNav().querySelectorAll<HTMLAnchorElement>("a")].find(link => link.textContent?.trim() === "Clients")!;
+  const clients = [...node.querySelectorAll<HTMLAnchorElement>("aside a")].find(link => link.textContent?.trim() === "All clients")!;
   await act(async () => clients.click()); await settle();
-  expect(selected()).toBe("Clients");
+  expect(selected()).toBe("All clients");
   expect(node.querySelector("h1")?.textContent).toBe("Clients");
   expect(new URLSearchParams(window.location.search).get("agencyView")).toBe("clients");
-  const brandHome = node.querySelector<HTMLAnchorElement>('aside a[aria-label$=" home"]')!;
+  // With the agency switcher in the header, Today is the way home.
+  const brandHome = [...mainNav().querySelectorAll<HTMLAnchorElement>("a")].find(link => link.textContent?.trim() === "Today")!;
   await act(async () => brandHome.click()); await settle();
-  expect(selected()).toBe("Home");
+  expect(selected()).toBe("Today");
   expect(new URLSearchParams(window.location.search).has("agencyView")).toBe(false);
   expect(node.querySelector("h1")?.textContent).not.toBe("Clients");
   // Both views reuse the mounted agency's client read.
@@ -67,6 +69,9 @@ it("opens the agency Connections section in the workspace and preserves its scop
   const node = document.createElement("div"); document.body.appendChild(node);
   const root = createRoot(node); roots.push(root);
   await act(async () => root.render(<WorkspaceApp request={request} />)); await settle();
+  // XA keeps Connections in the agency details sidebar, opened from the account row.
+  const details = node.querySelector<HTMLAnchorElement>('aside a[aria-label="Agency details"]')!;
+  await act(async () => details.click()); await settle();
   const connections = node.querySelector<HTMLAnchorElement>('aside a[href*="view=connections"]')!;
   expect(connections).not.toBeNull();
   await act(async () => connections.click()); await settle();

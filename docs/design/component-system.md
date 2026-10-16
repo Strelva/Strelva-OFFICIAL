@@ -7,6 +7,19 @@ The [visual direction map](../../DESIGN.md#visual-direction-and-extension-map) o
 how identity, imagery, composition and component treatment fit together. This
 file owns component contracts, extension and adoption, including gaps in source.
 
+## October 15 XA foundation (local, branch xa/build-20261015)
+
+XA is the default workspace look: paper, a quiet side rail, one ink primary per
+screen, moss for live, clay for what waits, DM Sans only (no monospace). The LX
+kit is `@/components/ui/strelva/Xa` (`XaButton`, `XaComposer`, `XaYes`,
+`XaStatus`, `XaWorking`, `XaPage`, `XaUndo`, Pebble and System clays, inputs,
+`XaSheet`, `XaEmpty`, `XaRows`, motion primitives). `StrelvaSidebar` renders
+`XaSidebar` (owner, agency, details shapes); `StrelvaShell theme="paper"` keeps
+the October 9 look. The St* kit is restyled to the same look and stays
+exported. API, Pen node per part, motion and the anti-slop checklist:
+[design-notes/XA-FOUNDATION.md](../../design-notes/XA-FOUNDATION.md). Preview:
+`/preview/strelva/xa`.
+
 ## October 11 coherence amendment
 
 [GLOSSARY.md](../../GLOSSARY.md) and

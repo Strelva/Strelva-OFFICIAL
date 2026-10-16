@@ -151,7 +151,7 @@ it("a save callback retained by old work cannot pull a person back after navigat
   window.history.replaceState(null, "", `/workspace?workspaceId=${BUSINESS}&view=document`);
   const node = await render(productRequest());
   const staleSave = savedCallbacks.at(-1)!;
-  const home = [...node.querySelectorAll<HTMLAnchorElement>("a")].find(link => link.textContent?.trim() === "Home")!;
+  const home = [...node.querySelectorAll<HTMLAnchorElement>("a")].find(link => link.textContent?.trim() === "Today")!;
   await act(async () => home.click()); await settle();
   const current = window.location.href;
   await act(async () => staleSave("saved-document")); await settle();
@@ -164,7 +164,7 @@ it("a late document callback cannot claim a new instance after Home and Back to 
   const node = await render(productRequest());
   // Models DocumentExperience's onSaved callback retained across its awaited POST.
   const obsoleteSave = savedCallbacks.at(-1)!;
-  const home = [...node.querySelectorAll<HTMLAnchorElement>("a")].find(link => link.textContent?.trim() === "Home")!;
+  const home = [...node.querySelectorAll<HTMLAnchorElement>("a")].find(link => link.textContent?.trim() === "Today")!;
   await act(async () => home.click()); await settle();
   await back();
   expect(`/workspace${window.location.search}`).toBe(target);

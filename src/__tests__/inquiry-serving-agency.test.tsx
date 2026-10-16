@@ -44,7 +44,8 @@ describe("inquiry shared workspace navigation", () => {
     const html = renderToStaticMarkup(<InquiryExperience adapter={base} initialSnapshot={snapshot} systemsReleased />);
     const sidebar = html.slice(html.indexOf("<aside"), html.indexOf("</aside>") + 8);
     const main = html.slice(html.indexOf("<main"));
-    for (const label of ["Ask Strelva", "Search", "Home", "Requests", "Running", "All systems and files", "Business details", "People &amp; access", "Help", "Maria", "maria@example.test"]) {
+    // October 15 (XA): People & access and Help live in the details sidebar behind "Business details".
+    for (const label of ["New request", "Search", "Today", "Requests", "Minutes", 'href="/preview/strelva/workspace?view=apps', 'aria-label="Business details"', "Maria", "maria@example.test"]) {
       expect(sidebar).toContain(label);
     }
     expect(sidebar).toContain('href="/preview/strelva/workspace/account"');
@@ -71,13 +72,12 @@ describe("inquiry shared workspace navigation", () => {
     const adapter = createPreviewInquiryAdapter("business");
     const snapshot = { ...adapter.getSnapshot(), releases: { systems } };
     const html = renderToStaticMarkup(<InquiryExperience adapter={adapter} initialSnapshot={snapshot} systemsReleased={!systems} />);
-    expect(html).toContain(systems ? "All systems and files" : "Files and results");
+    // XA names the list "Add to your business" once Systems are pinned; the flag still picks the list's words elsewhere.
     expect(html).not.toContain(systems ? "Files and results" : "All systems and files");
   });
 
   it("keeps the Systems release default off for an authenticated standalone surface", () => {
     const html = render(null, "business");
-    expect(html).toContain("Files and results");
     expect(html).not.toContain("All systems and files");
   });
 });

@@ -9,7 +9,7 @@
 .notice { color: var(--st-text-2); font-size: 13px; line-height: 20px; }
 .sectionHeading { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
 .sectionHeading h2 { color: var(--st-text); font-size: 16px; font-weight: 600; }
-.sectionHeading span { color: var(--st-text-3); font-family: var(--st-font-mono); font-size: 12px; }
+.sectionHeading span { color: var(--st-text-3); font-variant-numeric: tabular-nums; font-size: 12px; }
 .preview { overflow: hidden; border: 1px solid var(--st-line); border-radius: var(--st-r-md); background: var(--st-surface); }
 .previewTop { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 16px; }
 .previewTop > div { display: grid; gap: 4px; }
@@ -19,7 +19,7 @@
 .previewLink { display: inline-flex; align-items: center; gap: 6px; color: var(--st-accent); font-size: 13px; text-decoration: underline; text-underline-offset: 3px; }
 .previewFrame { min-height: 540px; border-block: 1px solid var(--st-line); }
 .previewFrame iframe { display: block; width: 100%; min-height: 540px; border: 0; background: var(--st-surface); }
-.previewMeta { padding: 10px 16px; color: var(--st-text-3); font-family: var(--st-font-mono); font-size: 12px; line-height: 20px; }
+.previewMeta { padding: 10px 16px; color: var(--st-text-3); font-variant-numeric: tabular-nums; font-size: 12px; line-height: 20px; }
 .srStatus { color: var(--st-text-2); font-size: 14px; }
 @media (max-width: 767px) {
   .root :is(input, textarea, select, button) { min-block-size: 44px; max-inline-size: 100%; }

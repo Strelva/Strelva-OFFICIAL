@@ -10,8 +10,9 @@ import type { OwnerBrand } from "@/platform/infra/agency-brand";
  * - One calm column (StPage). Wide only for dense comparison.
  * - Lists are open rows with hairlines (StRows/StRow), never a bordered box.
  *   StSurface is for real objects only: a draft, a preview, a receipt.
- * - Labels are sentence case (StLabel). Mono (StMono) only for times,
- *   counts, paths, keys and record values.
+ * - Labels are sentence case (StLabel). StMono is kept by name for times,
+ *   counts and record values; since October 15 it renders DM Sans tabular
+ *   figures (no monospace anywhere). New screens use the Xa* parts in ./Xa.
  * - One solid primary action per view (StPill). Everything else is soft
  *   (StPill variant="soft") or a text action (StTextButton).
  */

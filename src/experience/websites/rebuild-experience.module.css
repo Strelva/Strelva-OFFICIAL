@@ -37,7 +37,7 @@
 .records th,.records td { padding:12px 8px; border-bottom:1px solid var(--st-line); overflow-wrap:anywhere; }
 .records th { font-weight:500; color:var(--st-text-3); }
 .dns { table-layout:fixed; }
-.dns td { font-family:var(--st-font-mono); font-size:12px; }
+.dns td { font-variant-numeric:tabular-nums; font-size:12px; }
 .dns th:first-child,.dns td:first-child { width:64px; white-space:nowrap; }
 .dns th:nth-child(2),.dns td:nth-child(2) { width:30%; }
 .root a:focus-visible { outline:2px solid var(--st-accent); outline-offset:4px; border-radius:8px; }

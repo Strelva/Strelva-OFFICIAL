@@ -1,43 +1,131 @@
 /*
- * October 15, 2026: XA, the luxury-minimal workspace.
+ * October 15, 2026: XA, the luxury-minimal workspace. The default look.
  *
- * Source of truth: design/Strelva-Board-2026-10-15.pen, chapter "XA · Every
- * flow, redesigned" (renders in design/xa-2026-10-15/) and the LX kit.
- * Paper without the dot grid, a quiet side rail, ink for the one primary
- * action per screen, moss for live and confirmation, clay for what waits.
- * Declared after workspace-paper.css with the same selectors, so these win.
+ * Source of truth: design/Strelva-Board-2026-10-15.pen, chapters "01 · Luxury
+ * minimal" (the LX kit) and "XA · Every flow, redesigned" (renders in
+ * design/xa-2026-10-15/). Paper without the dot grid, a quiet side rail, ink
+ * for the one primary action per screen, moss for live and confirmation, clay
+ * for what waits. DM Sans everywhere; numbers use tabular figures, never mono.
+ *
+ * XA applies wherever the linen theme is set. The October 9 paper look stays
+ * reachable through the existing theme switch: StrelvaShell theme="paper"
+ * (or data-workspace-look="paper" on the linen element). `:not(...)` lifts
+ * these selectors above workspace-paper.css, so declaration order is not load
+ * bearing.
  */
-:root [data-workspace-theme="linen"],
-:root [data-workspace-theme="linen"] [data-dashboard] {
+:root [data-workspace-theme="linen"]:not([data-workspace-look="paper"]),
+:root [data-workspace-theme="linen"]:not([data-workspace-look="paper"]) [data-dashboard] {
   --st-canvas: #faf9f6;
   --st-sidebar: #f3f2ee;
+  --st-surface: #ffffff;
   --st-hover: #edece7;
   --st-selected: #e8e7e1;
   --st-inset: #f1f0ec;
+  --st-chip: #f4f3ef;
   --st-line: #e6e5e0;
+  --st-line-strong: #d9d8d2;
+  --st-text: #161715;
+  --st-text-body: #3a3c38;
   --st-text-2: #6b6f68;
-  --st-text-3: #8c8f88;
+  /* Readable meta text. The board's #a3a69f is kept for placeholders and
+     marks only (--st-faint), where it carries no information alone. */
+  --st-text-3: #81847d;
+  --st-faint: #a3a69f;
+  --st-accent: #2f5236;
+  --st-accent-hover: #26442c;
+  --st-on-accent: #ffffff;
+  --st-live: #3e8e5a;
   --st-tint: #edf1ea;
+  --st-need: #9c522c;
   --st-need-dot: #c9773f;
   --st-need-tint: #f6ebe1;
+  --st-draft-dot: #c4c6c0;
+  --st-critical: #b3261e;
   --st-action: #161715;
   --st-action-hover: #2a2c29;
   --st-on-action: #ffffff;
+  --st-glass: #ffffffd9;
   --st-dot: transparent;
-  --st-shadow-float: 0 1px 2px #0000000a, 0 4px 12px #0000000f;
-  --st-shadow-card: 0 1px 2px #0000000a, 0 16px 48px #00000014;
+  --st-undo-bg: #161715eb;
+  --st-undo-text: #ffffff;
+  --st-undo-check: #a9c49a;
+  --st-felt-from: #e8ece3;
+  --st-felt-to: #dde2d9;
+
+  /* Two shadows only. Small for things that sit on paper (buttons, the
+     composer), large for the one object a page is about (a page preview, the
+     decision panel, a sheet). */
+  --st-shadow-sm: 0 1px 2px #0000000a, 0 10px 30px #00000012;
+  --st-shadow-lg: 0 1px 2px #0000000a, 0 16px 48px #00000014;
+  --st-shadow-float: var(--st-shadow-sm);
+  --st-shadow-card: var(--st-shadow-lg);
   --st-shadow-sidebar: none;
+
+  /* Radii from the LX kit: 8 chips, 10 nav, 12 fields, 16 rows that are
+     objects, 24 a page preview, 999 pills. Nothing else. */
+  --st-r-sm: 8px;
+  --st-r-nav: 10px;
+  --st-r-md: 12px;
+  --st-r-lg: 16px;
   --st-r-xl: 24px;
-  --st-r-2xl: 28px;
+  --st-r-2xl: 24px;
+
+  /* No monospace anywhere in the workspace. Every former mono slot reads
+     DM Sans with tabular figures. */
+  --st-font-mono: var(--font-workspace, system-ui), system-ui, sans-serif;
+  --font-mono: var(--font-workspace, system-ui), system-ui, sans-serif;
+
+  --navigation-bg: var(--st-sidebar);
+  --navigation-selected-bg: var(--st-selected);
+  --navigation-hover-bg: var(--st-hover);
+  --home-bg: var(--st-canvas);
+  font-family: var(--font-workspace, system-ui), system-ui, sans-serif;
 }
 
-:root [data-workspace-theme="linen"][data-workspace-mode="dark"],
-:root [data-workspace-theme="linen"][data-workspace-mode="dark"] [data-dashboard] {
-  --st-sidebar: #161816;
+:root [data-workspace-theme="linen"][data-workspace-mode="dark"]:not([data-workspace-look="paper"]),
+:root [data-workspace-theme="linen"][data-workspace-mode="dark"]:not([data-workspace-look="paper"]) [data-dashboard],
+:root [data-workspace-mode="dark"] [data-workspace-theme="linen"]:not([data-workspace-look="paper"], [data-workspace-mode="light"]),
+:root [data-workspace-mode="dark"] [data-workspace-theme="linen"]:not([data-workspace-look="paper"], [data-workspace-mode="light"]) [data-dashboard] {
+  color-scheme: dark;
+  --st-canvas: #121412;
+  --st-sidebar: #171917;
+  --st-surface: #1c1e1c;
   --st-hover: #ffffff0d;
+  --st-selected: #ffffff14;
+  --st-inset: #232623;
+  --st-chip: #262926;
+  --st-line: #2c2f2c;
+  --st-line-strong: #3a3d3a;
+  --st-text: #ecece7;
+  --st-text-body: #d6d7d1;
+  --st-text-2: #a9aba5;
+  --st-text-3: #8d9089;
+  --st-faint: #6f726c;
+  --st-accent: #a9c49a;
+  --st-accent-hover: #bcd3af;
+  --st-on-accent: #142018;
+  --st-live: #7fbf8e;
   --st-tint: #a9c49a1f;
+  --st-need: #e6ad80;
   --st-need-dot: #e0a274;
+  --st-need-tint: #3a2a1f;
+  --st-draft-dot: #5d605a;
+  --st-critical: #e4a6a6;
   --st-action: #ecece7;
   --st-action-hover: #ffffff;
   --st-on-action: #161715;
+  --st-glass: #1c1e1cd9;
+  --st-undo-bg: #ecece7f0;
+  --st-undo-text: #161715;
+  --st-undo-check: #2f5236;
+  --st-felt-from: #263027;
+  --st-felt-to: #1d241e;
+  --st-shadow-sm: 0 1px 2px #00000052, 0 10px 30px #00000040;
+  --st-shadow-lg: 0 1px 2px #00000052, 0 16px 48px #00000059;
+}
+
+/* Tailwind's font-mono and every legacy mono class read DM Sans figures. */
+:root [data-workspace-theme="linen"]:not([data-workspace-look="paper"]) :is(.font-mono, code, kbd, samp, pre) {
+  font-family: var(--font-workspace, system-ui), system-ui, sans-serif;
+  font-variant-numeric: tabular-nums;
 }

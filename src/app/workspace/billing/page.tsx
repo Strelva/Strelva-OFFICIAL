@@ -40,7 +40,7 @@ export default async function BusinessBillingPage({ searchParams }: { searchPara
   }
   let billing;
   try { billing = await readBusinessBilling(actor, workspaceId); }
-  catch { return <StrelvaShell title="" workspaceId={workspaceId} active="settings" systemsReleased={process.env.STRELVA_SYSTEMS_RELEASE === "1"}><StPage><StHead title="Plan and billing" /><StNotice tone="critical">Billing could not be loaded. Confirm your access and try again.</StNotice><StPillLink variant="soft" href={`/workspace?workspaceId=${encodeURIComponent(workspaceId)}`}>Back to the business</StPillLink></StPage></StrelvaShell>; }
+  catch { return <StrelvaShell title="" workspaceId={workspaceId} active="settings" detailsPlace="plan" systemsReleased={process.env.STRELVA_SYSTEMS_RELEASE === "1"}><StPage><StHead title="Plan and billing" /><StNotice tone="critical">Billing could not be loaded. Confirm your access and try again.</StNotice><StPillLink variant="soft" href={`/workspace?workspaceId=${encodeURIComponent(workspaceId)}`}>Back to the business</StPillLink></StPage></StrelvaShell>; }
   // The service-role budget read needs an authorized customer member first.
   const customerMember = workspace?.kind === "customer" && workspace.access === "member";
   const canManage = customerMember && workspace.role === "owner";
@@ -74,7 +74,7 @@ export default async function BusinessBillingPage({ searchParams }: { searchPara
       invoiceCheckoutAvailability = invoice.business_workspace_id === workspaceId ? await readCheckoutAvailability(invoice.agency_workspace_id) : { status: "unavailable" };
     } catch { invoiceCheckoutAvailability = { status: "unavailable" }; }
   }
-  return <StrelvaShell title="" workspaceId={workspaceId} businessContext={workspace?.name} active="settings" systemsReleased={process.env.STRELVA_SYSTEMS_RELEASE === "1"}><StPage>
+  return <StrelvaShell title="" workspaceId={workspaceId} businessContext={workspace?.name} active="settings" detailsPlace="plan" systemsReleased={process.env.STRELVA_SYSTEMS_RELEASE === "1"}><StPage>
     <BusinessBillingView workspaceId={workspaceId} canManage={canManage} billing={billing} businessName={workspace?.name} backHref={`/workspace/business-details?workspaceId=${encodeURIComponent(workspaceId)}`} />
     {showStartPlan ? <StartWorkspacePlan workspaceId={workspaceId} budget={budget} capUsd={capUsd} budgetEnforced={budgetEnforced} controls={controlsOn ? budget?.controls ?? null : null} /> : customerMember ? <BusinessAiBudgetSummary budget={budget} capUsd={capUsd} enforced={budgetEnforced} controls={controlsOn ? budget?.controls ?? null : null} /> : null}
     {needsPlan && !showStartPlan ? <WorkspacePlanUnavailable workspaceId={workspaceId} /> : null}

@@ -13,6 +13,6 @@
 .disclosure { font-size: 13px; line-height: 22px; color: var(--st-text-2); }
 .disclosure summary { cursor: pointer; }
 .disclosure summary:focus-visible { outline: 2px solid var(--st-accent); outline-offset: 4px; }
-.disclosure pre { white-space: pre-wrap; overflow-wrap: anywhere; font-family: var(--st-font-mono); font-size: 12px; }
+.disclosure pre { white-space: pre-wrap; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; font-size: 12px; }
 @media (max-width: 767px) { .columns { grid-template-columns: minmax(0, 1fr); gap: 28px; } .issue { padding: 24px 20px; } .issueFooter { padding: 16px 20px; } }
 .paper { min-height: 100dvh; background: radial-gradient(circle at 1px 1px, var(--st-dot) 1px, transparent 1.4px) 0 0 / 24px 24px, var(--st-canvas); font-family: var(--font-workspace), system-ui, sans-serif; color: var(--st-text); }

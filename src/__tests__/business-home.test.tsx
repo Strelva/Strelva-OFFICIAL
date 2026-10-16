@@ -180,7 +180,7 @@ describe("business home", () => {
     expect(html).toContain("Files and results (2)");
     expect(html).toContain("Open Mediation intake");
     expect(html).toContain("Open AI check");
-    expect(html).toContain("aria-label=\"Website and apps\"");
+    expect(html).toContain("aria-label=\"Your business\"");
     expect(html).toContain(">alder.example<");
     // The Customers page is retired in both states (October 6).
     expect(html).not.toContain(">Customers<");

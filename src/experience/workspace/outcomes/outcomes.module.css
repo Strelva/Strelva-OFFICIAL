@@ -821,7 +821,7 @@ a.citation:hover {
   padding: 12px;
   border-radius: 12px;
   background: var(--oc-linen);
-  font-family: var(--font-mono, ui-monospace), monospace;
+  font-variant-numeric: tabular-nums;
   white-space: pre-wrap;
 }
 

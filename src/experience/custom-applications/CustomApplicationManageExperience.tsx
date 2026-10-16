@@ -173,7 +173,7 @@ export function CustomApplicationManageExperience({ workId, readOnly = false }: 
               className="block border-0 bg-white"
             />
           </div>
-          <p className="break-all font-mono text-xs text-gray-muted">Artifact digest: {preview.artifactDigest}</p>
+          <p className="break-all tabular-nums text-xs text-gray-muted">Artifact digest: {preview.artifactDigest}</p>
         </> : <p className="rounded-xl border border-dashed border-gray-border p-4 text-sm text-gray-muted">Build a candidate to inspect its immutable artifact.</p>}
       </section>
       {!readOnly ? <details className="rounded-2xl border border-gray-border bg-surface p-5 sm:p-7">
@@ -181,7 +181,7 @@ export function CustomApplicationManageExperience({ workId, readOnly = false }: 
         <div className="mt-5 space-y-5">
           <p className="text-sm leading-6 text-gray-fg">The source stays private to this workspace. Saving a candidate does not change what recipients use.</p>
           <TextInput label="Title" value={title} onChange={event => setTitle(event.target.value)} disabled={busy} />
-          <TextArea label="build.mjs" id="custom-build-entry" value={source} onChange={event => setSource(event.target.value)} disabled={busy} rows={8} className="font-mono text-xs leading-5" />
+          <TextArea label="build.mjs" id="custom-build-entry" value={source} onChange={event => setSource(event.target.value)} disabled={busy} rows={8} className="tabular-nums text-xs leading-5" />
           <div className="flex flex-wrap gap-3">
             <Button type="button" disabled={busy} onClick={() => void action("revise", { expectedCandidateRevision: application.candidate.revision, title, files: { ...application.candidate.files, "build.mjs": source } })}>Save candidate</Button>
             <Button type="button" variant="secondary" disabled={busy || !application.budget} onClick={() => void action("build", { expectedCandidateRevision: application.candidate.revision })}>Build candidate</Button>
@@ -190,7 +190,7 @@ export function CustomApplicationManageExperience({ workId, readOnly = false }: 
       </details> : null}
       <section className="space-y-5 rounded-2xl border border-gray-border bg-surface p-5 sm:p-7" aria-labelledby="custom-review-heading">
         <div><h2 id="custom-review-heading" className="font-display text-2xl font-medium">Review and release</h2><p className="mt-2 text-sm leading-6 text-gray-fg">A release requires the exact built digest and all four local checks.</p></div>
-        {artifact ? <p className="break-all rounded-xl bg-surface-inset p-3 font-mono text-xs text-gray-muted">{artifact.artifactDigest}</p> : <p className="rounded-xl border border-dashed border-gray-border p-4 text-sm text-gray-muted">No candidate artifact yet.</p>}
+        {artifact ? <p className="break-all rounded-xl bg-surface-inset p-3 tabular-nums text-xs text-gray-muted">{artifact.artifactDigest}</p> : <p className="rounded-xl border border-dashed border-gray-border p-4 text-sm text-gray-muted">No candidate artifact yet.</p>}
         <div className="grid gap-3" aria-label="Artifact review checks">
           {(Object.keys(checkLabels) as CheckId[]).map(id => {
             const check = reviewChecks[id];

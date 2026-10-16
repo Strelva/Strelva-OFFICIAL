@@ -80,8 +80,7 @@ describe("workspace product discovery", () => {
     expect(html).toContain(`href="${snapshot.managedWork[0].href}"`);
     expect(html).not.toContain('data-testid="website-assignment-handoff"');
     expect(html).not.toContain("Website installation");
-    expect(html).toContain("Recent work");
-    expect(html).toContain("AI Visibility assessment");
+    // XA drops the sidebar's Recent list; saved work stays in Search (⌘K) and the page.
     expect(html).not.toContain("workspace-products");
   });
 

@@ -46,7 +46,8 @@
   --st-r-lg: 16px;
   --st-column: 920px;
   --st-column-wide: 1120px;
-  --st-font-mono: var(--font-mono-st, ui-monospace), ui-monospace, SFMono-Regular, Menlo, monospace;
+  /* October 15: no monospace in the workspace, in either look. */
+  --st-font-mono: var(--font-workspace, system-ui), system-ui, sans-serif;
 
   /* Shared roles every workspace component already reads. */
   --cream: var(--st-canvas);

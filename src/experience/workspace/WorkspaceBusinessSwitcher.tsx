@@ -6,6 +6,7 @@ import { StMono, StTextButton } from "@/components/ui/strelva/Kit";
 import type { SystemView } from "@/experience/systems/model";
 import type { WorkspaceSnapshot } from "./contracts";
 import type { StrelvaSection } from "@/experience/app-frame/StrelvaShell";
+import type { StrelvaClientLink } from "@/experience/app-frame/workspace-places";
 import styles from "./workspace-business-switcher.module.css";
 
 /** Navigation hints never grant access. Prefer the serving agency when it is reachable. */
@@ -14,6 +15,16 @@ export function clientAgencyWorkspace(snapshot: WorkspaceSnapshot) {
   if (current?.kind !== "customer" || !["provider_seat", "delegated_read"].includes(current.access || "")) return undefined;
   const agencies = snapshot.workspaces.filter(item => item.kind === "agency");
   return agencies.find(item => item.id === snapshot.ownerBrand?.agencyId) || (agencies.length === 1 ? agencies[0] : undefined);
+}
+
+/**
+ * XA: the agency's clients for the sidebar, from the same server-authorized
+ * workspace list the switcher reads. Opening one switches workspace in place.
+ */
+export function agencyClientLinks(snapshot: WorkspaceSnapshot, appBase: string, onWorkspace?: (id: string) => void): StrelvaClientLink[] {
+  return snapshot.workspaces
+    .filter(item => item.kind === "customer" && ["provider_seat", "delegated_read"].includes(item.access || ""))
+    .map(item => ({ id: item.id, name: item.name, href: `${appBase}/workspace?workspaceId=${encodeURIComponent(item.id)}`, onOpen: onWorkspace ? () => onWorkspace(item.id) : undefined, current: item.id === snapshot.workspaceId, detail: item.access === "delegated_read" ? "Read-only" : undefined }));
 }
 
 /** Only server-authorized workspaces and Systems appear in this scope picker. */

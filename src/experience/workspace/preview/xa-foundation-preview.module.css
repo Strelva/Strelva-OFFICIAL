@@ -1,0 +1,62 @@
+/* Screen composition for the XA foundation preview (reference for lanes).
+   O1/AG1: a 560 column beside a felt circle; O3: brief beside the decision. */
+.notice { margin: 0; padding: 8px 20px; color: var(--st-text-3); font-size: 13px; line-height: 18px; }
+
+.split { box-sizing: border-box; display: flex; width: 100%; min-height: 100%; align-items: center; gap: 72px; padding: 48px 72px 64px 96px; }
+.lead { display: flex; width: min(560px, 100%); flex-shrink: 0; flex-direction: column; gap: 28px; }
+.greeting { display: flex; flex-direction: column; gap: 10px; }
+.side { display: flex; min-width: 0; flex: 1; flex-direction: column; align-items: center; gap: 28px; }
+.since { display: flex; width: min(340px, 100%); flex-direction: column; gap: 12px; }
+.side > [role="status"] { width: min(340px, 100%); }
+.stack { display: flex; flex-direction: column; gap: 10px; }
+.center { box-sizing: border-box; display: grid; min-height: 100%; place-items: center; padding: 48px 24px; }
+.error { display: flex; max-width: 460px; flex-direction: column; align-items: flex-start; gap: 20px; }
+
+.reply { display: flex; flex-direction: column; gap: 14px; color: var(--st-text); font-size: 15px; line-height: 1.5; }
+.bubble { align-self: flex-end; max-width: 420px; margin: 0; padding: 11px 16px; border-radius: 20px; background: var(--st-hover); }
+
+.yesLayout { box-sizing: border-box; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 540px); align-items: start; gap: 48px; padding: 96px 24px 140px 72px; }
+.yesBrief { display: flex; flex-direction: column; gap: 24px; padding-top: 24px; }
+.dock { width: min(480px, 100%); }
+.pageSub { margin: -6px 0 4px; color: var(--st-text-2); font-size: 13px; }
+.week { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 7px; }
+.day { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.day span { color: var(--st-text-2); font-size: 11px; }
+.day b { font-size: 16px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.day b[data-closed] { color: var(--st-faint); }
+.day i { display: grid; width: 100%; height: 28px; place-items: center; border-radius: 8px; background: var(--st-tint); color: var(--st-accent); font-size: 11px; font-style: normal; font-weight: 500; font-variant-numeric: tabular-nums; }
+.day i[data-closed] { background: var(--st-need-tint); color: var(--st-need); }
+
+.record { box-sizing: border-box; display: flex; width: 100%; max-width: 1000px; flex-direction: column; gap: 32px; padding: 64px 48px 96px 96px; }
+.recordRow { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) 120px 200px; align-items: center; gap: 16px; padding: 16px 0; }
+.recordRow + .recordRow::before { position: absolute; top: 0; left: 0; right: 0; height: 1px; background: var(--st-line); content: ""; }
+.recordValue { display: flex; min-width: 0; flex-direction: column; gap: 2px; padding: 4px 8px; margin: -4px -8px; border: 0; border-radius: var(--st-r-nav); background: transparent; color: var(--st-text); font: inherit; font-size: 16px; text-align: left; cursor: pointer; }
+.recordValue[data-static] { cursor: default; }
+.recordValue small { color: var(--st-text-2); font-size: 13px; }
+button.recordValue:hover { background: var(--st-hover); }
+button.recordValue:focus-visible { outline: 2px solid var(--st-accent); outline-offset: 2px; }
+.readers { display: flex; gap: 4px; }
+.saidBy { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; color: var(--st-text-3); font-size: 14px; }
+.recordEdit { grid-column: 1 / -1; display: flex; max-width: 480px; flex-direction: column; gap: 18px; }
+.recordActions { display: flex; gap: 8px; }
+.unplug { display: flex; align-items: center; gap: 8px; }
+.unplug i { width: 72px; height: 2px; background: linear-gradient(90deg, var(--st-accent) 55%, transparent 55%, transparent 70%, var(--st-line) 70%); }
+
+@media (max-width: 1180px) {
+  .split { gap: 40px; padding: 40px 32px 56px 48px; }
+  .yesLayout { padding-left: 40px; }
+}
+
+@media (max-width: 1023px) {
+  .split { flex-direction: column; align-items: stretch; gap: 28px; padding: 16px 16px 120px; }
+  .lead { width: 100%; gap: 22px; }
+  .lead > svg { display: none; }
+  .side { align-items: stretch; }
+  .side > :first-child { display: none; }
+  .since, .side > [role="status"] { width: 100%; }
+  .yesLayout { grid-template-columns: minmax(0, 1fr); gap: 28px; padding: 16px 16px 140px; }
+  .yesBrief { padding-top: 0; }
+  .record { padding: 24px 16px 96px; }
+  .recordRow { grid-template-columns: minmax(0, 1fr) auto; }
+  .saidBy { grid-column: 1 / -1; }
+}

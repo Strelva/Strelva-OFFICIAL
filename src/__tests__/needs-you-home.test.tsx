@@ -235,7 +235,8 @@ describe("The Needs you place", () => {
     const html = renderToStaticMarkup(createElement(BusinessHome, { ...props, view: "needs-you" }));
     expect(html).toMatch(/<h1 tabindex="-1"[^>]*>Needs you<\/h1>/);
     expect(html).toContain("Checking what needs you");
-    expect(html).toMatch(/aria-current="page" href="\/workspace\?view=needs-you&amp;workspaceId=/);
+    // XA: Needs you lives under Today, which stays selected; its page keeps its own address.
+    expect(html).toMatch(/aria-current="page" href="\/workspace\?workspaceId=[^"]*"><svg[^>]*lucide-sun/);
     expect(html).not.toContain("Good morning");
   });
 

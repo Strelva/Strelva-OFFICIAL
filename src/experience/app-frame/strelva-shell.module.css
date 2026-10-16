@@ -244,3 +244,87 @@
   color: var(--st-text-3);
   font-size: 13px;
 }
+
+/*
+ * October 15, 2026: XA. Paper without the dot grid, the quiet rail flush to
+ * the left edge, and no header on desktop (each page names itself). On a
+ * phone the header is XA · E6: the mark and the business name open the
+ * navigation, the account sits on the right.
+ */
+.mobileName,
+.mobileAccount {
+  display: none;
+}
+
+.root[data-workspace-look="xa"] .shell {
+  --app-navigation-width: 256px;
+  background: var(--st-canvas);
+}
+
+.root[data-workspace-look="xa"] {
+  background: var(--st-canvas);
+}
+
+@media (min-width: 1024px) {
+  .root[data-workspace-look="xa"] :global([role="banner"]):not(:has([data-shell-extra])) {
+    display: none;
+  }
+
+  .root[data-workspace-look="xa"] .title {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+}
+
+@media (max-width: 1023px) {
+  .root[data-workspace-look="xa"] .header {
+    min-height: 60px;
+    padding: 8px 16px 8px 8px;
+  }
+
+  .root[data-workspace-look="xa"] .mobileMenu {
+    display: flex;
+    width: auto;
+    max-width: calc(100vw - 96px);
+    height: 44px;
+    align-items: center;
+    gap: 10px;
+    padding: 0 10px;
+    border: 0;
+    border-radius: var(--st-r-nav, 10px);
+    background: transparent;
+    color: var(--st-text);
+  }
+
+  .root[data-workspace-look="xa"] .mobileName {
+    display: block;
+    overflow: hidden;
+    font-size: 15px;
+    font-weight: 600;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .root[data-workspace-look="xa"] .title {
+    display: none;
+  }
+
+  .root[data-workspace-look="xa"] .mobileAccount {
+    display: inline-flex;
+    margin-left: auto;
+  }
+
+  .root[data-workspace-look="xa"] .actions {
+    margin-left: 8px;
+  }
+}
+
+@media (max-width: 767px) {
+  .root[data-workspace-look="xa"] {
+    --st-phone-navigation-height: 0px;
+  }
+}

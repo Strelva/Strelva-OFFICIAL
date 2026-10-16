@@ -91,11 +91,37 @@ export interface StrelvaPinnedItem {
   onOpen?: () => void;
   /** The System currently open. */
   current?: boolean;
+  /**
+   * XA: one quiet fact beside the name ("31 this week", "3 new"), and a
+   * state only when it is an exception (waits for someone, draft, down).
+   */
+  detail?: string;
+  state?: "waits" | "draft" | "down";
 }
 
+/** XA: a client in the agency sidebar. Server membership decides the list; this only presents it. */
+export interface StrelvaClientLink {
+  id: string;
+  name: string;
+  href: string;
+  onOpen?: () => void;
+  /** The owner's first name, or the one fact that matters. */
+  detail?: string;
+  /** Something about this client needs the agency. */
+  waits?: boolean;
+  color?: string;
+  current?: boolean;
+}
+
+/** XA: the business's agency in the owner sidebar (Your agency). */
+export interface StrelvaAgencyLink { name: string; person?: string; href?: string; color?: string }
+
+/** XA: where a person is inside the business details sidebar. */
+export type StrelvaDetailsPlace = "record" | "access" | "plan" | "export" | "connections" | "help";
+
 /** Systems pinned by name, websites first, then everything else the business runs. */
-export function pinnedSystems(systems: readonly { id: string; name: string; kind: NonNullable<StrelvaPinnedItem["kind"]> }[], href: (id: string) => string, open?: (id: string) => void, currentId?: string | null, limit = 8): StrelvaPinnedItem[] {
-  return systems.slice(0, limit).map(system => ({ id: `system-${system.id}`, title: system.name, href: href(system.id), kind: system.kind, onOpen: open ? () => open(system.id) : undefined, current: system.id === currentId }));
+export function pinnedSystems(systems: readonly { id: string; name: string; kind: NonNullable<StrelvaPinnedItem["kind"]>; lifecycle?: string; health?: { state?: string } }[], href: (id: string) => string, open?: (id: string) => void, currentId?: string | null, limit = 8): StrelvaPinnedItem[] {
+  return systems.slice(0, limit).map(system => ({ id: `system-${system.id}`, title: system.name, href: href(system.id), kind: system.kind, onOpen: open ? () => open(system.id) : undefined, current: system.id === currentId, state: system.health?.state === "blocked" ? "down" as const : system.lifecycle === "draft" ? "draft" as const : undefined }));
 }
 
 /** Websites assigned to the business are pinned first, in their given order. */

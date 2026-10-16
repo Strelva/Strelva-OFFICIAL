@@ -110,7 +110,7 @@ it("a departed real document POST cannot navigate a replacement at the same crea
   expect(commands).toHaveLength(1);
   expect(departedTool!.getAttribute("aria-busy")).toBe("true");
 
-  const home = [...node.querySelectorAll<HTMLAnchorElement>("a")].find(link => link.textContent?.trim() === "Home");
+  const home = [...node.querySelectorAll<HTMLAnchorElement>("a")].find(link => link.textContent?.trim() === "Today");
   expect(home).toBeDefined();
   await act(async () => home!.click());
   await settle();

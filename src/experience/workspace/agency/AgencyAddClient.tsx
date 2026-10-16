@@ -264,7 +264,7 @@ function ProspectPicker({ prospects, error, added, value, onChoose }: { prospect
               <strong className="block truncate text-[14px] font-medium">{prospect.business}</strong>
               <small className="mt-0.5 block truncate text-[12px] text-gray-muted">{prospect.url ?? "No website given"} · {prospect.name}</small>
             </span>
-            <span className="shrink-0 font-mono text-[12px] tabular-nums text-gray-muted">{isAdded ? "Added" : `${prospect.grade} · ${prospect.score}`}</span>
+            <span className="shrink-0 tabular-nums text-[12px] tabular-nums text-gray-muted">{isAdded ? "Added" : `${prospect.grade} · ${prospect.score}`}</span>
           </label>
         </li>;
       })}
@@ -279,7 +279,7 @@ export function AddedClient({ emailEnabled = false, result, agencyWorkspaceId, a
   return <section className="mt-12" aria-labelledby={`${id}-title`}>
     <p className="inline-flex items-center gap-2 text-[12px] font-medium uppercase tracking-[0.14em] text-positive"><Check className="size-4" aria-hidden="true" />Client added</p>
     <h1 id={`${id}-title`} className="mt-3 break-words font-display text-[40px] font-medium leading-tight">{client.name}</h1>
-    <p className="mt-2 font-mono text-[12px] tabular-nums text-gray-muted">{currentClient?.ownerClaimed ? "Owner claimed the business" : currentClient ? "Owner has not claimed the business" : "Owner claim not yet checked"} · {currentClient?.seatActive === false ? "Agency seat ended" : "Agency client added"}{client.replayed ? " · this client was already added" : ""}</p>
+    <p className="mt-2 tabular-nums text-[12px] tabular-nums text-gray-muted">{currentClient?.ownerClaimed ? "Owner claimed the business" : currentClient ? "Owner has not claimed the business" : "Owner claim not yet checked"} · {currentClient?.seatActive === false ? "Agency seat ended" : "Agency client added"}{client.replayed ? " · this client was already added" : ""}</p>
 
     <div className="mt-8">
       <FirstClientHandoff status={result.website.rebuildOpenToAgency ? "Ready for a website draft" : currentClient?.ownerClaimed ? "Owner claimed the business" : "Waiting for the owner to claim the business"}
@@ -340,7 +340,7 @@ export function AgencyClientAiCheck({ check }: { check: ClientAiCheck }) {
   return <section className="mt-10" aria-label="AI Visibility check">
     <h2 className="text-[15px] font-medium">AI Visibility check</h2>
     {check.status === "ready" ? <>
-      {check.result.measurementStatus !== "unavailable" && check.result.readinessMeasured !== false ? <p className="mt-3 font-mono text-[14px] tabular-nums">{check.result.grade} · {check.result.score}/100</p> : null}
+      {check.result.measurementStatus !== "unavailable" && check.result.readinessMeasured !== false ? <p className="mt-3 tabular-nums text-[14px] tabular-nums">{check.result.grade} · {check.result.score}/100</p> : null}
       {check.result.measurementNote ? <p className="mt-2 text-[13px] leading-relaxed text-gray-muted">{check.result.measurementNote}</p> : null}
       <p className="mt-2 text-[13px] leading-relaxed text-gray-muted">{check.result.citation.note} {check.result.citation.probed ? "Probe completed." : "Probe not completed."}</p>
       <p className="mt-2 text-[13px] leading-relaxed">{check.result.topFix}</p>
@@ -423,7 +423,7 @@ function OwnerLink({ subject, agencyWorkspaceId, onClaim, currentClient, emailEn
     {ownerClaimed ? <p className="mt-2 text-[13px] leading-relaxed text-gray-muted" role="status">The owner has accepted their claim. No new owner link is needed.</p> : claim ? <>
       <p className="mt-1 text-[13px] leading-relaxed text-gray-muted">For {claim.recipientEmail}. The recipient signs in with that address and accepts to become the owner.</p>
       <label htmlFor={`${headingId}-value`} className="sr-only">Owner claim link</label>
-      <input id={`${headingId}-value`} readOnly value={link} onFocus={(event) => event.currentTarget.select()} className="mt-4 w-full min-h-10 truncate rounded-xl border border-gray-border bg-surface-inset px-4 py-2 font-mono text-[12px]" />
+      <input id={`${headingId}-value`} readOnly value={link} onFocus={(event) => event.currentTarget.select()} className="mt-4 w-full min-h-10 truncate rounded-xl border border-gray-border bg-surface-inset px-4 py-2 tabular-nums text-[12px]" />
       <Button className="mt-3 w-full" onClick={() => void copy()} icon={copied ? <Check className="size-4" /> : <Copy className="size-4" />}>{copied ? "Copied" : "Copy link"}</Button>
       <p className="mt-4 text-[12px] leading-relaxed text-gray-muted" role="status"><strong className="font-medium text-warm-black">{ownerClaimDeliveryCopy(claim.delivery).headline}</strong> {ownerClaimDeliveryCopy(claim.delivery).next} Works until {dateLabel(claim.expiresAt)}.</p>
       <p className="mt-2 text-[12px] leading-relaxed text-gray-muted">The link is shown once. Making a new one replaces it.</p>

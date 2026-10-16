@@ -7,9 +7,9 @@
 .body { margin: 0; color: var(--st-text-2); font-size: 14px; line-height: 22px; overflow-wrap: anywhere; }
 .actions { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; }
 .actions > * { min-height: 44px; }
-.code { margin: 0; max-height: 320px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; padding: 16px; background: var(--st-inset); border-radius: var(--st-r-sm); color: var(--st-text); font: 12px/20px var(--st-font-mono); }
+.code { margin: 0; max-height: 320px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; padding: 16px; background: var(--st-inset); border-radius: var(--st-r-sm); color: var(--st-text); font-size: 13px; line-height: 20px; font-variant-numeric: tabular-nums; }
 .field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .check { display: flex; align-items: flex-start; gap: 12px; min-height: 44px; font-size: 14px; line-height: 22px; }
 .check input { width: 20px; height: 20px; margin-top: 2px; flex: none; }
 .urgent { display: inline-block; padding: 0 8px; border: 1px solid currentColor; border-radius: 999px; font-size: 12px; line-height: 20px; }
-.reveal { margin: 4px 0 0; font: 13px/20px var(--st-font-mono); overflow-wrap: anywhere; }
+.reveal { margin: 4px 0 0; font-size: 13px; line-height: 20px; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }

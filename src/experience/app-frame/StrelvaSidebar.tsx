@@ -10,9 +10,10 @@ import { PLACE_LABELS } from "@/platform/presentation/place-labels";
 import { WorkspaceSignOutButton } from "@/experience/workspace/WorkspaceSignOutButton";
 import type { WorkspaceSearchItem } from "@/experience/workspace/workspace-search";
 import styles from "./strelva-sidebar.module.css";
-import { placeForSection, sectionTitle, workspaceSectionHref, type StrelvaPinnedItem, type StrelvaSection } from "./workspace-places";
+import { placeForSection, sectionTitle, workspaceSectionHref, type StrelvaAgencyLink, type StrelvaClientLink, type StrelvaDetailsPlace, type StrelvaPinnedItem, type StrelvaSection } from "./workspace-places";
+import { XaSidebar } from "./XaSidebar";
 
-export { placeForSection, workspaceSectionHref, type StrelvaPinnedItem, type StrelvaSection } from "./workspace-places";
+export { placeForSection, workspaceSectionHref, type StrelvaAgencyLink, type StrelvaClientLink, type StrelvaDetailsPlace, type StrelvaPinnedItem, type StrelvaSection } from "./workspace-places";
 
 type NavigableSection = Exclude<StrelvaSection, "account">;
 
@@ -24,7 +25,13 @@ export interface AgencyNavigation {
   leadsCurrent?: boolean;
   active?: AgencyPlace;
   onNavigate?: (view: AgencyNavigationView) => void;
-  hrefs?: Partial<Record<AgencyPlace, string>>;
+  hrefs?: Partial<Record<AgencyPlace | "minutes", string>>;
+  /** XA: the agency's clients, read through ordinary agency scope. */
+  clients?: readonly StrelvaClientLink[];
+  /** XA: cross-client Queue items, when known. */
+  queueCount?: number | null;
+  /** XA: the agency workspace while the person is inside one client. */
+  agencyWorkspaceId?: string;
 }
 
 const PRIMARY_ITEMS: readonly { id: NavigableSection; icon: LucideIcon }[] = [
@@ -72,6 +79,12 @@ interface Props {
   /** STRELVA_NEEDS_YOU_RELEASE: show the Needs you place, with its count when known. */
   needsYou?: { count: number | null; label?: string };
   allClients?: { href: string; onOpen?: () => void };
+  /** October 15: XA is the default look; "paper" keeps the October 9 sidebar. */
+  look?: "xa" | "paper";
+  /** XA: the business's agency, shown under "Your agency". */
+  agency?: StrelvaAgencyLink;
+  /** XA: which business details place is open (billing and export set it). */
+  detailsPlace?: StrelvaDetailsPlace;
 }
 
 function navigateInPlace(event: MouseEvent<HTMLAnchorElement>, action: (() => void) | undefined) {
@@ -81,7 +94,14 @@ function navigateInPlace(event: MouseEvent<HTMLAnchorElement>, action: (() => vo
 }
 
 /** One navigation contract for owners, agencies, account and managed work. */
-export function StrelvaSidebar({ connectionsAvailable = false, agencyNavigation, ownerBrand, workspaceName, active, appBase = "", workspaceId, accountName, accountDetail, businessContext, contextualNavigation, recentWork = [], pinned = [], mobileOpen = false, onCloseMobile, onNavigate, onSearch, onStart, startDisabled = false, signedIn = true, signInHref, signOut, standalone = false, systemsReleased = false, needsYou, allClients }: Props) {
+export function StrelvaSidebar(props: Props) {
+  if (props.look === "paper") return <PaperSidebar {...props} />;
+  const { recentWork: _recentWork, look: _look, ...xa } = props;
+  return <XaSidebar {...xa} />;
+}
+
+/** The October 9 paper sidebar, kept behind the theme switch. */
+function PaperSidebar({ connectionsAvailable = false, agencyNavigation, ownerBrand, workspaceName, active, appBase = "", workspaceId, accountName, accountDetail, businessContext, contextualNavigation, recentWork = [], pinned = [], mobileOpen = false, onCloseMobile, onNavigate, onSearch, onStart, startDisabled = false, signedIn = true, signInHref, signOut, standalone = false, systemsReleased = false, needsYou, allClients }: Props) {
   const pinnedLabel = systemsReleased ? SYSTEMS_LABEL : "Website and apps";
   const listLabel = systemsReleased ? SYSTEMS_LIST_LABEL : PLACE_LABELS.filesAndResults;
   const contextName = plainWorkspaceName(businessContext);

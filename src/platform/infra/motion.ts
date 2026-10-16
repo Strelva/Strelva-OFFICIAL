@@ -57,3 +57,35 @@ export function staggerDelay(index: number, step: number = strelvaEntrance.stagg
   const position = Math.max(0, Math.min(Math.floor(index), Math.max(1, cap) - 1));
   return Math.round(position * step * 1000) / 1000;
 }
+
+/* ---------- XA (October 15, 2026) ---------- */
+
+/** The Undo window after a yes, in milliseconds. Mirrors --motion-undo-window. */
+export const strelvaUndoWindowMs = 5000;
+/** Pace of a streamed reply, per word, in milliseconds. Mirrors --motion-word. */
+export const strelvaWordMs = 28;
+
+export type StrelvaStep = Exclude<keyof typeof strelvaDuration, "stagger">;
+
+/** True when the person asked for less motion. Server render reads false. */
+export function prefersReducedMotion(): boolean {
+  return typeof window !== "undefined" && typeof window.matchMedia === "function" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+}
+
+/**
+ * One WAAPI call on the ladder with the settle curve. Under reduced motion
+ * travel is dropped (only opacity keyframes survive) and the step becomes the
+ * 120 ms crossfade the CSS ladder uses. Resolves when finished or cancelled.
+ */
+export function playStep(element: Element | null | undefined, keyframes: Keyframe[], step: StrelvaStep = "base", options: { delay?: number; fill?: FillMode } = {}): Promise<void> {
+  if (!element || typeof (element as HTMLElement).animate !== "function") return Promise.resolve();
+  const reduced = prefersReducedMotion();
+  const frames = reduced ? keyframes.map(frame => (frame.opacity === undefined ? {} : { opacity: frame.opacity })) : keyframes;
+  const animation = (element as HTMLElement).animate(frames, {
+    duration: reduced ? 120 : strelvaDuration[step] * 1000,
+    easing: `cubic-bezier(${strelvaEase.settle.join(",")})`,
+    delay: options.delay ?? 0,
+    fill: options.fill ?? "none",
+  });
+  return animation.finished.then(() => undefined, () => undefined);
+}
