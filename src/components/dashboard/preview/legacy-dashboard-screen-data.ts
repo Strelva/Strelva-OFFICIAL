@@ -10,7 +10,7 @@ import type { Product } from "@/lib/products";
 import type { ReplyVoice } from "@/lib/reviews/reply-voice";
 import type { GbpState } from "@/lib/gbp-management";
 import type { DailyMetric } from "@/lib/storage/analytics-store";
-import { xaDaysAgo } from "./xa-day";
+import { xaDaysAgo } from "@/experience/workspace/preview/xa-day";
 import type { SiteSnapshotSummary } from "@/lib/storage";
 import type { ScanHistoryPoint, ScanSummary } from "@/lib/scan-store";
 import type { PeriodStats } from "@/lib/analytics/period";

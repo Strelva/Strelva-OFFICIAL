@@ -3,8 +3,9 @@ import { strelvaUiPreviewEnabled } from "@/experience/workspace/preview/enabled"
 import { XsLeadsPreview, type XsScreen } from "@/experience/workspace/preview/XsLeadsPreview";
 import { renderPaperEmailBody, type PaperEmail } from "@/platform/infra/email/paper";
 import { newInquiryEmail } from "@/platform/infra/email/paper-templates";
-import { connectedInquiryEmail } from "@/products/connected-sites/notify";
-import { websiteReportPaper, type WebsiteMonthlyReport } from "@/products/websites/site-report";
+import { connectedInquiryEmail } from "@/products/connected-sites/server";
+import { websiteReportPaper } from "@/products/websites/server";
+import type { WebsiteMonthlyReport } from "@/products/websites/client";
 import { XA_SYSTEM_HREFS } from "@/experience/workspace/preview/xa-day";
 
 export const dynamic = "force-dynamic";

@@ -13,7 +13,7 @@ import { readHostedBusinessFacts } from "./business-facts-server";
 import { isSitesPathHost } from "@/platform/infra/brand";
 import { websiteDocumentStore } from "./document-store";
 import { websiteRebuildReleaseEnabledForTenant } from "./rebuild-release";
-import { getStoredContent } from "@/lib/storage";
+import { getStoredContentData } from "@/platform/infra/db/repositories";
 import { getSupabase } from "@/platform/infra/db/client";
 import { visitorBrandFromRecord, visitorBrandFromSiteDocument, visitorTypeFromTheme, type VisitorBrand } from "./visitor-brand";
 
@@ -84,7 +84,7 @@ export async function readVisitorBrand(tenantId: string | null | undefined): Pro
     if (document) return visitorBrandFromSiteDocument(document, tenantCanonicalOrigin(tenantId, config));
     const own = config?.productionDomain || config?.siteUrl ? tenantCanonicalOrigin(tenantId, config) : null;
     // An older site records its faces in its theme section; only a saved theme counts, never the template default.
-    const theme = await getStoredContent("theme", tenantId).catch(() => null);
+    const theme = await getStoredContentData(tenantId, "theme").catch(() => null);
     return visitorBrandFromRecord({ accent: config?.branding?.accentColor, type: visitorTypeFromTheme(theme), website: own });
   } catch {
     return null;

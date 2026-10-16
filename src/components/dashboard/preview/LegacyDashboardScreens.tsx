@@ -27,7 +27,7 @@ import {
 } from "./legacy-dashboard-screen-data";
 import { LegacyBrandKit, LegacyChat, LegacyCollections, LegacyConnectionDetail, LegacyConnections, LegacyHistoryFrame, LegacyPhotos, LegacySettings, LegacySite } from "./LegacyDashboardClientBits";
 import { LegacyDashboardShell } from "./LegacyDashboardShell";
-import { XA_DAY } from "./xa-day";
+import { XA_DAY } from "@/experience/workspace/preview/xa-day";
 import { LegacyConfirmPreview, LegacyErrorPreview } from "./LegacyDashboardClientBits";
 import {
   LEGACY_BASE, LEGACY_BUSINESS, LEGACY_OWNER, LEGACY_TENANT, legacyActivity, legacyLeads, legacyPending, legacyResolved, legacyRetention, type LegacyState,

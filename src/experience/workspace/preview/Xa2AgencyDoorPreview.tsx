@@ -53,7 +53,7 @@ const sidebarClients = (mode: "light" | "dark") => [
   { id: XA_CLIENT.fieldwork, name: "Fieldwork Studio", href: "#" },
 ].map(link => ({ ...link, color: clientColor(link.id) }));
 
-const delivery = { status: "not_sent" as const, reason: "gated", decision: "R08", agencyEmailVerified: false };
+const delivery = { status: "not_sent" as const, reason: "gated", decision: "gate-08", agencyEmailVerified: false };
 const addition = { additionId: "00000000-0000-4000-8000-0000000000c1", agencyWorkspaceId: AGENCY, customerWorkspaceId: HARBOR, name: "Harbor Dental", sourceKind: "url" as const, sourceUrl: "https://harbordental.com", prospectId: null, factsSeeded: 4, seatId: "00000000-0000-4000-8000-0000000000d1", addedBy: "00000000-0000-4000-8000-0000000000e1", addedAt: ago(0.1), replayed: false };
 function addResult(over: Partial<AddAgencyClientResult> = {}): AddAgencyClientResult {
   return {

@@ -10,7 +10,7 @@ import { DashboardProvider } from "@/components/dashboard/DashboardContext";
 import { DashboardSurfacesProvider } from "@/components/dashboard/DashboardSurfacesContext";
 import { DashNote } from "@/components/dashboard/xa/DashboardXa";
 import { resolveRelationship } from "@/platform/relationships";
-import { XA_DAY } from "./xa-day";
+import { XA_DAY } from "@/experience/workspace/preview/xa-day";
 import { LEGACY_BASE, LEGACY_BUSINESS, LEGACY_EMAIL, LEGACY_OWNER, LEGACY_SITE_FIXTURE, LEGACY_SURFACES, LEGACY_TENANT } from "./legacy-dashboard-fixtures";
 
 export function LegacyDashboardShell({ children, mode, pendingCount, hasStore = true, billing, inspect = false }: {

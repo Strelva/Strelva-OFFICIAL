@@ -69,3 +69,6 @@ export const gettingStartedActionSchema = z.discriminatedUnion("action", [
 ]);
 export type GettingStartedAction = z.infer<typeof gettingStartedActionSchema>;
 
+
+/** Pure: why a website could not be read, in owner words (previews show the same sentence). */
+export { unreadableSite } from "./site-words";

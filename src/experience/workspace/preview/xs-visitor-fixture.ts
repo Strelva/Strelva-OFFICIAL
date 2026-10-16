@@ -10,12 +10,16 @@ import type { VisitorConfirmationView } from "@/experience/bookings/BookingConfi
 import type { InquiryBookingOffer } from "@/platform/bookings/inquiry-offers";
 import type { InquiryReceipt } from "@/products/scheduling/contracts";
 import type { PublicFacts } from "@/products/connected-sites/contracts";
-import type { PublicBlogPost } from "@/lib/cms/blog-public";
+import type { ComponentProps } from "react";
+import type { SiteBlogPost } from "@/components/public/SiteBlog";
 import type { SiteLinkItem } from "@/components/public/SiteLinks";
 import type { StoreBooking } from "@/platform/bookings/store";
 import type { EmailOptions } from "@/platform/infra/email/layout";
 import { XA_HARBOR, XA_NORTH } from "./xa-day";
 import { visitorBrandFromRecord, visitorBrandFromSiteDocument, type VisitorBrand } from "@/products/websites/client";
+
+/** The public blog post shape, read off the component that renders it (no src/lib import from the workspace layer). */
+type PublicBlogPost = ComponentProps<typeof SiteBlogPost>["post"];
 
 export const HARBOR = { name: XA_HARBOR.name, doctor: XA_HARBOR.owner, street: XA_HARBOR.address, city: "Buffalo", region: "NY", phone: "(716) 555-0142", email: "hello@harbordental.example.test", zone: "America/New_York" } as const;
 export const PREVIEW_NOW = Date.parse("2026-11-20T14:05:00Z");

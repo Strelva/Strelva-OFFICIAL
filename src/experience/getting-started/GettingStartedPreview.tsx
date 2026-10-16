@@ -5,7 +5,7 @@ import { WorkspaceRequestContext } from "@/experience/workspace/WorkspaceRequest
 import type { FoundFact } from "@/products/getting-started/contracts";
 import { GettingStarted } from "./GettingStarted";
 import { StartBusinessFromCheck } from "./StartBusinessFromCheck";
-import { unreadableSite } from "@/products/getting-started/site-words";
+import { unreadableSite } from "@/products/getting-started/contracts";
 
 const BUSINESS = "d2960000-0000-4000-8000-000000000001";
 const FOUND: FoundFact[] = [

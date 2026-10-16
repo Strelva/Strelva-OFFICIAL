@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { strelvaUiPreviewEnabled } from "@/experience/workspace/preview/enabled";
-import { legacyState } from "@/experience/workspace/preview/legacy-dashboard-fixtures";
-import { LegacyDashboardScreen } from "@/experience/workspace/preview/LegacyDashboardScreens";
+import { legacyState } from "@/components/dashboard/preview/legacy-dashboard-fixtures";
+import { LegacyDashboardScreen } from "@/components/dashboard/preview/LegacyDashboardScreens";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Strelva · Website dashboard (XA)", robots: { index: false, follow: false } };

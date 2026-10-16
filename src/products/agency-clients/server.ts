@@ -6,3 +6,4 @@ export { assertGhlAgencyManager, defaultGhlServiceDeps } from "./gohighlevel/ser
 
 export { agencyClaimEmailReleased } from "./claim-email";
 export { ghlConnectionSource } from "./gohighlevel/connection-source";
+export { claimEmailOptions } from "./claim-email";

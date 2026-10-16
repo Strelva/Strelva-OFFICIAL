@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { strelvaUiPreviewEnabled } from "@/experience/workspace/preview/enabled";
-import { legacyApiFixture, legacyState } from "@/experience/workspace/preview/legacy-dashboard-api";
+import { legacyApiFixture, legacyState } from "@/components/dashboard/preview/legacy-dashboard-api";
 
 /**
  * Fixture API for the legacy dashboard preview. Every dashboardHref("/api/…")

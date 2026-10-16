@@ -8,7 +8,7 @@ import type { ActivityEntry } from "@/lib/storage/activity-store";
 import type { OwnerRetentionSignals } from "@/lib/retention";
 import type { UnifiedEvent } from "@/lib/types";
 import type { DashboardSurface } from "@/lib/dashboard-surfaces";
-import { xaHoursAgo } from "./xa-day";
+import { xaHoursAgo } from "@/experience/workspace/preview/xa-day";
 
 export const LEGACY_BASE = "/preview/strelva/xa/xs-legacy-dashboard";
 export const LEGACY_TENANT = "harbor-dental";

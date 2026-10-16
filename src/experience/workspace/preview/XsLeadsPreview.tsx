@@ -170,11 +170,11 @@ function resultsState(state: string, rangeKey: RangeKey): WorkspaceResultsState 
 
 /* ---------- Prospects ---------- */
 const PROSPECTS: AgencyProspect[] = [
-  { id: "5e000000-0000-4000-8000-0000000001a1", name: XA_HARBOR.owner, email: "dr.lin@harbordental.com", business: XA_HARBOR.name, url: "https://harbordental.com", source: "audit", result_id: "r1", score: 62, grade: "C", created_at: "2026-10-15T13:40:00Z" },
-  { id: "5e000000-0000-4000-8000-0000000001a2", name: "Ana Ruiz", email: "ana@hertelflorist.com", business: "Hertel Avenue Florist", url: "https://hertelflorist.com", source: "monitor", result_id: "r2", score: 41, grade: "D", created_at: "2026-10-12T10:00:00Z" },
-  { id: "5e000000-0000-4000-8000-0000000001a3", name: "Ruth Adler", email: "ruth@lakeviewmediation.com", business: "Lakeview Mediation", url: "https://lakeviewmediation.com", source: "audit", result_id: "r3", score: 78, grade: "B", created_at: "2026-10-03T15:00:00Z" },
-  { id: "5e000000-0000-4000-8000-0000000001a5", name: "Ana Reyes", email: "ana@fieldwork.studio", business: "Fieldwork Studio", url: "https://fieldwork.studio", source: "audit", result_id: "r5", score: 70, grade: "B", created_at: "2026-09-25T09:00:00Z" },
-  { id: "5e000000-0000-4000-8000-0000000001a4", name: "Sam Ortiz", email: "sam@elmwoodbikes.com", business: "Elmwood Bikes", url: null, source: "audit", result_id: "r4", score: 55, grade: "C", created_at: "2026-09-22T11:00:00Z" },
+  { id: "5e000000-0000-4000-8000-0000000001a1", name: XA_HARBOR.owner, email: "dr.lin@harbordental.com", business: XA_HARBOR.name, url: "https://harbordental.com", source: "audit", result_id: "scan-1", score: 62, grade: "C", created_at: "2026-10-15T13:40:00Z" },
+  { id: "5e000000-0000-4000-8000-0000000001a2", name: "Ana Ruiz", email: "ana@hertelflorist.com", business: "Hertel Avenue Florist", url: "https://hertelflorist.com", source: "monitor", result_id: "scan-2", score: 41, grade: "D", created_at: "2026-10-12T10:00:00Z" },
+  { id: "5e000000-0000-4000-8000-0000000001a3", name: "Ruth Adler", email: "ruth@lakeviewmediation.com", business: "Lakeview Mediation", url: "https://lakeviewmediation.com", source: "audit", result_id: "scan-3", score: 78, grade: "B", created_at: "2026-10-03T15:00:00Z" },
+  { id: "5e000000-0000-4000-8000-0000000001a5", name: "Ana Reyes", email: "ana@fieldwork.studio", business: "Fieldwork Studio", url: "https://fieldwork.studio", source: "audit", result_id: "scan-5", score: 70, grade: "B", created_at: "2026-09-25T09:00:00Z" },
+  { id: "5e000000-0000-4000-8000-0000000001a4", name: "Sam Ortiz", email: "sam@elmwoodbikes.com", business: "Elmwood Bikes", url: null, source: "audit", result_id: "scan-4", score: 55, grade: "C", created_at: "2026-09-22T11:00:00Z" },
 ];
 
 export function XsLeadsPreview({ screen, state, mode, range, period, recap, open, prospect }: { screen: XsScreen; state: string; mode: "light" | "dark"; range?: string; period?: string; recap?: string; open?: boolean; prospect?: string }) {

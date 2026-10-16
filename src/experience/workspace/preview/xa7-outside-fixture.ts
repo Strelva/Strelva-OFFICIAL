@@ -9,7 +9,7 @@ import type { SystemView } from "@/experience/systems/model";
 import type { InquiryBookingChoice } from "@/products/inquiries";
 import { parseStoreBooking } from "@/platform/bookings/store";
 import { publicIntakeForm, type PublicIntakeForm } from "@/products/vertical-intake/contracts";
-import { DENTAL_INTAKE } from "@/products/vertical-intake/definitions/dental";
+import { DENTAL_INTAKE } from "@/products/vertical-intake/contracts";
 import { mondayEmail, waitsForYouEmail, type XaMail } from "@/platform/infra/email/xa-mail";
 import { XA_HARBOR, XA_SYSTEM_HREFS, XA_SYSTEMS } from "./xa-day";
 

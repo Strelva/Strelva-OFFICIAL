@@ -313,3 +313,6 @@ export function intakeReviewLines(form: PublicIntakeForm, config: IntakeInstallC
   if (!emailOn) lines.push("Patients aren't emailed. The office calls them back.");
   return lines;
 }
+
+/** The dental intake definition (fixed copy and fields; blocked until counsel). */
+export { DENTAL_INTAKE } from "./definitions/dental";

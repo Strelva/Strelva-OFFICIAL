@@ -13,7 +13,7 @@ import { StrelvaShell } from "@/experience/app-frame/StrelvaShell";
 import type { StrelvaPinnedItem } from "@/experience/app-frame/workspace-places";
 import { WorkspaceRequestContext } from "@/experience/workspace/WorkspaceRequest";
 import { BusinessDoor } from "@/experience/getting-started/BusinessDoor";
-import { unreadableSite } from "@/products/getting-started/site-words";
+import { unreadableSite } from "@/products/getting-started/contracts";
 import { SignUpClosed, SignUpDoor } from "@/experience/getting-started/SignUpDoor";
 import { GettingStarted, type GettingStartedLinks, type GettingStartedStart } from "@/experience/getting-started/GettingStarted";
 import { FirstDay } from "@/experience/getting-started/FirstDay";

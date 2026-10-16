@@ -3,7 +3,7 @@
  * free check, the claim). Harbor Dental and North Studio are the board's
  * fictional business and agency; no address or email here is real.
  */
-import type { AuditResult } from "@/lib/audit/types";
+import type { AuditResult } from "@/products/website-audit/client";
 import type { AiVisibilityResult } from "@/products/ai-visibility/client";
 import type { AgencyAttribution } from "@/platform/infra/agency-attribution";
 import type { OwnerBrand } from "@/platform/infra/agency-brand";

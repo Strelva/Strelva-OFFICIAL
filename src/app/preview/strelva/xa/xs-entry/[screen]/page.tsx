@@ -9,7 +9,7 @@ import { AccessRequestPage } from "@/components/marketing/AccessRequestPage";
 import { PossibilityTryErrorClient } from "./TryErrorClient";
 import { PossibilityTry, PossibilityTryLoading, type PossibilityTryState } from "@/experience/systems/PossibilityTry";
 import { WebsiteAuditPage } from "@/products/website-audit";
-import { claimEmailOptions } from "@/products/agency-clients/claim-email";
+import { claimEmailOptions } from "@/products/agency-clients/server";
 import { renderEmailHtml } from "@/platform/infra/email/layout";
 import { composeAskPageSet } from "@/products/websites/index";
 import { XS_AGENCY, XS_BUSINESS, XS_BUSINESSES, XS_IDENTITY_UNAVAILABLE, XS_NORTH_STUDIO, XS_OWNER, XS_REPORT_ID, XS_SCAN_ID, xsAi, xsAudit } from "@/experience/workspace/preview/XsEntryFixtures";

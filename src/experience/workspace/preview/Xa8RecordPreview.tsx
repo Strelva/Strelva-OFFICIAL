@@ -22,7 +22,7 @@ import type { BusinessRecord, BusinessRecordSource } from "@/platform/business-r
 import type { StrelvaDetailsPlace } from "@/experience/app-frame/workspace-places";
 
 import type { Xa8Screen, Xa8State } from "./xa8-record-screens";
-import { recordGoogleApprovalCopy } from "@/products/publishing/record-consent";
+import { recordGoogleApprovalCopy } from "@/products/publishing/client";
 import { xaSearchItems, xaOwnerPinned, XA_HARBOR, XA_NORTH } from "./xa-day";
 
 const WS = "11111111-1111-4111-8111-111111111111";
@@ -128,7 +128,7 @@ function stubFetch(screen: Xa8Screen, state: Xa8State): typeof fetch {
       if (state === "error") return json({ error: "Leaving can't be read right now." }, 503);
       if (state === "done") return json({ state: { id: "f0000000-1111-4111-8111-111111111111", workspaceId: WS, status: "completed", requestedAt: "2026-10-15T18:00:00Z", completedAt: "2026-10-15T18:00:01Z", requestedBy: AMY, futureWork: "paused", providerParticipation: "kept", maintainedResources: { kind: "stopped" }, summary: { standingPaused: 0, standingRevoked: 0, scheduledPaused: 2, scheduledCancelled: 0, assignmentsRevoked: 3, providerDeliveriesRevoked: 0, investigationsPaused: 2, retainedAccepted: 1, retainedUnknown: 0 }, retainedObligations: [{ workId: "w", title: "Thanksgiving hours", status: "waiting", effect: "none" }], resources: [] }, successors: [] });
       return json({ state: null, successors: [{ userId: "a1000000-1111-4111-8111-111111111111", email: "ana.ruiz@harbordental.com" }],
-        handoff: { businessRecordRetained: true, dataDeleted: false, systems: [], sites: [{ tenantId: "harbor", tenantStableId: "99999999-1111-4111-8111-111111111111", siteName: XA_HARBOR.domain, steps: [{ kind: "domain", status: "pending", detail: "Arrange the domain move with the owner; no DNS or provider change has been made." }] }] } });
+        handoff: { businessRecordRetained: true, dataDeleted: false, systems: [], sites: [{ tenantId: "harbor", tenantStableId: "99999999-1111-4111-8111-111111111111", siteName: XA_HARBOR.domain, steps: [{ kind: "domain", status: "pending", detail: "Arrange the domain move with the owner. Nothing about the domain has changed yet." }] }] } });
     }
     return json({ error: "Not part of this preview" }, 404);
   }) as typeof fetch;

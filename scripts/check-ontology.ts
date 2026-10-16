@@ -31,10 +31,8 @@ const SIZE_EXEMPT = [/^src\/platform\/infra\/db\/database\.types\.ts$/, /^src\/c
 // to dodge the gate — split the file instead. Trim it as files shrink.
 const SIZE_GRANDFATHER = new Set([
   "scripts/production-checklist.ts",
-  "src/app/dashboard/settings/page.tsx",
   "src/__tests__/route-handlers.test.ts",
   "src/__tests__/production-readiness-rules.test.ts",
-  "src/components/dashboard/ChatPanel.tsx",
 ]);
 
 function tsFiles(): string[] {
