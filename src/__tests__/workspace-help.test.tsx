@@ -90,8 +90,8 @@ describe("workspace help service request", () => {
     expect(body).not.toHaveProperty("agencyWorkspaceId");
 
     await act(async () => pending[1]!.resolve(response({ request: saved })));
-    expect(container.textContent).toContain("Saved for review.");
-    expect(container.textContent).toContain("does not mean an agency accepted it");
+    expect(container.textContent).toContain("Sent to Ordinary Agency for review.");
+    expect(container.textContent).toContain("doesn’t mean they accepted it");
 
     await act(async () => root.render(null));
     await act(async () => root.render(createElement(
@@ -241,7 +241,7 @@ describe("workspace help service request", () => {
     expect(row.textContent).toContain("Withdrawn");
     expect(row.textContent).not.toContain("Pending agency review");
     await act(async () => row.click());
-    const saveButton = Array.from(container.querySelectorAll<HTMLButtonElement>("button")).find((button) => ["Saved", "Save request"].includes(button.textContent || ""));
+    const saveButton = Array.from(container.querySelectorAll<HTMLButtonElement>("button")).find((button) => ["Sent", "Send request"].includes(button.textContent || "") || (button.textContent || "").startsWith("Send to "));
     expect(saveButton?.disabled).toBe(true);
     expect(container.textContent).toContain("It cannot be edited.");
   });
@@ -273,7 +273,7 @@ describe("workspace help service request", () => {
     )));
     expect(pending).toHaveLength(3);
     await act(async () => pending[1]!.resolve(response({ request: saved })));
-    expect(container.textContent).not.toContain("Saved for review.");
+    expect(container.textContent).not.toContain("for review. That doesn’t mean");
     await act(async () => pending[2]!.resolve(response({ requests: [] })));
     expect(container.textContent).not.toContain("Request from the first business");
   });

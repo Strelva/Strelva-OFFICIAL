@@ -1,0 +1,15 @@
+/* In-between pages. Geometry comes from the entry frame; this file only
+   spaces the actions and the text links under them. Tokens only. */
+.actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.links { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 0; margin: 0; color: var(--st-text-2); font-size: 15px; line-height: 22px; }
+.dot { padding: 0 8px; color: var(--st-text-3); }
+
+/* Opening a workspace: Pebble beside the Working line, where the page's
+   headline will be. Not centered: the page starts where it will stay. */
+.opening { display: flex; align-items: flex-start; gap: 14px; width: 100%; max-width: 720px; margin: 0 auto; padding: clamp(32px, 9vh, 96px) 24px 0; box-sizing: border-box; }
+.opening > :last-child { padding-top: 8px; }
+@media (max-width: 767px) { .opening { padding: 32px 20px 0; } }
+
+/* A state inside the shell: the column a page's content will use. */
+.page { box-sizing: border-box; width: 100%; max-width: 720px; margin: 0 auto; padding: clamp(32px, 9vh, 96px) 24px 48px; }
+@media (max-width: 767px) { .page { padding: 28px 20px 40px; } }

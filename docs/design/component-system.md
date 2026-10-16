@@ -2592,3 +2592,41 @@ and link controls; staff see none of the controls that change anything.
 minutes inside Responsibility and availability, each with an id made once per
 entry so a retry is recorded once. Previews: `/preview/strelva/care-report` and
 `/preview/strelva/agency-care-reports`.
+
+## XS · account, search, help and in-between states (October 16, 2026)
+
+No Pen render exists for these; they are drawn in the XA language from B1/C1,
+O1, R1 and AS1. Previews: `/preview/strelva/xa/xs-shell-states/<screen>`
+(`account`, `search`, `switcher`, `dialog`, `help`, `not-found`, `error`,
+`marketing-error`, `not-open`, `getting-started-off`, `loading`, `unopened`,
+`shared-empty`) with `?state=` and `&mode=dark`, plus `./email?template=team|owner|export`
+and `./global-error`.
+
+- [XaStates](../../src/experience/states/XaStates.tsx): `XaNotFound`,
+  `XaPageBroke` (root and marketing error boundaries), `XaNotOpenYet`
+  (release off for `/workspace` and getting started), `XaWorkspaceOpening`
+  (loading), `XaWorkspaceUnopened` (sign-in, 403, 404, failed read) and
+  `XaSharedReadOnlyEmpty`. Built on the entry frame or `XaEmpty`; Pebble is in
+  frame for bad news. [GlobalErrorDocument](../../src/experience/states/GlobalErrorDocument.tsx)
+  is the literal-styled root crash page.
+- `src/components/ui/strelva/xa/entry.tsx` is byte-identical to the
+  `xa/lane-xs-entry` copy (XaEntryFrame). Imported by path, not through
+  `Xa.tsx`, so the two lanes merge without a conflict.
+- [WorkspaceAccountView](../../src/experience/workspace/WorkspaceAccountView.tsx):
+  the entry column with R1's label and fact rows; places are open rows; status
+  only for an unconfirmed email or read-only access; sign-out defaults in.
+- [WorkspaceSearchDialog](../../src/experience/workspace/WorkspaceSearchDialog.tsx):
+  XA motion 4; "Open ↵" on the selected row; Pebble says when nothing matches;
+  a top sheet on a phone.
+- [WorkspaceBusinessSwitcher](../../src/experience/workspace/WorkspaceBusinessSwitcher.tsx):
+  white popover, sentence-case groups, a check on the current scope, arrow keys,
+  "Read-only" as the only access word.
+- [WorkspaceDialog](../../src/experience/workspace/WorkspaceDialog.tsx): the
+  LX confirm sheet, with `WorkspaceDialogTitle` and `WorkspaceDialogActions`, a
+  close button, and a bottom sheet on a phone. One ink pill per sheet.
+- [WorkspaceHelp](../../src/experience/workspace/WorkspaceHelpForm.tsx): the
+  request is a composer card with "Goes to" and one ink pill, "Send to
+  <agency>"; requests are open rows.
+- Emails: `teamInvitationPaperEmail` (now used by invitation delivery, still
+  gated off), owner invitation and export ready. Paper emails use the ink pill
+  and no monospace.

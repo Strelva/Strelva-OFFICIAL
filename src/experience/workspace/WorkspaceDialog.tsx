@@ -1,8 +1,16 @@
 "use client";
 
 import { useEffect, useRef, type KeyboardEvent, type ReactNode } from "react";
+import { X } from "lucide-react";
+import { XaIconButton } from "@/components/ui/strelva/Xa";
+import styles from "./workspace-dialog.module.css";
 
 /**
+ * XA (October 16): drawn like LX · In · Confirm sheet (zY9qV). White, 24
+ * radius, the one large shadow, rising on Fast from .98; a bottom sheet on a
+ * phone. Only for a confirmation that needs its own moment; inline tasks
+ * stay inline. A sheet counts as its own screen: one ink pill inside it.
+ *
  * The workspace's modal shell: initial focus on the first enabled control,
  * focus contained while open, Escape closes unless busy, and focus returns to
  * the trigger on close. The caller owns the title (pass its id) and actions.
@@ -42,10 +50,20 @@ export function WorkspaceDialog({ labelledBy, busy = false, onClose, children }:
   }
 
   return (
-    <div ref={dialogRef} tabIndex={-1} onKeyDown={handleDialogKeyDown} role="dialog" aria-modal="true" aria-labelledby={labelledBy} className="fixed inset-0 z-50 overflow-y-auto bg-overlay-scrim p-3 outline-none sm:p-8">
-      <div className="mx-auto flex min-h-full max-w-xl items-center">
-        <div className="w-full rounded-2xl border border-gray-border bg-surface p-5 shadow-2xl sm:p-8">{children}</div>
+    <div ref={dialogRef} tabIndex={-1} onKeyDown={handleDialogKeyDown} role="dialog" aria-modal="true" aria-labelledby={labelledBy} data-workspace-theme="linen" data-workspace-look="xa" className={styles.scrim}>
+      <div className={styles.frame}>
+        <div className={styles.sheet}>{children}<span className={styles.close}><XaIconButton label="Close" tone="plain" disabled={busy} onClick={onClose}><X size={18} aria-hidden="true" /></XaIconButton></span></div>
       </div>
     </div>
   );
+}
+
+/** The sheet's question: what pressing the ink pill will do, as a sentence. */
+export function WorkspaceDialogTitle({ id, children, quiet }: { id: string; children: ReactNode; quiet?: ReactNode }) {
+  return <h1 id={id} className={styles.title}>{children}{quiet ? <span className={styles.quiet}> {quiet}</span> : null}</h1>;
+}
+
+/** The way out on the left, the one ink pill on the right; stacked with the pill first on a phone. */
+export function WorkspaceDialogActions({ children }: { children: ReactNode }) {
+  return <div className={styles.actions}>{children}</div>;
 }

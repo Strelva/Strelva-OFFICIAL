@@ -50,10 +50,25 @@ export function weeklyRecapEmail(input: EmailIdentity & { subject: string; metri
 }
 
 export function ownerInvitationPaperEmail(input: EmailIdentity & { business: string; greeting: string; systems: Extract<PaperBlock, { kind: "rows" }>["rows"]; accept: PaperAction; expires: string; invitedBy: string }): PaperEmail {
-  return { ...input, subject: `Your workspace for ${input.business} is ready`, footer: `Invited by ${input.invitedBy}. Not expecting this? Ignore it and nothing changes.`, blocks: [
+  return { ...input, subject: `Your workspace for ${input.business} is ready`, preheader: `Everything runs as it did. Accept to see it and decide what changes.`, footer: `Invited by ${input.invitedBy}. Not expecting this? Ignore it and nothing changes.`, blocks: [
     p(input.greeting), { kind: "rows", rows: input.systems }, a([{ ...input.accept, style: "primary" }]),
-    p(`Accept this invitation with the email address it was sent to. You’ll be asked to sign in. This invitation expires ${input.expires}. You can also answer decision emails without opening the workspace.`, true),
+    p(`Accept with the email address this was sent to; you’ll sign in once. This invitation expires ${input.expires}. Decision emails work without opening the workspace.`, true),
   ] };
+}
+
+/**
+ * A teammate invitation (XS · shell states). Strelva is the sender because
+ * the platform issues it; the inviter is named in the first sentence. The
+ * accept link comes from existing issuance; this only lays it out.
+ */
+export function teamInvitationPaperEmail(input: { workspace: string; inviter: string; recipient: string; owner: boolean; accept: PaperAction }): PaperEmail {
+  return { sender: "Strelva", senderDetail: `to ${input.recipient}`, subject: `Join ${input.workspace} on Strelva`,
+    preheader: `${input.inviter} invited you${input.owner ? " as its owner" : ""}. Nothing changes until you accept.`,
+    footer: "Not expecting this? Ignore it and nothing changes.", blocks: [
+      p(`${input.inviter} invited you to join ${input.workspace} on Strelva${input.owner ? " as its owner" : ""}.`),
+      a([{ ...input.accept, style: "primary" }], false),
+      p(`Sign in with ${input.recipient} to accept. That’s the only address this invitation works for.`, true),
+    ] };
 }
 
 export function cardDeclinedPaperEmail(input: EmailIdentity & { payer: string; chargeDescription: string; knownSchedule: Extract<PaperBlock, { kind: "rows" }>["rows"]; update: PaperAction; serviceNote: string }): PaperEmail {
@@ -64,7 +79,7 @@ export function cardDeclinedPaperEmail(input: EmailIdentity & { payer: string; c
 }
 
 export function exportReadyPaperEmail(input: EmailIdentity & { business: string; filename: string; fileDetail: string; included: string; omitted: string; unavailable?: string; download: PaperAction; linkNote: string; requestedBy: string }): PaperEmail {
-  return { ...input, subject: `Your export of ${input.business} is ready`, footer: `${input.requestedBy} Exporting doesn’t change or cancel anything.`, blocks: [
+  return { ...input, subject: `Your export of ${input.business} is ready`, preheader: input.linkNote, footer: `${input.requestedBy} Exporting doesn’t change or cancel anything.`, blocks: [
     { kind: "file", name: input.filename, detail: input.fileDetail }, { kind: "label", text: "Included" }, p(input.included),
     { kind: "label", text: "Left out, and why" }, p(input.omitted, true),
     ...(input.unavailable ? [{ kind: "label" as const, text: "Unavailable" }, p(input.unavailable, true)] : []),

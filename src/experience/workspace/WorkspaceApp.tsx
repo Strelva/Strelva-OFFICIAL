@@ -8,20 +8,16 @@ import { prepareWebsiteRequestDraft } from "@/lib/website-request-draft";
 import { WebsiteAuditPage } from "@/products/website-audit";
 import { navigateWorkspace, readWorkspaceLocation, replaceWorkspaceLocation, workspaceHistoryState, workspaceReturnTarget } from "@/platform/workspaces/location";
 
-import {
-  ArrowRight,
-  CircleAlert,
-  Loader2,
-  LockKeyhole,
-} from "lucide-react";
-import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { AiVisibilityAssessmentForm, AiVisibilityAssessmentResult } from "@/products/ai-visibility";
 import { AccessHandoffOverlay, AccessPanel } from "./WorkspaceAccess";
 import { WorkspaceLayout } from "./WorkspaceLayout";
-import { WorkspaceDialog } from "./WorkspaceDialog";
+import { WorkspaceDialog, WorkspaceDialogActions, WorkspaceDialogTitle } from "./WorkspaceDialog";
+import { XaButton } from "@/components/ui/strelva/Xa";
+import dialogStyles from "./workspace-dialog.module.css";
+import { XaSharedReadOnlyEmpty, XaWorkspaceOpening, XaWorkspaceUnopened } from "@/experience/states/XaStates";
 import { StartBusinessFromCheck } from "@/experience/getting-started/StartBusinessFromCheck";
 import { normalizeWorkspaceHandoffPreview, normalizeWorkspaceSnapshot, normalizeWorkspaceWork } from "./result";
 import { StrelvaShell } from "@/experience/app-frame/StrelvaShell";
@@ -490,24 +486,13 @@ function WorkspaceContent({ appBase, signOut, inquiry: inquiryConfig, rebuildEna
     }
   }
 
-  if (loading && !snapshot) return <WorkspaceLoading label="Opening your private workspace…" />;
+  if (loading && !snapshot) return <WorkspaceLoading label="Opening your workspace" />;
 
   if (!snapshot) {
     return (
       <WorkspaceFrame>
         <StrelvaShell signedIn={Boolean(accessFailure)} signInHref={signInHref} title="Your Strelva">
-        <div className="mx-auto flex min-h-[70vh] max-w-xl flex-col items-center justify-center text-center">
-          {signInRequired ? <LockKeyhole className="h-7 w-7 text-accent-text" strokeWidth={1.5} /> : <CircleAlert className="h-7 w-7 text-critical" strokeWidth={1.5} />}
-          <h1 className="mt-5 font-display text-[28px] font-medium text-warm-black">{signInRequired ? "Sign in to open your private work." : accessFailure === 403 ? "This account can’t open this workspace." : accessFailure === 404 ? "This workspace is no longer available." : "Your workspace didn’t open."}</h1>
-          <p role="alert" className="mt-2 text-[14px] leading-relaxed text-gray-muted">{notice?.message}</p>
-          {signInRequired ? (
-            <Link href={signInHref} className="mt-6 inline-flex items-center justify-center gap-2 rounded-full bg-accent px-5 py-2.5 text-[13px] font-medium text-on-accent transition-colors hover:bg-accent/85">Sign in <ArrowRight className="h-4 w-4" /></Link>
-          ) : accessFailure ? <>
-            <p className="mt-4 text-[14px] leading-relaxed text-gray-muted">{accessFailure === 403 ? "Ask a workspace owner to invite the email address you use for this account, or choose a workspace you can access." : "The link may be out of date. Choose another workspace or ask its owner for a current link."}</p>
-            <Link href={`${appBase}/workspace/account`} className="mt-6 inline-flex items-center justify-center gap-2 rounded-full bg-accent px-5 py-2.5 text-[13px] font-medium text-on-accent">Choose another workspace <ArrowRight className="h-4 w-4" /></Link>
-            <Link href={`${appBase}/workspace/account`} className="mt-4 text-[14px] underline">Check your account and email</Link>
-          </> : <Button className="mt-6" onClick={() => void loadWorkspace()}>Try again</Button>}
-        </div>
+          <XaWorkspaceUnopened reason={signInRequired ? "sign-in" : accessFailure === 403 ? "forbidden" : accessFailure === 404 ? "gone" : "failed"} message={notice?.message} signInHref={signInHref} accountHref={`${appBase}/workspace/account`} onRetry={() => void loadWorkspace()} />
         </StrelvaShell>
       </WorkspaceFrame>
     );
@@ -717,9 +702,7 @@ function WorkspaceLoading({ label }: { label: string }) {
     <WorkspaceFrame>
       <div inert className="contents">
         <StrelvaShell signedIn={false} title="Your Strelva">
-          <div className="flex flex-1 items-center justify-center gap-3 text-sm text-gray-muted">
-            <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />{label}
-          </div>
+          <XaWorkspaceOpening label={label} />
         </StrelvaShell>
       </div>
       <p role="status" className="sr-only">{label}</p>
@@ -728,27 +711,19 @@ function WorkspaceLoading({ label }: { label: string }) {
 }
 
 function DelegatedEmpty() {
-  return (
-    <div className="mx-auto max-w-2xl">
-      <LockKeyhole className="h-6 w-6 text-accent-text" strokeWidth={1.5} />
-      <h1 className="mt-5 font-display text-[36px] font-medium text-warm-black">Client work shared read-only.</h1>
-      <p className="mt-3 max-w-xl text-[14px] leading-relaxed text-gray-muted">There is no work available in this shared view. Only the client can create or change work here.</p>
-    </div>
-  );
+  return <XaSharedReadOnlyEmpty />;
 }
 
-function PublicResultSaveOverlay({ workspaceName, saving, error, onSave, onClose }: { workspaceName: string; saving: boolean; error: string; onSave: () => void; onClose: () => void }) {
+export function PublicResultSaveOverlay({ workspaceName, saving, error, onSave, onClose }: { workspaceName: string; saving: boolean; error: string; onSave: () => void; onClose: () => void }) {
   return (
     <WorkspaceDialog labelledBy="public-save-title" busy={saving} onClose={onClose}>
-      <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-accent-text">Private workspace</p>
-      <h1 id="public-save-title" className="mt-3 font-display text-[28px] font-medium leading-tight text-warm-black">Save a private copy of this result?</h1>
-      <p className="mt-5 rounded-xl border border-gray-border bg-surface-inset px-4 py-3 text-[13px] text-gray-fg"><span className="font-medium text-warm-black">Workspace:</span> {workspaceName}</p>
-      <p className="mt-5 text-[14px] leading-relaxed text-gray-muted">This creates a new private work item in this workspace. The original public report stays separate and its source ownership does not change.</p>
-      {error ? <p role="alert" className="mt-4 rounded-lg border border-critical/30 bg-critical/10 px-3 py-2 text-[13px] leading-relaxed text-critical">{error}</p> : null}
-      <div className="mt-7 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-        <Button type="button" variant="secondary" size="lg" disabled={saving} onClick={onClose}>Back</Button>
-        <Button type="button" size="lg" loading={saving} onClick={onSave} icon={<ArrowRight className="h-4 w-4" />}>Save a copy</Button>
-      </div>
+      <WorkspaceDialogTitle id="public-save-title" quiet={`It goes into ${workspaceName}.`}>Save a private copy of this result?</WorkspaceDialogTitle>
+      <p>This makes a new private item. The public report stays where it is and keeps its owner.</p>
+      {error ? <p role="alert" className={dialogStyles.error}>{error}</p> : null}
+      <WorkspaceDialogActions>
+        <XaButton variant="quiet" disabled={saving} onClick={onClose}>Back</XaButton>
+        <XaButton variant="primary" busy={saving} onClick={onSave}>Save a copy</XaButton>
+      </WorkspaceDialogActions>
     </WorkspaceDialog>
   );
 }

@@ -38,9 +38,10 @@ describe("paper email presentation", () => {
     expect(renderEmailText({ heading: "", paper: EMAIL_PREVIEW_TEMPLATES.dates.email })).toContain("Opening a link does nothing");
   });
   it("matches the email literal palette to the canonical light token boundary", () => {
-    const source = readFileSync("src/app/styles/workspace-paper.css", "utf8");
-    expect(source).toContain("--st-accent: #2f5236");
-    expect(renderPaperEmailHtml(example)).toContain("background:#2f5236");
+    // XA: the one primary is the ink pill, as in the workspace (--st-action).
+    const source = readFileSync("src/app/styles/workspace-xa.css", "utf8");
+    expect(source).toContain("--st-action: #161715");
+    expect(renderPaperEmailHtml(example)).toContain("background:#161715");
   });
 });
 describe("raw preview route", () => {

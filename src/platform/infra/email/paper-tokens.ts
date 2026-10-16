@@ -5,5 +5,6 @@ export const PAPER_EMAIL = {
   text: "#161715", muted: "#5f615c", faint: "#6b6d67", accent: "#2f5236",
   onAccent: "#ffffff", need: "#9c522c", live: "#3e8e5a",
   font: "'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif",
-  mono: "'Geist Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace",
+  /** XA (Oct 15): no monospace anywhere; figures are DM Sans with tabular numerals. */
+  figures: "'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;font-variant-numeric:tabular-nums",
 } as const;

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ArrowRight, Copy, Mail } from "lucide-react";
+import { Mail } from "lucide-react";
 import type { ServiceRequest, ServiceRequestAgency } from "@/platform/service-requests";
 import type { OfferingCollection, OfferingInstallation } from "@/platform/offerings";
 import { useWorkspaceRequest } from "./WorkspaceRequest";
@@ -9,7 +9,7 @@ import { BringInAgency } from "./BringInAgency";
 import type { AgencyScope } from "@/platform/agency-directory/contract";
 import { useServiceRequestProviders } from "./useServiceRequestProviders";
 import { ServiceRequestDeliveryCompletion } from "./ServiceRequestDeliveryCompletion";
-import { StEmpty, StHead, StNotice, StPage, StPill, StPillLink, StRows, StRow, StSection, StSkeleton, StSurface, StTextButton } from "@/components/ui/strelva/Kit";
+import { XaButton, XaButtonLink, XaHeadline, XaLabel, XaRow, XaRows, XaSays, XaTextLink, XaWorking } from "@/components/ui/strelva/Xa";
 import styles from "./owner-help.module.css";
 
 export interface WorkspaceHelpAgencyOption {
@@ -40,6 +40,8 @@ export interface WorkspaceHelpProps {
   /** An owner may bring in and end agencies (ADR 0015); others see the list. */
   canManageAgencies?: boolean;
   initialAgencyScope?: AgencyScope;
+  /** Where saved requests and their delivery deadlines are reviewed, when the business has that page. */
+  deliveryHref?: string;
 }
 
 function requestKey(): string {
@@ -83,7 +85,7 @@ function responseMessage(value: unknown, fallback: string): string {
   return fallback;
 }
 
-export function WorkspaceHelp({ workspaceName, hasManagedService: _hasManagedService, onAgency, initialRequest = "", requestSubject = "Strelva — product help or request", workspaceId, agencyOptions, providerOptions, scope = ["help_request"], onSaved, canManageAgencies = false, initialAgencyScope }: WorkspaceHelpProps) {
+export function WorkspaceHelp({ workspaceName, hasManagedService: _hasManagedService, onAgency, initialRequest = "", requestSubject = "Strelva: product help or request", workspaceId, agencyOptions, providerOptions, scope = ["help_request"], onSaved, canManageAgencies = false, initialAgencyScope, deliveryHref }: WorkspaceHelpProps) {
   const [request, setRequest] = useState(initialRequest);
   const [outcome, setOutcome] = useState("");
   const suppliedRecipients = useMemo(() => agencyOptions === undefined ? providerOptions : agencyOptions.map(option => ({ label: option.label, provider: option.agency })), [agencyOptions, providerOptions]);
@@ -247,7 +249,7 @@ export function WorkspaceHelp({ workspaceName, hasManagedService: _hasManagedSer
       setSaved(responseBody.request);
       setEditingRequest(responseBody.request);
       setSavedRequests((current) => [responseBody.request!, ...current.filter((item) => item.id !== responseBody.request!.id)]);
-      setMessage("Saved for review. This does not mean an agency accepted it or that work has started.");
+      setMessage(`Sent to ${providerLabel(responseBody.request.provider, selectableRecipients)} for review. That doesn’t mean they accepted it or started work.`);
       onSaved?.(responseBody.request);
     } catch (error) {
       if (activeWorkspaceRef.current !== saveWorkspaceId) return;
@@ -290,44 +292,66 @@ export function WorkspaceHelp({ workspaceName, hasManagedService: _hasManagedSer
     setDeliveryContextRequested(true);
     setDeliveryContextAttempt((value) => value + 1);
   }
-  return <StPage>
-    <div ref={headingRef} tabIndex={-1}><StHead title="What do you need?" meta="Send a request to your agency, bring one in, or contact Strelva about the platform itself." /></div>
-    <StSection title="Tell us about it." id="request-title"><StSurface label="Help request">
-      <div className={styles.form}>
-        <label htmlFor="capability-request">What are you trying to do?</label>
-        <textarea ref={requestRef} id="capability-request" rows={6} maxLength={3000} value={request} onChange={event => { setRequest(event.target.value); setSaved(null); setMessage(""); }} placeholder="What do you use today? What would make it better?" />
-        {workspaceId ? <>
-          <label htmlFor="request-outcome">What would a useful outcome look like? <span>(optional)</span></label>
-          <textarea id="request-outcome" rows={4} maxLength={3000} value={outcome} onChange={event => { setOutcome(event.target.value); setSaved(null); setMessage(""); }} placeholder="Add detail if the outcome needs more explanation." />
-          {agencyChoices.loading ? <><p role="status">Loading agency choices…</p><StSkeleton label="Loading agency choices" /></> : agencyChoices.error ? <StNotice tone="critical">{agencyChoices.error}</StNotice> : !recipients.length ? <StNotice>Bring in an agency below before requesting work. Platform support remains available by email.</StNotice> : null}
-          <label htmlFor="request-provider">Who should review this?</label>
-          <select id="request-provider" value={provider ? JSON.stringify(provider) : ""} onChange={event => { const option = selectableRecipients.find(item => JSON.stringify(item.provider) === event.target.value); if (option) { setProvider(option.provider); setSaved(null); setMessage(""); } }}><option value="">Choose an agency</option>{selectableRecipients.map(option => <option key={JSON.stringify(option.provider)} value={JSON.stringify(option.provider)}>{option.label}</option>)}</select>
-        </> : null}
-        <p>Include an example if it helps. Leave out passwords and private information.</p>
-        <div className={styles.actions}>
-          {workspaceId ? <StPill disabled={saving || !provider || provider.kind !== "agency" || !request.trim() || Boolean(editingRequest && (editingRequest.status === "withdrawn" || (editingRequest.status !== "draft" && editingRequest.providerAcceptance.status !== "pending")))} onClick={() => void saveServiceRequest()}>{saving ? "Saving…" : saved ? "Saved" : "Save request"}</StPill> : null}
-          <StPillLink variant={workspaceId ? "soft" : "primary"} href={`mailto:hello@strelva.com?subject=${encodeURIComponent(requestSubject)}&body=${encodeURIComponent(body)}`}><Mail size={16} aria-hidden="true" />Email platform support</StPillLink>
-          <StTextButton disabled={!request.trim()} onClick={() => void copy()}><Copy size={16} aria-hidden="true" />Copy request</StTextButton>
+  const chosen = provider ? selectableRecipients.find(option => JSON.stringify(option.provider) === JSON.stringify(provider)) : undefined;
+  const locked = Boolean(editingRequest && (editingRequest.status === "withdrawn" || (editingRequest.status !== "draft" && editingRequest.providerAcceptance.status !== "pending")));
+  const sendLabel = saving ? "Sending" : saved ? "Sent" : chosen ? `Send to ${chosen.label}` : "Send request";
+  const mailto = `mailto:hello@strelva.com?subject=${encodeURIComponent(requestSubject)}&body=${encodeURIComponent(body)}`;
+  return <div className={styles.page}>
+    <div ref={headingRef} tabIndex={-1} className={styles.heading}>
+      <XaHeadline size="md" quiet={workspaceId ? "Your agency reads it before anything starts." : "Write it here, then email it to Strelva."}>What do you need?</XaHeadline>
+    </div>
+
+    <section className={styles.composer} aria-labelledby="request-title">
+      <h2 id="request-title" className={styles.srOnly}>Your request</h2>
+      <label htmlFor="capability-request" className={styles.srOnly}>What are you trying to do?</label>
+      <textarea ref={requestRef} id="capability-request" className={styles.ask} rows={4} maxLength={3000} value={request} onChange={event => { setRequest(event.target.value); setSaved(null); setMessage(""); }} placeholder="What are you trying to do? What do you use today?" />
+      {workspaceId ? <>
+        <label htmlFor="request-outcome" className={styles.outcomeLabel}>What would done look like? <span>Optional</span></label>
+        <textarea id="request-outcome" className={styles.outcome} rows={2} maxLength={3000} value={outcome} onChange={event => { setOutcome(event.target.value); setSaved(null); setMessage(""); }} placeholder="Add detail if the outcome needs it." />
+        <div className={styles.composerBar}>
+          <label htmlFor="request-provider" className={styles.goesTo}>Goes to</label>
+          <select id="request-provider" className={styles.provider} value={provider ? JSON.stringify(provider) : ""} disabled={agencyChoices.loading} onChange={event => { const option = selectableRecipients.find(item => JSON.stringify(item.provider) === event.target.value); if (option) { setProvider(option.provider); setSaved(null); setMessage(""); } }}><option value="">Choose an agency</option>{selectableRecipients.map(option => <option key={JSON.stringify(option.provider)} value={JSON.stringify(option.provider)}>{option.label}</option>)}</select>
+          <span className={styles.barEnd}><XaButton variant="primary" busy={saving} disabled={saving || !provider || provider.kind !== "agency" || !request.trim() || locked} onClick={() => void saveServiceRequest()}>{sendLabel}</XaButton></span>
         </div>
-        <p>{workspaceId ? "Saving keeps this request available in your workspace and in the selected agency’s review inbox. It does not set a price or date, grant authority, or start work." : "Opens your email app. Nothing is sent until you send it; requests are not delivery commitments."}</p>
-        {message ? <p role="status">{message}</p> : null}
-      </div>
-    </StSurface></StSection>
-    {workspaceId ? <StSection title="Saved requests" id="saved-requests-title" action={editingRequest ? <StTextButton onClick={startNewRequest}>Start another request</StTextButton> : undefined}>
-      {loadingSavedRequests ? <><p role="status">Loading saved requests…</p><StSkeleton label="Loading saved requests" /></> : savedRequestsError ? <StNotice tone="critical">{savedRequestsError}</StNotice> : savedRequests.length ? <StRows>{savedRequests.map(item => <StRow key={item.id} onClick={() => reopenServiceRequest(item)} title={item.request} detail={`${acceptanceLabel(item)} · ${providerLabel(item.provider, recipients)}`} end={<ArrowRight size={16} aria-hidden="true" />} />)}</StRows> : <StEmpty>No saved requests yet.</StEmpty>}
-    </StSection> : null}
-    {editingRequest?.provider.kind === "agency" && editingRequest.providerAcceptance.status === "accepted" && !deliveryContext ? <StSection title="Move this accepted request into delivery" id={`delivery-controls-${editingRequest.id}`}>
-      <p className={styles.copy}>The agency accepted the request for review. Open the delivery controls to choose the exact approved scope and resource before granting revocable work access.</p>
-      <StPill variant="soft" disabled={deliveryContextLoading} onClick={openDeliveryControls}>{deliveryContextLoading ? "Loading delivery controls…" : "Review delivery options"}</StPill>
-      {deliveryContextError ? <StNotice tone="critical">{deliveryContextError} <StTextButton onClick={openDeliveryControls}>Try again</StTextButton></StNotice> : null}
-    </StSection> : null}
+        {agencyChoices.loading ? <p role="status" className={styles.barNote}>Reading which agencies can take requests</p>
+          : agencyChoices.error ? <p role="alert" className={styles.barNote} data-tone="error">{agencyChoices.error}</p>
+            : !recipients.length ? <p className={styles.barNote}>No agency can take requests yet. Bring one in below, or email Strelva about the platform.</p> : null}
+      </> : <div className={styles.composerBar}><span className={styles.barEnd}><XaButtonLink variant="primary" href={mailto}><Mail size={16} aria-hidden="true" />Email platform support</XaButtonLink></span></div>}
+    </section>
+
+    <p className={styles.after}>
+      {workspaceId ? <>Leave out passwords and private details. Sending keeps it in your workspace and in that agency’s review list; it sets no price or date and starts no work. </> : <>Opens your email app. Nothing is sent until you send it. Leave out passwords and private details. </>}
+      <span className={styles.textLinks}>
+        {workspaceId ? <><a href={mailto} className={styles.textLink}>Email platform support</a><span aria-hidden="true"> · </span></> : null}
+        <button type="button" className={styles.textLink} disabled={!request.trim()} onClick={() => void copy()}>Copy request</button>
+      </span>
+    </p>
+    {message ? <div role="status"><XaSays>{message}</XaSays></div> : null}
+
+    {workspaceId ? <section className={styles.section} aria-labelledby="saved-requests-title">
+      <div className={styles.sectionHead}><XaLabel as="h2" id="saved-requests-title">Your requests</XaLabel><span className={styles.textLinks}>{editingRequest ? <XaTextLink onClick={startNewRequest}>Start another request</XaTextLink> : null}{editingRequest && deliveryHref ? <span aria-hidden="true"> · </span> : null}{deliveryHref ? <XaTextLink href={deliveryHref}>Review saved requests and delivery deadlines</XaTextLink> : null}</span></div>
+      {loadingSavedRequests ? <XaWorking title="Reading your requests" steps={[]} />
+        : savedRequestsError ? <XaSays>{savedRequestsError}</XaSays>
+          : savedRequests.length ? <XaRows label="Your requests">{savedRequests.map(item => <XaRow key={item.id} onClick={() => reopenServiceRequest(item)} current={editingRequest?.id === item.id} title={item.request} detail={`${acceptanceLabel(item)} · ${providerLabel(item.provider, recipients)}`} />)}</XaRows>
+            : <p className={styles.quiet}>Nothing sent yet. Requests you send show here with what the agency said.</p>}
+    </section> : null}
+
+    {editingRequest?.provider.kind === "agency" && editingRequest.providerAcceptance.status === "accepted" && !deliveryContext ? <section className={styles.section} aria-labelledby={`delivery-controls-${editingRequest.id}`}>
+      <XaLabel as="h2" id={`delivery-controls-${editingRequest.id}`}>Move this accepted request into delivery</XaLabel>
+      <p className={styles.quiet}>The agency accepted it for review. Choose the exact scope and the one resource they may work on before giving them access you can take back.</p>
+      <div><XaButton variant="secondary" busy={deliveryContextLoading} onClick={openDeliveryControls}>{deliveryContextLoading ? "Loading delivery controls" : "Review delivery options"}</XaButton></div>
+      {deliveryContextError ? <XaSays links={[<XaTextLink key="retry" onClick={openDeliveryControls}>Try again</XaTextLink>]}>{deliveryContextError}</XaSays> : null}
+    </section> : null}
     {editingRequest && deliveryContext ? <ServiceRequestDeliveryCompletion request={editingRequest} installation={deliveryContext.installation} responsibilities={deliveryContext.responsibilities} onRequestUpdated={updated => { setEditingRequest(updated); setSaved(updated); setSavedRequests(current => current.map(item => item.id === updated.id ? updated : item)); }} /> : null}
-    {workspaceId ? <BringInAgency workspaceId={workspaceId} canManage={canManageAgencies} initialScope={initialAgencyScope} /> : <StSection title="Want it done for you?">
-      <p className={styles.copy}>Open your business in Strelva to bring in an agency. You choose what it can do, and it accepts before anything changes.</p>
-    </StSection>}
-    <StSection title="Working for a client?">
-      <p className={styles.copy}>Use an agency workspace to prepare assessments and hand a copy to your client. Access is scoped to the work that was shared; broader product management still needs a supported permission.</p>
-      {onAgency ? <StTextButton onClick={onAgency}>Sharing &amp; agency access<ArrowRight size={16} aria-hidden="true" /></StTextButton> : null}
-    </StSection>
-  </StPage>;
+
+    {workspaceId ? <BringInAgency workspaceId={workspaceId} canManage={canManageAgencies} initialScope={initialAgencyScope} /> : <section className={styles.section} aria-labelledby="done-for-you">
+      <XaLabel as="h2" id="done-for-you">Want it done for you?</XaLabel>
+      <p className={styles.quiet}>Open your business in Strelva to bring in an agency. You choose what it can do, and it accepts before anything changes.</p>
+    </section>}
+
+    <section className={styles.section} aria-labelledby="for-a-client">
+      <XaLabel as="h2" id="for-a-client">Working for a client?</XaLabel>
+      <p className={styles.quiet}>An agency workspace prepares work and hands a copy to the client. It only sees what the client shared.{onAgency ? <> <XaTextLink onClick={onAgency}>Sharing &amp; agency access</XaTextLink></> : null}</p>
+    </section>
+  </div>;
 }

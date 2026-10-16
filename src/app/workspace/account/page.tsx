@@ -8,7 +8,7 @@ import { PublicContinuationCard } from "@/experience/workspace/PublicContinuatio
 import { cookies } from "next/headers";
 import { openPublicContinuation, PUBLIC_CONTINUATION_COOKIE } from "@/lib/public-continuation";
 import { readPublicContinuationImport } from "@/platform/public-continuations/repository";
-import Link from "next/link";
+import { XaButtonLink, XaHeadline, XaLabel, XaSays } from "@/components/ui/strelva/Xa";
 import { AccountPayerInbox } from "@/experience/workspace/AccountPayerInbox";
 
 export const dynamic = "force-dynamic";
@@ -90,9 +90,9 @@ export default async function WorkspaceAccountPage({
     }
   }
 
-  const continuationView = importedContinuation ? <section className="border-b border-gray-border py-8"><p className="text-[14px] font-medium text-accent-text">Public session saved</p><h2 className="mt-2 text-[20px] font-medium text-warm-black">{continuation?.resultTitle}</h2><p className="mt-3 max-w-xl text-[14px] leading-relaxed text-gray-muted">This brief is already private in the workspace that accepted it.</p><Link className="mt-5 inline-flex min-h-12 items-center rounded-xl border border-gray-border px-4 py-3 text-[14px] font-medium text-warm-black underline underline-offset-4" href={`/workspace?workspaceId=${encodeURIComponent(importedContinuation.workspaceId)}&work=${encodeURIComponent(importedContinuation.workId)}&view=document`}>Open saved brief</Link></section>
+  const continuationView = importedContinuation ? <section aria-label="Public session saved"><XaLabel as="h2">Public session saved</XaLabel><XaHeadline as="h2" size="sm" quiet="It’s already private in the workspace that took it.">{continuation?.resultTitle}</XaHeadline><p style={{ marginTop: 16 }}><XaButtonLink variant="primary" href={`/workspace?workspaceId=${encodeURIComponent(importedContinuation.workspaceId)}&work=${encodeURIComponent(importedContinuation.workId)}&view=document`}>Open saved brief</XaButtonLink></p></section>
     : continuation && !continuationUnavailable ? <PublicContinuationCard brief={continuation} destinations={writableDestinations} actorEmail={normalizedEmail} />
-    : continuing ? <section className="border-b border-gray-border py-8"><h2 className="text-[16px] font-medium text-warm-black">{emailConfirmed ? "Public session unavailable" : "Confirm your email to continue"}</h2><p className="mt-4 max-w-xl text-[14px] leading-relaxed text-gray-muted">{emailConfirmed ? "This continuation is missing, no longer accessible to this account, or could not be restored. Return to the public session or use a downloaded brief. No workspace was changed." : "The retained brief stays hidden until this account email is confirmed. No workspace was changed."}</p></section>
+    : continuing ? <section aria-label={emailConfirmed ? "Public session unavailable" : "Confirm your email to continue"}><XaLabel as="h2">{emailConfirmed ? "Public session unavailable" : "Confirm your email to continue"}</XaLabel><XaSays>{emailConfirmed ? "This session is missing, no longer open to this account, or couldn’t be restored. Go back to it, or use the brief you downloaded. No workspace changed." : "The brief you started stays hidden until this email is confirmed. No workspace changed."}</XaSays></section>
     : undefined;
 
   return <WorkspaceAccountView

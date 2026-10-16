@@ -7,6 +7,7 @@
 import { sendEmailWithReceipt, type SendEmailInput, type SendEmailResult } from "@/platform/infra/email/send";
 import { customerEmailEnabled, emailSendingEnabled } from "@/platform/infra/email/enabled";
 import type { WorkspaceInvitation } from "./invitations";
+import { teamInvitationPaperEmail } from "@/platform/infra/email/paper-templates";
 
 export type InvitationDelivery =
   | { status: "not_sent"; reason: "email_off" | "release_off" | "email_not_requested" }
@@ -49,6 +50,8 @@ export async function deliverWorkspaceInvitation(
       subject: `Join ${workspaceName} on Strelva`,
       idempotencyKey: `workspace-invitation:${input.invitation.id}`,
       options: {
+        // XA layout; heading, paragraphs and button stay as the plain fallback.
+        paper: teamInvitationPaperEmail({ workspace: workspaceName, inviter: input.inviterLabel, recipient: input.invitation.recipientEmail, owner: input.invitation.role === "owner", accept: { label: "Accept the invitation", url: input.acceptUrl } }),
         heading: `You're invited to ${workspaceName}`,
         paragraphs: [
           `${input.inviterLabel} invited you to join ${workspaceName} on Strelva${input.invitation.role === "owner" ? " as its owner" : ""}. Sign in with this email address to accept.`,

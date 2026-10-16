@@ -1,0 +1,12 @@
+/* XA account: the entry column at 640, sections separated by space, not boxes. */
+.page { display: flex; flex-direction: column; gap: 40px; }
+.section { display: flex; flex-direction: column; gap: 12px; }
+.section > h2 { padding-bottom: 4px; border-bottom: 1px solid var(--st-line); }
+.email { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; min-width: 0; }
+.address { overflow-wrap: anywhere; }
+.quiet { color: var(--st-text-3); }
+.signOut { display: inline-flex; flex-direction: column; align-items: flex-start; }
+.signOutButton { display: inline-flex; align-items: center; gap: 6px; padding: 0; border: 0; background: none; color: var(--st-accent); font: inherit; font-weight: 500; cursor: pointer; }
+.signOutButton:hover:not(:disabled) { text-decoration: underline; text-underline-offset: 3px; }
+.signOutButton:disabled { color: var(--st-text-3); cursor: progress; }
+.body { margin: 0; color: var(--st-text-2); font-size: 14px; line-height: 1.5; }

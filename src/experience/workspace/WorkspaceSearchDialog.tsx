@@ -1,8 +1,8 @@
 "use client";
 
-import { ArrowUpRight, Search, X } from "lucide-react";
+import { CornerDownLeft, Search, X } from "lucide-react";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
-import { StEmpty, StKbd, StMono, StTextButton } from "@/components/ui/strelva/Kit";
+import { XaIconButton, XaKbd, XaSays } from "@/components/ui/strelva/Xa";
 import { searchWorkspaceItems, type WorkspaceSearchItem } from "./workspace-search";
 import styles from "./workspace-search.module.css";
 
@@ -52,7 +52,7 @@ export function WorkspaceSearchDialog({ open, items, scopeName, storageKey, onCl
       <header className={styles.header}>
         <Search size={20} aria-hidden="true" />
         <label className={styles.srOnly} htmlFor={`${id}-query`}>Search {scopeName}</label>
-        <input ref={input} id={`${id}-query`} placeholder="Search your work…" maxLength={3000} value={query} onChange={event => { setQuery(event.target.value); setSelected(0); if (storageKey) { try { window.sessionStorage.setItem(storageKey, event.target.value); } catch { /* Keep the query in this dialog. */ } } }} role="combobox" aria-autocomplete="list" aria-expanded={open} aria-controls={`${id}-results`} aria-activedescendant={results.length ? `${id}-result-${activeIndex}` : undefined} onKeyDown={event => {
+        <input ref={input} id={`${id}-query`} placeholder={`Search ${scopeName}`} maxLength={3000} value={query} onChange={event => { setQuery(event.target.value); setSelected(0); if (storageKey) { try { window.sessionStorage.setItem(storageKey, event.target.value); } catch { /* Keep the query in this dialog. */ } } }} role="combobox" aria-autocomplete="list" aria-expanded={open} aria-controls={`${id}-results`} aria-activedescendant={results.length ? `${id}-result-${activeIndex}` : undefined} onKeyDown={event => {
           if (event.nativeEvent.isComposing) return;
           if (event.key === "ArrowDown" || event.key === "ArrowUp") {
             event.preventDefault();
@@ -60,14 +60,14 @@ export function WorkspaceSearchDialog({ open, items, scopeName, storageKey, onCl
           }
           if (event.key === "Enter" && results[activeIndex]) { event.preventDefault(); choose(results[activeIndex]); }
         }} />
-        <StTextButton aria-label="Close search" onClick={onClose}><span className={styles.desktopEscape}><StKbd>Esc</StKbd></span><X className={styles.phoneClose} size={18} aria-hidden="true" /></StTextButton>
+        <button type="button" className={styles.desktopEscape} aria-label="Close search" onClick={onClose}><XaKbd>Esc</XaKbd></button><span className={styles.phoneClose}><XaIconButton label="Close search" tone="plain" onClick={onClose}><X size={18} aria-hidden="true" /></XaIconButton></span>
       </header>
-      <div className={styles.meta}><h2 id={`${id}-title`}>{scopeName}</h2><span role="status" aria-live="polite"><StMono>{results.length}</StMono> {results.length === 1 ? "result" : "results"}</span></div>
+      <div className={styles.meta}><h2 id={`${id}-title`}>{query ? `In ${scopeName}` : `Everything in ${scopeName}`}</h2><span role="status" aria-live="polite" className={styles.count}>{results.length} {results.length === 1 ? "result" : "results"}</span></div>
       <div id={`${id}-results`} role="listbox" aria-label="Search results" className={styles.results}>
-        {results.map((item, index) => <button key={item.id} id={`${id}-result-${index}`} type="button" role="option" tabIndex={-1} aria-selected={index === activeIndex} className={styles.result} onMouseMove={() => setSelected(index)} onClick={() => choose(item)}><span><strong>{item.title}</strong><small>{item.detail}</small></span><span className={styles.resultEnd}>{index === activeIndex ? <span className={styles.openHint}><StMono>Enter to open</StMono></span> : null}<ArrowUpRight size={16} aria-hidden="true" /></span></button>)}
+        {results.map((item, index) => <button key={item.id} id={`${id}-result-${index}`} type="button" role="option" tabIndex={-1} aria-selected={index === activeIndex} className={styles.result} onMouseMove={() => setSelected(index)} onClick={() => choose(item)}><span><strong>{item.title}</strong><small>{item.detail}</small></span><span className={styles.resultEnd} aria-hidden="true">{index === activeIndex ? <span className={styles.openHint}>Open<CornerDownLeft size={14} /></span> : null}</span></button>)}
       </div>
-      {!results.length ? <div className={styles.empty}><StEmpty><strong>{query ? "No matching work" : "No saved work yet"}</strong><p>{query ? "Try a different name or a shorter search." : systemsReleased ? "Your systems, documents and files will be searchable here." : "Your saved apps, documents, and work will be searchable here."}</p></StEmpty></div> : null}
-      <footer className={styles.footer}><span><StKbd>↑ ↓</StKbd> Choose</span><span><StKbd>Enter</StKbd> Open</span><span><StKbd>Esc</StKbd> Close</span></footer>
+      {!results.length ? <div className={styles.empty}><XaSays>{query ? <>Nothing in {scopeName} matches “{query.trim().slice(0, 60)}”. Try one word from its name.</> : systemsReleased ? <>Nothing saved yet. Your Systems, documents and files show up here as they’re made.</> : <>Nothing saved yet. Your Apps, documents and work show up here as they’re made.</>}</XaSays></div> : null}
+      <footer className={styles.footer}><span><XaKbd>↑</XaKbd><XaKbd>↓</XaKbd> Choose</span><span><XaKbd>↵</XaKbd> Open</span><span><XaKbd>Esc</XaKbd> Close</span></footer>
     </div>
   </dialog>;
 }

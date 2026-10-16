@@ -99,11 +99,11 @@ describe("authenticated workspace account context", () => {
     expect(text).toContain("owner@example.com");
     expect(text).toContain("Confirmed");
     expect(text).toContain("My work");
-    expect(text).toContain("Personal workspace");
-    expect(text).toContain("Member access");
+    // XA: each place says what it is to this person; access is named only where it differs (read-only).
+    expect(text).toContain("Just you");
+    expect(text).not.toContain("Member access");
     expect(text).toContain("Harbor Dental");
-    expect(text).toContain("Your business");
-    expect(text).toContain("Read-only access");
+    expect(text).toContain("Client · Read-only access");
     expect(text).toContain("Each site keeps its own people and settings");
     expect(linksFrom(page)).toContain("/workspace?workspaceId=personal");
     expect(linksFrom(page)).toContain("/workspace?workspaceId=customer");

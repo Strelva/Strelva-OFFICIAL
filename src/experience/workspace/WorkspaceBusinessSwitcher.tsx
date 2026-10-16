@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { ChevronsUpDown } from "lucide-react";
-import { StMono, StTextButton } from "@/components/ui/strelva/Kit";
+import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
+import { Check, ChevronsUpDown } from "lucide-react";
+import { XaInitial, XaMark, XaSystemTile } from "@/components/ui/strelva/Xa";
+import { PLACE_LABELS } from "@/platform/presentation/place-labels";
 import type { SystemView } from "@/experience/systems/model";
 import type { WorkspaceSnapshot } from "./contracts";
 import type { StrelvaSection } from "@/experience/app-frame/StrelvaShell";
@@ -27,11 +28,19 @@ export function agencyClientLinks(snapshot: WorkspaceSnapshot, appBase: string, 
     .map(item => ({ id: item.id, name: item.name, href: `${appBase}/workspace?workspaceId=${encodeURIComponent(item.id)}`, onOpen: onWorkspace ? () => onWorkspace(item.id) : undefined, current: item.id === snapshot.workspaceId, detail: item.access === "delegated_read" ? "Read-only" : undefined }));
 }
 
-/** Only server-authorized workspaces and Systems appear in this scope picker. */
+/**
+ * XA scope switcher (October 16). The trigger is the sidebar's first line:
+ * an initial, the scope, and the up-down chevrons (XA · AS1). The menu is a
+ * white popover of open rows grouped in sentence case, with a check on the
+ * current one and a quiet word only where access differs ("Read-only",
+ * "Agency access"). Arrow keys move between rows; Escape returns focus.
+ * Only server-authorized workspaces and Systems appear in this scope picker.
+ */
 export function WorkspaceBusinessSwitcher({ snapshot, busy, onWorkspace, onNavigate, systems = [], currentSystemId, onSystem }: { systems?: readonly SystemView[]; currentSystemId?: string | null; onSystem?: (id: string) => void; snapshot: WorkspaceSnapshot; busy: boolean; onWorkspace: (id: string) => void; onNavigate: (place: StrelvaSection) => void }) {
   const [open, setOpen] = useState(false);
   const root = useRef<HTMLDivElement>(null);
   const trigger = useRef<HTMLButtonElement>(null);
+  const menu = useRef<HTMLDivElement>(null);
   const current = snapshot.workspaces.find(item => item.id === snapshot.workspaceId);
   const currentSystem = systems.find(item => item.id === currentSystemId);
   const groups = [
@@ -43,21 +52,40 @@ export function WorkspaceBusinessSwitcher({ snapshot, busy, onWorkspace, onNavig
   const scope = [agency?.name, current?.name || "Your business", currentSystem?.name].filter(Boolean).join(" / ");
   useEffect(() => {
     if (!open) return;
+    (menu.current?.querySelector<HTMLButtonElement>('[aria-current="true"]:not(:disabled)') ?? menu.current?.querySelector<HTMLButtonElement>("button:not(:disabled)"))?.focus();
     function close(event: PointerEvent) { if (!root.current?.contains(event.target as Node)) setOpen(false); }
     function key(event: KeyboardEvent) { if (event.key === "Escape") { setOpen(false); trigger.current?.focus(); } }
     document.addEventListener("pointerdown", close); document.addEventListener("keydown", key);
     return () => { document.removeEventListener("pointerdown", close); document.removeEventListener("keydown", key); };
   }, [open]);
   function navigate(place: StrelvaSection) { setOpen(false); onNavigate(place); }
+  function arrows(event: ReactKeyboardEvent<HTMLDivElement>) {
+    if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) return;
+    const buttons = Array.from(menu.current?.querySelectorAll<HTMLButtonElement>("button:not(:disabled)") ?? []);
+    if (!buttons.length) return;
+    event.preventDefault();
+    const at = buttons.indexOf(document.activeElement as HTMLButtonElement);
+    const next = event.key === "Home" ? 0 : event.key === "End" ? buttons.length - 1 : (at + (event.key === "ArrowDown" ? 1 : -1) + buttons.length) % buttons.length;
+    buttons[next]?.focus();
+  }
+  // Exceptions only: an agency person is expected to hold agency access to a client; read-only is the one that differs.
+  const accessWord = (item: WorkspaceSnapshot["workspaces"][number]) => item.access === "delegated_read" ? "Read-only" : null;
   return <div ref={root} className={styles.switcher}>
     <button ref={trigger} className={styles.trigger} type="button" disabled={busy} aria-label={`Current scope: ${scope}`} aria-expanded={open} aria-controls="owner-business-menu" onClick={() => setOpen(!open)}>
-      <span className={styles.initial} aria-hidden="true">{current?.name?.slice(0, 1) || "S"}</span><span>{scope}{current?.access === "provider_seat" ? " · Agency access" : ""}</span><ChevronsUpDown size={14} aria-hidden="true" />
+      {current?.name ? <XaInitial name={current.name} size={24} /> : <XaMark size={22} />}<span className={styles.scope}>{scope}{current?.access === "delegated_read" ? <span className={styles.aside}> · Read-only</span> : ""}</span><ChevronsUpDown size={14} aria-hidden="true" className={styles.chevrons} />
     </button>
-    {open ? <div id="owner-business-menu" className={styles.menu} aria-label="Switch scope">
-      {groups.filter(group => group.items.length).map(group => <div key={group.label}><p className="px-2 py-1 text-xs text-gray-muted">{group.label}</p>{group.items.map(item => <button className={styles.business} type="button" key={item.id} disabled={busy} aria-current={item.id === snapshot.workspaceId ? "true" : undefined} onClick={() => { setOpen(false); onWorkspace(item.id); }}><span>{item.name}</span><StMono>{item.access === "delegated_read" ? "Read-only" : item.access === "provider_seat" ? "Agency access" : item.role || item.kind}</StMono></button>)}</div>)}
-      {systems.length && onSystem ? <div><p className="px-2 py-1 text-xs text-gray-muted">Systems · {current?.name}</p>{systems.map(system => <button type="button" className={styles.business} key={system.id} disabled={busy} aria-current={system.id === currentSystemId ? "true" : undefined} onClick={() => { setOpen(false); onSystem(system.id); }}>{system.name}</button>)}</div> : null}
-      <StTextButton onClick={() => navigate("help")}>Ask to add a business</StTextButton>
-      <div className={styles.links}><StTextButton onClick={() => navigate("settings")}>Business details</StTextButton><StTextButton onClick={() => navigate("access")}>People & access</StTextButton><StTextButton onClick={() => navigate("help")}>Help</StTextButton></div>
+    {open ? <div id="owner-business-menu" ref={menu} className={styles.menu} aria-label="Switch scope" onKeyDown={arrows}>
+      {groups.filter(group => group.items.length).map(group => <div key={group.label} className={styles.group} role="group" aria-label={group.label}><p className={styles.groupLabel}>{group.label}</p>{group.items.map(item => <button className={styles.business} type="button" key={item.id} disabled={busy} aria-current={item.id === snapshot.workspaceId ? "true" : undefined} onClick={() => { setOpen(false); onWorkspace(item.id); }}>
+        <XaInitial name={item.name} size={24} /><span className={styles.name}>{item.name}</span>{accessWord(item) ? <span className={styles.aside}>{accessWord(item)}</span> : null}<Check size={15} aria-hidden="true" className={styles.check} />
+      </button>)}</div>)}
+      {systems.length && onSystem ? <div className={styles.group} role="group" aria-label={`Systems in ${current?.name || "your business"}`}><p className={styles.groupLabel}>Systems in {current?.name || "your business"}</p>{systems.map(system => <button type="button" className={styles.business} key={system.id} disabled={busy} aria-current={system.id === currentSystemId ? "true" : undefined} onClick={() => { setOpen(false); onSystem(system.id); }}>
+        <XaSystemTile kind={system.kind} size={24} /><span className={styles.name}>{system.name}</span><Check size={15} aria-hidden="true" className={styles.check} />
+      </button>)}</div> : null}
+      <div className={styles.links}>
+        <button type="button" className={styles.link} onClick={() => navigate("settings")}>{PLACE_LABELS.businessDetails}</button>
+        <button type="button" className={styles.link} onClick={() => navigate("access")}>{PLACE_LABELS.access}</button>
+        <button type="button" className={styles.link} onClick={() => navigate("help")}>Ask to add a business</button>
+      </div>
     </div> : null}
   </div>;
 }
