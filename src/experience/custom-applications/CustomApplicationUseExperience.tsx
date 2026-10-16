@@ -1,14 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { StHead, StMono, StNotice, StPage, StPill, StRow, StRows, StSection, StSkeleton, StState, StSurface } from "@/components/ui/strelva/Kit";
 import { StandaloneApplicationShell } from "@/experience/applications/StandaloneApplicationShell";
 import { useWorkspaceRequest } from "@/experience/workspace/WorkspaceRequest";
-import styles from "@/experience/applications/standalone-application.module.css";
+import styles from "@/experience/applications/application-use.module.css";
+import { ToolClosed, ToolOpening } from "@/experience/applications/ToolStates";
 import { CUSTOM_APPLICATION_PARENT_CSP, customApplicationSandboxHtml } from "@/products/custom-applications/client";
 
 type UseState = "loading" | "ready" | "denied" | "error";
-type Snapshot = { workId: string; title: string; releaseVersion: number; artifactDigest: string; html: string; grant: { expiresAt: string } };
+type Snapshot = { workId: string; title: string; releaseVersion: number; artifactDigest: string; html: string; grant: { expiresAt: string }; businessName?: string | null };
 
 function message(body: unknown, fallback: string): string {
   return body && typeof body === "object" && typeof (body as { error?: unknown }).error === "string"
@@ -43,32 +43,38 @@ export function CustomApplicationUseExperience({ workId }: { workId: string }) {
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { void load(); }, [load]);
 
-  if (state === "loading") return <StandaloneApplicationShell><StPage><StHead title="Opening internal tool…" /><StSkeleton label="Opening internal tool" /><StSkeleton width="60%" /></StPage></StandaloneApplicationShell>;
+  if (state === "loading") return <ToolOpening />;
   if (state !== "ready" || !snapshot) {
-    return <StandaloneApplicationShell><StPage>
-      <StHead title={state === "denied" ? "This internal tool link is unavailable" : "Strelva could not open this internal tool"} />
-      <div role="alert"><StNotice tone={state === "denied" ? "need" : "critical"}>{error}</StNotice></div>
-      {state === "error" ? <div><StPill variant="soft" onClick={() => { setState("loading"); setError(""); void load(); }}>Try again</StPill></div> : null}
-    </StPage></StandaloneApplicationShell>;
+    return <ToolClosed kind={state === "denied" ? "denied" : "error"} title={state === "denied" ? "This internal tool link is unavailable" : "Strelva could not open this internal tool"} message={error}
+      onRetry={state === "error" ? () => { setState("loading"); setError(""); void load(); } : undefined} />;
   }
 
+  const until = new Date(snapshot.grant.expiresAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+  // The tool is the page: its own heading is the one title. The frame grows to the tool's height.
   return <>
     <meta httpEquiv="Content-Security-Policy" content={CUSTOM_APPLICATION_PARENT_CSP} />
-    <StandaloneApplicationShell><StPage>
-      <StHead title={snapshot.title} meta={<><StState kind="live">Live</StState> · release <StMono>{snapshot.releaseVersion}</StMono> · internal tool</>} />
-      <StSurface pad={false}>
+    <StandaloneApplicationShell from={snapshot.businessName ?? undefined} meta={<>Release {snapshot.releaseVersion} · Yours until <time dateTime={snapshot.grant.expiresAt}>{until}</time></>}>
+      <div className={styles.toolFrame} data-artifact-digest={snapshot.artifactDigest}>
         <iframe
-          title={`${snapshot.title} released internal tool`}
+          title={snapshot.title}
           srcDoc={customApplicationSandboxHtml(snapshot.html)}
           sandbox="allow-scripts allow-forms"
-          className={styles.applicationFrame}
+          className={styles.frame}
           referrerPolicy="no-referrer"
+          onLoad={event => fit(event.currentTarget)}
         />
-      </StSurface>
-      <StSection title="Access and checks"><StRows>
-        <StRow title="Access expires" value={<StMono as="time" dateTime={snapshot.grant.expiresAt}>{new Date(snapshot.grant.expiresAt).toLocaleString()}</StMono>} />
-        <StRow title="Reviewed artifact" value={<StMono>{snapshot.artifactDigest}</StMono>} />
-      </StRows></StSection>
-    </StPage></StandaloneApplicationShell>
+      </div>
+    </StandaloneApplicationShell>
   </>;
+}
+
+/**
+ * Size the frame to the tool. The sandbox has no same-origin access, so the
+ * height can't always be read; then the frame keeps a calm default height.
+ */
+function fit(frame: HTMLIFrameElement) {
+  try {
+    const height = frame.contentDocument?.documentElement.scrollHeight;
+    if (height && height > 0) frame.style.height = `${Math.min(Math.max(height, 240), 4000)}px`;
+  } catch { /* cross-origin sandbox: keep the default height */ }
 }

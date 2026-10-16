@@ -108,7 +108,7 @@ tabular figures. Geist Mono is no longer loaded.
 
 `XaYes` is the only way a screen asks for a yes.
 
-1. **waiting.** The ink pill states the consequence. It reads "Put it live" by
+1. **waiting.** The ink pill states the consequence. It reads "Make it live" by
    default (`XA_YES_LABELS`). "Not yet" sits beside it as a quiet action. ⌘↵
    (or Ctrl+Enter) presses it from anywhere on the screen. If several are
    waiting, the newest owns the shortcut.
@@ -225,7 +225,8 @@ Each screen needs one dominant element and a reason to remember it.
    - The board says **Minutes**; GLOSSARY says Running and What changed.
      `app-frame-contract` used to list "Today" as retired. It now asserts the
      paper look keeps the old words and XA uses the board's.
-   - The board says **Put it live**; GLOSSARY says Make it live.
+   - The board says **Put it live**; GLOSSARY says Make it live. Settled
+     October 16: **Make it live** everywhere (`XA_YES_LABELS`).
    - The board says **Business record**, which GLOSSARY lists under Underneath.
 2. **Emails.** `src/platform/infra/email/paper-tokens.ts` still sets Geist Mono
    for metric values in email HTML. E1 and E3 are designs only and stay off

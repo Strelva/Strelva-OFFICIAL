@@ -307,7 +307,7 @@ textarea.fieldControl { min-height: 96px; resize: vertical; field-sizing: conten
 .fieldControl::placeholder { color: var(--st-faint); }
 .fieldControl:focus { outline: none; border-color: var(--st-accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--st-accent) 16%, transparent); }
 .fieldControl[aria-invalid="true"] { border-color: var(--st-critical); box-shadow: 0 0 0 3px color-mix(in srgb, var(--st-critical) 14%, transparent); }
-.fieldControl:disabled, .fieldControl:read-only { background: var(--st-inset); color: var(--st-text-2); }
+.fieldControl:disabled, input.fieldControl:read-only, textarea.fieldControl:read-only { background: var(--st-inset); color: var(--st-text-2); }
 .fieldControl:disabled { cursor: not-allowed; }
 .fieldHint { margin: 0; color: var(--st-text-2); font-size: 13px; line-height: 1.45; }
 .fieldHint[data-error="true"] { color: var(--st-critical); }
@@ -400,3 +400,28 @@ textarea.fieldControl { min-height: 96px; resize: vertical; field-sizing: conten
 .roll > span { display: inline-block; }
 .rollIn { animation: var(--kf-enter-float) var(--motion-fast) var(--ease-settle) both; }
 .headline[tabindex="-1"]:focus { outline: none; }
+
+/* ---------- Select (native, field skin) ---------- */
+.select { appearance: none; padding-right: 40px; cursor: pointer; }
+.field[data-compact="true"] .fieldControl { min-height: 40px; padding-block: 8px; font-size: 14px; }
+
+/* ---------- File drop (an object, Pebble holding the place) ---------- */
+.drop { display: flex; flex-direction: column; gap: 8px; }
+.dropTarget { box-sizing: border-box; display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 28px 24px 26px; border: 1.5px dashed var(--st-line-strong); border-radius: var(--st-r-xl); background: var(--st-surface); text-align: center; cursor: pointer; transition: border-color var(--motion-fast) var(--ease-settle), background-color var(--motion-fast) var(--ease-settle); }
+.drop[data-over="true"] .dropTarget { border-color: var(--st-accent); background: color-mix(in srgb, var(--st-accent) 6%, var(--st-surface)); }
+.drop[data-disabled="true"] .dropTarget { cursor: not-allowed; opacity: .6; }
+.drop:has(input:focus-visible) .dropTarget { outline: 2px solid var(--st-accent); outline-offset: 2px; }
+.dropTitle { color: var(--st-text); font-size: 17px; font-weight: 600; line-height: 24px; }
+.dropBody { max-width: 380px; color: var(--st-text-2); font-size: 14px; line-height: 1.45; }
+.dropButton { margin-top: 6px; color: var(--st-accent); font-size: 15px; font-weight: 500; }
+
+/* ---------- Fold (in place of <details>) ---------- */
+.fold { display: flex; flex-direction: column; gap: 12px; padding-top: 4px; }
+.foldButton { display: inline-flex; align-self: flex-start; align-items: center; gap: 6px; min-height: 36px; padding: 0; border: 0; background: none; color: var(--st-text); font: inherit; font-size: 15px; font-weight: 500; cursor: pointer; }
+.foldButton:hover { color: var(--st-accent); }
+.foldButton:focus-visible { outline: 2px solid var(--st-accent); outline-offset: 2px; border-radius: 4px; }
+.foldChevron { color: var(--st-text-3); transition: rotate var(--motion-fast) var(--ease-settle); }
+.foldButton[aria-expanded="true"] .foldChevron { rotate: 90deg; }
+.foldBody { display: flex; flex-direction: column; gap: 16px; }
+.foldBody[hidden] { display: none; }
+@media (prefers-reduced-motion: reduce) { .foldChevron { transition: none; } }

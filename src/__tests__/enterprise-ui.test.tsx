@@ -18,7 +18,8 @@ it("keeps live hierarchy data and archived command revision without inventing cl
   const request = vi.fn(async (_input: unknown, options?: RequestInit) => Response.json(options?.method === "POST" ? { ok: true } : view));
   vi.stubGlobal("fetch", request);
   const node = await render(createElement(Units, { organizationId: ORGANIZATION, businesses: [{ id: BUSINESS, name: "Clinic", role: "owner" }], canManage: true }));
-  expect(node.textContent).toContain("1 locations are unavailable");
+  expect(node.textContent).toContain("You can't see one location. Ask the owner to add you.");
+  expect(node.textContent).not.toMatch(/Structure grants no access|The organization itself/);
   expect(node.textContent).not.toContain("All live");
   await act(async () => ([...node.querySelectorAll("button")].find(button => button.textContent?.startsWith("Archive"))!).click());
   const post = request.mock.calls.find(call => call[1]?.method === "POST");
@@ -28,7 +29,7 @@ it("shows permission and no hierarchy controls when live read is denied", async 
   vi.stubGlobal("fetch", vi.fn(async () => Response.json({ error: "Denied" }, { status: 403 })));
   const node = await render(createElement(Units, { organizationId: ORGANIZATION, businesses: [], canManage: false }));
   expect(node.querySelector('[role="alert"]')).not.toBeNull();
-  expect(node.textContent).toContain("Only an organization owner");
+  expect(node.textContent).toContain("The owner changes locations.");
   expect(node.querySelector("form")).toBeNull();
 });
 it("push fixture requires the hold control and retains local intake differences", async () => {

@@ -129,9 +129,11 @@ describe("agency v2 document drafts", () => {
     pageIdentity.context.mockResolvedValue({ businessWorkspaceId: bindingId, businessName: "Harbor Dental", agencyName: "North Studio", websiteName: "Harbor website", personName: "maya@example.test" });
     const element=await AgencyManagedWebsiteDraftPage({params:Promise.resolve({bindingId})});
     expect(element.type).toBe(StrelvaShell);
-    expect(element.props.businessContext).toBe("North Studio → Harbor Dental → Harbor website");
-    const children = element.props.children as React.ReactElement[];
-    expect(isValidElement(children[1]) && children[1].type).toBe(AgencyManagedWebsiteDraftExperience);
+    // XA: the sidebar names the client; the page's crumbs carry Harbor Dental / website / Prepare an update.
+    expect(element.props.businessContext).toBe("Harbor Dental");
+    const child = element.props.children as React.ReactElement<{ businessName?: string }>;
+    expect(isValidElement(child) && child.type).toBe(AgencyManagedWebsiteDraftExperience);
+    expect(child.props.businessName).toBe("Harbor Dental");
     expect(fetchMock).not.toHaveBeenCalled();
   });
   it("explains the owner limitation for governance-blocked navigation scopes",async()=>{
@@ -146,6 +148,6 @@ describe("agency v2 document drafts", () => {
     vi.stubGlobal("fetch",vi.fn(async()=>new Response(JSON.stringify({grant:initial.grant,state:{tenantId:"fixture",section:"hero",revision:0,data:{headline:"Legacy headline"},dataHash:"a".repeat(32)},customerWebsiteHref:null}))));
     await mount({read:async()=>({...initial,website:null}),save:vi.fn()});
     expect(container.querySelector<HTMLInputElement>('#managed-website-hero-headline')!.value).toBe("Legacy headline");
-    expect(container.textContent).toContain("Prepare and save draft");
+    expect(container.textContent).toContain("Send to");
   });
 });

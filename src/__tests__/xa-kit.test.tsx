@@ -19,7 +19,7 @@ async function mount(element: ReactElement) {
 
 describe("XA kit", () => {
   it("marks exactly the primary pill and keeps buttons from deciding authority", () => {
-    const html = renderToStaticMarkup(createElement("div", null, createElement(XaButton, { variant: "primary" }, "Put it live"), createElement(XaButton, null, "See the page"), createElement(XaButton, { variant: "quiet" }, "Not yet")));
+    const html = renderToStaticMarkup(createElement("div", null, createElement(XaButton, { variant: "primary" }, "Make it live"), createElement(XaButton, null, "See the page"), createElement(XaButton, { variant: "quiet" }, "Not yet")));
     expect(html.match(/data-xa-primary/g)).toHaveLength(1);
     expect(html).toContain('type="button"');
   });
@@ -30,7 +30,7 @@ describe("XA kit", () => {
     await act(async () => { document.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", metaKey: true, bubbles: true })); });
     expect(second).toHaveBeenCalledOnce();
     expect(first).not.toHaveBeenCalled();
-    expect(document.body.textContent).toContain("Put it live");
+    expect(document.body.textContent).toContain("Make it live");
     expect(document.body.textContent).toContain("Not yet");
   });
 

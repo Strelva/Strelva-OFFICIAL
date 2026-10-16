@@ -4,7 +4,7 @@
  * the decision of XA · O3 (MdDX8), LX · Undo (N2cSZg); motion moments
  * "The yes" (oSFGc) and "Undo, with a visible window" (bjUNl).
  *
- * The ink pill says the consequence ("Make it live"); "Not yet" sits beside it
+ * The ink pill says the consequence ("Make it live", GLOSSARY); "Not yet" sits beside it
  * as a quiet action. ⌘↵ (Ctrl+Enter) presses it from anywhere on the screen
  * while it waits. The state flips at once; the Working trail then shows each
  * real step the caller reports; Live settles and Undo rises with a draining

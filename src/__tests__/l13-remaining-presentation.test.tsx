@@ -14,7 +14,7 @@ describe("L13 remaining page presentation", () => {
     expect(html).toContain("Find your home");
     expect(html).toContain("City, area or address");
     expect(html).toMatch(/<label for="[^"]+">City, area or address<\/label>/);
-    expect(html).toContain("Choose an area to see current, permitted listings.");
+    expect(html).toContain("Search an area to see homes for sale.");
     expect(html).not.toContain("Send inquiry");
     expect(request).not.toHaveBeenCalled();
   });

@@ -1,5 +1,6 @@
 import { StrelvaShell } from "@/experience/app-frame/StrelvaShell";
-import { StHead, StNotice, StPage } from "@/components/ui/strelva/Kit";
+import { XaEmpty } from "@/components/ui/strelva/Xa";
+import { XaCrumbs, XaOutside } from "@/components/ui/strelva/Xa";
 import { readAgencyWebsiteContext } from "@/platform/offerings/agency-website-context";
 import { AgencyWebsiteDocumentDraftExperience } from "@/experience/agency-website/AgencyWebsiteDocumentDraftExperience";
 
@@ -14,6 +15,11 @@ import { websiteRebuildReleaseEnabled, websiteRebuildReleaseEnabledForTenant, we
  * or `workspace` with the client's business row on. Unresolvable (signed out,
  * no grant, a failed read): the env-only rule decides, and the APIs behind
  * either experience still check the grant and the flag themselves.
+ *
+ * October 16 (XA): AgencyWebsiteDocumentDraftExperience still uses St kit
+ * internals and has not been rebuilt to the XA object layout. Keep the website
+ * rebuild release off for agency drafts until it is; the XA editor is
+ * AgencyManagedWebsiteDraftExperience below.
  */
 async function documentDraftReleased(bindingId: string): Promise<boolean> {
   if (!websiteRebuildReleaseMayBeOn()) return false;
@@ -32,7 +38,7 @@ export default async function AgencyManagedWebsiteDraftPage({ params }: { params
   const { bindingId } = await params;
   const actor = await workspaceHttpActor();
   const context = actor ? await readAgencyWebsiteContext(actor, bindingId).catch(() => null) : null;
-  if (!context) return <StPage><StHead title="Website preparation" /><StNotice tone="critical">Agency and client context could not be verified. Sign in with the assigned account and reopen this website from the client.</StNotice></StPage>;
-  const documentDraft = await documentDraftReleased(bindingId);
-  return <StrelvaShell title="" systemsReleased workspaceId={context.businessWorkspaceId} businessContext={`${context.agencyName} → ${context.businessName} → ${context.websiteName}`} accountName={context.personName} accountDetail="Agency access">{documentDraft ? null : <StPage><StHead title={context.websiteName} crumb={{ label: `Back to ${context.businessName}`, href: `/workspace?workspaceId=${encodeURIComponent(context.businessWorkspaceId)}` }} meta={`${context.agencyName} → ${context.businessName} → ${context.websiteName}`} /></StPage>}{documentDraft ? <AgencyWebsiteDocumentDraftExperience bindingId={bindingId} clientName={context.businessName} /> : <AgencyManagedWebsiteDraftExperience bindingId={bindingId} />}</StrelvaShell>;
+  if (!context) return <XaOutside from={null} label="Website preparation"><div role="alert"><XaEmpty pose="alone" title="This website couldn't be opened" job="Nothing on the client's website changed.">The agency and client couldn&apos;t be confirmed for your account. Sign in with the account you were assigned, then open this website from the client.</XaEmpty></div></XaOutside>;
+  const crumbs = <XaCrumbs items={[{ label: context.businessName, href: `/workspace?workspaceId=${encodeURIComponent(context.businessWorkspaceId)}` }, { label: context.websiteName }, { label: "Prepare an update" }]} />;
+  return <StrelvaShell title="" systemsReleased workspaceId={context.businessWorkspaceId} businessContext={context.businessName} accountName={context.personName} accountDetail="Agency access">{await documentDraftReleased(bindingId) ? <AgencyWebsiteDocumentDraftExperience bindingId={bindingId} clientName={context.businessName} /> : <AgencyManagedWebsiteDraftExperience bindingId={bindingId} businessName={context.businessName} crumbs={crumbs} />}</StrelvaShell>;
 }

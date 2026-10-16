@@ -2,8 +2,9 @@
 
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import { Button } from "@/components/ui/Button";
-import { TextArea, TextInput } from "@/components/ui/TextInput";
+import { XaButton, XaDecision, XaField, XaHeadline, XaStatus, XaSystemTile, XaTextArea, XaTextLink } from "@/components/ui/strelva/Xa";
+import { XaNote, XaObjectPage } from "@/components/ui/strelva/Xa";
+import styles from "@/experience/applications/application-use.module.css";
 
 const starter = `import { writeFile } from "node:fs/promises";
 
@@ -18,12 +19,18 @@ function cents(value: string): number | null {
   return Math.round(amount * 100);
 }
 
-export function CustomApplicationCreateExperience({ workspaceId, onSaved }: { workspaceId: string; onSaved?: (workId: string, recovery?: { maxAuthorizedCents: number; estimateCents: number | null }) => void }) {
+/**
+ * Making an internal tool from a build file. Only for the people who build:
+ * the business's agency, or an agency in its own workspace. Owners get
+ * CustomToolRequest instead, which asks their agency in plain words.
+ */
+export function CustomApplicationCreateExperience({ workspaceId, businessName = "this business", onSaved, request = fetch }: { workspaceId: string; businessName?: string; onSaved?: (workId: string, recovery?: { maxAuthorizedCents: number; estimateCents: number | null }) => void; request?: typeof fetch }) {
   const router = useRouter();
   const [title, setTitle] = useState("");
   const [source, setSource] = useState(starter);
   const [maximum, setMaximum] = useState("0");
   const [estimate, setEstimate] = useState("0");
+  const [estimateOpen, setEstimateOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
@@ -35,12 +42,12 @@ export function CustomApplicationCreateExperience({ workspaceId, onSaved }: { wo
     const maxAuthorizedCents = cents(maximum);
     const estimateCents = cents(estimate);
     if (maxAuthorizedCents === null || estimateCents === null || estimateCents > maxAuthorizedCents) {
-      setError("Enter an estimate at or below the maximum authorized budget.");
+      setError(maxAuthorizedCents === null ? "Write the stop amount as dollars, like 2.50." : "What you expect has to be at or below where the build stops.");
       setBusy(false);
       return;
     }
     try {
-      const response = await fetch("/api/custom-applications", {
+      const response = await request("/api/custom-applications", {
         method: "POST",
         headers: { Accept: "application/json", "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -90,26 +97,31 @@ export function CustomApplicationCreateExperience({ workspaceId, onSaved }: { wo
     }
   }
 
-  return (
-    <main className="mx-auto flex w-full max-w-4xl flex-col gap-8 px-4 py-8 text-warm-black sm:px-6 sm:py-12">
-      <header className="space-y-2">
-        <p className="text-xs uppercase tracking-[0.16em] text-gray-muted">Internal tool delivery</p>
-        <h1 className="font-display text-3xl font-medium sm:text-4xl">Create a local internal tool</h1>
-        <p className="max-w-2xl text-sm leading-6 text-gray-fg">Name the outcome, provide the build source, and authorize the maximum local build budget. The signed-in workspace owner becomes the named maintenance owner.</p>
-      </header>
-      <form className="space-y-6 rounded-2xl border border-gray-border bg-surface p-5 sm:p-7" onSubmit={submit}>
-        <TextInput label="System name" value={title} onChange={event => setTitle(event.target.value)} required maxLength={160} disabled={busy} />
-        <TextArea label="build.mjs" value={source} onChange={event => setSource(event.target.value)} required rows={10} disabled={busy} className="tabular-nums text-xs leading-5" helperText="The local builder must write the final HTML to /output/index.html. Network access is disabled." />
-        <div className="grid gap-4 sm:grid-cols-2">
-          <TextInput label="Maximum authorized budget (USD)" type="number" min="0" max="10000" step="0.01" value={maximum} onChange={event => setMaximum(event.target.value)} required disabled={busy} helperText="The build cannot exceed this amount." />
-          <TextInput label="Expected build cost (USD)" type="number" min="0" max="10000" step="0.01" value={estimate} onChange={event => setEstimate(event.target.value)} required disabled={busy} helperText="Use $0 when the local build has no reported cost." />
-        </div>
-        {error ? <p role="alert" className="rounded-xl border border-terra/30 bg-terra/5 p-3 text-sm text-terra">{error}</p> : null}
-        <div className="flex flex-wrap items-center gap-3">
-          <Button type="submit" loading={busy} disabled={!title.trim() || !source.trim()}>Create internal tool</Button>
-          <p className="text-xs leading-5 text-gray-muted">No external provider, paid model, or public deployment is started.</p>
+  const max = cents(maximum);
+  const costLine = max === null ? "Write the stop amount as dollars, like 2.50."
+    : `Strelva stops the build at ${dollars(max)}${max === 0 ? ", so it runs only if it costs nothing" : ""}. It counts toward ${businessName}'s usage this month.`;
+  const missing = !title.trim() ? "Name it first." : !source.trim() ? "Add the build file first." : "";
+  return <XaObjectPage label="Make an internal tool from code" phone="object-first"
+    head={<>
+      <XaSystemTile kind="form" size={48} label="Internal tool" />
+      <XaHeadline quiet={`${businessName} reviews it before anyone uses it.`}>A new internal tool, from your code.</XaHeadline>
+    </>}
+    story={<XaNote>The build runs on its own machine with no internet. It writes one page, and that page is the tool. You&apos;re named as the person who keeps it working.</XaNote>}
+    object={<XaDecision label="The internal tool" status={<XaStatus kind="draft">Draft</XaStatus>} meta={`${businessName} · Internal tool`} yes={null}>
+      <form className={styles.form} onSubmit={event => { if (missing) { event.preventDefault(); setError(missing); return; } void submit(event); }} aria-label="Make an internal tool" noValidate>
+        <XaField label="Name" value={title} onChange={event => setTitle(event.target.value)} required maxLength={160} disabled={busy} placeholder="Consultation planner" />
+        <XaTextArea label="Build file" value={source} onChange={event => setSource(event.target.value)} required rows={10} disabled={busy} spellCheck={false}
+          hint="It writes the finished page to /output/index.html." />
+        <XaField label="Stop the build at, in dollars" type="number" min="0" max="10000" step="0.01" inputMode="decimal" value={maximum} onChange={event => setMaximum(event.target.value)} required disabled={busy} hint={costLine} />
+        {estimateOpen ? <XaField label="You expect about, in dollars" type="number" min="0" max="10000" step="0.01" inputMode="decimal" value={estimate} onChange={event => setEstimate(event.target.value)} disabled={busy} hint="Shown beside the build so you can compare." />
+          : <p className={styles.quietLine}><XaTextLink onClick={() => setEstimateOpen(true)}>Add what you expect it to cost</XaTextLink></p>}
+        {error ? <XaNote tone="down" role="alert">{error}</XaNote> : null}
+        <div className={styles.actions}>
+          <XaButton type="submit" variant="primary" size="lg" busy={busy}>Make the internal tool</XaButton>
+          {missing ? <span className={styles.reason}>{missing}</span> : null}
         </div>
       </form>
-    </main>
-  );
+    </XaDecision>} />;
 }
+
+const dollars = (value: number) => `$${(value / 100).toFixed(2)}`;

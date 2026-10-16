@@ -16,6 +16,7 @@ const actorId = "a1000000-0000-4000-8000-000000000012";
 function fixture(state: OwnerRequestPreviewState): DeliveryInspection {
   return {
     actorId,
+    people: { askedBy: "Alex Rivera", operator: null, agency: null, viewerIsAgencyOperator: false },
     request: {
       id: requestId, businessId, status: "requested", revision: 3,
       request: "Keep the workshop’s service descriptions and contact details clear on a rebuilt website.",

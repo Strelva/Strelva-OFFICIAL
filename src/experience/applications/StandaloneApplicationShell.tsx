@@ -1,12 +1,17 @@
 "use client";
 
 import { createContext, useContext, type ReactNode } from "react";
+import { XaOutside } from "@/components/ui/strelva/Xa";
 
 export const StandaloneApplicationModeContext = createContext<"light" | "dark">("light");
-import styles from "./standalone-application.module.css";
 
-/** Recipient and delegated pages have their own paper, without workspace navigation. */
-export function StandaloneApplicationShell({ children }: { children: ReactNode }) {
+/**
+ * Recipient and delegated pages open from a link: their own paper, without
+ * workspace navigation (XA outside frame). `from` names the business or agency
+ * when the page knows it; otherwise the frame shows Strelva, which signed the
+ * person in.
+ */
+export function StandaloneApplicationShell({ children, from, meta }: { children: ReactNode; from?: string; meta?: ReactNode }) {
   const mode = useContext(StandaloneApplicationModeContext);
-  return <main data-dashboard data-workspace-theme="linen" data-workspace-mode={mode} className={styles.canvas}>{children}</main>;
+  return <XaOutside from={from ?? null} meta={meta} mode={mode} width="wide">{children}</XaOutside>;
 }

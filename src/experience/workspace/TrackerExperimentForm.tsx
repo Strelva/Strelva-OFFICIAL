@@ -2,8 +2,7 @@
 
 import { useState } from "react";
 import { z } from "zod";
-import { Button } from "@/components/ui/Button";
-import { SelectInput, TextInput, TextArea } from "@/components/ui/TextInput";
+import { XaBlock, XaButton, XaField, XaNote, XaSelect, XaTextArea, XaTextLink } from "@/components/ui/strelva/Xa";
 import {
   TRACKER_EXPERIMENT_MAX_CANDIDATES,
   trackerExperimentComparisonInputSchema,
@@ -89,18 +88,18 @@ function ExperimentOptionFields({
     { value: "failed", label: "Failed the stated checks" },
   ];
   return (
-    <fieldset className="space-y-3 rounded-lg border border-gray-border p-4">
-      <legend className="px-1 font-display text-lg text-warm-black">{labelPrefix}</legend>
+    <fieldset className="space-y-3 border-t border-[color:var(--st-line)] pt-4">
+      <legend className="px-1 text-[13px] font-medium text-[color:var(--st-text-3)]">{labelPrefix}</legend>
       <input type="hidden" name={`${prefix}-id`} value={kind === "baseline" ? "baseline" : `candidate-${index ?? 0}`} readOnly />
       <div className="grid gap-3 sm:grid-cols-2">
-        <TextInput
+        <XaField
           name={`${prefix}-label`}
           label={kind === "baseline" ? "Baseline approach" : "Candidate approach"}
           defaultValue={kind === "baseline" ? "Current manual process" : `Tracker candidate ${(index ?? 0) + 1}`}
           maxLength={160}
           required
         />
-        <TextInput
+        <XaField
           name={`${prefix}-version`}
           label={kind === "baseline" ? "Baseline version or date" : "Candidate version"}
           defaultValue={kind === "baseline" ? "current" : "v1"}
@@ -109,18 +108,18 @@ function ExperimentOptionFields({
         />
       </div>
       {kind === "baseline" ? (
-        <TextInput
+        <XaField
           name="baselineMinutes"
           label="Previous approach, minutes"
           type="number"
           min={0}
           max={100000}
           step="any"
-          helperText="Optional total-time reference. The breakdown below is used when it is filled in."
+          hint="Optional total-time reference. The breakdown below is used when it is filled in."
         />
       ) : null}
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-        <TextInput
+        <XaField
           name={`${prefix}-setupMinutes`}
           label={isFirstCandidate ? "Setup, minutes" : `${labelPrefix} setup, minutes`}
           type="number"
@@ -130,7 +129,7 @@ function ExperimentOptionFields({
           defaultValue="0"
           required
         />
-        <TextInput
+        <XaField
           name={`${prefix}-reviewMinutes`}
           label={isFirstCandidate ? "Review, minutes" : `${labelPrefix} review, minutes`}
           type="number"
@@ -140,7 +139,7 @@ function ExperimentOptionFields({
           defaultValue="0"
           required
         />
-        <TextInput
+        <XaField
           name={`${prefix}-correctionMinutes`}
           label={isFirstCandidate ? "Corrections, minutes" : `${labelPrefix} corrections, minutes`}
           type="number"
@@ -150,7 +149,7 @@ function ExperimentOptionFields({
           defaultValue="0"
           required
         />
-        <TextInput
+        <XaField
           name={`${prefix}-supportMinutes`}
           label={kind === "baseline" ? "Baseline support, minutes" : isFirstCandidate ? "Support, minutes" : `${labelPrefix} support, minutes`}
           type="number"
@@ -160,7 +159,7 @@ function ExperimentOptionFields({
           defaultValue="0"
           required
         />
-        <TextInput
+        <XaField
           name={`${prefix}-maintenanceMinutes`}
           label={kind === "baseline" ? "Baseline maintenance, minutes" : isFirstCandidate ? "Maintenance, minutes" : `${labelPrefix} maintenance, minutes`}
           type="number"
@@ -172,7 +171,7 @@ function ExperimentOptionFields({
         />
       </div>
       <div className="grid gap-3 sm:grid-cols-2">
-        <TextInput
+        <XaField
           name={`${prefix}-providerCostUsd`}
           label={kind === "baseline" ? "Baseline provider cost, USD (leave blank if unknown)" : isFirstCandidate ? "Provider cost, USD (leave blank if unknown)" : `${labelPrefix} provider cost, USD (leave blank if unknown)`}
           type="number"
@@ -180,7 +179,7 @@ function ExperimentOptionFields({
           max={100000}
           step="any"
         />
-        <SelectInput
+        <XaSelect
           name={`${prefix}-result`}
           label={kind === "baseline" ? "Baseline check result" : `${labelPrefix} check result`}
           options={resultOptions}
@@ -196,6 +195,7 @@ export function TrackerExperimentForm({ workId, expectedRevision, readOnly = fal
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [failed, setFailed] = useState(false);
+  const [open, setOpen] = useState(false);
 
   async function record(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -264,22 +264,21 @@ export function TrackerExperimentForm({ workId, expectedRevision, readOnly = fal
     }
   }
 
-  if (readOnly) return <p role="note" className="border-t border-gray-border pt-4 text-sm text-gray-muted">Experiment records require workspace membership.</p>;
+  if (readOnly) return <XaNote>Comparisons are recorded by members of this business.</XaNote>;
 
   return (
-    <details className="border-t border-gray-border pt-4">
-      <summary className="cursor-pointer text-sm">Internal R&amp;D: record an experiment</summary>
-      <form onSubmit={(event) => void record(event)} className="mt-4 space-y-5">
+    <XaBlock label="Strelva staff: compare ways of doing this job" action={<XaTextLink onClick={() => setOpen(value => !value)}>{open ? "Hide" : "Record a comparison"}</XaTextLink>}>
+      {open ? <form onSubmit={(event) => void record(event)} className="space-y-5">
         <div className="space-y-3">
-          <TextInput label="What are we testing?" name="hypothesis" required maxLength={1000} disabled={busy} />
-          <TextInput label="Workload and comparison method" name="workload" helperText="Describe the same job, rows or cases each option receives." required maxLength={1000} disabled={busy} />
-          <TextInput label="Input scope" name="inputScope" defaultValue="The same saved tracker revision and imported rows" required maxLength={1000} disabled={busy} />
-          <TextInput label="Workload key (optional)" name="workloadKey" helperText="Use a stable fixture or sample ID when one exists." maxLength={160} disabled={busy} />
+          <XaField label="What are we testing?" name="hypothesis" required maxLength={1000} disabled={busy} />
+          <XaField label="Workload and comparison method" name="workload" hint="Describe the same job, rows or cases each option receives." required maxLength={1000} disabled={busy} />
+          <XaField label="Input scope" name="inputScope" defaultValue="The same saved tracker revision and imported rows" required maxLength={1000} disabled={busy} />
+          <XaField label="Workload key (optional)" name="workloadKey" hint="Use a stable fixture or sample ID when one exists." maxLength={160} disabled={busy} />
         </div>
 
         <section aria-labelledby="tracker-experiment-baseline-title" className="space-y-3">
           <div>
-            <h2 id="tracker-experiment-baseline-title" className="font-display text-lg text-warm-black">Explicit baseline</h2>
+            <h2 id="tracker-experiment-baseline-title" className="text-[13px] font-medium leading-[18px] text-[color:var(--st-text-3)]">Explicit baseline</h2>
             <p className="text-sm text-gray-muted">Record the reference approach and include the human effort needed to support and maintain it.</p>
           </div>
           <ExperimentOptionFields kind="baseline" />
@@ -288,11 +287,11 @@ export function TrackerExperimentForm({ workId, expectedRevision, readOnly = fal
         <section aria-labelledby="tracker-experiment-candidates-title" className="space-y-3">
           <div className="flex flex-wrap items-baseline justify-between gap-3">
             <div>
-              <h2 id="tracker-experiment-candidates-title" className="font-display text-lg text-warm-black">Candidates</h2>
+              <h2 id="tracker-experiment-candidates-title" className="text-[13px] font-medium leading-[18px] text-[color:var(--st-text-3)]">Candidates</h2>
               <p className="text-sm text-gray-muted">Each candidate runs against the same workload. Costs left blank stay unknown.</p>
             </div>
             <div className="flex gap-2">
-              <Button
+              <XaButton
                 type="button"
                 variant="secondary"
                 size="sm"
@@ -300,16 +299,16 @@ export function TrackerExperimentForm({ workId, expectedRevision, readOnly = fal
                 disabled={busy || candidateCount >= TRACKER_EXPERIMENT_MAX_CANDIDATES}
               >
                 Add candidate
-              </Button>
-              <Button
+              </XaButton>
+              <XaButton
                 type="button"
-                variant="ghost"
+                variant="quiet"
                 size="sm"
                 onClick={() => setCandidateCount((current) => Math.max(1, current - 1))}
                 disabled={busy || candidateCount <= 1}
               >
                 Remove last
-              </Button>
+              </XaButton>
             </div>
           </div>
           <div className="space-y-3">
@@ -318,8 +317,8 @@ export function TrackerExperimentForm({ workId, expectedRevision, readOnly = fal
         </section>
 
         <section aria-labelledby="tracker-experiment-evidence-title" className="space-y-3">
-          <h2 id="tracker-experiment-evidence-title" className="font-display text-lg text-warm-black">Evidence and decision</h2>
-          <SelectInput
+          <h2 id="tracker-experiment-evidence-title" className="text-[13px] font-medium leading-[18px] text-[color:var(--st-text-3)]">Evidence and decision</h2>
+          <XaSelect
             name="evidenceKind"
             label="Evidence type"
             options={evidenceOptions}
@@ -327,15 +326,15 @@ export function TrackerExperimentForm({ workId, expectedRevision, readOnly = fal
             disabled={busy}
           />
           <p className="text-sm text-gray-muted">Simulated and operator-reported evidence helps plan the next test. Measured evidence needs a repeatable source or instrument.</p>
-          <TextArea label="Checks, evidence and failures" name="evidence" required maxLength={2000} disabled={busy} />
-          <TextArea label="Test failures (one per line, optional)" name="testFailures" maxLength={10000} disabled={busy} />
-          <SelectInput name="decision" label="Decision" options={decisionOptions} defaultValue="needs_more_evidence" disabled={busy} />
+          <XaTextArea label="Checks, evidence and failures" name="evidence" required maxLength={2000} disabled={busy} />
+          <XaTextArea label="Test failures (one per line, optional)" name="testFailures" maxLength={10000} disabled={busy} />
+          <XaSelect name="decision" label="Decision" options={decisionOptions} defaultValue="needs_more_evidence" disabled={busy} />
           <p className="text-sm text-gray-muted">Recording a comparison keeps it experimental. It never promotes or publishes an offering.</p>
         </section>
 
-        <Button type="submit" disabled={busy}>{busy ? "Recording…" : "Record experiment"}</Button>
+        <div><XaButton type="submit" variant="secondary" busy={busy}>Record experiment</XaButton></div>
         {message ? <p role={failed ? "alert" : "status"} aria-live={failed ? "assertive" : "polite"} aria-atomic="true" className="text-sm">{message}</p> : null}
-      </form>
-    </details>
+      </form> : null}
+    </XaBlock>
   );
 }

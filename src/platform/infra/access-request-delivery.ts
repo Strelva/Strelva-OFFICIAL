@@ -84,6 +84,7 @@ function coerceLead(value: unknown): DeliveryLead | null {
   return {
     businessName: record.businessName,
     ...(record.agencyWorkspaceId != null ? { agencyWorkspaceId: typeof record.agencyWorkspaceId === "string" ? record.agencyWorkspaceId : "invalid" } : {}),
+    ...(typeof record.agencyName === "string" && record.agencyName.trim() ? { agencyName: record.agencyName.trim().slice(0, 120) } : {}),
     ...(record.requestType != null ? { requestType: typeof record.requestType === "string" ? record.requestType : "invalid" } : {}),
     ...(record.conversion && typeof record.conversion === "object" ? { conversion: record.conversion as DeliveryLead["conversion"] } : {}),
     description: typeof record.description === "string" ? record.description : null,

@@ -2,8 +2,8 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { keepPageTitle } from "@/platform/presentation/page-title";
-import { StEmpty, StHead, StNotice, StPage, StPill, StPillLink, StSkeleton } from "@/components/ui/strelva/Kit";
 import { StandaloneApplicationShell } from "./StandaloneApplicationShell";
+import { ToolClosed, ToolOpening } from "./ToolStates";
 import { useWorkspaceRequest } from "@/experience/workspace/WorkspaceRequest";
 import {
   ApplicationUseRenderer,
@@ -42,13 +42,8 @@ function responseDetail(body: unknown): string | undefined {
 }
 
 function ErrorSurface({ kind, message, onRetry, signInHref }: { kind: "denied" | "error"; message: string; onRetry?: () => void; signInHref?: string }) {
-  return <StandaloneApplicationShell><StPage>
-    <StHead title={kind === "denied" ? "This internal tool link is unavailable" : "Strelva could not open this internal tool"} />
-    <div role="alert"><StNotice tone={kind === "denied" ? "need" : "critical"}>{message}</StNotice></div>
-    {signInHref ? <div><StPillLink href={signInHref}>Sign in</StPillLink></div> : null}
-    {kind === "denied" && !signInHref ? <StEmpty>Ask the person who sent this link to issue a new one if you still need access.</StEmpty> : null}
-    {onRetry ? <div><StPill variant="soft" onClick={onRetry}>Try again</StPill></div> : null}
-  </StPage></StandaloneApplicationShell>;
+  return <ToolClosed kind={kind} title={kind === "denied" ? "This internal tool link is unavailable" : "Strelva could not open this internal tool"} signInHref={signInHref} onRetry={onRetry}
+    message={kind === "denied" && !signInHref ? `${message} Ask the person who sent it for a new link if you still need access.` : message} />;
 }
 
 export function ApplicationUseExperience({ workId }: { workId: string }) {
@@ -156,7 +151,7 @@ export function ApplicationUseExperience({ workId }: { workId: string }) {
   useEffect(() => keepPageTitle(pageTitle), [pageTitle]);
 
   if (state === "loading") {
-    return <StandaloneApplicationShell><StPage><StHead title="Opening internal tool…" /><StSkeleton label="Opening internal tool" /><StSkeleton width="60%" /></StPage></StandaloneApplicationShell>;
+    return <ToolOpening />;
   }
   if (state === "denied") return <ErrorSurface kind="denied" message={deniedMessage} signInHref={signInHref} />;
   if (state === "error" || !snapshot) return <ErrorSurface kind="error" message="This internal tool could not be opened right now." onRetry={() => void load()} />;

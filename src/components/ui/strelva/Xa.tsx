@@ -14,9 +14,10 @@ export { XA_POSES, XA_SYSTEM_KINDS, XaAddTile, XaPebbleAvatar, XaPebbleScene, Xa
 export { XaComposer, XaWaiting, type XaComposerScope, type XaComposerSystem, type XaWaitingItem } from "./xa/composer";
 export { XaStream, XaWorking, type XaWorkingStep } from "./xa/working";
 export { XaDecision, XaUndo, XaUndoDock, XaYes, type XaYesState } from "./xa/yes";
-export { XaAnswers, XaEmpty, XaHeadline, XaLabel, XaLede, XaLines, XaPage, XaPageChange, XaRow, XaRows, XaSays, XaSheet } from "./xa/surfaces";
-export { XaChoices, XaDoors, XaField, XaSegmented, XaSelect, XaTextArea, type XaOption } from "./xa/inputs";
+export { XaAnswers, XaEmpty, XaFold, XaHeadline, XaLabel, XaLede, XaLines, XaPage, XaPageChange, XaRow, XaRows, XaSays, XaSheet } from "./xa/surfaces";
+export { XaChoices, XaDoors, XaField, XaFileDrop, XaSegmented, XaSelect, XaTextArea, type XaOption } from "./xa/inputs";
 export { XaCollapse, XaGlideList, XaRollingCount } from "./xa/motion";
+export { XaBlock, XaChanges, XaCrumbs, XaFigure, XaNote, XaObjectPage, XaOutside, XaSteps } from "./xa/object";
 export { StComposerDock as XaComposerDock } from "./Kit";
 export { XaEntry, XaEntryBrand, XaEntryBrokenLink, XaEntryCaption, XaEntryDoors, XaEntryFelt, XaEntryFrame, XaEntryNote, XaEntryPebbleLine, XaEntryStack, XaEntrySteps, type XaEntryStage } from "./xa/entry";
 export { XaChecklist, type XaChecklistItem } from "./xa/checklist";

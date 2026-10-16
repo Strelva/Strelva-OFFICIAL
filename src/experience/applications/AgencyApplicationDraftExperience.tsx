@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { StEmpty, StHead, StNotice, StPage, StPill, StSkeleton } from "@/components/ui/strelva/Kit";
+import { useEffect, useState, type ReactNode } from "react";
+import { XaButton, XaEmpty, XaWorking } from "@/components/ui/strelva/Xa";
+import { XaObjectPage } from "@/components/ui/strelva/Xa";
+import { AgencyToolDraft, type AgencyToolDraftContext } from "./AgencyToolDraft";
 import { StandaloneApplicationShell } from "./StandaloneApplicationShell";
 import { useWorkspaceRequest } from "@/experience/workspace/WorkspaceRequest";
-import { BoundedWorkExperience } from "@/experience/operations/BoundedWorkExperience";
 import { agencyApplicationDraftGrantSchema, type AgencyApplicationDraftGrant } from "@/platform/offerings/agency-application-draft-contracts";
 
 function message(body: unknown): string {
@@ -12,7 +13,12 @@ function message(body: unknown): string {
   return "Draft access could not be confirmed.";
 }
 
-export function AgencyApplicationDraftExperience({ workId }: { workId: string }) {
+/**
+ * The agency's internal tool draft. With `context` (read on the server) it
+ * sits inside the agency shell and names the client, owner and person; the
+ * outside frame is only for a page whose context couldn't be confirmed.
+ */
+export function AgencyApplicationDraftExperience({ workId, context }: { workId: string; context?: AgencyToolDraftContext | null }) {
   const request = useWorkspaceRequest();
   const [grant, setGrant] = useState<AgencyApplicationDraftGrant | null>(null);
   const [busy, setBusy] = useState(true);
@@ -44,11 +50,11 @@ export function AgencyApplicationDraftExperience({ workId }: { workId: string })
   }, [request, reload, workId]);
 
   const active = now !== null && grant?.status === "active" && Number.isFinite(Date.parse(grant.expiresAt)) && Date.parse(grant.expiresAt) > now;
-  return <StandaloneApplicationShell><StPage>
-    {busy ? <><StHead title="Opening internal tool draft…" /><StSkeleton label="Checking the current draft permission" /></> : null}
-    {error ? <><div role="alert"><StNotice tone="critical">{error}</StNotice></div><div><StPill variant="soft" onClick={() => { setBusy(true); setError(""); setReload(value => value + 1); }}>Reload permission</StPill></div></> : null}
-    {!busy && !error && !active ? <StNotice tone="need">The client has not granted draft editing for this internal tool, or the grant has expired or been revoked. You can inspect the assigned work when its delivery is active, but you cannot save a draft revision.</StNotice> : null}
-    {!busy ? <BoundedWorkExperience workspaceId="assigned" workId={workId} productId="applications" standaloneApplication readOnly={!active} draftEditOnly={active} canEdit={active} sources={[]} onSaved={() => undefined} /> : null}
-    {!busy && !error && active ? <StEmpty>The client reviews and publishes changes. This access is limited to the internal tool named by the accepted delivery and assignment.</StEmpty> : null}
-  </StPage></StandaloneApplicationShell>;
+  const until = grant ? new Date(grant.expiresAt).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : null;
+  const frame = (node: ReactNode) => context ? node : <StandaloneApplicationShell>{node}</StandaloneApplicationShell>;
+  const shown: AgencyToolDraftContext = context ?? { businessName: "your client", ownerName: null, agencyName: "your agency", personName: "you" };
+  if (busy) return frame(<XaObjectPage story={<XaWorking title="Opening the draft" steps={[{ id: "grant", label: `Checking that ${shown.businessName} opened it to you`, state: "active" }]} />} />);
+  if (error) return frame(<XaObjectPage story={<div role="alert"><XaEmpty pose="fixing" title="Your permission for this draft couldn't be read" job={`Nothing was saved. The draft is as ${shown.businessName} left it.`}
+    action={<XaButton variant="primary" size="lg" onClick={() => { setBusy(true); setError(""); setReload(value => value + 1); }}>Try again</XaButton>}>{error}</XaEmpty></div>} />);
+  return frame(<AgencyToolDraft workId={workId} context={shown} canEdit={active} until={active ? until : null} />);
 }

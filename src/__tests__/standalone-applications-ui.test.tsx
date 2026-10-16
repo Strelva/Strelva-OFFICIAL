@@ -88,7 +88,9 @@ describe("standalone recipient and delegated application surfaces", () => {
     expect(container.querySelector("iframe")?.getAttribute("sandbox")).toBe("allow-scripts allow-forms");
     expect(container.querySelector("iframe")?.getAttribute("referrerpolicy")).toBe("no-referrer");
     expect(document.querySelector('meta[http-equiv="Content-Security-Policy"]')?.getAttribute("content")).toBe(CUSTOM_APPLICATION_PARENT_CSP);
-    expect(container.textContent).toContain("reviewed-digest");
+    // The reviewed build stays traceable without showing an id to the person using the tool.
+    expect(container.querySelector("[data-artifact-digest]")?.getAttribute("data-artifact-digest")).toBe("reviewed-digest");
+    expect(container.textContent).not.toContain("reviewed-digest");
     expect(container.querySelector('[aria-label="Ask Strelva"]')).toBeNull();
   });
   it.each(["native", "custom", "agency"] as const)("shows %s loading and denied states without an Ask write path", async kind => {
@@ -99,25 +101,25 @@ describe("standalone recipient and delegated application surfaces", () => {
     expect(container.querySelector('[role="alert"]')).not.toBeNull();
     expect(container.querySelector('[aria-label="Ask Strelva"]')).toBeNull();
   });
-  it("preserves current agency records when draft editing is not granted", async () => {
+  it("keeps a draft without permission readable, with no way to send it", async () => {
     await act(async () => root.render(createElement(L13Applications, { kind: "agency", state: "read-only", mode: "light" })));
-    expect(container.textContent).toContain("Read-only access");
-    expect(container.textContent).toContain("Commercial lease dispute, two parties");
-    expect(button("Save new draft")).toBeUndefined();
+    expect(container.textContent).toContain("hasn't opened this draft to you");
+    expect([...container.querySelectorAll("button")].some(item => item.textContent?.startsWith("Send to"))).toBe(false);
     expect(button("Make it live")).toBeUndefined();
-    expect(container.querySelector("form")).toBeNull();
+    expect([...container.querySelectorAll<HTMLInputElement>('input[aria-label^="Question"]')].every(input => input.disabled)).toBe(true);
   });
-  it("limits the agency draft editor to checks and revisions and keeps save input clocks", async () => {
+  it("edits the questions in place beside the tool, with one ink yes that sends to the client", async () => {
     await act(async () => root.render(createElement(L13Applications, { kind: "agency", state: "ready", mode: "light" })));
-    expect(container.textContent).toContain("Draft editing only");
-    expect(button("Check proposed change")).toBeDefined();
-    expect(button("Save new draft").disabled).toBe(true);
+    expect(container.textContent).toContain("A draft, prepared by you.");
+    expect(container.querySelectorAll("[data-xa-primary]")).toHaveLength(1);
+    const send = () => [...container.querySelectorAll<HTMLButtonElement>("button")].find(item => item.textContent?.startsWith("Send to"))!;
+    expect(send()).toBeDefined();
     expect(button("Make it live")).toBeUndefined();
-    const name = container.querySelector<HTMLInputElement>('input[id][value="Mediation intake"]')!;
-    await act(async () => { Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(name, "Updated mediation intake"); name.dispatchEvent(new Event("input", { bubbles: true })); });
-    expect(button("Save new draft").disabled).toBe(false);
-    await act(async () => button("Save new draft").click());
+    const question = container.querySelector<HTMLInputElement>('input[aria-label="Question 1"]')!;
+    await act(async () => { Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(question, "Full legal name"); question.dispatchEvent(new Event("input", { bubbles: true })); });
+    expect([...container.querySelectorAll("label")].some(label => label.textContent?.includes("Full legal name"))).toBe(true);
+    await act(async () => send().click());
     expect(container.textContent).toContain("This fictional preview does not save changes");
-    expect(container.querySelector<HTMLInputElement>('input[id][value="Updated mediation intake"]')).not.toBeNull();
+    expect(container.querySelector<HTMLInputElement>('input[aria-label="Question 1"]')!.value).toBe("Full legal name");
   });
 });

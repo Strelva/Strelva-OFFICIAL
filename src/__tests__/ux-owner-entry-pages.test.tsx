@@ -42,7 +42,7 @@ describe("saved booking creation entry",()=>{
   mock.website.mockResolvedValue(false);
   mock.history.mockResolvedValue({mine:true,messages:[{id:messageId,role:"user",content:"Add a booking page for consultations"}]});
   const html=renderToStaticMarkup(await BookingAskPage({searchParams:Promise.resolve(input)}));
-  expect(html).toContain("Add a booking page for consultations");expect(html).toContain("Save availability");expect(html).not.toContain("Prepare a website");
+  expect(html).toContain("Add a booking page for consultations");expect(html).toContain("Keep this time");expect(html).not.toContain("Prepare a website");
   expect(mock.website).not.toHaveBeenCalled();
  });
  it.each(["stopped","exit_unknown","systems_off","not_mine"])("holds native creation for %s",async state=>{

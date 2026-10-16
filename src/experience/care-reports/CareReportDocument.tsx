@@ -1,25 +1,33 @@
-import { StCopy, StHead, StMono, StRow, StRows, StSection, StState, StTextButton } from "@/components/ui/strelva/Kit";
+import type { ReactNode } from "react";
+import { XaHeadline, XaInitial, XaStatus, XaTextLink } from "@/components/ui/strelva/Xa";
 import type { OwnerBrand } from "@/platform/infra/agency-brand";
 import { BUSINESS_EFFORT_CATEGORY_LABELS, type BusinessEffortCategory } from "@/platform/business-effort/types";
-import type { CareCheck, CareReportFacts } from "@/platform/care-reports/contracts";
+import type { CareReportFacts } from "@/platform/care-reports/contracts";
 import {
-  CARE_CHECK_LABEL, careChangeTitle, careHeadline, careOutcomeLine, careReleaseLabel, careReportTitle, careShortDate, careSiteCheckLines, careTimeLabel, careUsageLine,
+  careCheckException, careHeadline, careOutcomeLine, careReleaseLabel, careReportTitle, careShortDate, careSiteCheckSentence, careTimeLabel,
 } from "@/platform/care-reports/model";
 import { PrintDocumentButton } from "@/experience/workspace/billing/PrintDocumentButton";
 import { DOCUMENT_PRINT_CSS } from "@/experience/workspace/billing/print";
+import { XaBlock, XaChanges, XaFigure, XaNote } from "@/components/ui/strelva/Xa";
+import styles from "./care-report.module.css";
 
-const CHECK_KIND = { confirmed: "live", not_confirmed: "need", not_checked: "draft" } as const satisfies Record<CareCheck, "live" | "need" | "draft">;
 const plural = (n: number, one: string, many: string) => `${n.toLocaleString("en-US")} ${n === 1 ? one : many}`;
 
 export type CareReportDocumentSnapshot = CareReportFacts & { agencyNote?: string | null };
 
 /**
- * One month's report for one client, as a printable page. Server-renderable.
- * The agency's name comes from a live brand read passed in by the page, never
- * from the stored snapshot, so a renamed agency or an unavailable identity shows
- * as it is now.
+ * One month's Care plan report for one client, as one printable page (XA, in
+ * the voice of E3: one figure that matters, then what changed and who did it).
+ * Server-renderable. The agency's name comes from a live brand read passed in
+ * by the page, never from the stored snapshot, so a renamed agency or an
+ * unavailable identity shows as it is now.
  */
-export function CareReportDocument({ snapshot, brand, releaseNumber, releases, releaseHref, back }: {
+/** The owner's and the shared page: one calm column with the report as its object. */
+export function CareReportColumn({ children }: { children: ReactNode }) {
+  return <div className={styles.column}>{children}</div>;
+}
+
+export function CareReportDocument({ snapshot, brand, releaseNumber, releases, releaseHref, back, audience, flat = false }: {
   snapshot: CareReportDocumentSnapshot;
   brand: OwnerBrand;
   releaseNumber: number | null;
@@ -27,56 +35,66 @@ export function CareReportDocument({ snapshot, brand, releaseNumber, releases, r
   releaseHref?: (number: number) => string;
   back?: { label: string; href: string };
   audience: "agency" | "owner" | "shared";
+  /** Inside the agency's decision panel the panel is the page. */
+  flat?: boolean;
 }) {
   const { changes, requests, time } = snapshot;
   const note = snapshot.agencyNote?.trim();
   const categories = Object.entries(time.byCategory).filter(([, minutes]) => minutes > 0);
-  const earlier = releases && releases.length > 1 ? releases : null;
-  return <>
+  // Only Releases shared before the one on screen; a draft lists every shared one.
+  const earlier = releases?.filter(item => releaseNumber === null || item.number < releaseNumber) ?? [];
+  return <>{back ? <div data-print-hide className={styles.back}><XaTextLink href={back.href}>{back.label}</XaTextLink></div> : null}<article className={styles.report} data-flat={flat || undefined} aria-label={`${careReportTitle(snapshot)} for ${snapshot.business.name}`}>
     <style>{DOCUMENT_PRINT_CSS}</style>
-    {back ? <div data-print-hide><StTextButton href={back.href}>{back.label}</StTextButton></div> : null}
-    <StHead title={careReportTitle(snapshot)} meta={`${snapshot.business.name} · ${releaseNumber ? careReleaseLabel(releaseNumber) : "Draft, not shared"}`} />
-    <p className="flex items-center gap-2 text-sm">
-      {brand.logoUrl ? <img src={brand.logoUrl} alt="" className="size-6 object-contain" /> : null}
-      <span>{`Prepared by ${brand.name}`}</span>
-      <StCopy muted>Runs on Strelva</StCopy>
-    </p>
-    {note ? <StSection title={`A note from ${brand.name}`}><StCopy>{note}</StCopy></StSection> : null}
-    <StCopy>{careHeadline(snapshot)}</StCopy>
-    <StSection title="Checked changes">
-      {changes.items.length ? <StRows label="Changes">
-        {changes.items.map(item => <StRow key={`${item.systemId}-${item.release}`} title={careChangeTitle(item)}
-          detail={[item.summary, careShortDate(item.at)].filter(Boolean).join(" · ")}
-          end={<StState kind={CHECK_KIND[item.check]}>{CARE_CHECK_LABEL[item.check]}</StState>} />)}
-      </StRows> : <StCopy muted>No Releases were recorded this month.</StCopy>}
-      {changes.notChecked > 0 ? <StCopy muted>{plural(changes.notChecked, "change wasn't", "changes weren't")} checked on the live site.</StCopy> : null}
-    </StSection>
-    <StSection title="Requests">
-      {requests.done.length ? <StRows label="Requests done">
-        {requests.done.map(item => <StRow key={item.id} title={item.request} end={<StMono>Done {careShortDate(item.doneAt)}</StMono>} />)}
-      </StRows> : <StCopy muted>No Requests were done this month.</StCopy>}
-      <StCopy muted>{requests.openCount.toLocaleString("en-US")} open · {requests.askedCount.toLocaleString("en-US")} asked this month</StCopy>
-    </StSection>
-    <StSection title="Inquiries and bookings"><StCopy>{careOutcomeLine(snapshot.outcomes)}</StCopy></StSection>
-    <StSection title="Site checks">
-      <StRows label="Site checks">{careSiteCheckLines(snapshot.siteChecks).map(line => <StRow key={line} title={line} />)}</StRows>
-    </StSection>
-    <StSection title="Time recorded">
-      {time.minutes > 0 ? <>
-        <StCopy>{careTimeLabel(time.minutes)} across {plural(time.entries, "entry", "entries")}</StCopy>
-        <StRows label="Time by kind of work">
-          {categories.map(([category, minutes]) => <StRow key={category} title={BUSINESS_EFFORT_CATEGORY_LABELS[category as BusinessEffortCategory] ?? category} end={<StMono>{careTimeLabel(minutes)}</StMono>} />)}
-        </StRows>
-      </> : <StCopy muted>No time recorded by {brand.name} this month.</StCopy>}
-    </StSection>
-    <StSection title="Strelva assistant"><StCopy>{careUsageLine(snapshot.usage)}</StCopy></StSection>
-    {earlier && releaseHref ? <div data-print-hide><StSection title="Earlier Releases">
-      <StRows label="Releases of this report">
-        {earlier.map(item => <StRow key={item.number} title={careReleaseLabel(item.number)} detail={`Shared ${careShortDate(item.publishedAt)}`}
-          href={releaseHref(item.number)} selected={item.number === releaseNumber} />)}
-      </StRows>
-    </StSection></div> : null}
-    <StCopy muted>Counts come from records Strelva keeps. A dash or &quot;not checked&quot; means unavailable, not zero.</StCopy>
-    <div data-print-hide><PrintDocumentButton /></div>
-  </>;
+    <header className={styles.head}>
+      {audience === "shared" ? null : <p className={styles.byline}>
+        {brand.logoUrl ? <img src={brand.logoUrl} alt="" className={styles.logo} /> : <XaInitial name={brand.name} color={brand.accentColor} size={28} />}
+        <span className={styles.bylineName}>{brand.name}</span>
+        <span className={styles.credit}>Runs on Strelva</span>
+      </p>}
+      <XaHeadline quiet={releaseNumber ? `${snapshot.business.name} · ${careReleaseLabel(releaseNumber)}` : snapshot.business.name}>{careReportTitle(snapshot)}</XaHeadline>
+    </header>
+
+    {/* The month's number, held up by Pebble with the client's Systems (E3). */}
+    <div className={styles.figureRow}>
+      <img className={styles.lineup} src="/xa/pose-lineup.webp" width={220} height={120} alt={`Pebble and ${snapshot.business.name}'s Systems`} />
+      <XaFigure value={changes.total.toLocaleString("en-US")} label={changes.total === 1 ? "change made this month" : "changes made this month"} detail={careHeadline(snapshot)} />
+    </div>
+
+    {note ? <div className={styles.note}><XaInitial name={brand.name} color={brand.accentColor} size={28} shape="round" /><p><span className={styles.noteFrom}>{brand.name}</span> {note}</p></div> : null}
+
+    <XaBlock label="What changed">
+      {changes.items.length ? <XaChanges label="What changed" rows={changes.items.map(item => {
+        const exception = careCheckException(item.check);
+        return { key: `${item.systemId}-${item.release}`, when: careShortDate(item.at), dateTime: item.at,
+          text: item.summary || item.systemName,
+          who: exception ? <XaStatus kind="waits" size="sm">{exception}</XaStatus> : undefined, tone: exception ? "waits" as const : undefined };
+      })} /> : <XaNote>Nothing changed on {snapshot.business.name}&apos;s Systems this month.</XaNote>}
+    </XaBlock>
+
+    <XaBlock label="Requests">
+      {requests.done.length ? <XaChanges label="Requests done" rows={requests.done.map(item => ({ key: item.id, when: careShortDate(item.doneAt), dateTime: item.doneAt, text: item.request }))} />
+        : <XaNote>No Requests were finished this month.</XaNote>}
+      {requests.openCount > 0 ? <XaNote>{plural(requests.openCount, "Request is", "Requests are")} still open.</XaNote> : null}
+    </XaBlock>
+
+    <XaBlock label="Inquiries and bookings"><p className={styles.sentence}>{careOutcomeLine(snapshot.outcomes)}</p></XaBlock>
+
+    <XaBlock label="Site checks"><p className={styles.sentence}>{careSiteCheckSentence(snapshot.siteChecks, snapshot.business.name)}</p></XaBlock>
+
+    <XaBlock label="Time">
+      {time.minutes > 0 ? <p className={styles.sentence}>{brand.name} spent {careTimeLabel(time.minutes)} on {snapshot.business.name}{categories.length ? `: ${categories.map(([category, minutes]) => `${(BUSINESS_EFFORT_CATEGORY_LABELS[category as BusinessEffortCategory] ?? category).toLowerCase()} ${careTimeLabel(minutes)}`).join(", ")}` : ""}.</p>
+        : <XaNote>{brand.name} didn&apos;t record time this month.</XaNote>}
+    </XaBlock>
+
+    {earlier.length && releaseHref ? <div data-print-hide><XaBlock label="Earlier releases">
+      <ul className={styles.releases} aria-label="Earlier releases of this report">
+        {earlier.map(item => <li key={item.number}>
+          <XaTextLink href={releaseHref(item.number)}>{careReleaseLabel(item.number)}</XaTextLink>
+          <span className={styles.sub}>Shared {careShortDate(item.publishedAt)}</span>
+        </li>)}
+      </ul>
+    </XaBlock></div> : null}
+
+    <footer className={styles.foot} data-print-hide><PrintDocumentButton /></footer>
+  </article></>;
 }
