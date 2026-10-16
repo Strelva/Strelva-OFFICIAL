@@ -25,7 +25,8 @@ import type { SiteResults } from "@/products/websites/client";
 import type { AgencyProspect } from "@/platform/agency-prospecting/server";
 import { resolveRange, type RangeKey } from "@/platform/infra/analytics/range";
 import { identityColor } from "@/platform/presentation/identity-color";
-import { XA_CLIENTS, xaOwnerPinned, XA_HARBOR, XA_NORTH } from "./xa-day";
+import { XA_CLIENTS, XA_DAY, xaDayAt, xaDaysAgo, xaOwnerPinned, XA_HARBOR, XA_HARBOR_VISITS, XA_NORTH, XA_SYSTEM_HREFS } from "./xa-day";
+import type { ResultsChange } from "@/experience/places/WorkspaceResults";
 
 export type XsScreen = "leads" | "reviews" | "recaps" | "results" | "prospects" | "business-picker" | "business";
 
@@ -112,11 +113,15 @@ const replyRequest = (async (_url: RequestInfo | URL, init?: RequestInit) => {
 }) as typeof fetch;
 
 /* ---------- Recaps ---------- */
+// The one fixture day (xa-day.ts): Monday, Nov 23. The latest weekly recap is the week before it.
+// Thanksgiving still waits on Dr. Lin this morning, so no recap claims it changed.
+// Visits come from XA_HARBOR_VISITS, the same numbers Results shows for Nov 16 to 22.
+const pct = (now: number, before: number) => Math.round(((now - before) / before) * 100);
 const RECAPS: RecapView[] = [
-  { id: "w41", period: "week", start: "2026-10-05", end: "2026-10-11", summary: "Three new patients found you on Google Maps.", highlights: ["Maya at North Studio closed online booking for Thanksgiving, Nov 26 and 27, after you said yes", "Strelva fixed the map link on the contact page", "The new-patient form now asks for the insurance member ID"], visits: 412, visitsDelta: 12, customerActions: 31,
+  { id: "w47", period: "week", start: xaDaysAgo(7), end: xaDaysAgo(1), summary: "3 people asked for directions from Google Maps.", highlights: ["Maya at North Studio moved the Book a visit button to the top of the home page", "Strelva fixed the map link on the contact page", "Maya at North Studio added Delta Dental PPO to the insurance list"], visits: XA_HARBOR_VISITS.week, visitsDelta: pct(XA_HARBOR_VISITS.week, XA_HARBOR_VISITS.weekBefore), customerActions: XA_HARBOR_VISITS.weekActions,
     inquiryOutcome: { status: "available", inquiries: 9, answered: 9, withinDay: 8, unanswered: 0, averageReplySeconds: null, medianReplySeconds: null, evidence: "Saved proof" }, newReviews: 2, nextAction: { title: "List the insurance you take", description: "Four people asked about Delta Dental this week. One line on the services page would answer them before they write." } },
-  { id: "m09", period: "month", start: "2026-09-01", end: "2026-09-30", summary: "September was the busiest month since spring.", highlights: ["1,612 visits", "Cleanings is now the most visited page"], visits: 1612, visitsDelta: 18, customerActions: 104, newReviews: 6, nextAction: null },
-  { id: "w40", period: "week", start: "2026-09-28", end: "2026-10-04", summary: "A steady week.", highlights: [], visits: 368, visitsDelta: -4, customerActions: 22, newReviews: 1, nextAction: null },
+  { id: "m10", period: "month", start: "2026-10-01", end: "2026-10-31", summary: "October was the busiest month since spring.", highlights: [`${XA_HARBOR_VISITS.october.toLocaleString("en-US")} people visited your site this month`, "Cleanings is now the most visited page"], visits: XA_HARBOR_VISITS.october, visitsDelta: pct(XA_HARBOR_VISITS.october, XA_HARBOR_VISITS.september), customerActions: 104, newReviews: 6, nextAction: null },
+  { id: "w46", period: "week", start: xaDaysAgo(14), end: xaDaysAgo(8), summary: "A steady week.", highlights: [], visits: XA_HARBOR_VISITS.weekBefore, visitsDelta: -4, customerActions: XA_HARBOR_VISITS.weekBeforeActions, newReviews: 1, nextAction: null },
 ];
 function recapsState(state: string): WorkspaceRecapsState {
   const site = { tenantId: "harbor", siteName: XA_HARBOR.domain, unavailable: false, recaps: RECAPS };
@@ -130,6 +135,12 @@ function recapsState(state: string): WorkspaceRecapsState {
 }
 
 /* ---------- Results ---------- */
+/** The newest change in What changed, as `resultsChange` would pick it: Maya's, last Friday. ?state=quiet shows a week with none. */
+function resultsLatest(state: string): ResultsChange | null | undefined {
+  if (state === "quiet") return null;
+  if (state === "changes-unavailable") return undefined;
+  return { sentence: "Maya at North Studio moved the Book a visit button to the top of the home page.", at: xaDayAt("15:40", -3), href: XA_SYSTEM_HREFS.website };
+}
 function resultsState(state: string, rangeKey: RangeKey): WorkspaceResultsState {
   if (state === "loading") return { kind: "loading" };
   if (state === "error") return { kind: "error" };
@@ -138,14 +149,18 @@ function resultsState(state: string, rangeKey: RangeKey): WorkspaceResultsState 
   const days = rangeKey === "month" ? 30 : 7;
   const visits = Array.from({ length: days }, (_, index) => 38 + ((index * 17) % 23) + (index === days - 1 ? 14 : 0));
   const total = visits.reduce((sum, value) => sum + value, 0);
-  const stats: NonNullable<SiteResults["stats"]> = { range: window, pageViews: total, pageViewsPrior: total - 41, pageViewsDelta: 41, actions: 31, actionsPrior: 26, actionsDelta: 5, bookingClicks: 24, bookingClicksPrior: 20, phoneClicks: 7, phoneClicksPrior: 6, hasData: true,
+  // The Last 7 days are Nov 16 to 22: the same 361 and 320 the weekly recaps show (XA_HARBOR_VISITS).
+  const prior = rangeKey === "month" ? total - 41 : XA_HARBOR_VISITS.weekBefore;
+  const actions = XA_HARBOR_VISITS.weekActions, actionsPrior = XA_HARBOR_VISITS.weekBeforeActions;
+  const stats: NonNullable<SiteResults["stats"]> = { range: window, pageViews: total, pageViewsPrior: prior, pageViewsDelta: total - prior, actions, actionsPrior, actionsDelta: actions - actionsPrior, bookingClicks: 24, bookingClicksPrior: 20, phoneClicks: 7, phoneClicksPrior: 6, hasData: true,
     series: visits.map((pageViews, index) => ({ date: new Date(window.to.getTime() - (days - index - 1) * 86400000).toISOString().slice(0, 10), pageViews, bookingClicks: 0, phoneClicks: 0 })) };
   const site: SiteResults = { tenantId: "harbor", tenantStableId: "5e000000-0000-4000-8000-0000000000b9", siteName: XA_HARBOR.domain, stats, anomaly: null, visitorSeries: visits, milestone: null,
-    searchPerf: { status: "ok", clicks: 86, impressions: 1420, ctr: 86 / 1420, position: 3.8, topQueries: [{ query: "dentist elmwood buffalo", clicks: 31, impressions: 400, position: 2.1 }, { query: "harbor dental", clicks: 28, impressions: 120, position: 1 }, { query: "delta dental ppo dentist buffalo", clicks: 12, impressions: 300, position: 6.4 }] },
-    gaPerf: { status: "ok", users: 318, sessions: 402, pageviews: 911, topSources: [{ source: "google / organic", sessions: 240 }, { source: "(direct)", sessions: 102 }, { source: "google maps", sessions: 60 }], topPages: [{ path: "/", views: 380 }, { path: "/book", views: 214 }, { path: "/services/cleanings", views: 140 }] },
-    aiVisibility: { service: "dentists in Buffalo", mentionedCount: 2, total: 5, mentionedQueries: ["Which dentist on Elmwood takes Delta Dental?", "Gentle dentist for kids in Buffalo"], newlyAppeared: ["Gentle dentist for kids in Buffalo"], hasData: true, checkedAt: "2026-10-14T12:00:00Z" },
-    health: state === "issues" ? { url: "https://harbordental.com", scannedAt: "2026-10-15T07:02:00Z", overallScore: 81, grade: "B", categories: [], prioritizedIssues: [{ message: "Two photos on the services page have no description", category: "accessibility", priority: "medium" }, { message: "The booking page takes 3.1 s to load on a phone", category: "performance", priority: "medium" }] }
-      : { url: "https://harbordental.com", scannedAt: "2026-10-15T07:02:00Z", overallScore: 96, grade: "A", categories: [], prioritizedIssues: [] },
+    // Google sources and searches cover the last 4 weeks (Oct 26 to Nov 22): more than the two weeks above added together.
+    searchPerf: { status: "ok", clicks: 640, impressions: 9800, ctr: 640 / 9800, position: 3.8, topQueries: [{ query: "dentist elmwood buffalo", clicks: 212, impressions: 2600, position: 2.1 }, { query: "harbor dental", clicks: 190, impressions: 640, position: 1 }, { query: "delta dental ppo dentist buffalo", clicks: 64, impressions: 2100, position: 6.4 }] },
+    gaPerf: { status: "ok", users: 1090, sessions: XA_HARBOR_VISITS.fourWeeks, pageviews: 3120, topSources: [{ source: "google / organic", sessions: 820 }, { source: "(direct)", sessions: 352 }, { source: "google maps", sessions: 212 }], topPages: [{ path: "/", views: 1310 }, { path: "/book", views: 736 }, { path: "/services/cleanings", views: 482 }] },
+    aiVisibility: { service: "dentists in Buffalo", mentionedCount: 2, total: 5, mentionedQueries: ["Which dentist on Elmwood takes Delta Dental?", "Gentle dentist for kids in Buffalo"], newlyAppeared: ["Gentle dentist for kids in Buffalo"], hasData: true, checkedAt: xaDayAt("12:00", -2) },
+    health: state === "issues" ? { url: "https://harbordental.com", scannedAt: XA_DAY.checkedAt, overallScore: 81, grade: "B", categories: [], prioritizedIssues: [{ message: "Two photos on the services page have no description", category: "accessibility", priority: "medium" }, { message: "The booking page takes 3.1 s to load on a phone", category: "performance", priority: "medium" }] }
+      : { url: "https://harbordental.com", scannedAt: XA_DAY.checkedAt, overallScore: 96, grade: "A", categories: [], prioritizedIssues: [] },
   };
   if (state === "empty") return { kind: "ready", data: { sites: [], denied: [] } };
   if (state === "disconnected") return { kind: "ready", data: { sites: [{ ...site, searchPerf: null, gaPerf: null, aiVisibility: null, health: null }], denied: [] } };
@@ -166,10 +181,11 @@ export function XsLeadsPreview({ screen, state, mode, range, period, recap, open
   if (screen === "leads") return <StrelvaShell {...agencyChrome(mode, "leads")} title="Service requests"><AgencyLeads key={state} agencyWorkspaceId={AGENCY} request={leadsRequest(state)} knownClients={KNOWN_CLIENTS} initialOpen={open} /></StrelvaShell>;
   if (screen === "reviews") return <WorkspaceReviewsView workspaceId={BUSINESS} state={reviewsState(state)} publishing chrome={ownerChrome(mode, "reviews")} request={replyRequest} initialOpen={open} />;
   if (screen === "recaps") return <WorkspaceRecaps workspaceId={BUSINESS} state={recapsState(state)} period={period === "week" || period === "month" ? period : "all"} recapId={recap} hrefBase={`${BASE}/recaps`} releaseLabel={state === "release" ? "Recaps Release 1" : undefined}
-    careReports={state === "reports-unavailable" ? { kind: "unavailable" } : { kind: "ready", items: state === "empty" ? [] : PREVIEW_OWNER_REPORTS }} chrome={ownerChrome(mode, "recaps")} />;
+    careReports={state === "reports-unavailable" ? { kind: "unavailable" } : { kind: "ready", items: state === "empty" ? [] : PREVIEW_OWNER_REPORTS }} chrome={ownerChrome(mode, "recaps")}
+    seeHrefFor={() => `${BASE}/results${mode === "dark" ? "?mode=dark" : ""}`} />;
   if (screen === "results") {
     const key: RangeKey = range === "week" || range === "month" ? range : "live";
-    return <WorkspaceResultsView workspaceId={BUSINESS} state={resultsState(state, key)} range={key} chrome={ownerChrome(mode, "results")} hrefFor={(_id, next) => `${BASE}/results?${new URLSearchParams({ ...(state !== "ready" ? { state } : {}), ...(next !== "live" ? { range: next } : {}), ...(mode === "dark" ? { mode } : {}) })}`} />;
+    return <WorkspaceResultsView workspaceId={BUSINESS} state={resultsState(state, key)} range={key} chrome={ownerChrome(mode, "results")} latest={resultsLatest(state)} hrefFor={(_id, next) => `${BASE}/results?${new URLSearchParams({ ...(state !== "ready" ? { state } : {}), ...(next !== "live" ? { range: next } : {}), ...(mode === "dark" ? { mode } : {}) })}`} />;
   }
   if (screen === "prospects") {
     const query = (id: string | null) => `${BASE}/prospects?${new URLSearchParams({ ...(state !== "ready" ? { state } : {}), ...(mode === "dark" ? { mode } : {}), ...(id ? { prospect: id } : {}) })}`;

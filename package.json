@@ -39,6 +39,7 @@
     "check:app-events-sql": "bash scripts/check-app-events-sql.sh",
     "check:listings-sync-sql": "bash scripts/check-listings-sync-sql.sh",
     "check:workspace-sql": "bash scripts/check-workspace-sql.sh",
+    "check:results-change-sql": "bash scripts/check-results-change-sql.sh",
     "check:money-pay-links-sql": "bash scripts/check-money-pay-links-sql.sh",
     "check:care-reports-sql": "bash scripts/check-care-reports-sql.sh",
     "check:inquiry-forwarding-sql": "bash scripts/check-inquiry-forwarding-sql.sh",

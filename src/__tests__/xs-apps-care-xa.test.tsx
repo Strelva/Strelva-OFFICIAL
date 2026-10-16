@@ -3,13 +3,11 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { createRoot, type Root } from "react-dom/client";
 import { act, createElement, type ReactElement } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { existsSync } from "node:fs";
-import { join } from "node:path";
 import { PREVIEW_FACTS, PREVIEW_NOTE, PREVIEW_BRAND, PREVIEW_SNAPSHOT, PREVIEW_RELEASES } from "@/experience/care-reports/preview-fixture";
-import { CARE_REPORT_MAIL_ART, renderCareReportMail } from "@/platform/care-reports/mail";
-import { careCheckException, careSiteCheckSentence } from "@/platform/care-reports/model";
+import { renderCareReportMail } from "@/platform/care-reports/mail";
+import { careCheckException, careCheckReason, careLead, careMattered, careOtherChanges, careSiteCheckSentence } from "@/platform/care-reports/model";
 import { CareReportDocument } from "@/experience/care-reports/CareReportDocument";
-import { SiteDeliveryStatus } from "@/experience/operations/SiteDeliveryStatus";
+import { deliveryPebble, SiteDeliveryStatus } from "@/experience/operations/SiteDeliveryStatus";
 import { DeliveryCommitmentPanel, deliverySentence } from "@/experience/operations/DeliveryCommitmentPanel";
 import { WorkspaceRequestContext } from "@/experience/workspace/WorkspaceRequest";
 import { readDeliveryPeople } from "@/platform/service-requests/delivery-people";
@@ -32,16 +30,60 @@ async function mount(element: ReactElement) {
 }
 
 describe("Care plan report email (XA · E3, template only)", () => {
-  it("keeps the agency's subject, opens with Pebble and the Systems, and carries the agency's note", () => {
+  it("keeps the agency's subject, carries the agency's note as its own words, and has no idle clay line-up", () => {
     const { subject, html, text } = mail();
     expect(subject).toBe("North Studio: Harbor Dental · September 2026 report");
-    expect(html).toContain(`https://app.example.test${CARE_REPORT_MAIL_ART}`);
-    // The art is a file the app actually serves, not a path that 404s in the inbox.
-    expect(existsSync(join(process.cwd(), "public", CARE_REPORT_MAIL_ART))).toBe(true);
-    expect(html).toContain("Pebble and Harbor Dental");
+    expect(html).not.toMatch(/<img|lineup|Pebble and/);
+    expect(html).toContain("North Studio's note");
     expect(html).toContain(PREVIEW_NOTE);
     expect(text).toContain(PREVIEW_NOTE);
     expect(html).toContain("Open the report");
+  });
+  it("leads with one sentence, then one change that mattered with its date and a link to its System", () => {
+    const { html, text, preheader } = mail();
+    expect(html).not.toContain("font-size:64px");
+    expect(html).toContain("North Studio made 3 changes.");
+    expect(preheader).toBe("North Studio made 3 changes.");
+    expect(html).toContain("The change that mattered");
+    expect(html).toContain("North Studio: Moved the Book a visit button near the top of the home page.");
+    // Its date, then "See it" to the website System (never the report link the primary opens).
+    const system = "https://app.example.test/workspace?view=system&amp;system=5e000000-0000-4000-8000-0000000000e0&amp;workspaceId=5e000000-0000-4000-8000-0000000000b0";
+    expect(html).toContain(`Sep 11 · </span><a href="${system}"`);
+    expect(text).toContain("North Studio: Moved the Book a visit button near the top of the home page. (Sep 11)");
+    expect(text).toContain("See it: https://app.example.test/workspace?view=system&system=");
+    expect(html.match(/href="https:\/\/app\.example\.test\/r"/g)).toHaveLength(1);
+  });
+  it("lists the change that mattered once, and hides Release numbers from the owner", () => {
+    const { html, text } = mail();
+    expect(html.split("Book a visit button near the top").length - 1).toBe(1);
+    expect(html).toContain("Also changed");
+    expect(html).toContain("Put the fall hours on the website and Google.");
+    expect(`${html}${text}`).not.toMatch(/Release \d|above the fold|Requests? done|Requests? is still/);
+    expect(html).toContain("2 requests done:");
+    expect(html).toContain("North Studio sent this when it shared Harbor Dental's September report.");
+  });
+  it("loads DM Sans the same way the paper emails do", () => {
+    expect(mail().html).toContain("fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600");
+  });
+  it("words the lead and the change that mattered from the facts, crediting the agency", () => {
+    const facts = { month: "2026-09", changes: { total: 3, confirmed: 2, notConfirmed: 0, notChecked: 1, items: PREVIEW_FACTS.changes.items }, requests: { doneCount: 2, openCount: 1, askedCount: 3, done: [] } };
+    expect(careLead(facts, "North Studio")).toEqual({ text: "North Studio made 3 changes.", quiet: "2 were checked on the live site." });
+    expect(careLead({ ...facts, changes: { ...facts.changes, total: 0, confirmed: 0, items: [] } }, "North Studio")).toEqual({ text: "North Studio finished 2 requests.", quiet: "No Systems changed." });
+    expect(careLead({ ...facts, changes: { ...facts.changes, total: 0, confirmed: 0, items: [] }, requests: { ...facts.requests, doneCount: 0 } }, "North Studio").text).toBe("No recorded work this month.");
+    expect(careMattered({ changes: { ...facts.changes, items: [] } }, "North Studio")).toBeNull();
+    // The newest checked change, not the newer one nobody checked yet, and never the note.
+    const mattered = careMattered(facts, "North Studio")!;
+    expect(mattered.at).toBe("2026-09-11T16:00:00+00:00");
+    expect(mattered.text).toBe("North Studio: Moved the Book a visit button near the top of the home page.");
+    expect(careOtherChanges(facts, mattered).map(item => item.at)).toEqual(["2026-09-04T14:00:00+00:00", "2026-09-19T10:00:00+00:00"]);
+  });
+  it("says why a change wasn't checked and what clears it", () => {
+    const { html, text } = mail();
+    expect(html).toMatch(/Not checked: Strelva doesn(&#39;|')t check this kind of change on the live site\. Open the page to see it\./);
+    expect(text).toContain("(Not checked: Strelva doesn't check this kind of change on the live site. Open the page to see it.)");
+    expect(careCheckReason({ check: "confirmed", source: "website_deploy" }, "North Studio")).toBeNull();
+    expect(careCheckReason({ check: "not_checked", source: "website_deploy" }, "North Studio")).toBe("No check of the live site has come back for this yet. Open the page to see it.");
+    expect(careCheckReason({ check: "not_confirmed", source: "website_code" }, "North Studio")).toBe("The live site didn't show this change when Strelva looked. North Studio can publish it again.");
   });
   it("marks only the exception on a change and says the site checks in one sentence", () => {
     const { html, text } = mail();
@@ -64,22 +106,38 @@ describe("Care plan report email (XA · E3, template only)", () => {
 });
 
 describe("Care plan report page", () => {
-  const html = (audience: "owner" | "shared") => renderToStaticMarkup(createElement(CareReportDocument, { snapshot: PREVIEW_SNAPSHOT, brand: PREVIEW_BRAND, releaseNumber: 2, audience, releases: PREVIEW_RELEASES, releaseHref: (n: number) => `/r/${n}` }));
+  const html = (audience: "owner" | "shared" | "agency") => renderToStaticMarkup(createElement(CareReportDocument, { snapshot: PREVIEW_SNAPSHOT, brand: PREVIEW_BRAND, releaseNumber: 2, audience, releases: PREVIEW_RELEASES, releaseHref: (n: number) => `/r/${n}` }));
   it("shows status only as the exception and keeps builder words out", () => {
     const page = html("owner");
     expect(page).toContain("Not checked");
     expect(page).not.toContain("Checked on the live site");
     expect(page).not.toMatch(/Ask Strelva and drafting|Strelva assistant|Release 6|Release 7|Release 8|harbordental\.example/);
     expect(page).toContain("harbordental.com passed all 30 checks.");
-    expect(page).toContain("/xa/pose-lineup.webp");
+    expect(page).not.toContain("/xa/pose-lineup.webp");
+    expect(page).toContain("The change that mattered");
+    expect(page).toContain("Strelva doesn&#x27;t check this kind of change on the live site. Open the page to see it.");
+    expect(page).toContain("North Studio&#x27;s note");
+    expect(page).toContain("1 request is still open.");
+    expect(page).not.toMatch(/above the fold|Requests? is still|No Requests/);
   });
-  it("lists only truly earlier releases, in sentence case, and credits the agency once on the shared page", () => {
-    const page = html("shared");
+  it("names the month and business once: the lead says only who did the work", () => {
+    for (const audience of ["owner", "shared"] as const) {
+      const page = html(audience);
+      expect(page).toContain("North Studio made 3 changes.");
+      expect(page).not.toContain("for Harbor Dental in September");
+      expect(page, audience).not.toMatch(/Release \d|Earlier releases/);
+    }
+  });
+  it("keeps Release numbers and earlier releases for the agency only", () => {
+    const page = html("agency");
+    expect(page).toContain("Harbor Dental · Release 2");
     expect(page).toContain("Earlier releases");
     expect(page).not.toContain("Earlier Releases");
     expect(page).toContain('href="/r/1"');
     expect(page).not.toContain('href="/r/2"');
-    expect(page).not.toContain("Runs on Strelva");
+  });
+  it("credits the agency once on the shared page", () => {
+    expect(html("shared")).not.toContain("Runs on Strelva");
   });
   it("words exceptions in two words", () => {
     expect(careCheckException("confirmed")).toBeNull();
@@ -99,16 +157,52 @@ describe("Hired work names who acts", () => {
     expect(deliverySentence(proposed, item, "business", Date.now(), { agency: "North Studio" })).toBe("North Studio sent the scope. It waits for your yes.");
   });
 
+  it("says where a website request is in one sentence and the last move, with no order-tracker steps", () => {
+    const html = renderToStaticMarkup(createElement(SiteDeliveryStatus, { businessName: "Harbor Dental", status: "owner_review", submittedAt: "2026-11-09T15:00:00Z", updatedAt: "2026-11-18T19:30:00Z", maskedEmail: "am**@harbordental.com", agencyName: "North Studio" }));
+    // No draft link on the record: the page never claims you can look at it here.
+    expect(html).toContain("The draft is ready. North Studio is sending it to you by email.");
+    expect(html).not.toContain("See the draft");
+    expect(html).toContain("North Studio finished the draft on Nov 18. Nothing is published before you say yes.");
+    const linked = renderToStaticMarkup(createElement(SiteDeliveryStatus, { businessName: "Harbor Dental", status: "owner_review", submittedAt: "2026-11-09T15:00:00Z", updatedAt: "2026-11-18T19:30:00Z", maskedEmail: "am**@harbordental.com", agencyName: "North Studio", draftUrl: "https://drafts.example.test/harbor" }));
+    expect(linked).toContain("The draft is ready for you to look at.");
+    expect(linked).toMatch(/data-xa-primary="true" href="https:\/\/drafts\.example\.test\/harbor">See the draft</);
+    expect(linked.match(/data-xa-primary/g)).toHaveLength(1);
+    expect(html).not.toMatch(/Request received|Checking it&#x27;s a fit|Ready to launch/);
+    const received = renderToStaticMarkup(createElement(SiteDeliveryStatus, { businessName: "Harbor Dental", status: "received", submittedAt: "2026-11-09T15:00:00Z", maskedEmail: "am**@harbordental.com", agencyName: null }));
+    expect(received).toContain("You sent the request on Nov 9.");
+    expect(received).toContain("Your agency has your request and reads it next.");
+  });
   it("names the agency on the no-account status page and stays neutral when it can't", () => {
     const named = renderToStaticMarkup(createElement(SiteDeliveryStatus, { businessName: "Harbor Dental", status: "drafting", submittedAt: "2026-10-09T15:00:00Z", maskedEmail: "am**@harbordental.com", agencyName: "North Studio" }));
     expect(named).toContain("North Studio");
     expect(named).toContain("Runs on Strelva");
-    expect(named).toContain("Step 3 of 6");
+    expect(named).toContain("North Studio is building the draft now.");
+    expect(named).not.toMatch(/Step \d of \d/);
     expect(named).not.toContain("Strelva Agency");
     const neutral = renderToStaticMarkup(createElement(SiteDeliveryStatus, { businessName: "Harbor Dental", status: "paused", submittedAt: "2026-10-09T15:00:00Z", maskedEmail: "am**@harbordental.com", agencyName: null }));
     expect(neutral).not.toContain("Strelva Agency");
     expect(neutral).not.toContain("Runs on Strelva");
-    expect(neutral).toContain("Your agency will be in touch");
+    expect(neutral).toContain("The work is on hold.");
+    expect(neutral).toContain("Your agency paused it on Oct 9.".replace(" on Oct 9", ""));
+  });
+  it("gives Pebble a different job in each state, and names who to write to when it is paused", () => {
+    const at = (status: "received" | "drafting" | "owner_review" | "paused") => renderToStaticMarkup(createElement(SiteDeliveryStatus, { businessName: "Harbor Dental", status, submittedAt: "2026-11-09T15:00:00Z", updatedAt: "2026-11-18T19:30:00Z", maskedEmail: "am**@harbordental.com", agencyName: "North Studio", agencyEmail: "maya@northstudio.example" }));
+    const statuses = ["received", "reviewing", "drafting", "owner_review", "launch_ready", "launched", "paused"] as const;
+    expect(new Set(statuses.map(status => deliveryPebble(status, "North Studio", false))).size).toBe(statuses.length);
+    const lines = (["received", "drafting", "owner_review", "paused"] as const).map(status => at(status));
+    lines.forEach((page, index) => expect(page).toContain(deliveryPebble((["received", "drafting", "owner_review", "paused"] as const)[index]!, "North Studio", false).replace(/'/g, "&#x27;")));
+    for (const page of lines) expect(page).not.toContain("You don&#x27;t need an account yet. When there is something");
+    const paused = lines[3]!;
+    expect(paused).toContain("North Studio paused it on Nov 18. No reason was recorded here.");
+    expect(paused).toContain("Ask North Studio why it paused and what would start it again.");
+    expect(paused).toContain('href="mailto:maya@northstudio.example?subject=Harbor%20Dental%20website%20request"');
+  });
+  it("never invents a date for a legacy record with no status time", () => {
+    const legacy = renderToStaticMarkup(createElement(SiteDeliveryStatus, { businessName: "Harbor Dental", status: "drafting", submittedAt: "2026-11-09T15:00:00Z", updatedAt: "2026-11-09T15:00:00Z", maskedEmail: "am**@harbordental.com", agencyName: "North Studio" }));
+    expect(legacy).toContain("North Studio started the draft.");
+    expect(legacy).not.toMatch(/started the draft on/);
+    const missing = renderToStaticMarkup(createElement(SiteDeliveryStatus, { businessName: "Harbor Dental", status: "drafting", submittedAt: "2026-11-09T15:00:00Z", updatedAt: null, maskedEmail: "am**@harbordental.com", agencyName: "North Studio" }));
+    expect(missing).toContain("North Studio started the draft.");
   });
 
   it("reads people and only counts the agency itself, never a seat on the business, as an agency operator", async () => {

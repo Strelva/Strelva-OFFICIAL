@@ -1,5 +1,6 @@
 import type { OwnerCareReportItem, CareReportAgencyView, CareReportFacts, CareReportList, CareReportReleaseSnapshot } from "@/platform/care-reports";
 import type { OwnerBrand } from "@/platform/infra/agency-brand";
+import { XA_HARBOR_VISITS } from "@/experience/workspace/preview/xa-day";
 
 /** Fictional data for the local preview. Nothing here is a real business, agency or record. */
 export const PREVIEW_AGENCY_ID = "5e000000-0000-4000-8000-0000000000a0";
@@ -10,7 +11,8 @@ const SYSTEM = "5e000000-0000-4000-8000-0000000000e0";
 export const PREVIEW_BRAND: OwnerBrand = { agencyId: PREVIEW_AGENCY_ID, name: "North Studio", logoUrl: null, accentColor: "#447a4f", replyTo: null, credit: "runs_on_strelva" };
 export const PREVIEW_BRAND_UNAVAILABLE: OwnerBrand = { agencyId: null, name: "Agency identity unavailable", logoUrl: null, accentColor: "#447a4f", replyTo: null, credit: "runs_on_strelva" };
 
-export const PREVIEW_NOTE = "We moved your booking button above the fold and fixed the hours on Google.";
+/** The agency's own words for the month. Shown on its own, never as the change that mattered. */
+export const PREVIEW_NOTE = "Two fixes this month: the Book a visit button now sits near the top of the home page, and your fall hours match on Google.";
 
 export const PREVIEW_FACTS: CareReportFacts = {
   version: 1,
@@ -23,9 +25,9 @@ export const PREVIEW_FACTS: CareReportFacts = {
   changes: {
     total: 3, confirmed: 2, notConfirmed: 0, notChecked: 1,
     items: [
-      { systemId: SYSTEM, systemName: "Harbor Dental website", systemKind: "website", release: 6, summary: "Fall hours on the website and Google.", at: "2026-09-04T14:00:00+00:00", check: "confirmed", source: "website_deploy" },
-      { systemId: SYSTEM, systemName: "Harbor Dental website", systemKind: "website", release: 7, summary: "Booking button moved above the fold.", at: "2026-09-11T16:00:00+00:00", check: "confirmed", source: "website_code" },
-      { systemId: SYSTEM, systemName: "Harbor Dental website", systemKind: "website", release: 8, summary: "New-patient form asks for the insurance member ID.", at: "2026-09-19T10:00:00+00:00", check: "not_checked", source: "website_content" },
+      { systemId: SYSTEM, systemName: "Harbor Dental website", systemKind: "website", release: 6, summary: "Put the fall hours on the website and Google.", at: "2026-09-04T14:00:00+00:00", check: "confirmed", source: "website_deploy" },
+      { systemId: SYSTEM, systemName: "Harbor Dental website", systemKind: "website", release: 7, summary: "Moved the Book a visit button near the top of the home page.", at: "2026-09-11T16:00:00+00:00", check: "confirmed", source: "website_code" },
+      { systemId: SYSTEM, systemName: "Harbor Dental website", systemKind: "website", release: 8, summary: "Added an insurance member ID question to the new-patient form.", at: "2026-09-19T10:00:00+00:00", check: "not_checked", source: "website_content" },
     ],
   },
   requests: {
@@ -39,7 +41,7 @@ export const PREVIEW_FACTS: CareReportFacts = {
     available: true,
     month: {
       workspaceId: PREVIEW_BUSINESS_ID, month: "2026-09", sites: 1,
-      visits: { kind: "counted", value: 412 }, inquiries: { kind: "counted", value: 9 },
+      visits: { kind: "counted", value: XA_HARBOR_VISITS.september }, inquiries: { kind: "counted", value: 9 },
       answered: { kind: "linked", value: 8, withinDay: 7 }, bookings: { kind: "counted", value: 3, native: 3, legacy: null },
       bookingsFromInquiry: { kind: "linked", value: 2, joins: [] }, reviews: { kind: "counted", value: 2 },
     },
@@ -86,9 +88,16 @@ export function previewAgencyView(options: { canWrite: boolean; shared?: boolean
   };
 }
 
+/** The October report id. The September report (PREVIEW_REPORT_ID) is the one the report pages open. */
+export const PREVIEW_OCTOBER_REPORT_ID = "5e000000-0000-4000-8000-0000000000c3";
+
+/**
+ * The reports Harbor Dental sees on the fixture day (Monday, Nov 23): October,
+ * shared Nov 3, and September, shared Oct 1 and updated Oct 2. Newest first.
+ */
 export const PREVIEW_OWNER_REPORTS: OwnerCareReportItem[] = [
+  { reportId: PREVIEW_OCTOBER_REPORT_ID, agencyWorkspaceId: PREVIEW_AGENCY_ID, agencyName: "North Studio", month: "2026-10", latestRelease: { number: 1, publishedAt: "2026-11-03T14:00:00+00:00" } },
   { reportId: PREVIEW_REPORT_ID, agencyWorkspaceId: PREVIEW_AGENCY_ID, agencyName: "North Studio", month: "2026-09", latestRelease: { number: 2, publishedAt: "2026-10-02T09:00:00+00:00" } },
-  { reportId: "5e000000-0000-4000-8000-0000000000c1", agencyWorkspaceId: PREVIEW_AGENCY_ID, agencyName: "North Studio", month: "2026-08", latestRelease: { number: 1, publishedAt: "2026-09-02T09:00:00+00:00" } },
 ];
 
 const clientRow = (n: number, name: string, over: Partial<CareReportList["clients"][number]> = {}): CareReportList["clients"][number] => ({

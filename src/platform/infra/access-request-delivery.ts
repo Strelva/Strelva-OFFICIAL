@@ -97,7 +97,9 @@ function coerceLead(value: unknown): DeliveryLead | null {
     statusToken: record.statusToken,
     deliveryStatus: normalizeDeliveryStatus(record.deliveryStatus ?? record.status),
     submittedAt: typeof record.submittedAt === "string" ? record.submittedAt : now,
-    statusUpdatedAt: typeof record.statusUpdatedAt === "string" ? record.statusUpdatedAt : now,
+    // A record without a status time never claims a move happened now: it reads as its own submitted time.
+    statusUpdatedAt: typeof record.statusUpdatedAt === "string" ? record.statusUpdatedAt : typeof record.submittedAt === "string" ? record.submittedAt : now,
+    ...(typeof record.draftUrl === "string" && /^https:\/\/[^\s]+$/i.test(record.draftUrl.trim()) ? { draftUrl: record.draftUrl.trim() } : {}),
   };
 }
 

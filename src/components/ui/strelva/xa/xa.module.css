@@ -306,7 +306,8 @@ a.row:focus-visible, button.row:focus-visible { outline: 2px solid var(--st-acce
 .field { display: flex; min-width: 0; flex-direction: column; gap: 8px; }
 .fieldLabel { color: var(--st-text-body); font-size: 13px; font-weight: 500; line-height: 18px; }
 .fieldControl { box-sizing: border-box; width: 100%; min-width: 0; min-height: 50px; padding: 13px 16px; border: 1px solid var(--st-line); border-radius: var(--st-r-md); background: var(--st-surface); color: var(--st-text); font: inherit; font-size: 15px; line-height: 22px; transition: border-color var(--motion-fast) var(--ease-settle), box-shadow var(--motion-fast) var(--ease-settle); }
-textarea.fieldControl { min-height: 96px; resize: vertical; field-sizing: content; }
+/* The field grows with its text (field-sizing), so no native resize grip shows. */
+textarea.fieldControl { min-height: 96px; resize: none; field-sizing: content; }
 .fieldControl::placeholder { color: var(--st-faint); }
 .fieldControl:focus { outline: none; border-color: var(--st-accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--st-accent) 16%, transparent); }
 .fieldControl[aria-invalid="true"] { border-color: var(--st-critical); box-shadow: 0 0 0 3px color-mix(in srgb, var(--st-critical) 14%, transparent); }

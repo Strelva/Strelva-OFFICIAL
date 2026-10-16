@@ -8,7 +8,7 @@ import { AgencyClientTime } from "@/experience/care-reports/AgencyClientTime";
 import { CareReportDocument } from "@/experience/care-reports/CareReportDocument";
 import { CareReportEditor } from "@/experience/care-reports/CareReportEditor";
 import {
-  PREVIEW_BRAND, PREVIEW_BRAND_UNAVAILABLE, PREVIEW_CAREPLAN_LIST, PREVIEW_CAREPLAN_SKIPS, PREVIEW_FACTS, PREVIEW_RELEASES, PREVIEW_SNAPSHOT, previewAgencyView,
+  PREVIEW_BRAND, PREVIEW_BRAND_UNAVAILABLE, PREVIEW_CAREPLAN_LIST, PREVIEW_CAREPLAN_SKIPS, PREVIEW_FACTS, PREVIEW_RELEASES, PREVIEW_SNAPSHOT, previewAgencyView, PREVIEW_NOTE,
 } from "@/experience/care-reports/preview-fixture";
 
 const AGENCY = "5e000000-0000-4000-8000-0000000000a0";
@@ -19,11 +19,14 @@ describe("Care plan report document", () => {
     snapshot: PREVIEW_SNAPSHOT, brand: PREVIEW_BRAND, releaseNumber: 2, audience: "owner", releases: PREVIEW_RELEASES, releaseHref: n => `/r?release=${n}`, ...props,
   }));
 
-  it("credits the agency once, shows the Release and marks only the unchecked change", () => {
+  it("credits the agency once, keeps Release numbers from the owner and marks only the unchecked change", () => {
     const html = render();
-    for (const text of ["North Studio", "Runs on Strelva", "Release 2", "Not checked", "Print or save as PDF", "We moved your booking button", "Earlier releases", "Sep 4", "3 h 5 min", "harbordental.com passed all 30 checks."]) {
-      expect(html, text).toContain(text);
+    for (const text of ["North Studio", "Runs on Strelva", "Not checked", "Print or save as PDF", PREVIEW_NOTE, "Sep 4", "3 h 5 min", "harbordental.com passed all 30 checks."]) {
+      expect(html, text).toContain(text.replace(/'/g, "&#x27;"));
     }
+    expect(html).not.toMatch(/Release \d|Earlier releases/);
+    const agency = render({ audience: "agency" });
+    for (const text of ["Release 2", "Earlier releases"]) expect(agency, text).toContain(text);
     expect(html).not.toContain("Checked on the live site");
     expect(html).not.toContain("wasn&#x27;t checked on the live site");
     expect(html.match(/Runs on Strelva/g)).toHaveLength(1);
@@ -50,7 +53,7 @@ describe("Care plan report document", () => {
 
   it("says plainly when nothing happened", () => {
     const html = render({ snapshot: { ...PREVIEW_FACTS, changes: { total: 0, confirmed: 0, notConfirmed: 0, notChecked: 0, items: [] }, requests: { doneCount: 0, openCount: 0, askedCount: 0, done: [] }, time: { minutes: 0, entries: 0, byCategory: {} } } });
-    for (const text of ["Nothing changed on Harbor Dental&#x27;s Systems this month.", "No Requests were finished this month.", "North Studio didn&#x27;t record time this month."]) expect(html).toContain(text);
+    for (const text of ["Nothing changed on Harbor Dental&#x27;s Systems this month.", "No requests were finished this month.", "North Studio didn&#x27;t record time this month."]) expect(html).toContain(text);
   });
 
   it("hides the controls when printed", () => {

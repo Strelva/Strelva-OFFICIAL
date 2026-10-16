@@ -28,7 +28,10 @@ export interface DeliveryLead {
   statusToken: string;
   deliveryStatus: DeliveryStatus;
   submittedAt: string;
+  /** When the status last changed. A legacy record without one reads back as `submittedAt`, never as now. */
   statusUpdatedAt: string;
+  /** An https link to the draft for the person who asked, when the agency added one. The status page shows "See the draft". */
+  draftUrl?: string | null;
 }
 
 export const deliverySteps: Array<{

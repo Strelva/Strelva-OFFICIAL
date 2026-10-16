@@ -240,6 +240,22 @@ The list-beside-detail layout is `.split` / `.list` / `.pick` / `.detail`
 `xa-place.module.css`; `.speaks` is Pebble's one sentence right above the
 opened item's one ink pill, and `.facts` is a plain hairline list with nothing
 to click. On a phone the picked item opens as its own screen with Back.
+
+Lane results (October 16): Results, Recaps, the Care plan report and the
+no-account website request status no longer lead with `XaFigure` or a bar
+chart. They lead with `XaLead` (one sentence in ink plus one quiet clause that
+adds a different fact) and `XaChangeLine` (a 13/500 label, the one change that
+mattered in a sentence naming whoever acted, when, and a "See it" text link).
+The emails use the matching `lead` and `change` blocks in `paper.ts` and
+`xa-mail.ts`. `XaFigure` and `XaClay` stay exported for other lanes; do not
+use them to open a report. `XaChangeLine` keeps its date and "See it" in one
+non-wrapping trailing span (`.changeTail`), so no line starts with "·"; the
+mail `change` blocks do the same, and every email's "See it" uses
+`emailTextLinkStyle` (ink, 600, underlined) from `email/fonts.ts`, which also
+owns the one DM Sans `<link>` all three renderers (paper, XA, Care plan
+report) load. "See it" opens the System of the change, never the primary's
+target; with no System there is no "See it". `XaTextArea` grows with its text
+(`field-sizing: content`) and shows no native resize grip.
 Rails outside the workspace view come from `place-chrome-server.ts`
 (`readOwnerPlaceChrome`: pinned Systems, business name, agency;
 `readAgencyClients`: the agency's clients). `identityColor(id)` gives business

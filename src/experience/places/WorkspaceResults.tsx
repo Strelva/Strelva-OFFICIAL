@@ -2,22 +2,25 @@ import type { ComponentProps } from "react";
 import { XA_PLACE_LABELS } from "@/platform/presentation/place-labels";
 import { StrelvaShell } from "@/experience/app-frame/StrelvaShell";
 import { XaButtonLink, XaLabel, XaRow, XaRows, XaSays, XaStatus, XaSystemTile, XaTextLink } from "@/components/ui/strelva/Xa";
+import type { HandledReceipt } from "@/platform/needs-you/contracts";
+import { systemHref } from "@/experience/systems/model";
 import type { RangeKey } from "@/lib/analytics/period";
 import type { SiteResults, WorkspaceResults } from "@/products/websites/client";
 import { placeHomeHref, type PlaceState } from "./WorkspacePlace";
 import { ResultsRetry } from "./ResultsRetry";
-import { XaFigure, XaLinkSegmented, XaNote, XaPlace, XaPlaceHead, XaPlaceLoading, XaPlaceNotMember, XaPlaceTrouble, xaShortDate } from "./XaPlace";
+import { XaChangeLine, XaLead, XaLinkSegmented, XaNote, XaPlace, XaPlaceHead, XaPlaceLoading, XaPlaceNotMember, XaPlaceTrouble, xaShortDate } from "./XaPlace";
 import place from "./xa-place.module.css";
 import styles from "./workspace-results.module.css";
 
 /**
- * Results (lane xs-leads): one big number for the window, the days under it,
- * then what people searched and where they came from; health shows only as
- * an exception. Presentation only: all counts keep their selected window and
- * original source.
+ * Results (lane results, October 16): one sentence for the window, the one
+ * change that mattered with whoever made it and a link to see it, then what
+ * people searched and where they came from; health shows only as an
+ * exception. No hero number and no bar chart. Presentation only: all counts
+ * keep their selected window and original source.
  */
 const RANGES: Array<{ key: Exclude<RangeKey, "custom">; label: string }> = [
-  // The segment names the window the figure shows ("Last 7 days" is the live window).
+  // The segment names the window the sentence covers ("Last 7 days" is the live window).
   { key: "live", label: "Last 7 days" }, { key: "week", label: "This week" }, { key: "month", label: "This month" },
 ];
 
@@ -29,8 +32,15 @@ export function resultsHref(workspaceId: string, range: RangeKey = "live", windo
 }
 
 const count = (value: number) => value.toLocaleString("en-US");
+/** The window before, as part of a sentence: "vs the previous 7 days" reads "the 7 days before"; "vs last week" reads "last week". */
+export function priorWords(priorLabel: string): string {
+  const bare = priorLabel.replace(/^vs\s+/, "");
+  const days = /^the previous (\d+) days$/.exec(bare);
+  return days ? `the ${days[1]} days before` : bare;
+}
 function change(value: number, priorLabel: string): string {
-  return value === 0 ? `Unchanged ${priorLabel}` : `${value > 0 ? "Up" : "Down"} ${count(Math.abs(value))} ${priorLabel}`;
+  const prior = priorWords(priorLabel);
+  return value === 0 ? `The same as ${prior}` : `${value > 0 ? "Up" : "Down"} ${count(Math.abs(value))} from ${prior}`;
 }
 /** Where a business usually shows up on Google, in words an owner uses (never "rank 2.1"). */
 export function searchPlace(position: number): string {
@@ -59,14 +69,15 @@ export function sourceName(source: string): string {
 export function resultsFinding(site: SiteResults): string | null {
   const stats = site.stats;
   if (!stats?.hasData) return null;
-  const prior = stats.range.priorLabel.replace(/^vs /, "");
+  const prior = priorWords(stats.range.priorLabel);
   const change = stats.pageViewsDelta === 0 ? `Visits held steady against ${prior}.` : `${stats.pageViewsDelta > 0 ? "Up" : "Down"} ${count(Math.abs(stats.pageViewsDelta))} visits from ${prior}.`;
   const top = site.gaPerf?.status === "ok" ? site.gaPerf.topSources.filter(source => source.sessions > 0).sort((a, b) => b.sessions - a.sessions)[0] : undefined;
   const query = site.searchPerf?.status === "ok" ? site.searchPerf.topQueries[0]?.query : undefined;
   const from = top ? sourceName(top.source) : null;
   if (!from) return change;
-  if (from.startsWith("Typed")) return `${change} Most people typed your address or used a bookmark.`;
-  return `${change} Most came from ${from === "Google searches" && query ? `Google searches like \u201c${query}\u201d` : from}.`;
+  // Sources and searches are read over the last 4 weeks, not the selected window, so the clause names its own window.
+  if (from.startsWith("Typed")) return `${change} Over the last 4 weeks, most people typed your address or used a bookmark.`;
+  return `${change} Over the last 4 weeks, most came from ${from === "Google searches" && query ? `Google searches like \u201c${query}\u201d` : from}.`;
 }
 
 /** A page's name as an owner says it, never its path. */
@@ -91,23 +102,54 @@ function SiteHealth({ site }: { site: SiteResults }) {
   </section>;
 }
 
-function Visits({ site }: { site: SiteResults }) {
+/** "in the last 7 days", "this week", "between Oct 1 and Oct 9": the window as part of a sentence. */
+export function resultsWindowPhrase(range: { key: string; label: string }): string {
+  if (range.key === "live") return `in the ${range.label.toLowerCase()}`;
+  if (range.key === "week") return "this week";
+  if (range.key === "month") return "this month";
+  const [from, to] = range.label.split(/\s+[\u2013-]\s+/);
+  return to ? `between ${from} and ${to}` : `in ${range.label}`;
+}
+
+/**
+ * Results' one sentence (lane results, October 16): the visits in the window
+ * in ink, then one quiet clause with a different fact (the change against the
+ * window before, then where most visits came from). Never the same number twice.
+ */
+export function resultsLead(site: SiteResults): { main: string; quiet: string } | null {
+  const stats = site.stats;
+  if (!stats) return null;
+  const window = resultsWindowPhrase(stats.range);
+  if (!stats.hasData) return { main: `No visits to ${site.siteName} were counted ${window}.`, quiet: "It starts filling in as people find you." };
+  const prior = priorWords(stats.range.priorLabel);
+  const moved = stats.pageViewsDelta === 0 ? `The same as ${prior}.` : `${count(Math.abs(stats.pageViewsDelta))} ${stats.pageViewsDelta > 0 ? "more" : "fewer"} than ${prior}.`;
+  const finding = resultsFinding(site);
+  const source = finding?.replace(/^[^.]*\.\s*/, "") ?? "";
+  return { main: `${count(stats.pageViews)} ${stats.pageViews === 1 ? "visit" : "visits"} to ${site.siteName} ${window}.`, quiet: [moved, source].filter(Boolean).join(" ") };
+}
+
+/** The newest recorded change for this business, with whoever acted in its sentence, and where to see it. */
+export interface ResultsChange { sentence: string; at: string; href: string }
+
+/** Picks the change Results leads with from What changed (newest first). Undone changes are skipped. */
+export function resultsChange(handled: readonly Pick<HandledReceipt, "sentence" | "at" | "systemId" | "undo">[] | null | undefined, workspaceId: string): ResultsChange | null {
+  const row = handled?.find(item => item.undo.state !== "undone" && item.sentence.trim());
+  if (!row) return null;
+  const sentence = row.sentence.trim();
+  return { sentence: /[.!?]$/.test(sentence) ? sentence : `${sentence}.`, at: row.at, href: row.systemId ? systemHref("", workspaceId, row.systemId) : placeHomeHref(workspaceId) };
+}
+
+function Visits({ site, latest }: { site: SiteResults; latest: ResultsChange | null | undefined }) {
   const stats = site.stats;
   if (!stats) return <XaPlaceTrouble role="status" title={`Visits for ${site.siteName} couldn't be read right now.`} quiet="Nothing is lost; counting continues." />;
-  const series = stats.series;
-  const max = Math.max(1, ...series.map(day => day.pageViews));
+  const lead = resultsLead(site)!;
   return <section className={styles.visits} aria-label={`Visits, ${stats.range.label}`}>
-    {stats.hasData ? <XaFigure value={count(stats.pageViews)} label={`visits to ${site.siteName}`} note={`${stats.range.label} · ${change(stats.pageViewsDelta, stats.range.priorLabel)}`} />
-      : <XaFigure value="0" label={`visits to ${site.siteName} so far`} note="It starts filling in as people find you." />}
-    {series.length > 1 && stats.pageViews >= 5 ? <figure className={styles.chartFigure}>
-      <div className={styles.chart} role="img" aria-label={`Daily visits for ${stats.range.label}: ${series.map(day => `${day.date}: ${day.pageViews}`).join(", ")}`}>
-        {series.map(day => <span key={day.date} className={styles.bar} style={{ height: `${Math.max(2, day.pageViews / max * 100)}%` }} title={`${xaShortDate(day.date)}: ${count(day.pageViews)} visits`} />)}
-      </div>
-      <figcaption className={styles.chartLabels}><span>{xaShortDate(series[0]!.date)}</span><span className={styles.today}>{stats.range.key === "custom" ? xaShortDate(series[series.length - 1]!.date) : `Today, ${count(series[series.length - 1]!.pageViews)}`}</span></figcaption>
-    </figure> : <p className={place.quiet}>Not enough visits yet to draw the days. This fills in as more people find you.</p>}
+    <XaLead quiet={lead.quiet}>{lead.main}</XaLead>
+    {stats.range.key === "live" && site.anomaly ? <XaSays><b>{site.anomaly.headline}</b> {site.anomaly.why} {site.anomaly.suggestion}</XaSays> : null}
+    {latest ? <XaChangeLine label="The change that mattered" when={xaShortDate(latest.at)} href={latest.href}>{latest.sentence}</XaChangeLine>
+      : latest === null ? <XaChangeLine label="The change that mattered">Nothing on {site.siteName} changed in the last 7 days.</XaChangeLine> : null}
     <p className={place.body}>{stats.hasData ? <>{count(stats.actions)} people clicked to book or call: {count(stats.bookingClicks)} to book, {count(stats.phoneClicks)} to call. {change(stats.actionsDelta, stats.range.priorLabel)}.</> : "No clicks to book or call yet in this window."}</p>
     <p className={place.quiet}>Visits can include repeat visits. A click doesn&apos;t confirm a booking or an answered call.</p>
-    {stats.range.key === "live" && site.anomaly ? <XaSays><b>{site.anomaly.headline}</b> {site.anomaly.why} {site.anomaly.suggestion}</XaSays> : null}
   </section>;
 }
 
@@ -139,14 +181,14 @@ function Sources({ site, connectHref }: { site: SiteResults; connectHref: string
   </section>;
 }
 
-function SiteResultsView({ workspaceId, site }: { workspaceId: string; site: SiteResults }) {
+function SiteResultsView({ workspaceId, site, latest }: { workspaceId: string; site: SiteResults; latest: ResultsChange | null | undefined }) {
   // Google is connected by the owner with their own account, on the Google place.
   const connectHref = `/workspace/google?workspaceId=${encodeURIComponent(workspaceId)}`;
   const answers = site.aiVisibility;
   const milestone = site.milestone;
   return <div className={place.columns}>
     <div className={place.sectionGap}>
-      <Visits site={site} />
+      <Visits site={site} latest={latest} />
       <Searched site={site} connectHref={connectHref} />
       <Sources site={site} connectHref={connectHref} />
     </div>
@@ -175,16 +217,20 @@ function SiteResultsView({ workspaceId, site }: { workspaceId: string; site: Sit
 export type WorkspaceResultsState = PlaceState<WorkspaceResults> | { kind: "loading" };
 type ShellChrome = Partial<Omit<ComponentProps<typeof StrelvaShell>, "children">>;
 
-export function WorkspaceResultsView({ workspaceId, state, range, chrome, hrefFor = resultsHref }: { workspaceId: string; state: WorkspaceResultsState; range: RangeKey; chrome?: ShellChrome; hrefFor?: (workspaceId: string, range: RangeKey) => string }) {
+/**
+ * `latest` is the newest change from What changed (`resultsChange`). Left out
+ * when it couldn't be read, so the line is absent rather than claiming that
+ * nothing changed; `null` means it was read and nothing changed.
+ */
+export function WorkspaceResultsView({ workspaceId, state, range, chrome, hrefFor = resultsHref, latest }: { workspaceId: string; state: WorkspaceResultsState; range: RangeKey; chrome?: ShellChrome; hrefFor?: (workspaceId: string, range: RangeKey) => string; latest?: ResultsChange | null }) {
   const data = state.kind === "ready" ? state.data : null;
   const custom = data?.sites.find(site => site.stats?.range.key === "custom")?.stats?.range;
   const ready = state.kind === "ready";
   const art = <XaSystemTile kind="website" size={56} />;
-  const finding = data?.sites.length === 1 ? resultsFinding(data.sites[0]!) : null;
   return <StrelvaShell title="Results" workspaceId={workspaceId} active="system" {...chrome}>
     <XaPlace label="Results">
       <XaPlaceHead art={art} title="Results" back={{ href: placeHomeHref(workspaceId), label: `Back to ${XA_PLACE_LABELS.today}` }}
-        status={finding || range === "custom" ? <span>{finding}{range === "custom" ? `${finding ? " " : ""}${custom?.label || "Custom window"}.` : ""}</span> : undefined}
+        status={range === "custom" ? <span>{custom?.label || "Custom window"}</span> : undefined}
         aside={ready ? <XaLinkSegmented label="Time window" options={RANGES.map(item => ({ href: hrefFor(workspaceId, item.key), label: item.label, current: range === item.key }))} /> : <XaButtonLink size="sm" href={`/workspace/recaps?workspaceId=${encodeURIComponent(workspaceId)}`}>Recaps</XaButtonLink>} />
       {state.kind === "loading" ? <XaPlaceLoading label="Loading results" />
         : state.kind === "permission" ? <XaPlaceNotMember />
@@ -194,7 +240,7 @@ export function WorkspaceResultsView({ workspaceId, state, range, chrome, hrefFo
               {data && !data.sites.length && !data.denied.length ? <XaPlaceTrouble role="status" pose="waving" title="No site is connected to this business yet." quiet="Results start once a website is connected or published here." /> : null}
               {data?.sites.map(site => <section key={site.tenantId} aria-label={site.siteName} className={place.stack}>
                 {data.sites.length > 1 ? <XaLabel as="h2">{site.siteName}</XaLabel> : null}
-                <SiteResultsView workspaceId={workspaceId} site={site} />
+                <SiteResultsView workspaceId={workspaceId} site={site} latest={data.sites.length === 1 ? latest : undefined} />
               </section>)}
             </>}
     </XaPlace>
