@@ -1,6 +1,6 @@
 "use client";
 
-import { StHead, StPage, StTextButton } from "@/components/ui/strelva/Kit";
+import { XaHeadline } from "@/components/ui/strelva/Xa";
 import styles from "./owner-help.module.css";
 import { useState } from "react";
 import { WorkspaceHelp as WorkspaceHelpForm, type WorkspaceHelpProps } from "./WorkspaceHelpForm";
@@ -15,16 +15,16 @@ export function WorkspaceHelp(props: WorkspaceHelpProps) {
   // business creation a prerequisite. Do not mount an autofocus form while it
   // is hidden in a closed disclosure.
   if (!props.workspaceId && props.initialRequest?.trim()) {
-    return <StPage><section className={styles.businessSetup}>
-      <StHead title="Choose a business for this request." />
+    return <div className={styles.page}><section className={styles.businessSetup}>
+      <XaHeadline size="md" quiet="A request belongs to one business and goes to its agency.">Choose a business for this request.</XaHeadline>
       <BusinessSetupPanel key={props.initialRequest} initialRequest={props.initialRequest} />
       <details onToggle={event => setContactOpen(event.currentTarget.open)}>
-        <summary className="cursor-pointer text-sm">Contact the team without setting up a business</summary>
+        <summary>Contact the team without setting up a business</summary>
         {contactOpen ? <WorkspaceHelpForm {...props} /> : null}
       </details>
-    </section></StPage>;
+    </section></div>;
   }
 
   if (!props.workspaceId) return <WorkspaceHelpForm {...props} />;
-  return <><div className={styles.deliveryLink}><StTextButton href={`/workspace/delivery?businessId=${encodeURIComponent(props.workspaceId)}`}>Review saved requests and delivery deadlines</StTextButton></div><WorkspaceHelpForm {...props} /></>;
+  return <WorkspaceHelpForm {...props} deliveryHref={props.deliveryHref ?? `/workspace/delivery?businessId=${encodeURIComponent(props.workspaceId)}`} />;
 }

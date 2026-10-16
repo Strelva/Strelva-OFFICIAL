@@ -1,10 +1,21 @@
+/* XA scope switcher (AS1 trigger; popover after Linear and Replit's workspace menus). Tokens only. */
 .switcher { position: relative; width: 100%; }
-.trigger { display: flex; align-items: center; gap: 8px; width: 100%; min-height: 44px; border: 0; padding: 4px 0; background: transparent; color: var(--st-text-2); font: inherit; font-size: 14px; text-align: left; cursor: pointer; }
-.trigger > :nth-child(2) { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.initial { display: grid; place-items: center; width: 24px; height: 24px; border-radius: 999px; background: var(--st-inset); font-size: 12px; }
-.menu { position: absolute; top: calc(100% + 4px); left: 0; z-index: 45; width: 300px; max-width: calc(100vw - 40px); padding: 8px; border: 1px solid var(--st-line); border-radius: var(--st-r-md); background: var(--st-surface); box-shadow: var(--st-shadow-float); }
-.menu > p { padding: 4px 8px; color: var(--st-text-3); font-size: 12px; }
-.business { display: flex; width: 100%; min-height: 52px; flex-direction: column; align-items: flex-start; justify-content: center; gap: 4px; padding: 8px 12px; border: 0; border-radius: 8px; background: transparent; color: var(--st-text); text-align: left; font: inherit; font-size: 14px; cursor: pointer; }
-.business:hover, .business[aria-current="true"] { background: var(--st-inset); }
-.links { display: flex; flex-direction: column; align-items: flex-start; margin-top: 8px; padding: 8px; border-top: 1px solid var(--st-line); }
-.trigger:focus-visible, .business:focus-visible { outline: 2px solid var(--st-accent); outline-offset: 2px; }
+.trigger { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 40px; padding: 4px 8px; margin: 0 -8px; border: 0; border-radius: var(--st-r-nav, 10px); background: transparent; color: var(--st-text); font: inherit; font-size: 15px; font-weight: 600; text-align: left; cursor: pointer; transition: background-color var(--motion-fast) var(--ease-settle); box-sizing: content-box; }
+.trigger:hover:not(:disabled), .trigger[aria-expanded="true"] { background: var(--st-hover); }
+.scope { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chevrons { flex-shrink: 0; color: var(--st-text-3); }
+.menu { position: absolute; top: calc(100% + 6px); left: -8px; z-index: 45; box-sizing: border-box; width: 288px; max-width: calc(100vw - 32px); max-height: min(520px, calc(100dvh - 120px)); overflow: auto; padding: 6px; border-radius: 14px; background: var(--st-surface); box-shadow: var(--st-shadow-lg); animation: var(--kf-xa-palette) var(--motion-fast) var(--ease-settle) both; }
+.group + .group { margin-top: 4px; padding-top: 4px; border-top: 1px solid var(--st-line); }
+.groupLabel { margin: 0; padding: 8px 10px 4px; color: var(--st-text-3); font-size: 13px; font-weight: 500; line-height: 18px; }
+.business { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 40px; padding: 6px 10px; border: 0; border-radius: var(--st-r-nav, 10px); background: transparent; color: var(--st-text); font: inherit; font-size: 14px; text-align: left; cursor: pointer; transition: background-color var(--motion-fast) var(--ease-settle); }
+.business:hover:not(:disabled), .business:focus-visible { background: var(--st-hover); }
+.name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.aside { flex-shrink: 0; color: var(--st-text-3); font-size: 13px; font-weight: 400; }
+.check { flex-shrink: 0; color: var(--st-text); visibility: hidden; }
+.business[aria-current="true"] .check { visibility: visible; }
+.links { display: flex; flex-direction: column; margin-top: 4px; padding-top: 4px; border-top: 1px solid var(--st-line); }
+.link { display: flex; align-items: center; min-height: 36px; padding: 6px 10px; border: 0; border-radius: var(--st-r-nav, 10px); background: transparent; color: var(--st-text-2); font: inherit; font-size: 14px; text-align: left; cursor: pointer; }
+.link:hover, .link:focus-visible { background: var(--st-hover); color: var(--st-text); }
+.trigger:focus-visible, .business:focus-visible, .link:focus-visible { outline: 2px solid var(--st-accent); outline-offset: -2px; }
+.business:disabled, .trigger:disabled { cursor: not-allowed; opacity: 0.55; }
+@media (pointer: coarse) { .business, .link { min-height: 44px; } }

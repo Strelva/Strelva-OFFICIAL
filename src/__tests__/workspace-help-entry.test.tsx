@@ -39,8 +39,8 @@ describe("workspace help entry", () => {
       workspaceId: "b9100000-0000-4000-8000-000000000003",
       initialRequest: "Have Strelva build our website.",
     }));
-    expect(html).toContain("Save request");
-    expect(html).toContain("Review saved requests and delivery deadlines");
+    expect(html).toContain("Send request");
+    expect(html).toContain("All requests");
     expect(html).not.toContain("Choose a business for this request.");
   });
 });

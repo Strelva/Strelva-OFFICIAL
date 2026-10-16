@@ -17,18 +17,18 @@ it.each([403, 404])("%s has workspace/account destinations and access guidance i
   const request = vi.fn(async () => Response.json({ error: "Workspace unavailable" }, { status }));
   await act(async () => root.render(<WorkspaceApp request={request as typeof fetch} />));
   expect(node.textContent).toContain("Choose another workspace");
-  expect(node.textContent).toContain("Check your account and email");
+  // XA: one way forward (the pill); the guidance sits in the sentence above it.
   expect(node.querySelector('a[href="/workspace/account"]')).not.toBeNull();
   expect(node.textContent).not.toContain("Try again");
   expect(node.textContent).not.toContain("Sign in");
-  expect(node.textContent).toContain(status === 403 ? "invite the email address" : "ask its owner for a current link");
+  expect(node.textContent).toContain(status === 403 ? "invite the email you sign in with" : "Ask its owner for a current one");
   expect(request).toHaveBeenCalledTimes(1);
 });
 
 it("401 preserves sign-in recovery, and a transient outage still offers Retry", async () => {
   const unauthorized = vi.fn(async () => Response.json({ error: "Please sign in" }, { status: 401 }));
   await act(async () => root.render(<WorkspaceApp request={unauthorized as typeof fetch} />));
-  expect(node.textContent).toContain("Sign in to open your private work.");
+  expect(node.textContent).toContain("Sign in to open your workspace.");
   expect(node.querySelector('a[href^="/sign-in"]')).not.toBeNull();
   const offline = vi.fn(async () => { throw new Error("Network unavailable"); });
   await act(async () => root.render(<WorkspaceApp request={offline as typeof fetch} />));

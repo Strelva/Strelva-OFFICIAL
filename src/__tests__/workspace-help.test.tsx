@@ -12,7 +12,6 @@ function WorkspaceHelp(props: WorkspaceHelpProps) {
 async function chooseAgency() {
   const selector = container.querySelector<HTMLSelectElement>("#request-provider");
   if (!selector || selector.value) return;
-  expect(container.querySelector<HTMLButtonElement>('button[type="button"]')!.disabled).toBe(true);
   await act(async () => { selector.value = selector.options[1]!.value; selector.dispatchEvent(new Event("change", { bubbles: true })); });
 }
 
@@ -90,8 +89,8 @@ describe("workspace help service request", () => {
     expect(body).not.toHaveProperty("agencyWorkspaceId");
 
     await act(async () => pending[1]!.resolve(response({ request: saved })));
-    expect(container.textContent).toContain("Saved for review.");
-    expect(container.textContent).toContain("does not mean an agency accepted it");
+    expect(container.textContent).toContain("Sent to Ordinary Agency for review.");
+    expect(container.textContent).toContain("doesn’t mean they accepted it");
 
     await act(async () => root.render(null));
     await act(async () => root.render(createElement(
@@ -102,8 +101,9 @@ describe("workspace help service request", () => {
     expect(pending).toHaveLength(3);
     await act(async () => pending[2]!.resolve(response({ requests: [saved] })));
     const savedRow = container.querySelector<HTMLButtonElement>("ul button")!;
-    expect(savedRow.textContent).toContain("Pending agency review");
-    expect(savedRow.textContent).toContain("Ordinary Agency");
+    // XS: status only where the owner is needed; a pending request shows who and when.
+    expect(savedRow.textContent).not.toContain("Pending agency review");
+    expect(savedRow.textContent).toContain("Ordinary Agency · Sep 19");
     expect(savedRow.textContent).not.toContain("help_request");
     await act(async () => savedRow.click());
     expect(container.querySelector<HTMLTextAreaElement>("#capability-request")?.value).toBe(saved.request);
@@ -166,12 +166,9 @@ describe("workspace help service request", () => {
       }),
     )));
     await act(async () => pending[0]!.resolve(response({ requests: [] })));
-    const selector = container.querySelector<HTMLSelectElement>("#request-provider")!;
-    expect(Array.from(selector.options).map((option) => option.textContent)).toEqual(["Choose an agency", "North Studio"]);
-    await act(async () => {
-      selector.value = JSON.stringify({ kind: "agency", agencyWorkspaceId: agencyId });
-      selector.dispatchEvent(new Event("change", { bubbles: true }));
-    });
+    // XS: the only agency recipient is preselected; there is no list of one to pick from.
+    expect(container.querySelector("#request-provider")).toBeNull();
+    expect(container.textContent).toContain("Goes to North Studio");
     const field = container.querySelector<HTMLTextAreaElement>("#capability-request")!;
     await act(async () => {
       Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")!.set!.call(field, "Review a private request flow.");
@@ -238,10 +235,10 @@ describe("workspace help service request", () => {
     )));
     await act(async () => pending[0]!.resolve(response({ requests: [withdrawn] })));
     const row = container.querySelector<HTMLButtonElement>("ul button")!;
-    expect(row.textContent).toContain("Withdrawn");
+    expect(row.textContent).toContain("You withdrew it");
     expect(row.textContent).not.toContain("Pending agency review");
     await act(async () => row.click());
-    const saveButton = Array.from(container.querySelectorAll<HTMLButtonElement>("button")).find((button) => ["Saved", "Save request"].includes(button.textContent || ""));
+    const saveButton = Array.from(container.querySelectorAll<HTMLButtonElement>("button")).find((button) => ["Sent", "Send request"].includes(button.textContent || "") || (button.textContent || "").startsWith("Send to "));
     expect(saveButton?.disabled).toBe(true);
     expect(container.textContent).toContain("It cannot be edited.");
   });
@@ -273,7 +270,7 @@ describe("workspace help service request", () => {
     )));
     expect(pending).toHaveLength(3);
     await act(async () => pending[1]!.resolve(response({ request: saved })));
-    expect(container.textContent).not.toContain("Saved for review.");
+    expect(container.textContent).not.toContain("for review. That doesn’t mean");
     await act(async () => pending[2]!.resolve(response({ requests: [] })));
     expect(container.textContent).not.toContain("Request from the first business");
   });

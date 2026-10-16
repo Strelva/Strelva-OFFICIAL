@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { z } from "zod";
 import { useWorkspaceRequest } from "./WorkspaceRequest";
-import { StEmpty, StLabel, StNotice, StPill, StRow, StRows, StSection, StSegmented, StSkeleton, StSurface, StTextButton } from "@/components/ui/strelva/Kit";
+import { XaButton, XaLabel, XaRow, XaRows, XaSays, XaSegmented, XaStatus, XaTextLink, XaWorking } from "@/components/ui/strelva/Xa";
+import styles from "./owner-help.module.css";
 import {
   AGENCY_LEVEL_HELP, AGENCY_LEVEL_LABELS, AGENCY_SCOPE_LABELS, AGENCY_SCOPES, agencyConsentText,
   type AgencyLevel, type AgencyScope,
@@ -25,17 +26,25 @@ const LEVEL_OPTIONS = [
   { value: "full_control" as const, label: AGENCY_LEVEL_LABELS.full_control },
 ];
 
-function scopeSummary(scopes: BusinessAgency["scopes"]): string {
-  const active = scopes.filter(item => item.status === "active");
-  const proposed = scopes.filter(item => item.status === "proposed");
-  const describe = (items: BusinessAgency["scopes"]) => items.map(item => `${AGENCY_SCOPE_LABELS[item.scope]} · ${AGENCY_LEVEL_LABELS[item.level]}`).join(", ");
-  return [active.length ? `Current: ${describe(active)}` : "", proposed.length ? `Proposed: ${describe(proposed)}` : ""].filter(Boolean).join(". ");
+/** Area names inside a sentence: lower case except proper names. */
+function areas(items: BusinessAgency["scopes"]): string {
+  const names = items.map(item => item.scope === "google" ? AGENCY_SCOPE_LABELS[item.scope] : AGENCY_SCOPE_LABELS[item.scope].toLowerCase());
+  return names.length > 1 ? `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}` : names[0] ?? "";
+}
+
+/** What an agency does, as a sentence in GLOSSARY words (Prepare, Full control), never a list of grants. */
+export function agencyAccessSentence(scopes: BusinessAgency["scopes"]): string {
+  const full = scopes.filter(item => item.level === "full_control");
+  const prepare = scopes.filter(item => item.level === "prepare");
+  return [full.length ? `Full control of ${areas(full)}: they make it live.` : "", prepare.length ? `Prepares ${areas(prepare)} for you to approve.` : ""].filter(Boolean).join(" ");
 }
 
 /**
- * Bring in an agency (ADR 0015). The business chooses from a list, never a
- * default; each area gets Prepare or Full control, and the agency accepts
- * before anything changes. Payer, data and ending access stay with the owner.
+ * Bring in an agency (ADR 0015), XA (October 16). The business chooses from
+ * a list, never a default; each area gets Prepare or Full control, and the
+ * agency accepts before anything changes. Payer, data and ending access stay
+ * with the owner. Open rows, one action per row ("Change access"); ending
+ * access sits inside that change, beside the areas it ends.
  */
 export function BringInAgency(props: { workspaceId: string; canManage: boolean; transport?: Transport; initialScope?: AgencyScope }) {
   const request = useWorkspaceRequest();
@@ -103,38 +112,40 @@ function BringInAgencyScreen({ workspaceId, canManage, transport, initialScope }
   const current = new Set(state.agencies.map(agency => agency.agencyWorkspaceId));
   const available = state.directory.filter(agency => !current.has(agency.agencyWorkspaceId));
 
-  return <StSection title="Want it done for you? Bring in an agency." meta="Choose an agency and what it can do. It accepts before anything changes. You keep payment, your data and the choice to end their access.">
-    {state.loading ? <><p role="status">Loading agencies…</p><StSkeleton label="Loading agencies" /></> : state.error ? <StNotice tone="critical" action={<StTextButton onClick={() => void load()}>Try again</StTextButton>}>{state.error}</StNotice> : <>
-      {state.agencies.length ? <StLabel>Your agencies</StLabel> : null}
-      {state.agencies.length ? <StRows label="Your agencies">{state.agencies.map(agency => {
-        const waiting = agency.scopes.some(item => item.status === "proposed");
-        return <StRow key={agency.agencyWorkspaceId} title={agency.name} detail={agency.scopes.length ? scopeSummary(agency.scopes) : "Works on this business"}
-          value={waiting ? "Waiting for them to accept" : agency.ofRecord ? "Your main agency" : undefined}
-          end={canManage ? <span className="flex flex-wrap items-center gap-4"><StTextButton disabled={busy} onClick={() => choose(agency)}>Change access</StTextButton><StTextButton disabled={busy} onClick={() => void send("DELETE", { agencyWorkspaceId: agency.agencyWorkspaceId }, `${agency.name} no longer has access. Your data stays here.`)}>End access</StTextButton></span> : undefined}>
-          {waiting ? <p className="text-sm text-gray-muted">Your proposal is in {agency.name}’s Queue. No scope, price or deadline is agreed yet. You can change the proposal or end access here.</p> : null}</StRow>;
-      })}</StRows> : null}
-      {!canManage ? <p>Only an owner can bring in, change or end an agency.</p> : choosing ? <StSurface label={`${choosing.changing ? "Change access for" : "Bring in"} ${choosing.name}`}>
-        <p className="mb-4"><strong>{choosing.name}</strong> · {choosing.summary}</p>
-        {choosing.changing ? <p className="mb-4 text-sm text-gray-muted">Choose the complete set of areas they should handle. Current access stays in place until they accept. Areas set to Not this end on acceptance. To remove every area now, use End access.</p> : null}
-        <div className="grid gap-3">{AGENCY_SCOPES.map(scope => <div key={scope} className="flex flex-wrap items-center justify-between gap-3">
-          <p className="text-sm font-medium">{AGENCY_SCOPE_LABELS[scope]}</p>
-          <StSegmented label={`${AGENCY_SCOPE_LABELS[scope]} for ${choosing.name}`} value={levels[scope]} options={LEVEL_OPTIONS}
-            disabledValues={takenFullControl.has(scope) ? ["full_control"] : []} disabledReason="Another agency already has full control here."
-            onChange={busy ? undefined : value => setLevels(current => ({ ...current, [scope]: value }))} />
+  return <section className={styles.section} aria-labelledby="bring-in-agency">
+    <XaLabel as="h2" id="bring-in-agency">Want it done for you? Bring in an agency.</XaLabel>
+    <p className={styles.quiet}>The agency accepts before anything changes. You keep payment, your data and the choice to end their access.</p>
+    {state.loading ? <XaWorking title="Reading your agencies" steps={[]} /> : state.error ? <XaSays links={[<XaTextLink key="retry" onClick={() => void load()}>Try again</XaTextLink>]}>{state.error}</XaSays> : <>
+      {state.agencies.length ? <><XaLabel as="h3">Your agencies</XaLabel><XaRows label="Your agencies">{state.agencies.map(agency => {
+        const active = agency.scopes.filter(item => item.status === "active");
+        const proposed = agency.scopes.filter(item => item.status === "proposed");
+        return <XaRow key={agency.agencyWorkspaceId} title={agency.name}
+          detail={<>{active.length ? agencyAccessSentence(active) : agency.ofRecord ? "Your main agency." : "Works on this business."}{proposed.length ? <span className={styles.proposed}><XaStatus kind="waits" size="sm">Waits for them to accept</XaStatus> {agencyAccessSentence(proposed)}</span> : null}</>}
+          action={canManage && !(choosing?.changing && choosing.agencyWorkspaceId === agency.agencyWorkspaceId) ? <XaTextLink onClick={() => { if (!busy) choose(agency); }}>Change access</XaTextLink> : undefined} />;
+      })}</XaRows></> : null}
+      {!canManage ? <p className={styles.quiet}>Only an owner can bring in, change or end an agency.</p> : choosing ? <div className={styles.choosing} role="group" aria-label={`${choosing.changing ? "Change access for" : "Bring in"} ${choosing.name}`}>
+        <p className={styles.choosingTitle}><strong>{choosing.name}</strong> <span>{choosing.summary}</span></p>
+        {choosing.changing ? <p className={styles.quiet}>Choose every area they should handle. Current access stays in place until they accept. Areas set to Not this end when they accept. To remove every area now, use End access.</p> : null}
+        <div className={styles.areas}>{AGENCY_SCOPES.map(scope => <div key={scope} className={styles.area}>
+          <p className={styles.areaName}>{AGENCY_SCOPE_LABELS[scope]}{takenFullControl.has(scope) ? <span className={styles.areaNote}>Another agency has full control here.</span> : null}</p>
+          <XaSegmented label={`${AGENCY_SCOPE_LABELS[scope]} for ${choosing.name}`} value={levels[scope]}
+            options={LEVEL_OPTIONS.map(option => ({ ...option, disabled: option.value === "full_control" && takenFullControl.has(scope) }))}
+            onChange={value => { if (!busy) setLevels(current => ({ ...current, [scope]: value })); }} />
         </div>)}</div>
-        <div className="mt-5 grid gap-2 text-sm text-gray-muted">
-          {selected.some(item => item.level === "prepare") ? <p><strong className="text-warm-black">{AGENCY_LEVEL_LABELS.prepare}:</strong> {AGENCY_LEVEL_HELP.prepare}</p> : null}
-          {selected.some(item => item.level === "full_control") ? <p><strong className="text-warm-black">{AGENCY_LEVEL_LABELS.full_control}:</strong> {AGENCY_LEVEL_HELP.full_control}</p> : null}
+        <div className={styles.consent}>
+          {selected.some(item => item.level === "prepare") ? <p><strong>{AGENCY_LEVEL_LABELS.prepare}:</strong> {AGENCY_LEVEL_HELP.prepare}</p> : null}
+          {selected.some(item => item.level === "full_control") ? <p><strong>{AGENCY_LEVEL_LABELS.full_control}:</strong> {AGENCY_LEVEL_HELP.full_control}</p> : null}
           {selected.length ? <p>{agencyConsentText(choosing.name, selected)}</p> : <p>Choose at least one area.</p>}
         </div>
-        <div className="mt-5 flex flex-wrap items-center gap-4">
-          <StPill disabled={busy || !selected.length} busy={busy} onClick={() => void send("POST", { agencyWorkspaceId: choosing.agencyWorkspaceId, scopes: selected }, `Sent to ${choosing.name}. Nothing changes until they accept.`)}>Send to {choosing.name}</StPill>
-          <StTextButton disabled={busy} onClick={() => setChoosing(null)}>Cancel</StTextButton>
+        <div className={styles.choosingActions}>
+          <XaButton variant="primary" disabled={busy || !selected.length} busy={busy} onClick={() => void send("POST", { agencyWorkspaceId: choosing.agencyWorkspaceId, scopes: selected }, `Sent to ${choosing.name}. Nothing changes until they accept.`)}>Send to {choosing.name}</XaButton>
+          <XaButton variant="quiet" disabled={busy} onClick={() => setChoosing(null)}>Cancel</XaButton>
+          {choosing.changing ? <span className={styles.endAccess}><XaButton variant="quiet" disabled={busy} onClick={() => void send("DELETE", { agencyWorkspaceId: choosing.agencyWorkspaceId }, `${choosing.name} no longer has access. Your data stays here.`)}>End access</XaButton></span> : null}
         </div>
-      </StSurface> : available.length ? <><StLabel>Agencies you can bring in</StLabel><p className="text-sm text-gray-muted">Each agency supplies its own description. Agree the work, price and deadline with your chosen agency before work starts.</p><StRows label="Agencies you can bring in">{available.map(agency => <StRow key={agency.agencyWorkspaceId} title={agency.name} detail={agency.summary}
-          onClick={() => choose(agency)} value="Choose" />)}</StRows></>
-        : <StEmpty>No other agencies are listed yet.</StEmpty>}
+      </div> : available.length ? <><XaLabel as="h3">Agencies you can bring in</XaLabel><p className={styles.quiet}>Each agency writes its own description. Agree the work, price and deadline with the one you choose before work starts.</p><XaRows label="Agencies you can bring in">{available.map(agency => <XaRow key={agency.agencyWorkspaceId} title={agency.name} detail={agency.summary}
+          onClick={() => choose(agency)} meta="Choose" />)}</XaRows></>
+        : <p className={styles.quiet}>No other agencies are listed yet.</p>}
     </>}
-    {message ? <p role="status">{message}</p> : null}
-  </StSection>;
+    {message ? <div role="status"><XaSays>{message}</XaSays></div> : null}
+  </section>;
 }

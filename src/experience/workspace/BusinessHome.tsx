@@ -10,7 +10,7 @@ import { STRELVA_HANDLED_LABEL } from "@/platform/presentation/place-labels";
 import { StrelvaShell, pinnedApps, pinnedSystems, pinnedWebsites, type StrelvaSection } from "@/experience/app-frame/StrelvaShell";
 import { BusinessArrivals } from "@/experience/systems/BusinessArrivals";
 import { SystemList } from "@/experience/systems/SystemList";
-import { SYSTEMS_LABEL, SYSTEMS_LIST_LABEL, HEALTH_LABEL, LIFECYCLE_LABEL, type SystemView } from "@/experience/systems/model";
+import { SYSTEMS_LABEL, SYSTEMS_LIST_LABEL, SYSTEM_KIND_LABEL, HEALTH_LABEL, LIFECYCLE_LABEL, type SystemView } from "@/experience/systems/model";
 import type { OfferingWebsiteBinding, OfferingWebsiteBindingCommand } from "@/platform/offerings";
 import type { WorkspaceSnapshot, WorkspaceSystemActivation, WorkspaceWork } from "./contracts";
 import type { ManagedWorkSummary } from "./workspace-discovery";
@@ -223,10 +223,10 @@ export function BusinessHome({ needs: providedNeeds, agencyHome: providedAgencyH
     systemsReleased
       ? { id: "action-explore", title: "Browse Apps", detail: "Apps you can install and adapt", href: `${appBase}/workspace?view=products&workspaceId=${encodeURIComponent(snapshot.workspaceId)}`, onOpen: () => onNavigate("products") }
       : { id: "action-explore", title: "Get or build an app", detail: "Apps and templates you can adapt", href: `${appBase}/workspace?view=products&workspaceId=${encodeURIComponent(snapshot.workspaceId)}`, onOpen: () => onNavigate("products") },
-    ...snapshot.work.map(work => ({ id: work.id, title: work.title, detail: workspaceWorkLabel(work), href: workHref(work.id), onOpen: () => onOpen(work.id) })),
+    ...snapshot.work.map(work => ({ id: work.id, title: work.title, detail: workspaceWorkLabel(work), kind: work.productId, href: workHref(work.id), onOpen: () => onOpen(work.id) })),
     ...(systemsReleased
-      ? systems.map(system => ({ id: `system-${system.id}`, title: system.name, detail: "System", href: openSystemHref(system.id), onOpen: onOpenSystem ? () => onOpenSystem(system.id) : undefined }))
-      : sites.map(site => ({ id: `site-${site.id}`, title: site.title, detail: "Managed website", href: site.href }))),
+      ? systems.map(system => ({ id: `system-${system.id}`, title: system.name, detail: SYSTEM_KIND_LABEL[system.kind] ?? "System", kind: system.kind, href: openSystemHref(system.id), onOpen: onOpenSystem ? () => onOpenSystem(system.id) : undefined }))
+      : sites.map(site => ({ id: `site-${site.id}`, title: site.title, detail: "Website", kind: "website", href: site.href }))),
     ...deliveryItems.map(item => ({ id: `delivery-${item.id}`, title: item.title, detail: item.detail, href: item.href })),
   ];
   const recentWork = results.map(work => ({ id: work.id, title: work.title, detail: workspaceWorkLabel(work), href: workHref(work.id), onOpen: () => onOpen(work.id) }));

@@ -1,0 +1,52 @@
+/*
+ * XA account (October 16), inside the R1 details shell. The person is the
+ * dominant element; places are open rows with a hairline between, each
+ * saying "Open". Neutral outlined initials (filled tiles are for Systems).
+ * Tokens only; no cards, no shadows.
+ */
+.page { box-sizing: border-box; display: flex; width: 100%; max-width: 760px; flex-direction: column; gap: 44px; padding: clamp(32px, 7vh, 72px) clamp(20px, 5vw, 96px) 48px; }
+.back { align-self: flex-start; margin-bottom: -20px; color: var(--st-text-2); font-size: 14px; font-weight: 500; text-decoration: none; }
+.back::before { content: "← "; }
+.back:hover { color: var(--st-text); }
+.back:focus-visible { outline: 2px solid var(--st-accent); outline-offset: 3px; border-radius: 6px; }
+
+.identity { display: flex; align-items: flex-start; gap: 20px; }
+.identity > :first-child { margin-top: 4px; }
+.identityText { display: flex; min-width: 0; flex: 1; flex-direction: column; gap: 14px; }
+.identityText h1 { overflow-wrap: anywhere; }
+.facts { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 16px; margin: 0; color: var(--st-text-2); font-size: 15px; line-height: 1.5; }
+.signOut { display: inline-flex; flex-direction: column; align-items: flex-start; }
+.textButton { display: inline-flex; align-items: center; gap: 6px; padding: 0; border: 0; background: none; color: var(--st-accent); font: inherit; font-weight: 500; cursor: pointer; }
+.textButton:hover:not(:disabled) { text-decoration: underline; text-underline-offset: 3px; }
+.textButton:disabled { color: var(--st-text-3); cursor: progress; }
+.textButton:focus-visible { outline: 2px solid var(--st-accent); outline-offset: 2px; border-radius: 4px; }
+
+.section { display: flex; flex-direction: column; gap: 8px; }
+.body { margin: 0; color: var(--st-text-2); font-size: 15px; line-height: 1.5; }
+
+.places { margin: 0; padding: 0; list-style: none; }
+.places > li + li { border-top: 1px solid var(--st-line); }
+.place { display: flex; min-height: 56px; align-items: center; gap: 14px; padding: 12px 0; color: var(--st-text); text-decoration: none; }
+.place:focus-visible { outline: 2px solid var(--st-accent); outline-offset: 2px; border-radius: 8px; }
+.place:hover .open { text-decoration: underline; text-underline-offset: 3px; }
+.mark { box-sizing: border-box; display: inline-grid; flex-shrink: 0; place-items: center; width: 32px; height: 32px; border: 1px solid var(--st-line-strong); border-radius: 9px; color: var(--st-text-2); font-size: 14px; font-weight: 500; }
+.mark[data-shape="round"] { border-radius: 999px; }
+.placeText { display: flex; min-width: 0; flex: 1; flex-direction: column; gap: 2px; }
+.placeName { font-size: 15px; font-weight: 500; line-height: 21px; overflow-wrap: anywhere; }
+.placeRole { color: var(--st-text-2); font-size: 13px; line-height: 19px; }
+.open { flex-shrink: 0; color: var(--st-accent); font-size: 14px; font-weight: 500; }
+
+/* The place the sidebar goes back to leads the list, a step larger. */
+.place[data-lead="true"] { min-height: 72px; }
+.place[data-lead="true"] .mark { width: 44px; height: 44px; border-radius: 12px; font-size: 18px; color: var(--st-text); }
+.place[data-lead="true"] .placeName { font-size: 19px; letter-spacing: -0.3px; line-height: 26px; }
+.place[data-lead="true"] .placeRole { font-size: 14px; }
+
+.pebble { display: flex; align-items: flex-start; gap: 12px; margin-top: 8px; color: var(--st-text); font-size: 15px; line-height: 1.45; }
+.pebble p { margin: 0; padding-top: 6px; }
+.srOnly { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+
+@media (max-width: 767px) {
+  .page { gap: 36px; padding: 24px 20px 40px; }
+  .identity { flex-direction: column; gap: 14px; }
+}

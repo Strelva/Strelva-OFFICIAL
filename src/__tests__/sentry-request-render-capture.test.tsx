@@ -19,7 +19,8 @@ it("captures root layout failures while supplying a generic complete document", 
   const error = new Error("fictional sensitive detail");
   const html = renderToStaticMarkup(GlobalError({ error }));
   expect(capture.exception).toHaveBeenCalledWith(error);
-  expect(html).toContain("<html><head></head><body>");
+  expect(html).toMatch(/^<html><head>.*<\/head><body /);
+  expect(html).toContain("Reload Strelva");
   expect(html).not.toContain(error.message);
 });
 it("captures the root route boundary failure while retaining reset UI", () => {

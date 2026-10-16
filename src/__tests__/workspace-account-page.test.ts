@@ -11,6 +11,8 @@ const mocks = vi.hoisted(() => ({
   router: { replace: vi.fn(), refresh: vi.fn() },
   continuationCookie: "",
   readPublicContinuationImport: vi.fn(),
+  getCurrentUserTenants: vi.fn(),
+  getTenantConfig: vi.fn(),
 }));
 
 vi.mock("@/platform/infra/db/server-client", () => ({ getSessionUser: mocks.getSessionUser }));
@@ -18,6 +20,8 @@ vi.mock("@/platform/workspaces", () => ({
   ensurePersonalWorkspace: mocks.ensurePersonalWorkspace,
   listWorkspaces: mocks.listWorkspaces,
 }));
+vi.mock("@/platform/infra/auth", () => ({ getCurrentUserTenants: mocks.getCurrentUserTenants }));
+vi.mock("@/lib/tenants", () => ({ getTenantConfig: mocks.getTenantConfig, isActiveTenant: (config: { status?: string }) => config.status !== "archived" }));
 vi.mock("@/platform/workspace-release", () => ({ workspaceReleaseEnabled: mocks.workspaceReleaseEnabled }));
 vi.mock("@/platform/public-continuations/repository", () => ({ readPublicContinuationImport: mocks.readPublicContinuationImport }));
 vi.mock("next/link", () => ({
@@ -58,6 +62,8 @@ describe("authenticated workspace account context", () => {
     mocks.workspaceReleaseEnabled.mockReturnValue(true);
     mocks.continuationCookie = "";
     mocks.readPublicContinuationImport.mockResolvedValue(null);
+    mocks.getCurrentUserTenants.mockResolvedValue(["harbor"]);
+    mocks.getTenantConfig.mockResolvedValue({ id: "harbor", subdomain: "harbor", siteName: "Harbor Dental", siteUrl: "https://harbordental.com", status: "active" });
     mocks.ensurePersonalWorkspace.mockResolvedValue({
       id: "personal",
       kind: "personal",
@@ -97,14 +103,20 @@ describe("authenticated workspace account context", () => {
     expect(text).toContain("Your account");
     expect(text).toContain("Owner Example");
     expect(text).toContain("owner@example.com");
-    expect(text).toContain("Confirmed");
+    // XS: a confirmed email is the normal case and carries no status word; only "Confirmation needed" shows.
+    expect(text).not.toContain("Confirmation needed");
+    expect(text).toContain("You sign in with a link sent to this email.");
     expect(text).toContain("My work");
-    expect(text).toContain("Personal workspace");
-    expect(text).toContain("Member access");
+    // XA: each place says what it is to this person; access is named only where it differs (read-only).
+    expect(text).toContain("Just you");
+    expect(text).not.toContain("Member access");
     expect(text).toContain("Harbor Dental");
-    expect(text).toContain("Your business");
-    expect(text).toContain("Read-only access");
-    expect(text).toContain("Each site keeps its own people and settings");
+    expect(text).toContain("Client · Read-only access");
+    // XS: the older managed websites are named by their domain, under the glossary words "Your other websites".
+    expect(text).toContain("Your other websites");
+    expect(text).toContain("harbordental.com");
+    expect(text).not.toContain("Managed websites");
+    expect(text).not.toContain("Websites from before workspaces");
     expect(linksFrom(page)).toContain("/workspace?workspaceId=personal");
     expect(linksFrom(page)).toContain("/workspace?workspaceId=customer");
   });
@@ -116,7 +128,7 @@ describe("authenticated workspace account context", () => {
     const page = await WorkspaceAccountPage({});
     const text = textFrom(page);
 
-    expect(text).toContain("Workspace access is temporarily unavailable");
+    expect(text).toContain("Strelva couldn’t read where you work just now. No access or billing changed.");
     expect(text).not.toContain("database password secret");
     expect(text).toContain("Owner Example");
   });

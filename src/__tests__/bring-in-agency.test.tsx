@@ -77,7 +77,7 @@ describe("Bring in an agency (ADR 0015)", () => {
     const sent = calls.find(call => call.init?.method === "POST")!;
     expect(JSON.parse(String(sent.init!.body))).toEqual({ workspaceId: WORKSPACE, agencyWorkspaceId: STRELVA_AGENCY, scopes: [{ scope: "website", level: "full_control" }] });
     expect(container.textContent).toContain("Nothing changes until they accept");
-    expect(container.textContent).toContain("Waiting for them to accept");
+    expect(container.textContent).toContain("Waits for them to accept");
   });
 
   it("keeps full control off where another agency holds it", async () => {
@@ -85,7 +85,7 @@ describe("Bring in an agency (ADR 0015)", () => {
       directory: [{ agencyWorkspaceId: STRELVA_AGENCY, name: "Strelva Agency", summary: "Managed websites." }],
       agencies: [{ agencyWorkspaceId: NORTH, name: "North Studio", seat: true, ofRecord: true, scopes: [{ scope: "website", level: "full_control", status: "active" }] }],
     }));
-    expect(container.textContent).toContain("Website · Full control");
+    expect(container.textContent).toContain("Full control of website: they make it live.");
     await act(async () => byText("Strelva Agency")!.click());
     const website = container.querySelector('[aria-label="Website for Strelva Agency"]')!;
     expect([...website.querySelectorAll("button")].find(button => button.textContent === "Full control")!.disabled).toBe(true);
@@ -114,8 +114,9 @@ describe("Bring in an agency (ADR 0015)", () => {
     await act(async () => { option("Website", "Prepare").click(); option("Google", "Not this").click(); option("Bookings", "Full control").click(); });
     await act(async () => byText("Send to North Studio")!.click());
     expect(writes).toEqual([{ workspaceId: WORKSPACE, agencyWorkspaceId: NORTH, scopes: [{ scope: "website", level: "prepare" }, { scope: "bookings", level: "full_control" }] }]);
-    expect(container.textContent).toContain("Current: Website · Full control, Google · Prepare");
-    expect(container.textContent).toContain("Proposed: Website · Prepare, Bookings · Full control");
+    // XS: access reads as a sentence in glossary words; what is proposed waits, in clay, beside it.
+    expect(container.textContent).toContain("Full control of website: they make it live. Prepares Google for you to approve.");
+    expect(container.textContent).toContain("Waits for them to accept Full control of bookings: they make it live. Prepares website for you to approve.");
     expect(container.textContent).toContain("Nothing changes until they accept");
     await act(async () => byText("Change access")!.click());
     expect(option("Website", "Prepare").getAttribute("aria-checked")).toBe("true");
@@ -144,7 +145,7 @@ describe("Bring in an agency (ADR 0015)", () => {
     await act(async () => byText("Change access")!.click());
     await act(async () => byText("Cancel")!.click());
     expect(writes).not.toHaveBeenCalled();
-    expect(container.textContent).toContain("Current: Website · Prepare");
+    expect(container.textContent).toContain("Prepares website for you to approve.");
   });
 
   it("keeps the proposed choices available when the server rejects an amendment", async () => {
@@ -154,7 +155,7 @@ describe("Bring in an agency (ADR 0015)", () => {
     await act(async () => byText("Send to North Studio")!.click());
     expect(container.textContent).toContain("Another agency already has full control.");
     expect(byText("Send to North Studio")).toBeDefined();
-    expect(container.textContent).toContain("Current: Website · Prepare");
+    expect(container.textContent).toContain("Prepares website for you to approve.");
   });
 
   it("re-reads an unconfirmed amendment before allowing another proposal", async () => {
@@ -169,7 +170,7 @@ describe("Bring in an agency (ADR 0015)", () => {
     await act(async () => byText("Send to North Studio")!.click());
     expect(reads).toBe(2);
     expect(container.textContent).toContain("Outcome not confirmed");
-    expect(container.textContent).toContain("Proposed: Website · Prepare");
+    expect(container.textContent).toContain("Waits for them to accept Prepares website for you to approve.");
     expect(byText("Send to North Studio")).toBeUndefined();
     expect(byText("Change access")).toBeDefined();
   });
