@@ -23,7 +23,7 @@ describe("owner setup keeps the complete ask and check",()=>{
  it("opens Getting started with a typed Ask safely retained for Home",async()=>{
   const navigate=vi.fn();const request=transport(async()=>Response.json(setupResponse()));
   await render(createElement(WorkspaceRequestContext.Provider,{value:request},createElement(BusinessSetupPanel,{initialName:"Juniper",initialRequest:"Fix our hours",gettingStarted:true,navigate})));
-  await submit();expect(navigate).toHaveBeenCalledWith(`/workspace/getting-started?workspaceId=${workspaceId}`);
+  await submit();expect(navigate).toHaveBeenCalledWith(`/workspace/getting-started?workspaceId=${workspaceId}&ask=${conversationId}`);
   expect(readRequestDraft(sessionStorage,requestDraftKey({actorEmail,workspaceId}))).toBe("Fix our hours");
  });
  it("website help chooses an agency after setup without creating the owner's Ask",async()=>{

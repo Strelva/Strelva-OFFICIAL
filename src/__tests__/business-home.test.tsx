@@ -248,7 +248,8 @@ describe("Getting started on owner Home", () => {
   it.each([false, true])("keeps a scoped setup link in navigation and Home with Systems %s", systemsReleased => {
     const html = renderHome([], systemsReleased, { gettingStarted: "incomplete", releases: { systems: systemsReleased, businessSignup: true } });
     expect(html).toContain('/workspace/getting-started?workspaceId=business-1');
-    expect(html).toContain("Read your website or add business details");
+    // With Systems on, an owner's day one is FirstDay (XA · B6): the composer leads, the setup link stays in navigation.
+    expect(html).toContain(systemsReleased ? "Opening Alder Workshop." : "Read your website or add business details");
     expect(renderHome([], systemsReleased, { gettingStarted: "complete", releases: { systems: systemsReleased, businessSignup: true } })).not.toContain('/workspace/getting-started?');
     expect(renderHome([], systemsReleased, { gettingStarted: "incomplete", releases: { systems: systemsReleased, businessSignup: false } })).not.toContain('/workspace/getting-started?');
   });
