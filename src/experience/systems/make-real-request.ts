@@ -10,6 +10,11 @@ import type { MakeRealOutcome } from "./model";
 export const LIVE_YES = XA_YES_LABELS.yes;
 
 /** Who may say yes, in one sentence. Names the owner when known. */
+/** Where a blocked "only the owner" yes leads: People & access, which names who can say yes. */
+export function whoCanSayYesHref(workspaceId: string): string {
+  return `/workspace?${new URLSearchParams({ workspaceId, view: "access" })}`;
+}
+
 export function ownerOnlyReason(ownerName?: string): string {
   return ownerName ? `Only ${ownerName} can say yes to this.` : "Only the owner of this business can say yes to this.";
 }

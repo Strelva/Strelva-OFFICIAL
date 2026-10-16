@@ -107,12 +107,15 @@ describe("Today (O1, O2)", () => {
     expect(html).not.toContain("data-xa-primary");
   });
 
-  it("is a normal morning with what changed beside Pebble when nothing waits", () => {
+  it("is a normal morning with what changed beside it, and no idle Pebble, when nothing waits", () => {
     const html = today({ needs: ready({ items: [] }) });
     expect(html).toContain("Nothing needs you.");
     expect(html).toContain("Since yesterday");
     expect(html).toContain("Strelva renewed the security certificate for harbordental.com.");
-    expect(html).toContain("pose-resting");
+    // Pebble only appears doing a job; resting beside the calendar is decoration.
+    expect(html).not.toContain("pose-resting");
+    // The same composer chrome as when something waits: the business chip stays.
+    expect(html).toContain('title="Asking about Harbor Dental"');
     // Phone rows: one check time above the list, no status on rows that are fine.
     expect(html).toContain("Running for you, checked at 7:02");
     expect(html).not.toContain("Checks passed at");
@@ -132,7 +135,7 @@ describe("Today (O1, O2)", () => {
     expect(down).toContain("Pebble is on Bookings");
     expect(down).toContain("The booking page stopped loading at 6:40.");
     expect(down).toMatch(/See it<\/button>.*Running<\/button>/);
-    expect(today({ needs: { status: "error", message: "x" } })).toContain("I could not check what waits for you.");
+    expect(today({ needs: { status: "error", message: "x" } })).toContain("Strelva could not check what waits for you.");
   });
 });
 
@@ -177,15 +180,16 @@ describe("The prepared change and right after (O3, O4)", () => {
     expect(html).toContain("Insurance we take: Cigna, MetLife, Delta Dental (new)");
   });
 
-  it("after a turn-on with no one-tap undo, offers Roll it back, which asks Strelva for it", async () => {
+  it("after a turn-on with no one-tap undo, says rolling back is its own change and keeps a link that asks Strelva for it", async () => {
     vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
     const node = document.createElement("div"); document.body.append(node);
     const root = createRoot(node);
     const onAsk = vi.fn();
     const receipt = { ...yesReceipt(), undo: { state: "undo_needs_review" as const, reason: "Rolling it back is its own change. Ask Strelva and it rolls back step by step." } };
     await act(async () => root.render(createElement(OwnerDecisionView, { businessName: HARBOR.name, needs: ready({ items: [], handled: [...SINCE, receipt] }), pending: null, notices: { [decision().id]: { tone: "done", text: "Done." } }, initialDecided: decision(), selectedId: decision().id, now: PREVIEW_NOW, onDecide: noop, onUndo: noop, onRetry: noop, onToday: noop, onWhatChanged: noop, onOpenDecision: noop, onAsk })));
-    expect([...node.querySelectorAll("button")].some(button => button.textContent === "Undo")).toBe(false);
-    await act(async () => [...node.querySelectorAll("button")].find(button => button.textContent === "Roll it back")!.click());
+    expect([...node.querySelectorAll("button")].some(button => button.textContent === "Undo" || button.textContent === "Roll it back")).toBe(false);
+    expect(node.textContent).toContain("Rolling it back is its own change.");
+    await act(async () => [...node.querySelectorAll("button")].find(button => button.textContent === "Ask Strelva to roll it back")!.click());
     expect(onAsk).toHaveBeenCalledWith(expect.stringContaining("Roll back"));
     await act(async () => root.unmount());
   });

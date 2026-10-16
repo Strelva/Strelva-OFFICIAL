@@ -12,7 +12,6 @@
  * the caller (useNeedsYou).
  */
 import { useState, useSyncExternalStore } from "react";
-import { Check } from "lucide-react";
 import {
   XaAnswers, XaButton, XaComposer, XaDecision, XaEmpty, XaHeadline, XaLabel, XaPebbleScene, XaSays, XaStatus, XaSystemTile, XaTextLink, XaYes,
 } from "@/components/ui/strelva/Xa";
@@ -115,7 +114,8 @@ export function OwnerDecisionView({ businessName, needs, pending, notices, selec
     : phase === "undone" ? { headline: undoneHere === item.id ? "You took it back." : "It was taken back.", quiet: "Strelva recorded the undo in What changed." }
       : { headline: decisionHeadline(item), quiet: yesConsequence(item) };
   const canUndo = canDecide && ready?.authority !== "agency" && receipt?.undo.state === "undo";
-  // No one-tap undo, but a way back exists as its own change (Make real, a release, a revert): the pill asks Strelva for it.
+  // No one-tap undo, but a way back exists as its own change (Make real, a release, a revert). No pill pretends to be Undo:
+  // the sentence says so and a text link asks Strelva for it, and it stays after the window.
   const rollBack = !canUndo && canDecide && ready?.authority !== "agency" && receipt?.undo.state === "undo_needs_review" && onAsk ? () => onAsk(`Roll back "${item.title}".`) : undefined;
   const undoReason = receipt && "reason" in receipt.undo ? receipt.undo.reason : null;
   const answers: [string, string][] = after
@@ -137,7 +137,7 @@ export function OwnerDecisionView({ businessName, needs, pending, notices, selec
   const meta = after ? undefined
     : phase === "undone" ? undefined
       : [byShort ? `Prepared by ${byShort}` : null, now === null ? "" : relativeWhen(item.openedAt, now)].filter(Boolean).join(", ") || undefined;
-  const disabledReason = item.review === null ? <>This changed or could not be loaded. <XaTextLink onClick={onRetry}>Check again</XaTextLink> to see the latest before deciding.</> : undefined;
+  const disabledReason = item.review === null ? "This changed or could not be loaded. See the latest before deciding." : undefined;
   const audience = preview?.audience;
   const where = preview?.address ?? system?.name ?? null;
   const panelLabel = audience ? previewLabel(phase, audience)
@@ -163,11 +163,10 @@ export function OwnerDecisionView({ businessName, needs, pending, notices, selec
     </div>
     <div className={styles.panel}>
       <XaDecision label={`Decision for ${businessName}: ${item.title}`} status={status} meta={meta}
-        yes={!canDecide && phase === "waiting" ? <p className={styles.recordNote}>Only the owner can decide this. You can see what waits and what each choice does.</p> : <XaYes state={phase} yesLabel={label} disabledReason={disabledReason}
+        yes={!canDecide && phase === "waiting" ? <p className={styles.recordNote}>Only the owner can decide this. You can see what waits and what each choice does.</p> : <XaYes state={phase} yesLabel={label} disabledReason={disabledReason} unblock={<XaTextLink onClick={onRetry}>Check again</XaTextLink>}
           onYes={() => { setDecided(item); setExpired(false); onDecide(item, "approve"); }}
           onNotYet={canDecide && item.review !== null ? () => { onDecide(item, "not_yet"); onToday(); } : undefined}
-          onUndo={canUndo && receipt ? () => { setUndoneHere(item.id); onUndo(receipt); } : rollBack}
-          undoLabel={rollBack ? "Roll it back" : undefined}
+          onUndo={canUndo && receipt ? () => { setUndoneHere(item.id); onUndo(receipt); } : undefined}
           onUndoExpired={() => setExpired(true)}
           working={phase === "going" ? { title: "Going ahead", steps: [] } : undefined}
           liveLabel={where ? `${live ? "Live" : "Done"} on ${where}` : `${live ? "Live" : "Done"}: ${item.title}`}
@@ -181,16 +180,17 @@ export function OwnerDecisionView({ businessName, needs, pending, notices, selec
       </XaDecision>
     </div>
     <div className={styles.briefBody}>
-      {/* The panel's status and the Undo pill already say Live and where; the truths say what is now so. */}
-      {truths.length ? <div className={styles.truths}>
-        <ul aria-label="What is true now">{truths.map(line => <li key={line}><Check size={15} strokeWidth={2.2} aria-hidden="true" />{line}</li>)}</ul>
-      </div> : null}
+      {/* The panel's status and the Undo pill already say Live and where; what Strelva read back stays one click away, never a list of checks. */}
+      {truths.length ? <details className={styles.truths}>
+        <summary>What Strelva read back</summary>
+        <ul aria-label="What is true now">{truths.map(line => <li key={line}>{line}</li>)}</ul>
+      </details> : null}
       {answers.length ? <XaAnswers rows={answers} labelWidth={156} /> : null}
       {phase === "waiting" && others.length ? <XaSays links={others.slice(0, 2).map(other => <XaTextLink key={other.id} onClick={() => onOpenDecision(other.id)}>{other.title}</XaTextLink>)}>
         {others.length === 1 ? "One more waits after this:" : `${others.length} more wait after this:`}
       </XaSays> : null}
-      {after || phase === "undone" ? <XaSays links={[<XaTextLink key="today" onClick={onToday}>Back to Home</XaTextLink>, <XaTextLink key="changed" onClick={onWhatChanged}>What changed</XaTextLink>]}>
-        {phase === "undone" ? "It is back the way it was before your yes." : others.length ? `${others.length === 1 ? "One more waits" : `${others.length} more wait`} for you on Home.` : "Nothing else waits for you."}
+      {after || phase === "undone" ? <XaSays links={[...(after && rollBack ? [<XaTextLink key="back" onClick={rollBack}>Ask Strelva to roll it back</XaTextLink>] : []), <XaTextLink key="today" onClick={onToday}>Back to Home</XaTextLink>, <XaTextLink key="changed" onClick={onWhatChanged}>What changed</XaTextLink>]}>
+        {phase === "undone" ? "It is back the way it was before your yes." : `${after && rollBack ? "Rolling it back is its own change. " : ""}${others.length ? `${others.length === 1 ? "One more waits" : `${others.length} more wait`} for you on Home.` : "Nothing else waits for you."}`}
       </XaSays> : null}
     </div>
     {onAsk && phase === "waiting" && canDecide ? <div className={styles.briefDock}>

@@ -236,13 +236,15 @@ export function WorkspaceBookings({ workspaceId, state, view, rulesEnabled = fal
   const back = <a className={x.back} href={homeHref}>‹ Home</a>;
   const booked = ready?.sites.reduce((n, s) => n + s.bookings.filter(b => !OFF.has(b.status) && b.status !== "held").length, 0) ?? 0;
   const waiting = ready?.sites.reduce((n, s) => n + s.bookings.filter(b => WAITS.has(b.status)).length, 0) ?? 0;
+  // Said beside "booked" so the count adds up wherever else the week is counted (no-shows were booked too).
+  const noShows = ready?.sites.reduce((n, s) => n + s.bookings.filter(b => b.status === "no_show").length, 0) ?? 0;
   const paused = ready?.sites.some(s => s.evidence?.paused) ?? false;
   const status = !ready ? undefined : paused ? { kind: "draft" as const, label: "Paused" } : waiting ? { kind: "waits" as const, label: `${waiting} ${waiting === 1 ? "booking waits" : "bookings wait"} for ${ready.readOnly ? "the owner" : "you"}` } : ready.sites.length ? { kind: "live" as const, label: "Taking bookings" } : undefined;
   const says = ready && !ready.readOnly ? weekSentence(ready.sites, workspaceId, ready.source) : null;
   return (
     <div data-dashboard data-workspace-theme="linen"><div className={x.screen}>
       <SystemHead kind="bookings" back={back} title="Bookings" status={status} tone={waiting && !paused ? "waits" : undefined}
-        line={ready ? <>{heading} · {booked} booked</> : heading}
+        line={ready ? <>{heading} · {booked} booked{noShows ? ` · ${noShows} ${noShows === 1 ? "no-show" : "no-shows"}` : ""}</> : heading}
         actions={ready ? <nav aria-label="Bookings view" className={x.views}>{(["day", "week"] as const).map(value => <a key={value} href={href(workspaceId, value, ready.from, ready.source)} aria-current={view === value ? "page" : undefined}>{value === "day" ? "Day" : "Week"}</a>)}</nav> : undefined} />
       {state.kind === "permission" ? <XaEmpty size="sm" bare pose="alone" title="These bookings belong to another business" job="Pebble kept them closed to your account" action={<XaButtonLink href="/workspace">Go to Home</XaButtonLink>}>Your account isn&apos;t a member of this business. Ask its owner to invite you, or open your own workspace.</XaEmpty>
         : state.kind === "error" ? <XaEmpty size="sm" bare pose="fixing" title="Bookings couldn't load just now" job="Pebble kept every booking. Visitors can still book." action={<XaTextLink href={href(workspaceId, view)}>Reload</XaTextLink>} />

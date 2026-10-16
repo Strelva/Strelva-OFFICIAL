@@ -25,7 +25,7 @@ export function PhotoDetail({ asset, onClose, onDelete, initialConfirming = fals
   if (asset?.id !== prevAssetId) {
     setPrevAssetId(asset?.id);
     setCopied(false);
-    setConfirmingDelete(false);
+    setConfirmingDelete(initialConfirming);
     setDeleting(false);
     setDeleteFailed(false);
   }
@@ -77,9 +77,9 @@ export function PhotoDetail({ asset, onClose, onDelete, initialConfirming = fals
       <img src={asset.url} alt={caption} className="max-h-[300px] w-full rounded-[var(--st-r-md)] object-contain" />
       <p className="m-0 text-[14px] text-[var(--st-text-2)]">Ask Strelva to put it on any part of your site, or copy its address.</p>
       {confirmingDelete && onDelete ? <div className="flex flex-col gap-3 border-t border-[var(--st-line)] pt-4">
-        {/* Asked in place, under the photo it deletes: no sheet over the library. A delete has no server undo, so the pill is the confirmation. */}
+        {/* Asked in place, under the photo it deletes: no sheet over the library. The library holds the delete for the Undo window. */}
         <XaYes state={deleting ? "going" : deleteFailed ? "failed" : "waiting"} shortcut={false} block={false}
-          question="Delete this photo? It comes out of your photo library, and any part of your site still using it loses the image."
+          question="Delete this photo? It comes out of your photo library, and any part of your site still using it loses the image. Undo brings it back for a few seconds."
           yesLabel="Delete the photo" notYetLabel="Keep it" onYes={() => void handleConfirmDelete()} onNotYet={() => { setConfirmingDelete(false); setDeleteFailed(false); }}
           working={{ title: "Deleting the photo", steps: [{ id: "delete", label: `Taking ${caption} out of your library`, state: "active" }] }}
           failure="The photo couldn't be deleted. It is still in your library." />
@@ -90,22 +90,10 @@ export function PhotoDetail({ asset, onClose, onDelete, initialConfirming = fals
     </div>
   );
 
+  // Desktop: beside the library. Phone: in place of the grid, in the page's own flow (no sheet or scrim).
   return (
-    <>
-      {/* Desktop: the photo opens beside the library */}
-      <div className="hidden w-[340px] shrink-0 flex-col overflow-y-auto border-l border-[var(--st-line)] bg-[var(--st-surface)] md:flex">
-        {detail}
-      </div>
-
-      {/* Mobile: bottom sheet overlay */}
-      <div className="md:hidden fixed inset-0 z-50 flex flex-col justify-end">
-        {/* Backdrop */}
-        <div className="absolute inset-0 bg-[#16171566]" onClick={onClose} />
-        {/* Sheet */}
-        <div className="relative max-h-[85vh] overflow-y-auto rounded-t-[var(--st-r-lg)] bg-[var(--st-surface)] animate-fade-in-up">
-          {detail}
-        </div>
-      </div>
-    </>
+    <div className="flex w-full shrink-0 flex-col bg-[var(--st-surface)] max-md:rounded-[var(--st-r-lg)] max-md:border max-md:border-[var(--st-line)] md:w-[340px] md:overflow-y-auto md:border-l md:border-[var(--st-line)]" aria-label={`Photo: ${photoCaption(asset.filename)}`} role="region">
+      {detail}
+    </div>
   );
 }

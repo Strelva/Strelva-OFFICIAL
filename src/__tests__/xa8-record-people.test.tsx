@@ -97,7 +97,7 @@ describe("People & access (XA · R3–R5)", () => {
     await act(async () => (node.querySelector("form") as HTMLFormElement).requestSubmit());
     const post = calls.find(call => call.url === "/api/workspace-invitations");
     expect(JSON.parse(String(post?.init?.body))).toEqual({ workspaceId, recipientEmail: "desk@harbordental.com", role: "member" });
-    expect(node.textContent).toContain("I never email it for you.");
+    expect(node.textContent).toContain("Strelva never emails it for you.");
     expect((node.querySelector('input[readonly]') as HTMLInputElement).value).toContain("/workspace/invitations/accept/t0k");
   });
 

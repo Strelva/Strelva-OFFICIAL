@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { z } from "zod";
 import { StEmpty, StNotice, StPill, StRow, StRows, StSection, StTextButton } from "@/components/ui/strelva/Kit";
-import { XaYes } from "@/components/ui/strelva/Xa";
+import { XaTextLink, XaYes } from "@/components/ui/strelva/Xa";
 import { XA_YES_LABELS } from "@/platform/presentation/place-labels";
 import { ownerDecisionSchema, type OwnerDecision } from "@/platform/needs-you/contracts";
 import { actorCopy, actorLabel } from "@/platform/presentation/actor";
@@ -30,7 +30,7 @@ export function AgencyDecisionRows({ items, busy, onDecide }: { items: OwnerDeci
     return <StRow key={item.id} align="start" title={item.title} detail={actorLabel(item.actor)} end={<div className="flex flex-wrap items-center gap-3">
       {item.openHref?.startsWith("/") ? <StTextButton href={item.openHref}>Open preview</StTextButton> : null}
       <XaYes state={busy ? "going" : "waiting"} block={false} shortcut={items.length === 1} yesLabel={label} yesAriaLabel={`${label}: ${item.title}`} notYetAriaLabel={`Not yet: ${item.title}`}
-        disabledReason={item.review === null ? "The exact changes could not be loaded. Refresh before deciding." : undefined} disabled={busy} working={{ title: "Working…", steps: [] }}
+        disabledReason={item.review === null ? "The exact changes could not be loaded. Refresh before deciding." : undefined} unblock={<XaTextLink onClick={() => window.location.reload()}>Refresh</XaTextLink>} disabled={busy} working={{ title: "Working…", steps: [] }}
         onYes={() => onDecide(item, "approve")} onNotYet={item.review === null ? undefined : () => onDecide(item, "not_yet")} />
     </div>}>
       {item.review?.length ? <ul aria-label="Every change you approve" className="space-y-1">{item.review.map((line, index) => <li key={index} className="whitespace-pre-wrap break-words">{line}</li>)}</ul> : item.detail ? <p>{item.detail}</p> : null}

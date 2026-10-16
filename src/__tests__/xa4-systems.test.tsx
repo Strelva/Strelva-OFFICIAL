@@ -54,8 +54,13 @@ describe("XA · S5 A Possibility", () => {
     expect(request.mock.calls.some(([url]) => String(url).startsWith("/api/workspace?"))).toBe(true);
     expect(node.textContent).toContain("Book a visit is at the top of harbordental.com.");
     expect(node.textContent).not.toContain("Reload");
-    // Undo after Live: rolling it back is its own change, asked of Strelva.
-    await act(async () => button(node, "Roll it back")!.click());
+    // Live: the live page alone (read again), no Proposed beside it, and no trail of checks.
+    expect(node.querySelectorAll("iframe")).toHaveLength(1);
+    expect(node.textContent).not.toContain("Proposed");
+    // No pill pretends to be Undo: rolling it back is its own change, and the link that asks for it stays.
+    expect(button(node, "Roll it back")).toBeUndefined();
+    expect(node.textContent).toContain("Rolling it back is its own change.");
+    await act(async () => button(node, "Ask Strelva to roll it back")!.click());
     expect(onAsk).toHaveBeenCalledWith(expect.stringContaining("Roll back"));
   });
 

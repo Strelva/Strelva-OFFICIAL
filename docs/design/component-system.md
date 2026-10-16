@@ -334,6 +334,20 @@ has no server Undo. `StComposerBar` is a deprecated wrapper that renders
 `XaComposer` (a string `scope` becomes its scope chip), and `WorkspaceComposer`
 draws `XaComposer` in every tone. See `design-notes/XA-FOUNDATION.md`.
 
+October 16 owner-lane critic pass (kit):
+- `XaYes` with `disabledReason` now requires `unblock` (type `XaUnblock`, never
+  empty): a blocked yes always carries the action or text link that clears it.
+- `XaWaiting` is a line above the composer field with a hairline under it, not
+  a filled card inside the composer card. Owner Home passes the business scope
+  chip in every state, so the composer chrome never changes with what waits.
+- While `XaUndoDock` is mounted, the page that scrolls under it reserves the
+  pill's height (the composer-dock rule), so nothing is left covered.
+- The entry felt (`XaEntry` stage) and `XaPebbleScene`'s circle are one flat
+  felt tone: no radial haze. With a panel, the entry's account links sit at
+  the page's right edge over the panel corner, not where the task column ends.
+- `PhotoLibrary` deletes softly for the Undo window; `PhotoDetail` opens beside
+  the grid on desktop and in place of it on a phone (no sheet or scrim).
+
 October 12 legacy adoption adds [StChoiceCards / StChoiceLink](../../src/components/ui/strelva/ChoiceCards.tsx):
 full-card account choices use native radio semantics, a shared group name, visible
 focus and kit-selected marks; route-backed choices use the same card with

@@ -132,8 +132,8 @@ export function WebsiteHistoryView({ workspaceId, systemId, siteName, state, sys
       {showLive ? <XaPage bleed flat address={address || siteName} label={`${siteName} as visitors see it now`}>
         <iframe className={styles.sheetFrame} title={`${siteName} as visitors see it now`} src={livePreviewSrc} sandbox={sandbox(livePreviewSrc)} loading="lazy" referrerPolicy="no-referrer" tabIndex={-1} />
       </XaPage> : <XaSays>{index === 0
-        ? `${titleOf(selected)}. This is the newest change, and I didn't keep a picture of the page from it.`
-        : `I didn't keep a picture of ${siteName} from ${day(selected.at)}, so its change is named here instead: ${titleOf(selected).replace(/[.?!]+$/, "")}.`}</XaSays>}
+        ? `${titleOf(selected)}. This is the newest change, and Strelva didn't keep a picture of the page from it.`
+        : `Strelva didn't keep a picture of ${siteName} from ${day(selected.at)}, so its change is named here instead: ${titleOf(selected).replace(/[.?!]+$/, "")}.`}</XaSays>}
       <XaAnswers labelWidth={110} rows={[
         ...(showLive ? [["Changed", titleOf(selected)] as const] : []),
         ...(selected.deployment ? [["Checked", CHECKED[selected.deployment.readBack]] as const] : []),

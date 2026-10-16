@@ -212,7 +212,7 @@ export function DeliveryCommitmentPanel({ requestId, children }: { requestId: st
     </form>
   </XaDecision>
     : actions.includes("agree") ? <XaDecision label="Agree the scope" status={<XaStatus kind="waits">Waiting on you</XaStatus>} meta={people.agency ?? undefined}
-      yes={<XaYes state={saving ? "going" : "waiting"} yesLabel="Agree and start" onYes={() => void submit({ kind: "agree" })} disabledReason={pending ? "Send your last change again first." : undefined} />}>
+      yes={<XaYes state={saving ? "going" : "waiting"} yesLabel="Agree and start" onYes={() => void submit({ kind: "agree" })} disabledReason={pending ? "Send your last change again first." : undefined} unblock={<XaTextLink onClick={() => void submit()}>{saving ? "Sending it again" : "Send the same change again"}</XaTextLink>} />}>
       <p className={styles.lead}>{commitment?.deliveryDefinition}</p>
       <XaNote>{people.operator ?? people.agency ?? "Your agency"} starts as soon as you agree and has 24 hours. Agreeing doesn&apos;t approve a charge or publish anything.</XaNote>
     </XaDecision>
@@ -231,7 +231,7 @@ export function DeliveryCommitmentPanel({ requestId, children }: { requestId: st
         </form>
       </XaDecision>
         : decides ? <XaDecision label="Your decision" status={reviewing ? <XaStatus kind="waits">Waiting on you</XaStatus> : commitment?.blocker ? <XaStatus kind="waits">Blocked</XaStatus> : <XaStatus kind="working">In progress</XaStatus>} meta={due ? `Due ${due}` : undefined}
-          yes={reviewing ? <XaYes state={saving ? "going" : "waiting"} yesLabel="Accept it" onYes={() => void submit({ kind: "accept_result", note: note.trim() || "Accepted without a note." })} disabledReason={pending ? "Send your last change again first." : undefined} /> : null}>
+          yes={reviewing ? <XaYes state={saving ? "going" : "waiting"} yesLabel="Accept it" onYes={() => void submit({ kind: "accept_result", note: note.trim() || "Accepted without a note." })} disabledReason={pending ? "Send your last change again first." : undefined} unblock={<XaTextLink onClick={() => void submit()}>{saving ? "Sending it again" : "Send the same change again"}</XaTextLink>} /> : null}>
           {result}
           {commitment?.blocker ? <XaNote tone="waits">{commitment.blocker.note}.</XaNote> : null}
           {reviewing ? <>

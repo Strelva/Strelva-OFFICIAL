@@ -93,11 +93,11 @@ function claimDate(value: string): string {
 }
 
 /** The claim's entry frame (XA · C1, C2): the business keeps running on the right while the owner decides. */
-function ClaimEntry({ children, agencyName, businessName, footnote, mode, aside, corner, asideOnPhone }: { children: ReactNode; agencyName?: string; businessName?: string; footnote?: ReactNode; mode?: "light" | "dark"; aside?: ReactNode; corner?: ReactNode; asideOnPhone?: "below" | "hidden" }) {
+function ClaimEntry({ children, agencyName, businessName, footnote, mode, aside, corner, asideOnPhone }: { children: ReactNode; agencyName?: string; businessName?: string; footnote?: ReactNode; mode?: "light" | "dark"; /** null: no panel at all. */ aside?: ReactNode; corner?: ReactNode; asideOnPhone?: "below" | "hidden" }) {
   // C1: the panel is where "keeps running" is said, once, with Pebble tending the site.
   // On a phone it drops; a small Pebble sits beside "set this up for you" instead.
   return <XaEntry mode={mode} corner={corner} asideOnPhone={asideOnPhone ?? (aside ? "below" : "hidden")} footnote={footnote ?? (agencyName ? `Runs on Strelva. Same account as strelva.com.` : undefined)}
-    aside={aside ?? (businessName ? <>
+    aside={aside === null ? undefined : aside ?? (businessName ? <>
       <XaPebbleScene pose="adds" size={360} bare label={`Pebble tending ${businessName}’s site`} />
       <XaEntryCaption title={`${businessName} keeps running.`}>Nothing on it changes until you say so.</XaEntryCaption>
     </> : undefined)}>
@@ -110,29 +110,30 @@ function ClaimSetUpBy({ agencyName }: { agencyName: string }) {
 }
 
 /**
- * XA · C2: the owner owns it. One way in. Pebble hands over the clipboard: the
- * panel shows the first thing waiting in their business, as their composer
- * will show it, when the claim response says how many details wait.
+ * XA · C2: the owner owns it. One way in. The panel is a true preview: the
+ * first thing waiting in their business, as their composer will show it, when
+ * the claim response says how many details wait. With nothing waiting there
+ * is no panel; an idle Pebble would be decoration. The column says who
+ * confirms the details and when, never the count the preview already shows.
  */
 export function ClaimOwned({ workspaceId, workspaceName, agencyName, lead, agencyLine, waiting, mode, children }: { workspaceId: string; workspaceName: string; agencyName: string | null; lead: string | null; agencyLine?: string; waiting?: number | null; mode?: "light" | "dark"; children?: ReactNode }) {
   const agency = agencyName ?? "Your agency";
   const details = waiting === 1 ? "1 detail" : `${waiting} details`;
-  return <ClaimEntry mode={mode} footnote="Runs on Strelva. Same account as strelva.com." aside={<>
-    <XaPebbleScene pose="waving" size={320} bare label={waiting ? `Pebble handing over ${details} to confirm` : "Pebble handing over the clipboard"} />
-    {waiting ? <div className={styles.seen}>
+  // Said once: the preview shows how many wait; the row says who confirms them and when.
+  const detailsRow = waiting ? `You confirm them on Home, the first time you open ${workspaceName}.` : lead;
+  return <ClaimEntry mode={mode} footnote="Runs on Strelva. Same account as strelva.com." aside={waiting ? <div className={styles.seen}>
       <XaLabel>The first thing you’ll see</XaLabel>
       <div className={styles.seenComposer} inert aria-hidden="true">
         <XaWaiting item={{ kicker: <>Waits for you · from {agency}</>, title: `Confirm ${details} read from your site`, from: { name: agency, color: "#2f5236" }, action: null }} />
       </div>
-    </div> : <XaEntryCaption title={`${agency}’s changes come to you first.`} />}
-  </>}>
+    </div> : null}>
     <XaEntryStack>
       <p className="sr-only" role="status">{workspaceName} is yours. You’re the owner.</p>
       <XaHeadline quiet={`${agency}’s changes come to you first.`}>You own {workspaceName}.</XaHeadline>
       <XaAnswers labelWidth={124} rows={[
         ["You decide", <>What goes live, and who works on {workspaceName}.</>],
         [agency, agencyLine ?? "Prepares changes and asks you first. You can end their access at any time."],
-        ...(lead ? [["Your details", lead] as const] : []),
+        ...(detailsRow ? [["Your details", detailsRow] as const] : []),
       ]} />
       {children}
       <XaButtonLink variant="primary" size="lg" block href={`/workspace?workspaceId=${encodeURIComponent(workspaceId)}`}>Open {workspaceName}</XaButtonLink>

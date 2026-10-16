@@ -221,7 +221,7 @@ describe("XA · E6 Today on the phone (the real Home)", () => {
   });
   it("says it could not check what waits, and keeps the composer", () => {
     const html = renderToStaticMarkup(createElement(OwnerToday, { ...base, needs: { status: "error", message: "Your decisions could not be checked." } }));
-    expect(html).toContain("I could not check what waits for you.");
+    expect(html).toContain("Strelva could not check what waits for you.");
     expect(html).toContain("Check again");
     expect(html.match(/<textarea/g)).toHaveLength(1);
   });

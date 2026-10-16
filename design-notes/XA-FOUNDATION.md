@@ -121,6 +121,9 @@ tabular figures. Geist Mono is no longer loaded.
 4. **undone** or **expired.** One settled sentence.
 5. **failed.** Pebble says what happened in one sentence, followed by "Try again".
 
+A blocked yes (`disabledReason`) must pass `unblock`, the action or text link
+that clears it; the type will not allow one without the other (October 16).
+
 The caller owns authority and the server call. October 16: there is no other
 yes gesture. Press-and-hold is gone; every non-preview caller of `StHold` now
 renders `XaYes`, and `StHold` itself is a deprecated wrapper around `XaYes` for

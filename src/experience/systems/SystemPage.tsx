@@ -15,7 +15,7 @@ import { XaAnswers, XaButton, XaButtonLink, XaComposer, XaComposerDock, XaDecisi
 import { SidePanel, SystemHead } from "./xa/SystemHead";
 import { PossibilityView } from "./xa/PossibilityView";
 import { WebsiteHistoryView } from "./xa/WebsiteHistoryView";
-import { LIVE_YES, ownerOnlyReason, requestMakeReal } from "./make-real-request";
+import { LIVE_YES, ownerOnlyReason, whoCanSayYesHref, requestMakeReal } from "./make-real-request";
 import x from "./xa/system-xa.module.css";
 import { InquiryServerWorkspaceExperience } from "@/experience/inquiries/InquiryServerExperience";
 import type { InquirySurfaceAdapter } from "@/experience/inquiries/contracts";
@@ -323,7 +323,7 @@ function DraftYes({ possibility, workspaceId, systemHref, blockedReason, onLive 
       : outcome.kind === "result" ? `${outcome.result.headline} ${makeRealSummary(outcome.result)}` : outcome.message;
     return <div role={live || outcome.kind === "result" ? "status" : "alert"}><XaSays links={[<XaTextLink key="see" href={systemHref}>{live ? "See it" : "Reload now"}</XaTextLink>]}>{sentence.replace(/\.\.$/, ".")}</XaSays></div>;
   }
-  return <XaYes state={state === "going" ? "going" : "waiting"} onYes={() => void yes()} disabledReason={blockedReason} yesLabel={LIVE_YES}
+  return <XaYes state={state === "going" ? "going" : "waiting"} onYes={() => void yes()} disabledReason={blockedReason} unblock={<XaTextLink href={whoCanSayYesHref(workspaceId)}>See who can say yes</XaTextLink>} yesLabel={LIVE_YES}
     working={{ title: "Making it live", steps: [{ id: "ask", label: "Asking to make it live", state: "active" }] }} />;
 }
 

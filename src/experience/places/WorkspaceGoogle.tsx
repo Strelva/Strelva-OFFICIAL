@@ -95,9 +95,12 @@ export function WorkspaceGoogle({ workspaceId, state, result, action, reviewId, 
 
   return <>{listings.map(listing => {
     const blocked = listing.control.paused || !listing.connected || listing.control.accessPending;
-    const blockedReason = !listing.connected ? (reconnect && listing.canManage ? "Google is disconnected, so this can't reach your listing yet. Your draft is kept; it waits here until you reconnect." : "Google is disconnected, so this can't reach your listing yet. Your draft is kept until Google is reconnected.") : listing.control.accessPending ? "Google hasn't approved access yet. Your draft is kept and nothing was sent." : listing.control.paused ? "This listing is paused. Resume it to put changes on Google." : undefined;
+    const many = listing.drafts.length > 1;
+    const kept = !many ? "Your draft is kept" : listing.drafts.length === 2 ? "Both drafts are kept" : `All ${listing.drafts.length} drafts are kept`;
+    const blockedReason = !listing.connected ? (reconnect && listing.canManage ? `Google is disconnected, so nothing can reach your listing yet. ${kept} and ${many ? "wait" : "waits"} here until you reconnect.` : `Google is disconnected, so nothing can reach your listing yet. ${kept} until Google is reconnected.`) : listing.control.accessPending ? `Google hasn't approved access yet. ${kept} and nothing was sent.` : listing.control.paused ? "This listing is paused. Resume it to put changes on Google." : undefined;
     const site = reviews?.kind === "ready" ? reviews.data.find(item => item.tenantId === listing.tenantId && listings.filter(other => other.tenantId === listing.tenantId).length === 1) : undefined;
-    const status = !listing.connected ? <XaStatus kind="down" size="sm">Disconnected</XaStatus> : listing.control.accessPending ? <XaStatus kind="waits" size="sm">Waiting for Google</XaStatus> : listing.control.paused ? <XaStatus kind="draft" size="sm">Paused</XaStatus> : <XaStatus kind="live" size="sm">Live</XaStatus>;
+    // Disconnected: Pebble's sentence (in the held yes, or beside the listing) says it once; the head doesn't repeat it in red.
+    const status = !listing.connected ? null : listing.control.accessPending ? <XaStatus kind="waits" size="sm">Waiting for Google</XaStatus> : listing.control.paused ? <XaStatus kind="draft" size="sm">Paused</XaStatus> : <XaStatus kind="live" size="sm">Live</XaStatus>;
     return <div key={`${listing.tenantId}:${listing.locationId}`} className={styles.place} aria-label={listing.name} role="region">
       <div className={styles.main}>
         <Head title={listing.name} meta={<>{status}<span>{listingPreview ? `${listingPreview.category} · ${listingPreview.rating} from ${listingPreview.reviews} reviews` : "On Google Search and Maps"}</span></>} />
@@ -169,7 +172,7 @@ export function WorkspaceGoogle({ workspaceId, state, result, action, reviewId, 
         <NeverWithoutYou paused={listing.control.paused} />
         {listing.canManage ? <form id={`google-pause-${listing.locationId}`} action={action} hidden><Context workspaceId={workspaceId} listing={listing} /></form> : null}
         {listing.canManage ? <XaSays links={[<button key="pause" type="submit" form={`google-pause-${listing.locationId}`} className={styles.textButton} name="action" value={listing.control.paused ? "resume" : "pause"}>{listing.control.paused ? "Resume Google listing" : "Pause Google listing"}</button>]}>
-          {listing.control.paused ? "Paused. Reviews still sync; I stop drafting replies and changing Google." : "Every change waits for your yes, except replies your automatic reply setting covers."}
+          {listing.control.paused ? "Paused. Reviews still sync; Strelva stops drafting replies and changing Google." : "Every change waits for your yes, except replies your automatic reply setting covers."}
         </XaSays> : <XaSays>Only an authorized owner can prepare, approve or undo changes.</XaSays>}
         {listingPreview ? <p className={styles.small}>{listingPreview.pendingReview}</p> : null}
       </aside>

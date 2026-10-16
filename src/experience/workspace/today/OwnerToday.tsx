@@ -3,8 +3,10 @@
  * Today, for an owner (XA · O1 normal morning, XA · O2 one thing waits,
  * XA · E6 on the phone).
  *
- * One dominant element: the composer. On a normal morning it sits beside
- * Pebble and what changed lately. When something waits, the waiting item
+ * One dominant element: the composer, with the same chrome in every state
+ * (the business chip and the mic stay; a waiting item is a line above the
+ * field). On a normal morning it sits beside what changed lately, with
+ * Pebble there only while Pebble is doing something. When something waits, the waiting item
  * docks on the composer and the page centers on it: the one deliberate
  * centered composition in the product. Data comes from the caller
  * (BusinessHome reads Needs you, What changed, saved work and the Systems
@@ -129,12 +131,12 @@ export function OwnerToday(props: OwnerTodayProps) {
   } : undefined;
 
   const composer = readOnly ? null : <XaComposer value={ask} onChange={change} onSubmit={submit} busy={busy} placeholder="Ask Strelva for anything" inputLabel={`Ask Strelva about ${businessName}`}
-    scope={waiting ? { label: businessName, state: systems.some(system => system.lifecycle === "live") ? "live" : undefined } : undefined} waiting={waiting}
+    scope={{ label: businessName, state: systems.some(system => system.lifecycle === "live") ? "live" : undefined }} waiting={waiting}
     onVoice={dictation.supported ? dictation.start : undefined} />;
 
   // Strelva speaks once, about the most important thing; set-up offers follow in plain sentences.
   const says: ReactNode = needs.status === "error"
-    ? <XaSays links={[<XaTextLink key="retry" onClick={onRetry}>Check again</XaTextLink>]}>I could not check what waits for you. Nothing was decided while it was unavailable.</XaSays>
+    ? <XaSays links={[<XaTextLink key="retry" onClick={onRetry}>Check again</XaTextLink>]}>Strelva could not check what waits for you. Nothing was decided while it was unavailable.</XaSays>
     : ready && !ready.complete ? <XaSays links={[<XaTextLink key="retry" onClick={onRetry}>Check again</XaTextLink>]}>Some decisions could not be checked, so there may be more than this.</XaSays>
       : outcome ? <XaSays links={[<XaTextLink key="changed" onClick={onWhatChanged}>What changed</XaTextLink>]}>{outcome.text}</XaSays>
         : waitingCount > 1 ? <XaSays links={[<XaTextLink key="all" onClick={onAllWaiting}>See all {waitingCount}</XaTextLink>]}>{waitingCount - 1} more {waitingCount === 2 ? "waits" : "wait"} after this one.</XaSays>
@@ -186,7 +188,7 @@ export function OwnerToday(props: OwnerTodayProps) {
     {phoneSystems}
   </div>;
 
-  // O1: a normal morning. Pebble's pose says what Pebble is doing.
+  // O1: a normal morning. Pebble appears only while doing a job (fixing, adding, waiting for the first ask); resting is not a job.
   const pose = down.length || needs.status === "error" ? "fixing" : empty ? "waving" : lead ? "adds" : "resting";
   const broken = down[0];
   const poseLabel = pose === "fixing" ? broken ? `Pebble fixing ${broken.name}` : "Pebble checking the connection" : pose === "waving" ? "Pebble ready to make the first System" : pose === "adds" ? "Pebble adding a System" : "Pebble resting beside the bookings calendar";
@@ -203,7 +205,7 @@ export function OwnerToday(props: OwnerTodayProps) {
       {phoneSystems}
     </div>
     <aside className={styles.side} aria-label={empty ? "What Pebble is doing" : label}>
-      <XaPebbleScene pose={pose} size={320} label={poseLabel} />
+      {pose === "resting" ? null : <XaPebbleScene pose={pose} size={320} label={poseLabel} />}
       <div className={styles.since}>
         {broken ? <div className={styles.badNews} role="status">
           <XaLabel as="h2">{down.length === 1 ? `Pebble is on ${broken.name}` : `Pebble is on ${countWord(down.length, true)} Systems`}</XaLabel>

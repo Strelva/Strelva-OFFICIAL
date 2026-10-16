@@ -152,7 +152,8 @@ export function AskChangePanel({ item, site, decider, outcome, initialView = "ch
       <figcaption>Pebble left {site} as it was before the yes.</figcaption>
     </figure>;
     return <div className={styles.change}>
-      {live ? <p className={styles.changeHead}><XaStatus kind="live" breathe>Live</XaStatus><span className={styles.changeMeta}>{outcome.readBackAt ? <>Read back at <Clock at={outcome.readBackAt} /></> : "Not read back yet"}</span></p> : null}
+      {/* The headline beside this says when it was read back; the panel says Live and nothing more. */}
+      {live ? <p className={styles.changeHead}><XaStatus kind="live" breathe>Live</XaStatus>{outcome.readBackAt ? null : <span className={styles.changeMeta}>Not read back yet</span>}</p> : null}
       <ChangePage item={item} site={site} added={false} label={live ? `${site}, with the change live` : `${site}, unchanged`} />
       {live && outcome.facts?.length ? <XaAnswers rows={outcome.facts} labelWidth={110} /> : null}
     </div>;
@@ -180,12 +181,12 @@ export function AskChangePanel({ item, site, decider, outcome, initialView = "ch
 
 /* ---------- After the decision (AS5) ---------- */
 
-/** "North Studio sent it at 10:14, Dr. Lin said yes at 10:41, and Strelva made it live at 10:43." */
+/** "North Studio sent it at 10:14, Dr. Lin said yes at 10:41, and Strelva made it live." The read-back time is the headline's; it is not said twice. */
 function storySentence(outcome: AskChangeOutcome, who: string, live: boolean): ReactNode {
   const parts: ReactNode[] = [];
   if (outcome.sentBy && outcome.sentAt) parts.push(<>{outcome.sentBy} sent it at <Clock at={outcome.sentAt} /></>);
   if (outcome.state === "approved") parts.push(<>{who} said yes at <Clock at={outcome.decidedAt} /></>);
-  if (live && outcome.liveAt) parts.push(<>{outcome.liveBy ?? ACTOR_NOT_RECORDED} made it live at <Clock at={outcome.liveAt} /></>);
+  if (live && outcome.liveAt) parts.push(outcome.readBackAt ? <>{outcome.liveBy ?? ACTOR_NOT_RECORDED} made it live</> : <>{outcome.liveBy ?? ACTOR_NOT_RECORDED} made it live at <Clock at={outcome.liveAt} /></>);
   if (!parts.length) return null;
   return <>{parts.map((part, index) => <span key={index}>{index === 0 ? null : index === parts.length - 1 ? (parts.length > 2 ? ", and " : " and ") : ", "}{part}</span>)}.</>;
 }
@@ -227,7 +228,7 @@ export function AskChangeStory({ outcome, site, decider, title, onUndo, onChange
     ? outcome.undo === "available" && onUndo ? <p className={styles.next}><XaTextLink onClick={onUndo}>{XA_YES_LABELS.undo}</XaTextLink> <span>takes it back off {site}. What changed keeps the record.</span></p>
       : outcome.undo === "undone" ? <p className={styles.next}>It has since been undone.</p>
       : <p className={styles.next}>To reverse it, ask Strelva to change it back. That goes to {yesOf} too.</p>
-    : failed ? <XaSays links={[<XaTextLink key="help" href={helpHref}>Ask for help</XaTextLink>]}>{outcome.reason ? `The page refused it: ${outcome.reason.replace(/\.$/, "")}. ` : ""}I won&apos;t try again on my own, so nothing changes until someone asks.</XaSays>
+    : failed ? <XaSays links={[<XaTextLink key="help" href={helpHref}>Ask for help</XaTextLink>]}>{outcome.reason ? `The page refused it: ${outcome.reason.replace(/\.$/, "")}. ` : ""}Strelva won&apos;t try again on its own, so nothing changes until someone asks.</XaSays>
     : going ? null
     : <p className={styles.next}><XaTextLink onClick={onChange}>Ask for a change</XaTextLink> <span>and Strelva drafts it again for {yesOf}.</span></p>;
 

@@ -64,7 +64,7 @@ export type XaYesState = "waiting" | "going" | "live" | "failed" | "undone" | "e
 // Only the newest waiting yes on a screen answers ⌘↵.
 const shortcutOwners: string[] = [];
 
-interface XaYesProps {
+interface XaYesBaseProps {
   state: XaYesState;
   onYes: () => void;
   onNotYet?: () => void;
@@ -82,14 +82,6 @@ interface XaYesProps {
   failure?: ReactNode;
   /** Shown after Undo or after the window ends. */
   settled?: ReactNode;
-  /**
-   * Blocks the yes. There is then no gray pill: Pebble says why in one
-   * sentence, and `unblock` (the caller's action that clears it) sits beside
-   * "Not yet".
-   */
-  disabledReason?: ReactNode;
-  /** What clears `disabledReason`: usually the screen's one primary ("Reconnect Google", "Check with the feed again"). */
-  unblock?: ReactNode;
   /** The Undo pill's action word. Defaults to "Undo"; "Roll it back" when undoing is its own change. */
   undoLabel?: string;
   /** Holds the pill while something else on the screen is saving. Prefer disabledReason when the person can act on why. */
@@ -106,6 +98,28 @@ interface XaYesProps {
   block?: boolean;
   shortcut?: boolean;
 }
+
+/** Something the person can press: an action, never empty. */
+export type XaUnblock = Exclude<ReactNode, null | undefined | boolean | "">;
+
+/**
+ * A blocked yes always comes with what clears it (October 16): never a
+ * sentence and no action. `disabledReason` without `unblock` does not type.
+ */
+type XaYesBlock =
+  | { disabledReason?: undefined; unblock?: undefined }
+  | {
+    /**
+     * Blocks the yes. There is then no gray pill: Pebble says why in one
+     * sentence, and `unblock` (the caller's action that clears it) sits beside
+     * "Not yet".
+     */
+    disabledReason: ReactNode;
+    /** What clears `disabledReason`: the screen's one primary ("Reconnect Google") or a text link ("Ask Dr. Lin", "See the change being confirmed"). */
+    unblock: XaUnblock;
+  };
+
+type XaYesProps = XaYesBaseProps & XaYesBlock;
 
 export function XaYes({ state, onYes, onNotYet, onUndo, undoWindowMs = 5000, onUndoExpired, yesLabel = XA_YES_LABELS.yes, notYetLabel = XA_YES_LABELS.notYet, working, liveLabel, failure, settled, disabledReason, unblock, undoLabel, disabled = false, question, yesAriaLabel, notYetAriaLabel, block = true, shortcut = true }: XaYesProps) {
   const id = useId();
@@ -142,7 +156,7 @@ export function XaYes({ state, onYes, onNotYet, onUndo, undoWindowMs = 5000, onU
   if (disabledReason) return <div className={styles.yes} data-blocked="true">
     {question ? <p className={styles.yesQuestion}>{question}</p> : null}
     <div className={styles.yesBlocked} role="status"><XaPebbleAvatar size={28} /><p id={reasonId}>{disabledReason}</p></div>
-    {unblock || onNotYet ? <div className={styles.yesActions}>{unblock}{onNotYet ? <XaButton variant="quiet" size="lg" aria-label={notYetAriaLabel} onClick={onNotYet}>{notYetLabel}</XaButton> : null}</div> : null}
+    <div className={styles.yesActions}>{unblock}{onNotYet ? <XaButton variant="quiet" size="lg" aria-label={notYetAriaLabel} onClick={onNotYet}>{notYetLabel}</XaButton> : null}</div>
   </div>;
   return <div className={styles.yes} role={question ? "group" : undefined} aria-labelledby={question ? questionId : undefined}>
     {question ? <p id={questionId} className={styles.yesQuestion}>{question}</p> : null}

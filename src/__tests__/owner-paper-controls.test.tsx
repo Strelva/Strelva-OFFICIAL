@@ -29,7 +29,7 @@ describe("owner paper controls", () => {
     const node = await render(createElement(WorkspaceRequestContext.Provider, { value: request }, createElement(BusinessHome, { snapshot, sites: [], unassignedSites: [], siteAssignmentsKnown: true, offerings: { status: "unavailable", reason: "Unavailable" }, busy: false, onOpen: vi.fn(), onStart: vi.fn(), onNavigate: navigate, onWorkspace: vi.fn(), onOfferings: vi.fn(), accountHref: "/workspace/account", signOut: createElement("span", null, "Local test"), systemsReleased: true })));
     await act(async () => { await Promise.resolve(); });
     // XA · O1 error: Pebble says the check failed; Today never claims nothing needs the owner.
-    expect(node.textContent).toContain("I could not check what waits for you.");
+    expect(node.textContent).toContain("Strelva could not check what waits for you.");
     expect(node.textContent).not.toContain("Nothing needs you.");
     const retry = [...node.querySelectorAll("button")].find(button => button.textContent === "Check again")!;
     await act(async () => retry.click());

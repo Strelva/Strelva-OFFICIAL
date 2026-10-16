@@ -36,7 +36,8 @@
 
 /* A2: how a client sees the agency, live as the name is typed. */
 .seen { display: flex; width: 100%; max-width: 400px; flex-direction: column; align-items: center; gap: 16px; text-align: center; }
-.seenComposer { width: 100%; text-align: left; pointer-events: none; }
+/* The owner's composer as it will look: the white card with the waiting line on top. */
+.seenComposer { box-sizing: border-box; width: 100%; padding: 16px 16px 44px; border-radius: 28px; background: var(--st-surface); box-shadow: var(--st-shadow-sm); text-align: left; pointer-events: none; }
 .seenNote { margin: 0; color: var(--st-text-2); font-size: 13px; line-height: 18px; }
 .fakeAction { display: inline-flex; height: 34px; align-items: center; padding: 0 14px; border-radius: 999px; background: var(--st-surface); box-shadow: 0 1px 2px #00000014, 0 0 0 1px #0000000a; color: var(--st-text); font-size: 14px; font-weight: 500; }
 

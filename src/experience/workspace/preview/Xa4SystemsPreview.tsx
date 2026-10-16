@@ -26,6 +26,9 @@ function fixtureFetch(screen: Xa4Screen, state: Xa4State): typeof fetch {
   // The one booking request is decided once; afterwards Needs you no longer lists it.
   let bookingDecided = false;
   let reads = 0;
+  // S5 read-back: the fictional live page shows the landed change only after this preview's Make real (a short-lived cookie the
+  // site fixture reads). A fresh load starts from the page as it was.
+  if (typeof document !== "undefined") document.cookie = "xa4-landed=; path=/preview/strelva/xa/xa4-systems; max-age=0";
   return async (input, init) => {
     const url = new URL(typeof input === "string" ? input : input instanceof URL ? input.href : input.url, window.location.origin);
     const method = init?.method ?? (input instanceof Request ? input.method : "GET");
@@ -40,6 +43,7 @@ function fixtureFetch(screen: Xa4Screen, state: Xa4State): typeof fetch {
     if (path === "/api/workspace/systems/make-real") {
       await new Promise(resolve => setTimeout(resolve, 900));
       if (state === "error") return Response.json({ error: "harbordental.com did not answer." }, { status: 502 });
+      if (screen === "possibility") document.cookie = "xa4-landed=1; path=/preview/strelva/xa/xa4-systems; max-age=600";
       return Response.json({ live: { live: true, status: "done", headline: screen === "form" ? "The new-patient form is live" : "Live on harbordental.com", activationId: "fixture-activation" } });
     }
     // S5 read-back after Make real: one read while it runs, then the receipt of what landed.

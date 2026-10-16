@@ -142,9 +142,12 @@ describe("After the decision (XA · AS5)", () => {
     const page = html(props(live));
     expect(page).toContain("Live on harbordental.com.");
     expect(page).toContain("North Studio sent it at");
-    expect(page).toContain("Strelva made it live at");
+    expect(page).toContain("Strelva made it live");
+    expect(page).not.toContain("Strelva made it live at");
     expect(page).toContain("Show every step");
-    expect(page).toContain("Read back at");
+    // The read-back time is said once, in the subhead; neither the panel nor the sentence repeats it.
+    expect(page).toContain("Strelva read the live page back at");
+    expect(page).not.toContain("Read back at");
     expect(page).toContain(">Undo<");
     expect(page).not.toContain("Show the conversation\"><");
   });

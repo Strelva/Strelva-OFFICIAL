@@ -16,7 +16,8 @@ export interface CheckMark {
   id: string;
   label: string;
   detail?: string;
-  state: "found" | "missing" | "fix" | "reading";
+  /** `waiting`: before the check runs, what it will look for. */
+  state: "found" | "missing" | "fix" | "reading" | "waiting";
   /** Fix number, matching the column ("Start here" is 1). */
   n?: number;
 }
