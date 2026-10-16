@@ -58,6 +58,10 @@ export interface BookingLifecycleSummary {
 
 const CUSTOMER_FROM = "bookings@mail.strelva.com";
 
+function workspaceTodayUrl(origin: string, workspaceId: string): string {
+  return `${origin.replace(/\/$/, "")}/workspace?${new URLSearchParams({ workspaceId })}`;
+}
+
 function workspaceBookingsUrl(origin: string, booking: StoreBooking): string {
   const params = new URLSearchParams({ view: "week", date: booking.localDate });
   if (booking.workspaceId) params.set("workspaceId", booking.workspaceId);
@@ -92,7 +96,8 @@ async function deliver(
     if (!business.ownerEmail) return skip("no_owner_recipient");
     to = business.ownerEmail;
     audience = "client";
-    email = ownerRequestReminderEmail({ booking, businessName: business.name, openUrl: workspaceBookingsUrl(ports.appOrigin, booking) });
+    // The yes or not yet for a request lives in Needs you on Today, not in the Bookings list.
+    email = ownerRequestReminderEmail({ booking, businessName: business.name, openUrl: booking.workspaceId ? workspaceTodayUrl(ports.appOrigin, booking.workspaceId) : workspaceBookingsUrl(ports.appOrigin, booking) });
   } else {
     if (!booking.customer.email) return skip("no_customer_email");
     to = booking.customer.email;

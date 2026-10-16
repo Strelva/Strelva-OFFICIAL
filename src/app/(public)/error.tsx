@@ -1,36 +1,22 @@
 "use client";
 
-import { useEffect } from "react";
+import Link from "next/link";
+import styles from "@/components/public/site-pages.module.css";
 
 /**
- * Error boundary for the public client-site render tree. This page is shown to
- * a paying client's own visitors, so it must stay calm and brand-neutral and
- * must NOT leak any internal error detail. Most transient backend errors are
- * already caught upstream (the layout + section renderer fall back to defaults);
- * this is the last-resort net so a render failure degrades to a polite retry
- * rather than the raw framework error screen.
+ * Error boundary for the public client-site render tree. A paying client's own
+ * visitors see this, so it stays inside the business's page, brand-neutral,
+ * and never shows internal detail. Most transient backend errors are caught
+ * upstream (layout and section renderer fall back to defaults); this is the
+ * last net, so a render failure becomes a polite retry, not a framework screen.
  */
 export default function PublicError({ reset }: { error: Error; reset: () => void }) {
-  useEffect(() => {
-    // Intentionally do not surface error detail to site visitors.
-  }, []);
-
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-white px-6 text-center">
-      <div className="max-w-sm">
-        <h1 className="text-lg font-medium text-neutral-900">
-          This page is temporarily unavailable
-        </h1>
-        <p className="mt-2 text-sm text-neutral-500">
-          We&apos;re having a brief hiccup loading this page. Please try again in a moment.
-        </p>
-        <button
-          onClick={reset}
-          className="mt-6 rounded-md bg-neutral-900 px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90"
-        >
-          Try again
-        </button>
-      </div>
+  return <section className={`${styles.page} ${styles.narrow}`} aria-labelledby="site-error-title">
+    <h1 id="site-error-title" className={styles.title}>This page didn&apos;t load</h1>
+    <p className={styles.lede} role="alert">Something went wrong while loading it. Try again in a moment.</p>
+    <div className={styles.actions}>
+      <button type="button" onClick={reset} className={styles.primary} data-xa-primary>Try again</button>
+      <Link href="/" className={styles.text}>Go to the home page</Link>
     </div>
-  );
+  </section>;
 }

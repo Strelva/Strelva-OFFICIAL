@@ -19,5 +19,7 @@ export function themeContentToCssVars(theme: ThemeContent | null | undefined): R
     "--terra-light": theme.colors.terraLight,
     "--font-display": theme.fontDisplay,
     "--font-body": theme.fontBody,
+    // Pages Strelva draws inside the site (links, blog, errors) read this, so they keep the business's face.
+    "--site-font": theme.fontBody,
   };
 }

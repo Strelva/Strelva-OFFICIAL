@@ -191,6 +191,57 @@ who acted) blocks. Preview every screen and state at
 `/preview/strelva/xa/xs-leads/<screen>?state=…` (`&open=1` opens the picked
 item on a phone, `&prospect=<id>` picks a check result).
 
+### xs-visitor · What a business's visitors see (local, branch xa/lane-xs-visitor)
+
+No Pen render exists for these; they are designed in the XA language from
+E4, E2 and S2. Visitor pages name the business, never Strelva; emails carry the
+quiet "Runs on Strelva" credit, newsletters none.
+
+- **The booking as one object:** [VisitorAppointment](../../src/experience/bookings/VisitorAppointment.tsx)
+  (day, time in large figures, zone small, service when known; hairline border,
+  no lifted shadow; visitor pages pass no status dot because the headline says
+  the state; a time that no longer holds is struck). The choose pages
+  (`/book-inquiry`, `/inquiry-booking`) are one column; `VisitorSlotWeek` takes
+  `closed` days and says "Closed" plus the reason in place.
+  Used by [ManageBooking](../../src/experience/bookings/ManageBooking.tsx) (`/b/[token]`:
+  change the time as day rows under it, one primary; cancel opens in place in a
+  `<details>`, never a modal), [BookingConfirmation](../../src/experience/bookings/BookingConfirmation.tsx)
+  (`/booking-confirm/[token]`), and [VisitorBookingOutcome](../../src/experience/bookings/VisitorBookingOutcome.tsx)
+  for the booked states of `InquiryBookingChoice` and `InquiryBookingOffer`.
+  `VisitorBookingLoading` draws the booking's shape. `visitor.module.css` adds
+  dark (device setting, or `data-workspace-mode="dark"` on an ancestor).
+- **Visitor mail:** [visitor-mail.ts](../../src/platform/infra/email/visitor-mail.ts).
+  `renderEmailHtml` renders every customer email (options carry `businessName`)
+  through `visitorMailFromOptions` in XA; options and plain text are unchanged,
+  so inquiry digests hold. `EmailOptions.xa` lets a builder give its own XA mail:
+  booking reminders, today, lapsed, the owner's "still waiting" chase
+  (`bookings/emails.ts`) and booking updates (`bookingUpdateVisitorMail`).
+  `visitorNewsletterMail` (used by `sendNewsletter`). No offered-dates XA mail: the inquiry offer still sends through the existing options path until it is wired.
+  `xa-mail.ts` gains `status`, `when`, `rows`, `quote`, `choices`, `link` and
+  `html` blocks; `settings` is optional, `footerLinks` added.
+- **Unsubscribe:** [unsubscribe-page.ts](../../src/platform/infra/email/unsubscribe-page.ts),
+  standalone HTML (mail clients POST to it), ink pill, light and dark.
+- **Site pages Strelva draws:** [SiteLinks](../../src/components/public/SiteLinks.tsx)
+  (`/links`), [SiteBlog](../../src/components/public/SiteBlog.tsx) (`/blog`, `/blog/[slug]`),
+  `(public)/error.tsx`, new `(public)/not-found.tsx` and `sites/[tenant]/not-found.tsx`,
+  all on `site-pages.module.css`: the site's `--site-*` first, then paper and ink;
+  never the app's `--color-*`. Face: the business's `--site-font` (legacy theme
+  font) else DM Sans (`--font-workspace`), never the app's `--font-body` (Geist);
+  `tests/xs-visitor-fonts.spec.ts` asserts the computed face. `/links` shows the
+  business logo or nothing (no initial tile); blog has no topic chips. The native
+  catalog CSS (every native site): DM Sans, 16 px cards and images, pill
+  buttons, a left-aligned statement hero, the header CTA as a text link when the
+  page's hero has one, list-variant services as hairline rows with a text action
+  (Book / Call / Learn more), FAQ `+` marker. Before/after on a real tenant:
+  `design/xa-build-2026-10-15/xs-visitor/tenant-mooney-{before,after}-*.png`.
+- **Business page:** [PublicBusinessProfile](../../src/experience/product/assistants/PublicBusinessProfile.tsx)
+  (`/biz/[handle]`): the reach panel (hours, one primary "Book a time", call,
+  email and visit stacked) is the dominant object; services as hairline rows
+  with price in place; how the page is checked is one sourced sentence; "For
+  assistants" sits below, quieter; social links by name. One date format.
+  `biz/[handle]/not-found.tsx`: Pebble holding a blank page, primary to Google Maps.
+- Previews: `/preview/strelva/xa/xs-visitor` (index of every screen and state).
+
 ## October 11 coherence amendment
 
 [GLOSSARY.md](../../GLOSSARY.md) and

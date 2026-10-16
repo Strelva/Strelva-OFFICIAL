@@ -13,15 +13,17 @@ import { visitorWeek, type VisitorClosure } from "@/platform/bookings/visitor-we
  * its ISO start for an offer link. Every choice's accessible name is the full
  * date and zone, so a screen reader never hears a bare "10:30".
  */
-export function VisitorSlotWeek({ slots, timeZone, name, value, legend, closures = [] }: {
+export function VisitorSlotWeek({ slots, timeZone, name, value, legend, closures = [], closed = [] }: {
   slots: readonly { start: string }[];
   timeZone: string;
   name: string;
   value: (slot: { start: string }, index: number) => string;
   legend: string;
   closures?: readonly VisitorClosure[];
+  /** Same as `closures` (an offer's closedDays), said in place on the day. */
+  closed?: readonly VisitorClosure[];
 }) {
-  const week = visitorWeek(slots, timeZone, closures);
+  const week = visitorWeek(slots, timeZone, [...closures, ...closed]);
   const firstStart = slots[0]?.start;
   return <fieldset className={styles.fieldset}>
     <legend className={styles.srOnly}>{legend}</legend>
@@ -39,3 +41,6 @@ export function VisitorSlotWeek({ slots, timeZone, name, value, legend, closures
     </div>
   </fieldset>;
 }
+
+/** A closed day as an offer carries it; the same shape the week reads. */
+export type VisitorClosedDay = VisitorClosure;

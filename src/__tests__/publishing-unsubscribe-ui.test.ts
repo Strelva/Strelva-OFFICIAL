@@ -10,13 +10,13 @@ beforeEach(() => { mocks.unsubscribe.mockReset().mockResolvedValue(undefined); m
 describe("unsubscribe paper document preserves its privacy and failure contract", () => {
   it("GET offers a POST confirmation and never mutates or discloses the signed address", async () => {
     const response = await GET(request("GET")); const html = await response.text();
-    expect(html).toContain('method="post"'); expect(html).toContain("Unsubscribe from this newsletter?");
+    expect(html).toContain('method="post"'); expect(html).toContain("Stop getting this newsletter?");
     expect(html).not.toContain("private-reader"); expect(mocks.unsubscribe).not.toHaveBeenCalled();
     expect(response.headers.get("Cache-Control")).toBe("no-store");
   });
   it("success has no invented business name or undo route", async () => {
     const response = await POST(request("POST")); const html = await response.text();
-    expect(response.status).toBe(200); expect(html).toContain("You&#39;re unsubscribed");
+    expect(response.status).toBe(200); expect(html).toContain("You&#39;re off the list");
     expect(html).not.toContain("Undo"); expect(html).not.toContain("private-reader");
     expect(mocks.unsubscribe).toHaveBeenCalledWith("private-reader@example.test", "fixture-tenant");
   });
@@ -30,6 +30,6 @@ describe("unsubscribe paper document preserves its privacy and failure contract"
     const limited = await POST(request("POST")); expect(limited.status).toBe(429); expect(mocks.unsubscribe).not.toHaveBeenCalled();
     mocks.unsubscribe.mockRejectedValueOnce(new Error("Unavailable"));
     const failed = await POST(request("POST")); const html = await failed.text();
-    expect(failed.status).toBe(503); expect(html).toContain("That didn&#39;t go through"); expect(html).not.toContain("You&#39;re unsubscribed");
+    expect(failed.status).toBe(503); expect(html).toContain("That didn&#39;t go through"); expect(html).not.toContain("You&#39;re off the list");
   });
 });

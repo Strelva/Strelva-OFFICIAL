@@ -8,7 +8,7 @@ describe("published assistant profile", () => {
   it("keeps publication separate from domain and provider verification, and does not invent action permissions", () => {
     const html = renderToStaticMarkup(<PublicBusinessProfile {...base} facts={{ name: "Fictional business", verification: { ...unknownVerification, googleBusinessProfile: { linked: true, verified: null, url: null } } }} />);
     expect(html).toContain("No public business details have been confirmed yet.");
-    expect(html).toContain("Linked; provider verification status unknown");
+    expect(html).toContain("Its Google listing is linked, but Google hasn&#x27;t checked it yet.");
     expect(html).not.toContain("Domain control confirmed");
     expect(html).not.toContain("Provider verification confirmed");
     expect(html).not.toContain("POST /request");
@@ -18,9 +18,9 @@ describe("published assistant profile", () => {
   it("shows confirmed policy provenance without turning those terms into booking or charging controls", () => {
     const html = renderToStaticMarkup(<PublicBusinessProfile {...base} facts={{ name: "Fictional business", policies: { deposit: { value: { required: true, percent: 20 }, source: "owner", updatedAt: "2026-10-09T00:00:00Z" } } }} />);
     expect(html).toContain("Deposit required. Amount: 20%.");
-    expect(html).toContain("Owner confirmed");
-    expect(html).toContain("Oct 9");
-    expect(html).toContain("They do not establish booking enforcement or charging.");
+    expect(html).toContain("Fictional business confirmed this on Oct 9, 2026.");
+    // No legal disclaimer in builder words; the policy is the business's own sentence.
+    expect(html).not.toContain("booking enforcement");
     expect(html).not.toContain("Pay a deposit");
   });
   it("error and permission states omit supplied business facts and methods", () => {

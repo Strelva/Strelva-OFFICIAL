@@ -10,6 +10,10 @@ const confirmationSchema = z.object({
   state: z.enum(["held", "confirming", "placed", "cancelled"]),
   bookingStatus: z.enum(["held", "requested", "confirmed", "declined", "cancelled", "completed"]).nullable(),
   timeZone: z.string().default("UTC"), expiresAt: z.string().datetime({ offset: true }).optional(),
+  // read_public_booking_confirmation does not return the service yet (a SQL
+  // change, outside this lane). Read it when present so confirm and manage
+  // name the appointment the same way once it is.
+  serviceName: z.string().trim().min(1).max(500).optional(),
 });
 export async function readVisitorConfirmation(token: string) {
   if (!/^[A-Za-z0-9_-]{43}$/.test(token)) return null;

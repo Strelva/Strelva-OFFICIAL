@@ -1,6 +1,8 @@
 import { brandColors, BRAND_CREDIT, type OwnerBrand } from "@/platform/infra/agency-brand";
 import { escapeEmailHtml } from "./escape";
 import { renderPaperEmailHtml, renderPaperEmailText, type PaperEmail } from "./paper";
+import { renderXaMailHtml, renderXaMailText, type XaMail } from "./xa-mail";
+import { visitorMailFromOptions } from "./visitor-mail";
 export { escapeEmailHtml } from "./escape";
 /**
  * Strelva shared email design system.
@@ -99,6 +101,8 @@ export interface EmailDecision {
 export interface EmailOptions {
   /** Additive 1.0 presentation. No sender uses it during the silent rollout. */
   paper?: PaperEmail;
+  /** XA presentation for this message (both HTML and text). Takes precedence over every other field. */
+  xa?: XaMail;
   /** Legacy name-only attribution. Prefer brand for workspace identity. */
   preparedBy?: string;
   brand?: OwnerBrand;
@@ -245,6 +249,10 @@ function footerHtml(opts: EmailOptions): string {
 
 /** Full branded HTML email document. */
 export function renderEmailHtml(opts: EmailOptions): string {
+  if (opts.xa) return renderXaMailHtml(opts.xa);
+  // End customers read the business's own email in XA. Only the HTML changes:
+  // the options (and so inquiry digests and the plain text) stay as they were.
+  if (opts.businessName && !opts.paper) return renderXaMailHtml(visitorMailFromOptions(opts));
   if (opts.paper) return renderPaperEmailHtml({ ...opts.paper, ...(opts.brand ? { brand: opts.brand } : {}), ...(opts.businessName ? { businessName: opts.businessName } : {}) });
   const colors = brandColors(opts.brand?.accentColor ?? TOKENS.accent);
   const preheader = opts.preheader
@@ -284,6 +292,7 @@ ${preheader}
 
 /** Plain-text counterpart — same content, no markup. */
 export function renderEmailText(opts: EmailOptions): string {
+  if (opts.xa) return renderXaMailText(opts.xa);
   if (opts.paper) return renderPaperEmailText({ ...opts.paper, ...(opts.brand ? { brand: opts.brand } : {}), ...(opts.businessName ? { businessName: opts.businessName } : {}) });
   const parts: string[] = [opts.heading, ""];
   for (const p of opts.paragraphs ?? []) parts.push(p, "");
