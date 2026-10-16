@@ -34,6 +34,13 @@
 .stack { display: flex; flex-direction: column; gap: 24px; }
 .stack[data-gap="sm"] { gap: 12px; }
 .stack[data-gap="lg"] { gap: 32px; }
+.pebbleLine { display: flex; margin: 0; align-items: center; gap: 10px; color: var(--st-text); font-size: 15px; line-height: 21px; text-align: left; }
+.pebbleLine > span:last-child { min-width: 0; }
+.broken { display: flex; width: 100%; flex-direction: column; align-items: center; gap: 16px; text-align: left; }
+.broken > figure { opacity: 0.92; }
+.brokenTitle { margin: 0; color: var(--st-text-2); font-size: 17px; font-weight: 500; line-height: 24px; }
+.brokenLine { display: block; width: 100%; height: 10px; border-radius: 5px; background: repeating-linear-gradient(90deg, var(--st-line) 0 14px, transparent 14px 22px); }
+.brokenLine[data-short="true"] { width: 62%; }
 .note { margin: 0; color: var(--st-text-2); font-size: 14px; line-height: 1.5; }
 .note a { color: var(--st-accent); font-weight: 500; text-decoration: none; }
 .note a:hover { text-decoration: underline; text-underline-offset: 3px; }
@@ -42,6 +49,7 @@
 .feltSlot { position: sticky; top: 0; height: 100dvh; box-sizing: border-box; padding: 24px 24px 24px 0; }
 .felt { box-sizing: border-box; display: flex; height: 100%; align-items: center; justify-content: center; overflow: hidden; padding: 40px; border-radius: var(--st-r-xl); background: radial-gradient(120% 90% at 50% 40%, var(--st-felt-from), var(--st-felt-to)); }
 .feltInner { display: flex; width: 100%; max-width: 440px; flex-direction: column; align-items: center; text-align: center; }
+.feltInner[data-object="true"] { max-width: 472px; }
 .feltObject { width: 100%; margin-top: 8px; text-align: left; animation: var(--kf-enter) var(--motion-slow) var(--ease-settle) both; }
 .feltTitle { margin: 24px 0 0; color: var(--st-text); font-size: 17px; font-weight: 600; letter-spacing: -0.2px; line-height: 24px; }
 .feltBody { margin: 6px 0 0; max-width: 380px; color: var(--st-text-2); font-size: 15px; line-height: 22px; }
@@ -49,7 +57,7 @@
 @media (max-width: 1023px) {
   .frame[data-felt="true"] { grid-template-columns: minmax(0, 1fr); }
   .feltSlot { display: none; }
-  .phoneArt { display: block; margin-bottom: -4px; }
+  .phoneArt { display: block; }
   .phoneObject { display: block; }
 }
 @media (max-width: 767px) {

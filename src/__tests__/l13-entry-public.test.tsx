@@ -29,8 +29,8 @@ describe("L13 retained entry and report actions", () => {
     const fetch = vi.fn(); vi.stubGlobal("fetch", fetch);
     await act(async () => root.render(createElement(AccessRequestPage)));
     expect(container.querySelector("form")).toBeNull();
-    expect(container.querySelector('a[href="/sign-up"]')?.textContent).toContain("Open my business account");
-    expect(container.querySelector('a[href="/sign-up?as=agency"]')?.textContent).toContain("Open my agency account");
+    expect(container.querySelector('a[href="/sign-up"]')?.textContent).toContain("Make my business account");
+    expect(container.querySelector('a[href="/sign-up?as=agency"]')?.textContent).toContain("Make my agency account");
     expect(container.querySelector('a[href="/agencies"]')?.textContent).toContain("Find an agency");
     expect(fetch).not.toHaveBeenCalled();
     expect(container.textContent).not.toContain("Ask Strelva Agency");
@@ -81,6 +81,9 @@ describe("L13 retained entry and report actions", () => {
     vi.stubGlobal("URL", class extends URL { static createObjectURL = vi.fn(() => "blob:fixture"); static revokeObjectURL = vi.fn(); });
     vi.spyOn(window, "open").mockReturnValue(window);
     await act(async () => root.render(createElement(WebsiteAuditPage, { initialResult: audit })));
+    // Every check sits behind one text link; no scores or grade on the result.
+    expect(container.textContent).not.toMatch(/\/100|Grade/);
+    await click("See every check");
     await click("Readability for assistants");
     expect(container.textContent).toContain("Hide checks");
     expect(container.textContent).not.toMatch(/\b(?:AI|agent|automation|workflow|task)\b/i);

@@ -15,7 +15,7 @@ const SCREENS: readonly (readonly [string, string, readonly string[]])[] = [
   ["try", "Try a Possibility", ["ready", "form", "follow-up", "unknown", "loading", "error", "expired", "changed"]],
   ["embed", "Agency check embed", ["ready", "scanning", "done"]],
   ["email-code", "Sign-in code email", ["ready"]],
-  ["email-claim", "Claim email", ["ready", "no-agency"]],
+  ["email-claim", "Claim email", ["ready"]],
 ];
 
 /** Index of the entry lane's previews. Add &mode=dark to any screen. */

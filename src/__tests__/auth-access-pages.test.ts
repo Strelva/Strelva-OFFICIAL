@@ -120,7 +120,11 @@ describe("auth access pages", () => {
     mockGetStoredContent.mockResolvedValue({ fontDisplay: "Georgia, serif" });
     for (const page of [SignInPage, SignUpPage]) {
       const html = renderToStaticMarkup(await page({ searchParams: Promise.resolve({}) }));
-      expect(html).toMatch(/<a[^>]+style="font-family:Georgia, serif"[^>]*>(?:(?!<\/a>).)*Agency identity unavailable/);
+      // XA sign-in: no agency resolved, so the door names the business in its own font, never the fallback string.
+      if (page === SignInPage) {
+        expect(html).toMatch(/<a[^>]+style="font-family:Georgia, serif"[^>]*>(?:(?!<\/a>).)*Great Lakes Dried Fruit/);
+        expect(html).not.toContain("Agency identity unavailable");
+      } else expect(html).toMatch(/<a[^>]+style="font-family:Georgia, serif"[^>]*>(?:(?!<\/a>).)*Agency identity unavailable/);
       expect(html).toContain("&quot;next&quot;:&quot;/client/gldf/dashboard&quot;");
     }
     expect(mockGetStoredContent).toHaveBeenCalledWith("theme", "gldf");

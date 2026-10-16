@@ -8,6 +8,7 @@ const mockClaimPendingInvite = vi.hoisted(() => vi.fn());
 const mockGetAllTenants = vi.hoisted(() => vi.fn());
 const mockGetTenantConfig = vi.hoisted(() => vi.fn());
 const mockIsSuperAdmin = vi.hoisted(() => vi.fn());
+const mockGetCurrentUserEmail = vi.hoisted(() => vi.fn());
 const mockRedirect = vi.hoisted(() => vi.fn());
 const mockWorkspaceReleaseEnabled = vi.hoisted(() => vi.fn());
 const mockInquiryReleaseEnabled = vi.hoisted(() => vi.fn());
@@ -31,6 +32,7 @@ vi.mock("@/platform/infra/auth", async (importOriginal) => {
     getCurrentUserTenants: mockGetCurrentUserTenants,
     claimPendingInviteForCurrentUser: mockClaimPendingInvite,
     isSuperAdmin: mockIsSuperAdmin,
+    getCurrentUserEmail: mockGetCurrentUserEmail,
   };
 });
 
@@ -71,6 +73,7 @@ describe("account page access handoff", () => {
     mockGetAllTenants.mockResolvedValue([]);
     mockGetTenantConfig.mockResolvedValue(undefined);
     mockIsSuperAdmin.mockResolvedValue(false);
+    mockGetCurrentUserEmail.mockResolvedValue(null);
   });
 
   it("shows recovery guidance when tenant grants no longer resolve", async () => {
@@ -83,23 +86,28 @@ describe("account page access handoff", () => {
     expect(mockGetTenantConfig).toHaveBeenCalledWith("missing-b");
     expect(mockRedirect).not.toHaveBeenCalled();
     expect(text).toContain("This email isn’t on a business yet.");
-    expect(text).toContain("Use the exact email address that received your invite");
-    expect(text).toContain("signs you out so you can choose that account");
+    expect(text).toContain("Sign in with the address the invitation went to.");
     expect(text).toContain("Use my invited email");
-    expect(text).toContain("jacob@strelva.com");
+    expect(text).toContain("Email Strelva support");
+    expect(renderToStaticMarkup(page as never)).toContain("mailto:hello@strelva.com");
+    expect(text).not.toContain("jacob@strelva.com");
     expect(text).not.toContain("Request your build");
   });
 
   it("asks which business to open when several use this email, without builder words", async () => {
     mockGetCurrentUserTenants.mockResolvedValue(["harbor", "lakeview"]);
-    mockGetTenantConfig.mockImplementation(async (id: string) => ({ id, active: true, siteName: id === "harbor" ? "Harbor Dental" : "Lakeview Yoga" }));
+    mockGetCurrentUserEmail.mockResolvedValue("dr.lin@harbordental.com");
+    mockGetTenantConfig.mockImplementation(async (id: string) => ({ id, active: true, siteName: id === "harbor" ? "Harbor Dental" : "Lakeview Yoga", productionDomain: id === "harbor" ? "harbordental.com" : undefined }));
     const { default: AccountPage } = await import("@/app/(marketing)/account/page");
     const page = await AccountPage({});
     const html = renderToStaticMarkup(page as never);
     expect(html).toContain("Which business do you want to open?");
-    expect(html).toContain("2 businesses use this email.");
+    expect(html).toContain("2 businesses use dr.lin@harbordental.com.");
     expect(html).toContain('href="https://app.strelva.com/client/harbor/dashboard"');
-    expect(html).toContain("admin.lakeview.example.com");
+    expect(html).toContain("harbordental.com");
+    expect(html).toContain("No public website yet");
+    expect(html).not.toContain("admin.");
+    expect(html).not.toContain(">Open<");
     expect(html).not.toContain("Fallback via strelva.com");
     expect(html).not.toContain("Choose a site");
   });

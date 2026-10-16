@@ -20,6 +20,16 @@ exported. API, Pen node per part, motion and the anti-slop checklist:
 [design-notes/XA-FOUNDATION.md](../../design-notes/XA-FOUNDATION.md). Preview:
 `/preview/strelva/xa`.
 
+XA entry frame (`XaEntryFrame`, lane xs-entry, October 16): paper column plus
+the felt, which always holds the page's object (the sign-in email as it is
+typed and sent, the check's read page with fixes marked in place, the broken
+link via `XaEntryBrokenLink`). `XaEntryBrand` shows a resolved agency's logo or
+name in text, never a letter in a coloured square; with no agency it shows the
+business name with "Runs on Strelva", or Strelva's wordmark, and never the
+"Agency identity unavailable" fallback. On a phone the felt is gone: Pebble says
+one sentence (`phoneSays`, `XaEntryPebbleLine`) and any object the page depends
+on moves into the column. Previews: `/preview/strelva/xa/xs-entry`.
+
 ## October 11 coherence amendment
 
 [GLOSSARY.md](../../GLOSSARY.md) and

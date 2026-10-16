@@ -5,16 +5,15 @@
  * 19-20), designed in XA from O3 (the prepared change) and C1 (whose door
  * this is). The candidate itself is the page's one object: the site, the
  * form or the follow-up exactly as visitors would meet it, marked Not live.
- * Beside it, the decision names who proposed it and holds the one yes,
- * which stays disabled here: approval happens through the separate link in
- * the owner's email. Any submission is a test that goes nowhere and says so.
+ * Beside it on the canvas (no card), the decision names who proposed it and
+ * says where the yes happens: the approval email, never this page, so no
+ * dead button stands in for it. Any submission is a test that goes nowhere.
  */
 import { useState, type FormEvent, type ReactNode } from "react";
 import { actorPresentation, type RecordedActor } from "@/platform/presentation/actor";
 import type { OwnerBrand } from "@/platform/infra/agency-brand";
-import { XA_YES_LABELS } from "@/platform/presentation/place-labels";
-import { XaButton, XaDecision, XaField, XaHeadline, XaInitial, XaLabel, XaPage, XaSays, XaStatus, XaSystemTile, XaTextArea, XaWorking, XaYes } from "@/components/ui/strelva/Xa";
-import { XaEntryFelt, XaEntryFrame } from "@/components/ui/strelva/xa/entry";
+import { XaButton, XaButtonLink, XaField, XaHeadline, XaLabel, XaPage, XaStatus, XaSystemTile, XaTextArea, XaTextLink, XaWorking } from "@/components/ui/strelva/Xa";
+import { XaEntryBrokenLink, XaEntryFelt, XaEntryFrame, XaEntryNote } from "@/components/ui/strelva/xa/entry";
 import styles from "./try.module.css";
 import { SiteDocumentTry, type SiteDocument } from "@/products/websites/client";
 import type { PublicBookingSchedule } from "../../../custom-repo-starter/booking-client";
@@ -43,38 +42,52 @@ export interface PossibilityTryView {
   };
 }
 
+/** Who sent the link, when the record is known: the agency and how to reach it. */
+export interface PossibilityTrySender { agencyName?: string; proposer?: string; replyTo?: string | null }
+
 export type PossibilityTryState =
   | { kind: "ready"; view: PossibilityTryView }
-  | { kind: "expired" }
-  | { kind: "changed" };
+  | { kind: "expired"; from?: PossibilityTrySender }
+  | { kind: "changed"; from?: PossibilityTrySender };
 
 type Mode = { mode?: "light" | "dark" };
 
+const WORKSPACE_HREF = `/sign-in?next=${encodeURIComponent("/workspace")}`;
+
 export function PossibilityTryLoading({ mode }: Mode = {}) {
-  return <XaEntryFrame mode={mode} phoneArt="adds" felt={<XaEntryFelt pose="adds" title="Setting up your test copy.">Only the candidate opens here. Nothing live is read or written.</XaEntryFelt>}>
+  return <XaEntryFrame mode={mode} felt={<XaEntryFelt pose="adds" title="Setting up your test copy.">Only the Possibility opens here. Nothing live is read or written.</XaEntryFelt>}>
     <XaHeadline quiet="This takes a moment.">Opening the Possibility.</XaHeadline>
-    <XaWorking title="Opening the Possibility" steps={[{ id: "open", label: "Loading the candidate", state: "active" }]} />
+    <XaWorking title="Opening the Possibility" steps={[{ id: "open", label: "Loading the test copy", state: "active" }]} />
   </XaEntryFrame>;
 }
 
 export function PossibilityTryError({ onRetry, mode }: { onRetry: () => void } & Mode) {
-  return <XaEntryFrame mode={mode} phoneArt="fixing" felt={<XaEntryFelt pose="fixing" title="Your live site is untouched.">The preview failed to open. Nothing was published, sent or booked.</XaEntryFelt>}>
+  return <XaEntryFrame mode={mode} phoneSays="The preview didn’t open. Your live site is untouched."
+    felt={<XaEntryFelt object={<XaEntryBrokenLink address="Your preview link" title="The preview didn’t open.">Your live site is untouched. Nothing was published, sent or booked.</XaEntryBrokenLink>} />}>
     <XaHeadline quiet="Nothing was published, sent or booked.">This Possibility could not be opened.</XaHeadline>
-    <XaSays>The preview is unavailable just now. Try again in a moment.</XaSays>
-    <div><XaButton variant="secondary" onClick={onRetry}>Try again</XaButton></div>
+    <XaButton variant="primary" size="lg" block onClick={onRetry}>Try again</XaButton>
+    <XaEntryNote>Still not opening? The same Possibility waits in your workspace. <XaTextLink href={WORKSPACE_HREF}>Open your workspace</XaTextLink></XaEntryNote>
   </XaEntryFrame>;
 }
 
-function Unavailable({ title, quiet, says, mode }: { title: string; quiet: string; says: string } & Mode) {
-  return <XaEntryFrame mode={mode} phoneArt="fixing" felt={<XaEntryFelt pose="fixing" title="Your live site is untouched.">A preview link only ever shows a test copy.</XaEntryFelt>}>
+/** Bad news about the link: the broken link in the felt, who sent it when known, and one way forward. */
+function Unavailable({ title, quiet, felt, from, mode }: { title: string; quiet: string; felt: string; from?: PossibilityTrySender } & Mode) {
+  const sender = from?.proposer || from?.agencyName;
+  const ask = sender ? `${from?.proposer && from.agencyName ? `${from.proposer} at ${from.agencyName}` : sender} can send a fresh link.` : "The latest version waits in your workspace.";
+  return <XaEntryFrame mode={mode} phoneSays={felt}
+    felt={<XaEntryFelt object={<XaEntryBrokenLink address="Your preview link" title={title}>{felt}</XaEntryBrokenLink>} />}>
     <XaHeadline quiet={quiet}>{title}</XaHeadline>
-    <XaSays>{says}</XaSays>
+    <XaEntryNote>{ask}</XaEntryNote>
+    {from?.replyTo && sender
+      ? <XaButtonLink href={`mailto:${from.replyTo}`} variant="primary" size="lg" block>Email {sender}</XaButtonLink>
+      : <XaButtonLink href={WORKSPACE_HREF} variant="primary" size="lg" block>Open your workspace</XaButtonLink>}
+    {from?.replyTo && sender ? <XaEntryNote>Or find it in <XaTextLink href={WORKSPACE_HREF}>your workspace</XaTextLink>.</XaEntryNote> : null}
   </XaEntryFrame>;
 }
 
 export function PossibilityTry({ state, previewContent, mode }: { state: PossibilityTryState; previewContent?: ReactNode } & Mode) {
-  if (state.kind === "expired") return <Unavailable mode={mode} title="This link has expired." quiet="Preview links last 14 days. Nothing changed." says="Ask whoever sent it for a fresh link." />;
-  if (state.kind === "changed") return <Unavailable mode={mode} title="This changed since we emailed you." quiet="Nothing live changed." says="This preview no longer matches the saved Possibility. Ask the sender for the latest link." />;
+  if (state.kind === "expired") return <Unavailable mode={mode} from={state.from} title="This link has expired." quiet="Preview links last 14 days. Nothing changed." felt="Preview links last 14 days. Your live site is untouched." />;
+  if (state.kind === "changed") return <Unavailable mode={mode} from={state.from} title="This changed since we emailed you." quiet="Nothing live changed." felt="This preview no longer matches the saved Possibility." />;
   const { view } = state;
   const proposer = actorPresentation(view.proposingActor);
   const agency = view.agencyBrand?.agencyId ? view.agencyBrand : null;
@@ -86,8 +99,8 @@ export function PossibilityTry({ state, previewContent, mode }: { state: Possibi
     <div data-workspace-theme="linen" className={styles.shell}>
       <header className={styles.topBar}>
         <div className={styles.who}>
-          <XaInitial name={view.businessName || "?"} size={30} />
-          <div><strong>{view.businessName || "Business identity unavailable"}</strong>{agency ? <p data-agency-brand={agency.agencyId ?? undefined}>{agency.name} · Runs on Strelva</p> : null}</div>
+          {agency?.logoUrl ? <img src={agency.logoUrl} alt="" className={styles.logo} /> : null}
+          <div><strong>{view.businessName || "A change for your business"}</strong>{agency ? <p data-agency-brand={agency.agencyId ?? undefined}>{agency.name} · Runs on Strelva</p> : <p>Runs on Strelva</p>}</div>
         </div>
         <XaStatus kind="draft" size="sm">Not live · only people with this link can open it</XaStatus>
       </header>
@@ -97,19 +110,17 @@ export function PossibilityTry({ state, previewContent, mode }: { state: Possibi
           {previewContent}
           {object}
         </div>
-        <aside className={styles.aside}>
-          <XaDecision label="What this would do" status={<XaStatus kind="waits">Waits for your yes</XaStatus>}
-            meta={proposer.name ? `Proposed by ${proposer.name}${proposer.credit ? ` · ${proposer.credit}` : ""}` : "Who proposed this wasn’t recorded"}
-            yes={<XaYes state="waiting" onYes={() => {}} shortcut={false} yesLabel={XA_YES_LABELS.yes}
-              disabledReason="Use the approval link in your email to put it live. Nothing here changes your live site, sends a message or books anything." />}>
-            {view.changes.length || view.introduces.length ? <div className={styles.changes}>
-              <XaLabel as="h2">What it would change</XaLabel>
-              <ul>
-                {view.changes.map(line => <li key={line}>{line}</li>)}
-                {view.introduces.map(line => <li key={`new-${line}`} className={styles.newSystem}><XaSystemTile kind={null} size={26} /><span>{line}<small>New System</small></span></li>)}
-              </ul>
-            </div> : <p className={styles.quiet}>Test submissions go nowhere.</p>}
-          </XaDecision>
+        <aside className={styles.aside} aria-label="What this would do">
+          <XaStatus kind="waits">Waits for your yes</XaStatus>
+          <p className={styles.quiet}>{proposer.name ? `Proposed by ${proposer.name}${proposer.credit ? ` · ${proposer.credit}` : ""}` : "Who proposed this wasn’t recorded."}</p>
+          {view.changes.length || view.introduces.length ? <div className={styles.changes}>
+            <XaLabel as="h2">What it would change</XaLabel>
+            <ul>
+              {view.changes.map(line => <li key={line}>{line}</li>)}
+              {view.introduces.map(line => <li key={`new-${line}`} className={styles.newSystem}><XaSystemTile kind={line.toLowerCase()} size={26} /><span>{line}<small>New System</small></span></li>)}
+            </ul>
+          </div> : <p className={styles.quiet}>Test submissions go nowhere.</p>}
+          <p className={styles.yes}>You make it live from the approval email. Nothing on this page changes your site, sends a message or books anything.</p>
         </aside>
       </main>
     </div>

@@ -30,8 +30,8 @@ export default async function XsEntryPreview({ params, searchParams }: { params:
 
   switch (screen) {
     case "sign-in": {
-      if (state === "invite") return <WorkspaceSignIn mode={mode} emailReady codeReady brand={XS_NORTH_STUDIO} title={`Sign in to manage ${XS_BUSINESS.name}.`} description={`Use ${XS_OWNER.email}, the address your invitation went to.`} prefillEmail={XS_OWNER.email} next="/account" resume={`your invitation to ${XS_BUSINESS.name}`} />;
-      if (state === "admin-host") return <WorkspaceSignIn mode={mode} emailReady codeReady brand={XS_IDENTITY_UNAVAILABLE} host="admin.harbordental.com" title={`Manage ${XS_BUSINESS.name}.`} description={`For the people ${XS_BUSINESS.name} added. Looking for the business itself? Open its public website.`} next="/client/harbor-dental/dashboard" />;
+      if (state === "invite") return <WorkspaceSignIn mode={mode} emailReady codeReady brand={XS_NORTH_STUDIO} businessName={XS_BUSINESS.name} title={`Sign in to manage ${XS_BUSINESS.name}.`} description="Use the address your invitation went to." prefillEmail={XS_OWNER.email} next="/account" resume={`your invitation to ${XS_BUSINESS.name}`} />;
+      if (state === "admin-host") return <WorkspaceSignIn mode={mode} emailReady codeReady brand={XS_IDENTITY_UNAVAILABLE} businessName={XS_BUSINESS.name} host="admin.harbordental.com" title={`Manage ${XS_BUSINESS.name}.`} description={`For the people ${XS_BUSINESS.name} added.`} next="/client/harbor-dental/dashboard" />;
       if (state === "code") return <WorkspaceSignIn mode={mode} emailReady codeReady initialStatus="sent" prefillEmail={XS_OWNER.email} next="/workspace" />;
       if (state === "link") return <WorkspaceSignIn mode={mode} emailReady codeReady={false} initialStatus="sent" prefillEmail={XS_OWNER.email} next="/workspace" resume="what you were opening" />;
       if (state === "failed") return <WorkspaceSignIn mode={mode} emailReady codeReady failed next="/workspace?save=scan_preview" resume="your saved check" />;
@@ -76,8 +76,8 @@ export default async function XsEntryPreview({ params, searchParams }: { params:
       return <EmailFrame subject="Your Strelva sign-in code" from="Strelva <no-reply@updates.strelva.com>" to={XS_OWNER.email} html={html} mode={mode} />;
     }
     case "email-claim": {
-      const options = claimEmailOptions({ workspaceName: XS_BUSINESS.name }, "#preview-claim", state === "no-agency" ? undefined : "North Studio");
-      return <EmailFrame subject={`Claim ${XS_BUSINESS.name} on Strelva`} from="Strelva <hello@updates.strelva.com>" to={XS_OWNER.email} html={renderEmailHtml({ ...options, brand: XS_NORTH_STUDIO, businessName: XS_BUSINESS.name })} mode={mode} />;
+      const options = claimEmailOptions({ workspaceName: XS_BUSINESS.name }, "https://app.strelva.com/workspace/claim/preview", "North Studio");
+      return <EmailFrame subject={`Claim ${XS_BUSINESS.name} on Strelva`} from="North Studio · Strelva <hello@updates.strelva.com>" to={XS_OWNER.email} html={renderEmailHtml({ ...options, paper: { ...options.paper, brand: XS_NORTH_STUDIO } })} mode={mode} />;
     }
     default:
       notFound();
@@ -86,7 +86,7 @@ export default async function XsEntryPreview({ params, searchParams }: { params:
 
 function tryState(state: string): PossibilityTryState {
   if (state === "expired") return { kind: "expired" };
-  if (state === "changed") return { kind: "changed" };
+  if (state === "changed") return { kind: "changed", from: { proposer: "Maya Okafor", agencyName: "North Studio", replyTo: XS_NORTH_STUDIO.replyTo } };
   const base = { businessName: XS_BUSINESS.name, proposingActor: { kind: "person" as const, displayName: "Maya Okafor" }, agencyBrand: XS_NORTH_STUDIO };
   if (state === "form") return { kind: "ready", view: { ...base, title: "A shorter new-patient form", intent: "Four questions instead of eleven, with insurance asked after the visit is booked.", changes: ["The new-patient form on harbordental.com"], introduces: [], takesSubmissions: true } };
   if (state === "follow-up") return { kind: "ready", view: { ...base, title: "A next-day follow-up for unanswered inquiries", intent: "One friendly note the day after an inquiry goes unanswered.", changes: ["Inquiries from the contact form"], introduces: [], takesSubmissions: false,
@@ -99,14 +99,20 @@ function tryState(state: string): PossibilityTryState {
   return { kind: "ready", view: { ...base, title: "Online booking for new patients", intent: "A Book a visit page beside the contact form, so new patients can pick a time themselves.", changes: ["harbordental.com with a Book a visit page", "Inquiries from the booking form"], introduces: ["Bookings"], takesSubmissions: true, websiteDocument: document } };
 }
 
+/**
+ * Email review frame. The preview loads DM Sans so review matches intent;
+ * real inboxes that block web fonts fall back to the system sans in the
+ * template's stack (an accepted email exception). No slab behind the email:
+ * it sits on the page as an inbox would show it.
+ */
 function EmailFrame({ subject, from, to, html, mode }: { subject: string; from: string; to: string; html: string; mode?: "light" | "dark" }) {
+  const reviewed = html.replace("</head>", '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&display=swap"></head>');
   return <div data-workspace-mode={mode} style={{ display: "contents" }}>
-    <div data-workspace-theme="linen" style={{ minHeight: "100dvh", background: "var(--st-sidebar)", color: "var(--st-text)", fontFamily: "var(--font-workspace), sans-serif", padding: "32px 16px" }}>
-      <div style={{ maxWidth: 680, margin: "0 auto", display: "flex", flexDirection: "column", gap: 16 }}>
+    <div data-workspace-theme="linen" style={{ minHeight: "100dvh", background: "var(--st-canvas)", color: "var(--st-text)", fontFamily: "var(--font-workspace), sans-serif", padding: "32px 16px" }}>
+      <div style={{ maxWidth: 640, margin: "0 auto", display: "flex", flexDirection: "column", gap: 20 }}>
         <div><p style={{ margin: 0, fontSize: 22, fontWeight: 600, letterSpacing: -0.4 }}>{subject}</p><p style={{ margin: "6px 0 0", fontSize: 14, color: "var(--st-text-2)" }}>{from} · to {to}</p><p style={{ margin: "4px 0 0", fontSize: 13, color: "var(--st-text-3)" }}>Template preview. Client email stays off during the rollout; nothing is sent from here.</p></div>
-        <iframe title={subject} srcDoc={html} style={{ width: "100%", height: 760, border: 0, borderRadius: 16, background: "#ffffff" }} />
+        <iframe title={subject} srcDoc={reviewed} style={{ width: "100%", height: 640, border: "1px solid var(--st-line)", borderRadius: 12, background: "#f4f4f1" }} />
       </div>
     </div>
   </div>;
 }
-

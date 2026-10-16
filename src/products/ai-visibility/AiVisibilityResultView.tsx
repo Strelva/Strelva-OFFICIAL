@@ -29,7 +29,43 @@ type MonitorState = "idle" | "saving" | "saved" | "error";
 
 /** Change legacy model terminology for display only; saved contracts stay unchanged. */
 export function publicCopy(value: string) {
-  return value.replace(/\bAI[- ]crawler/gi, "assistant crawler").replace(/\bAI\b/g, "assistants").replace(/\bagent(s?)\b/gi, (_, plural: string) => `assistant${plural.toLowerCase()}`).replace(/\bautomation\b/gi, "scheduled work").replace(/\bworkflow\b/gi, "process").replace(/\btask\b/gi, "work");
+  return ownerPaths(value).replace(/\bAI[- ]crawler/gi, "assistant crawler").replace(/\bAI\b/g, "assistants").replace(/\bagent(s?)\b/gi, (_, plural: string) => `assistant${plural.toLowerCase()}`).replace(/\bautomation\b/gi, "scheduled work").replace(/\bworkflow\b/gi, "process").replace(/\btask\b/gi, "work");
+}
+
+/** A site path read as the page it names: "on /contact" becomes "on your contact page". */
+export function ownerPaths(value: string) {
+  return value.replace(/\b(on|at|from|in) \/([a-z][a-z0-9-]*)\/?(?![\w/]|\.\w)/gi, (_, word: string, path: string) => `${word} your ${path.replace(/-/g, " ")} page`)
+    .replace(/\b(on|at|from|in) \/(?![\w/]|\.\w)/gi, (_, word: string) => `${word} your home page`);
+}
+
+/**
+ * Ask for this check again every month: the one email field after a result.
+ * The existing monitor endpoint records the request; nothing is sent from here.
+ */
+export function AiVisibilityFollowUp({ scanId, agencyName }: { scanId: string; agencyName?: string }) {
+  const [email, setEmail] = useState("");
+  const [state, setState] = useState<MonitorState>("idle");
+  const [error, setError] = useState("");
+  async function submit(event: FormEvent) {
+    event.preventDefault();
+    setState("saving"); setError("");
+    try {
+      const response = await fetch(`/api/ai-visibility/${scanId}/monitor`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email }) });
+      if (!response.ok) {
+        const body = await response.json().catch(() => null);
+        throw new Error(body?.error || "We couldn't save your request.");
+      }
+      setState("saved");
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "We couldn't save your request.");
+      setState("error");
+    }
+  }
+  return <section className={styles.stack} aria-label="Check every month">
+    <p className={styles.muted}>{agencyName ? `Want ${agencyName} to run recurring Gemini checks for you? Leave your email.` : "Want this checked every month? Leave your email."}</p>
+    {state === "saved" ? <p className={styles.saved} role="status">{agencyName ? `Your request was sent to ${agencyName}.` : "Your interest is saved."}</p>
+      : <form onSubmit={submit} className={styles.address}><XaField label="Your email" type="email" required value={email} onChange={event => setEmail(event.target.value)} autoComplete="email" error={error || undefined} /><XaButton variant="secondary" type="submit" busy={state === "saving"}>{agencyName ? "Send request" : "Keep me posted"}</XaButton></form>}
+  </section>;
 }
 
 /** What Gemini could read on the site, labelled in place: found reads quietly, missing reads clay. */
@@ -46,9 +82,6 @@ export function AiVisibilityResultView({ result: raw, scanId, shareUrl, workspac
   const result = attributedAiVisibility(raw, raw.agency);
   const agency = result.agency;
   const [shareStatus, setShareStatus] = useState<"idle" | "copied">("idle");
-  const [email, setEmail] = useState("");
-  const [monitorState, setMonitorState] = useState<MonitorState>("idle");
-  const [monitorError, setMonitorError] = useState("");
   const measured = result.readinessMeasured ?? result.measurementStatus !== "unavailable";
 
   async function handleShare() {
@@ -57,7 +90,7 @@ export function AiVisibilityResultView({ result: raw, scanId, shareUrl, workspac
       if (navigator.share) {
         await navigator.share({
           title: `${result.business} · Gemini business check`,
-          text: measured ? `${result.grade} · ${result.score}/100` : "Measurement unavailable",
+          text: publicCopy(result.verdict),
           url,
         });
         return;
@@ -75,28 +108,6 @@ export function AiVisibilityResultView({ result: raw, scanId, shareUrl, workspac
     }
   }
 
-  async function handleMonitor(event: FormEvent) {
-    event.preventDefault();
-    if (!scanId) return;
-    setMonitorState("saving");
-    setMonitorError("");
-    try {
-      const response = await fetch(`/api/ai-visibility/${scanId}/monitor`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email }),
-      });
-      if (!response.ok) {
-        const body = await response.json().catch(() => null);
-        throw new Error(body?.error || "We couldn't save your request.");
-      }
-      setMonitorState("saved");
-    } catch (cause) {
-      setMonitorError(cause instanceof Error ? cause.message : "We couldn't save your request.");
-      setMonitorState("error");
-    }
-  }
-
   const nextHref = continuationHref || (scanId && workspaceEnabled ? `/workspace?save=${encodeURIComponent(scanId)}` : agency?.contactUrl || `/access-request?ref=ai-visibility${scanId ? `&scan=${encodeURIComponent(scanId)}` : ""}`);
   const Heading = embedded ? "h3" : "h1";
   const wrong = sample ? sample.lines.filter(line => line.wrong).length : 0;
@@ -110,7 +121,7 @@ export function AiVisibilityResultView({ result: raw, scanId, shareUrl, workspac
       </header>
       <figure className={styles.answer} aria-label="Gemini result">
         {sample ? <><XaLabel>We asked: “{sample.prompt}”</XaLabel><blockquote className={styles.quote}>{sample.lines.map((line, index) => <p key={index} className={line.wrong ? styles.wrong : undefined}>{line.text}</p>)}</blockquote><p className={styles.muted}>{sample.explanation}</p></>
-          : <><XaLabel>{result.citation.probed ? "One sampled Gemini answer" : "Gemini answer unavailable"}</XaLabel><p className={styles.answerText}>{publicCopy(result.citation.note)}</p><p className={styles.muted}>The saved check records whether Gemini named your business. Its full answer and claim-by-claim accuracy were not saved.</p></>}
+          : <><XaLabel>{result.citation.probed ? "One sampled Gemini answer" : "Gemini answer unavailable"}</XaLabel><p className={styles.answerText}>{publicCopy(result.citation.note)}</p></>}
         <figcaption className={styles.muted}>One answer, sampled once. Asking again can give a different one.</figcaption>
       </figure>
       {result.measurementStatus === "unavailable" ? <XaSays>{publicCopy(result.measurementNote || "This check could not measure the website or a Gemini answer.")}</XaSays> : result.measurementStatus === "partial" ? <p className={styles.muted}>{publicCopy(result.measurementNote || "Only part of this check completed.")}</p> : null}
@@ -124,22 +135,16 @@ export function AiVisibilityResultView({ result: raw, scanId, shareUrl, workspac
         {scanId && workspaceEnabled && !continuationHref ? <p className={styles.muted}>Start your business with its website and this check saved. You review any change before it goes live.</p> : null}
       </section>
       {showSignals ? <section className={styles.stack} aria-labelledby="gemini-readability">
-        <XaLabel as="h3" id="gemini-readability">Can Google read your site?</XaLabel>
+        <XaLabel as="h3" id="gemini-readability">What Gemini can read about {result.business}</XaLabel>
         {result.signals.length ? <AiVisibilitySignals signals={result.signals} /> : <p className={styles.muted}>Website readability was not measured. Try a reachable public website.</p>}
       </section> : null}
-      {measured && !embedded ? <p className={styles.muted}>Website check: {result.grade} · {result.score}/100</p> : null}
       {result.agentBookingAvailability ? <section className={styles.stack} aria-labelledby="gemini-booking">
         <XaLabel as="h3" id="gemini-booking">Can an assistant request a booking through Strelva?</XaLabel>
         <XaStatus kind={result.agentBookingAvailability.status === "yes" ? "live" : "draft"} size="sm">{result.agentBookingAvailability.status === "yes" ? "Available" : result.agentBookingAvailability.status === "no" ? "Not available" : "Not verified"}</XaStatus>
         <p className={styles.muted}>{publicCopy(result.agentBookingAvailability.detail)}</p>
       </section> : null}
     </div>
-    {scanId && !continuationHref ? <section className={styles.stack} aria-labelledby="gemini-follow">
-      <XaLabel as="h3" id="gemini-follow">{agency ? `Contact ${agency.name}` : "Recurring checks pilot"}</XaLabel>
-      <p className={styles.muted}>{agency ? `Leave your email to ask ${agency.name} about recurring Gemini checks.` : "Recurring checks are a pilot. Leave your email to register your interest."}</p>
-      {monitorState === "saved" ? <p className={styles.saved} role="status">{agency ? `Your request was sent to ${agency.name}.` : "Your interest is saved."}</p>
-        : <form onSubmit={handleMonitor} className={styles.address}><XaField label="Your email" type="email" required value={email} onChange={event => setEmail(event.target.value)} autoComplete="email" error={monitorError || undefined} /><XaButton variant="secondary" type="submit" busy={monitorState === "saving"}>{agency ? "Send request" : "Join pilot"}</XaButton></form>}
-    </section> : null}
+    {scanId && !continuationHref ? <AiVisibilityFollowUp scanId={scanId} agencyName={agency?.name} /> : null}
     <div><XaTextLink onClick={onReset}>Check another business</XaTextLink></div>
   </div>;
 }

@@ -136,10 +136,11 @@ describe("dashboard route redirects", () => {
     expect(recoveryButton).toContain('type="button"');
     expect(recoveryButton).toContain("onClick={signOut}");
     expect(recoveryButton).toContain("Use my invited email");
-    expect(noAccess).toContain("<UseInvitedEmailButton redirectUrl={signInHref} />");
-    expect(noAccess).toContain("Use the exact email address that received your invite");
-    expect(noAccess).toContain("signs you out so you can choose that account");
-    expect(noAccess).toContain("mailto:jacob@strelva.com");
+    expect(noAccess).toContain("<UseInvitedEmailButton redirectUrl={signInHref}>Sign out and use my invited email</UseInvitedEmailButton>");
+    expect(noAccess).toContain("Sign in with the address your invitation went to.");
+    // Platform support, never one person's inbox (Strelva Agency like anyone).
+    expect(noAccess).toContain("mailto:${STRELVA_SUPPORT_EMAIL}");
+    expect(noAccess).not.toContain("jacob@strelva.com");
     expect(noAccess).toContain('href="/account"');
     expect(noAccess).toContain("Choose another business");
     expect(noAccess.indexOf("UseInvitedEmailButton")).toBeLessThan(noAccess.indexOf("Choose another business"));
@@ -151,12 +152,12 @@ describe("dashboard route redirects", () => {
     const empty = view.slice(view.indexOf("export function AccountNoBusiness"), view.indexOf("export function NoAccessView"));
 
     expect(empty).toContain("This email isn’t on a business yet.");
-    expect(empty).toContain("<UseInvitedEmailButton />");
+    expect(empty).toContain("<UseInvitedEmailButton>Sign out and use my invited email</UseInvitedEmailButton>");
     expect(empty).not.toContain("Request your build");
     expect(empty).toContain('href="/agencies"');
-    expect(empty).toContain("mailto:jacob@strelva.com");
+    expect(empty).toContain("mailto:${STRELVA_SUPPORT_EMAIL}");
+    expect(empty).not.toContain("jacob@strelva.com");
     expect(source).toContain("!tenantConfigs.some(({ config }) => config)");
-    expect(source).toContain("return <NoAccessState />");
-    expect(source).toContain("<AccountNoBusiness />");
+    expect(source).toContain("return <AccountNoBusiness email={email} />");
   });
 });

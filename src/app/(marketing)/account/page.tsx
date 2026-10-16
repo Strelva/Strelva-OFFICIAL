@@ -1,11 +1,8 @@
 import { redirect } from "next/navigation";
 import { AccountNoBusiness, AccountPicker } from "@/experience/entry/AccountEntry";
-import { claimPendingInviteForCurrentUser, getAuthUserId, getCurrentUserTenants, isSuperAdmin } from "@/platform/infra/auth";
+import { claimPendingInviteForCurrentUser, getAuthUserId, getCurrentUserEmail, getCurrentUserTenants, isSuperAdmin } from "@/platform/infra/auth";
 import { getTenantConfig, isActiveTenant } from "@/lib/tenants";
-import {
-  getTenantDashboardFallbackUrl,
-  getTenantDashboardHost,
-} from "@/lib/tenant-urls";
+import { getTenantDashboardFallbackUrl } from "@/lib/tenant-urls";
 import { getDevAccessTenant } from "@/platform/infra/dev-access";
 import type { TenantConfig } from "@/lib/types";
 import { workspaceReleaseEnabled } from "@/platform/workspace-release";
@@ -62,9 +59,11 @@ export default async function AccountPage({
   }
 
   const tenants = await getCurrentUserTenants();
+  // The header names the signed-in address; a failed read only drops it.
+  const email = await getCurrentUserEmail().catch(() => null);
 
   if (tenants.length === 0) {
-    return <NoAccessState />;
+    return <AccountNoBusiness email={email} />;
   }
 
   if (tenants.length === 1) {
@@ -83,14 +82,10 @@ export default async function AccountPage({
   );
 
   if (!tenantConfigs.some(({ config }) => config)) {
-    return <NoAccessState />;
+    return <AccountNoBusiness email={email} />;
   }
 
-  return <TenantPicker tenants={tenantConfigs} />;
-}
-
-function NoAccessState() {
-  return <AccountNoBusiness />;
+  return <TenantPicker tenants={tenantConfigs} email={email} />;
 }
 
 interface TenantPickerProps {
@@ -98,11 +93,13 @@ interface TenantPickerProps {
     id: string;
     config: TenantConfig | undefined;
   }>;
+  email: string | null;
 }
 
-function TenantPicker({ tenants }: TenantPickerProps) {
+/** Each business by what people know it by (its public website), never its admin host. */
+function TenantPicker({ tenants, email }: TenantPickerProps) {
   const businesses = tenants.flatMap(({ id, config }) => config ? [{
-    id, name: config.siteName || id, host: getTenantDashboardHost(config), href: getTenantDashboardFallbackUrl(config),
+    id, name: config.siteName || id, site: config.productionDomain || config.customDomains?.[0] || null, href: getTenantDashboardFallbackUrl(config),
   }] : []);
-  return <AccountPicker businesses={businesses} />;
+  return <AccountPicker businesses={businesses} email={email} />;
 }

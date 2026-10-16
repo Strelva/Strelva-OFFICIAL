@@ -46,7 +46,9 @@ describe("Systems 1.0 presentation boundaries", () => {
       title: "Shorter intake", intent: "Try the shorter form", changes: ["The intake form"], introduces: [], takesSubmissions: true,
     } } }));
     const approve = [...node.querySelectorAll<HTMLButtonElement>("button")].find(button => /^(Make real|Make it live|Put it live)$/.test(button.textContent ?? ""));
-    expect(approve?.disabled).toBe(true);
+    // No yes control at all here: the yes happens from the approval email.
+    expect(approve).toBeUndefined();
+    expect(node.textContent).toContain("You make it live from the approval email.");
     await act(async () => node.querySelector("form")!.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })));
     expect(node.textContent).toContain("Test submission, nobody was told");
     expect(request).not.toHaveBeenCalled();

@@ -20,9 +20,9 @@ export const XS_AGENCY: AgencyAttribution = {
 };
 
 export const XS_BUSINESSES = [
-  { id: "harbor-dental", name: "Harbor Dental", host: "admin.harbordental.com", href: "/preview/strelva/xa/xs-entry/no-access" },
-  { id: "elmwood-ortho", name: "Elmwood Orthodontics", host: "admin.elmwoodortho.com", href: "/preview/strelva/xa/xs-entry/no-access" },
-  { id: "lakeview-yoga", name: "Lakeview Yoga", host: "admin.lakeviewyoga.com", href: "/preview/strelva/xa/xs-entry/no-access" },
+  { id: "harbor-dental", name: "Harbor Dental", site: "harbordental.com", waiting: 1, href: "/preview/strelva/xa/xs-entry/no-access" },
+  { id: "elmwood-ortho", name: "Elmwood Orthodontics", site: "elmwoodortho.com", href: "/preview/strelva/xa/xs-entry/no-access" },
+  { id: "lakeview-yoga", name: "Lakeview Yoga", site: null, href: "/preview/strelva/xa/xs-entry/no-access" },
 ] as const;
 
 export function xsAudit(agency?: AgencyAttribution): AuditResult {
@@ -30,7 +30,7 @@ export function xsAudit(agency?: AgencyAttribution): AuditResult {
     businessName: "Harbor Dental", agency, url: "https://harbordental.com/", scannedAt: "2026-10-15T18:14:00.000Z", overallScore: 62, grade: "C",
     categories: [
       { name: "Search", slug: "seo", weight: 25, score: 58, guides: [{ slug: "local-seo-basics", title: "Local search basics" }], checks: [
-        { name: "Opening hours in structured data", status: "fail", score: 0, priority: "high", message: "Your hours appear only as an image, so search engines and assistants can't read them.", impact: "People asking “is Harbor Dental open Saturday” get no answer from your site.", quantified: "~9 calls a month" },
+        { name: "Opening hours in structured data", status: "fail", score: 0, priority: "high", message: "Your hours appear only as an image, so search engines and assistants can't read them.", impact: "People asking “is Harbor Dental open Saturday” get no answer from your site." },
         { name: "Page titles", status: "warn", score: 60, priority: "medium", message: "Three pages share the title “Home”.", impact: "Search results show the same line for different pages." },
         { name: "Sitemap", status: "pass", score: 100, message: "Found at /sitemap.xml with 14 pages." },
       ] },

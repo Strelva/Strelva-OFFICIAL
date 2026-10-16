@@ -3,12 +3,19 @@
 .shell { min-height: 100dvh; background: var(--st-canvas); color: var(--st-text); font-family: var(--font-workspace, system-ui), sans-serif; }
 .topBar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 24px; padding: 20px clamp(20px, 4.5vw, 64px); }
 .who { display: flex; min-width: 0; align-items: center; gap: 12px; }
+.logo { width: 30px; height: 30px; flex-shrink: 0; border-radius: 8px; object-fit: contain; }
 .who strong { display: block; font-size: 16px; font-weight: 600; line-height: 22px; }
 .who p { margin: 0; color: var(--st-text-3); font-size: 13px; line-height: 18px; }
 .layout { display: grid; grid-template-columns: minmax(0, 1fr) 380px; align-items: start; gap: 48px; padding: 24px clamp(20px, 4.5vw, 64px) 72px; animation: var(--kf-enter) var(--motion-base) var(--ease-settle) both; }
 .main { display: flex; min-width: 0; flex-direction: column; gap: 28px; }
-.aside { position: sticky; top: 24px; }
-.site { overflow: hidden; border: 1px solid var(--st-line); border-radius: var(--st-r-xl); background: var(--st-surface); box-shadow: var(--st-shadow-sm); }
+.aside { position: sticky; top: 24px; display: flex; flex-direction: column; align-items: flex-start; gap: 16px; padding-top: 6px; }
+.yes { margin: 4px 0 0; padding-top: 16px; border-top: 1px solid var(--st-line); color: var(--st-text); font-size: 15px; line-height: 1.5; }
+.site { overflow: hidden; border: 1px solid var(--st-line); border-radius: var(--st-r-lg); background: var(--st-surface); }
+/* Read as a real page: no full-viewport floor, section rhythm tightened for a preview at this width. */
+.site :global(.site-document) { min-height: 0; }
+.site :global(.site-document .site-wrap:not(.site-header):not(.site-footer)) { padding-block: 16px; }
+.site :global(.site-document .site-body) { margin-bottom: 8px; }
+.site :global(.site-document .site-display) { font-size: clamp(32px, 4vw, 52px); margin-bottom: 16px; }
 /* The candidate's own "Preview page: /" status reads as the Page address bar (XaPage geometry). */
 .site > section > p[role="status"] { display: flex; height: 40px; align-items: center; justify-content: center; margin: 0 !important; padding: 0 16px; background: color-mix(in srgb, var(--st-surface) 96%, var(--st-text)); color: var(--st-text-2); font-size: 13px; line-height: 18px; }
 .changes { display: flex; flex-direction: column; gap: 10px; }

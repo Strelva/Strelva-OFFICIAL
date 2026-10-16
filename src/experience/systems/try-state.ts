@@ -1,4 +1,4 @@
-import { recordedActor, type RecordedActor } from "@/platform/presentation/actor";
+import { actorPresentation, recordedActor, type RecordedActor } from "@/platform/presentation/actor";
 import type { OwnerBrand } from "@/platform/infra/agency-brand";
 import { verifyPossibilityPreviewToken } from "@/platform/possibilities/preview-link";
 import type { PossibilityTryState } from "./PossibilityTry";
@@ -27,20 +27,24 @@ export async function possibilityTryState(token: string, deps: {
   if (!(await deps.enabled(claims.workspaceId).catch(() => false))) return null;
   const p = await deps.read({ businessId: claims.workspaceId, possibilityId: claims.possibilityId, candidateRevision: claims.candidateRevision }).catch(() => null);
   if (!p) return { kind: "changed" };
+  // The record is known, so a stale link can name who sent it and how to reach them.
+  const agency = p.agencyBrand?.agencyId ? p.agencyBrand : null;
+  const from = { proposer: actorPresentation(p.proposingActor).name ?? undefined, agencyName: agency?.name, replyTo: agency?.replyTo ?? null };
+  const changed = { kind: "changed" as const, from };
   const inquiry = p.changes.find(item => item.candidate.content.kind === "ask-inquiry-follow-up")?.candidate.content;
   const inquiryFollowUp = inquiry ? followUpTryView(inquiry.selection, inquiry.draft, inquiry.rehearsal) : null;
-  if (inquiry && !inquiryFollowUp) return { kind: "changed" };
+  if (inquiry && !inquiryFollowUp) return changed;
   const website = [...p.introduces, ...p.changes].find(item => ["ask-website-pages", "ask-existing-booking-page", "ask-existing-website-pages"].includes(String(item.candidate?.content.kind)));
   const existingWebsite = website?.candidate?.content.kind === "ask-existing-website-pages";
   const booking = website?.candidate?.content.kind === "ask-existing-booking-page";
   const document = siteDocumentSchema.safeParse(website?.candidate?.content.document);
-  if (website && !document.success) return { kind: "changed" };
+  if (website && !document.success) return changed;
   const bookingSchedule = publicBookingScheduleSchema.safeParse(website?.candidate?.content.bookingSchedule);
   if (website && document.success && (siteDocumentHash(document.data) !== website.candidate?.content.candidateContentHash
     || !booking && !existingWebsite && (document.data.capabilities || Object.values(document.data.nodes).some(node => node.type === "Booking" || node.type === "InquiryForm"))
-    || booking && (!bookingSchedule.success || document.data.capabilities?.booking?.capabilityId !== bookingSchedule.data.capabilityId || document.data.capabilities.booking.version !== bookingSchedule.data.version))) return { kind: "changed" };
+    || booking && (!bookingSchedule.success || document.data.capabilities?.booking?.capabilityId !== bookingSchedule.data.capabilityId || document.data.capabilities.booking.version !== bookingSchedule.data.version))) return changed;
   const bookingPath = website?.candidate?.content.bookingPath;
-  if (booking && (typeof bookingPath !== "string" || !document.success || !document.data.pages.some(page => page.path === bookingPath))) return { kind: "changed" };
+  if (booking && (typeof bookingPath !== "string" || !document.success || !document.data.pages.some(page => page.path === bookingPath))) return changed;
   return {
     kind: "ready",
     view: {

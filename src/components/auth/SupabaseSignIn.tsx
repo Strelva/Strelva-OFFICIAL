@@ -12,8 +12,7 @@ import { XaEntryNote, XaEntryStack } from "@/components/ui/strelva/xa/entry";
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { signInCodeErrorCopy, signInErrorCopy } from "./sign-in-errors";
 import { createBrowserSupabase } from "@/platform/infra/db/browser-client";
-
-type Status = "idle" | "google" | "sending" | "sent" | "error";
+import { useSignInMail } from "./sign-in-mail";
 
 export function SupabaseSignIn({
   next = "/account",
@@ -35,15 +34,15 @@ export function SupabaseSignIn({
   /** Preview fixtures only: open on the sent step. */
   initialStatus?: "idle" | "sent";
 }) {
-  const [email, setEmail] = useState(prefillEmail);
-  const [status, setStatus] = useState<Status>(initialStatus);
+  // Shared with the felt's email when SignInMailProvider wraps the page.
+  const { email, setEmail, status, setStatus } = useSignInMail(prefillEmail, initialStatus);
   const [error, setError] = useState<string | null>(null);
   const [resent, setResent] = useState(false);
   const [code, setCode] = useState("");
   const [codeError, setCodeError] = useState<string | null>(null);
   const [verifying, setVerifying] = useState(false);
   const codeRef = useRef<HTMLInputElement>(null);
-  const headRef = useRef<HTMLDivElement>(null);
+  const headRef = useRef<HTMLHeadingElement>(null);
   const lastTried = useRef("");
 
   useEffect(() => {
@@ -102,11 +101,11 @@ export function SupabaseSignIn({
   }
 
   if (status === "sent") return <XaEntryStack>
-    <div ref={headRef} tabIndex={-1} className="outline-none"><XaHeadline quiet={<>We sent {codeReady ? "a code" : "a sign-in link"} to <span data-sent-to>{email}</span>.</>}>Check your email.</XaHeadline></div>
+    <XaHeadline ref={headRef} quiet={<>We sent {codeReady ? "a code" : "a sign-in link"} to <span data-sent-to>{email}</span>.</>}>Check your email.</XaHeadline>
     {codeReady ? <form className="contents" onSubmit={event => { event.preventDefault(); void verify(); }}>
       <XaEntryStack gap="sm">
         <XaField ref={codeRef} label="Code from the email" name="code" inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]*" maxLength={10} required
-          value={code} disabled={verifying} error={codeError ?? undefined} hint={codeError ? undefined : "Six digits, from the newest email."}
+          value={code} disabled={verifying} error={codeError ?? undefined} hint={codeError ? undefined : "Six digits, from the newest email."} placeholder="000000"
           data-code-field style={{ fontSize: 24, letterSpacing: "0.32em", fontVariantNumeric: "tabular-nums", fontWeight: 500 }}
           onChange={event => { const digits = event.target.value.replace(/\D/g, "").slice(0, 10); setCode(digits); setCodeError(null); if (digits.length === 6) void verify(digits); }} />
         <XaButton type="submit" variant="primary" size="lg" block busy={verifying}>Sign in</XaButton>
