@@ -1,23 +1,30 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { StEmpty, StMono, StNotice, StPill, StRow, StRows, StSection, StSkeleton, StState, StSurface, StTextButton, StToast } from "@/components/ui/strelva/Kit";
-import { SelectInput, TextInput } from "@/components/ui/TextInput";
+import { XaButton, XaDoors, XaField, XaLabel, XaRow, XaRows, XaSelect, XaStatus, XaTextLink } from "@/components/ui/strelva/Xa";
 import type { PayerTransition, PayerTransitionSnapshot } from "@/platform/work-economics/payer-transitions";
+import styles from "@/experience/workspace/money/money.module.css";
 
 /** Who would pay: a person, an agency, or the business itself. */
 function successorLabel(item: PayerTransition): string {
-  if (item.successorKind === "agency") return `${item.successorWorkspaceName ?? "An agency"} (agency)`;
+  if (item.successorKind === "agency") return item.successorWorkspaceName ?? "An agency";
   if (item.successorKind === "business") return "This business";
   return item.successorEmail;
 }
+const when = (iso: string | null | undefined) => {
+  const value = iso ? new Date(iso) : null;
+  return value && Number.isFinite(value.getTime()) ? new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric" }).format(value) : "date not recorded";
+};
+const STATUS_WORDS: Record<PayerTransition["status"], string> = { pending: "Waiting for an answer", accepted: "Accepted", rejected: "Declined", revoked: "Withdrawn", stale: "Expired" };
+type Kind = "business" | "agency" | "user";
 
+/** Who pays for future jobs (XA · R4 language): one sentence for today, the waiting change beside it, then the choice. */
 export function WorkspacePayerTransition({ workspaceId, canPropose, agencyChoices = [], agencyChoicesError = "", providerChangeEnabled = false, request = fetch }: { workspaceId: string; canPropose: boolean; agencyChoices?: { id: string; name: string }[]; agencyChoicesError?: string; providerChangeEnabled?: boolean; request?: typeof fetch }) {
   const [data, setData] = useState<PayerTransitionSnapshot | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
-  const [successorKind, setSuccessorKind] = useState("business");
+  const [successorKind, setSuccessorKind] = useState<Kind>("business");
   const [successorAgencyWorkspaceId, setSuccessorAgencyWorkspaceId] = useState("");
   const [providerChange, setProviderChange] = useState<{ id: string; status: string } | null>(null);
 
@@ -47,7 +54,7 @@ export function WorkspacePayerTransition({ workspaceId, canPropose, agencyChoice
       scoped.pending = scoped.transitions.find((item: PayerTransition) => item.status === "pending") ?? null;
       setData(scoped);
       const resolved = typeof body.transitionId === "string" ? scoped.transitions?.find((item: { id: string }) => item.id === body.transitionId) : null;
-      setNotice(body.action === "accept" && resolved?.status === "stale" ? "This proposal became stale because its proposer is no longer a business owner." : body.action === "accept" ? "You accepted responsibility for future jobs." : body.action === "reject" ? "You declined this payer change." : body.action === "revoke" ? "The pending payer change was revoked." : "Payer change proposed. An authorized representative of the proposed payer must accept it.");
+      setNotice(body.action === "accept" && resolved?.status === "stale" ? "This proposal became stale because its proposer is no longer a business owner." : body.action === "accept" ? "You accepted responsibility for future jobs." : body.action === "reject" ? "You declined this payer change." : body.action === "revoke" ? "The pending payer change was withdrawn." : "Payer change proposed. Someone who can sign for the proposed payer accepts it.");
     } catch (cause) { setError(cause instanceof Error ? cause.message : "The payer change could not be confirmed."); }
     finally { setBusy(false); }
   }
@@ -61,27 +68,40 @@ export function WorkspacePayerTransition({ workspaceId, canPropose, agencyChoice
       const result = await response.json();
       if (!response.ok) throw new Error(result.error ?? "The agency handoff could not be confirmed.");
       setProviderChange(result);
-      setNotice(result.status === "completed" ? "The agency handoff is complete. Existing sites and financial records are preserved." : result.status === "awaiting_policy" ? "Your handoff request is saved. The provider response policy must be approved before it can proceed." : "Your handoff request is saved. The outgoing provider must receive the notice and response window before completion.");
+      setNotice(result.status === "completed" ? "The agency handoff is complete. Existing sites and money records are kept." : result.status === "awaiting_policy" ? "Your handoff request is saved. The agency's response policy must be approved before it can go ahead." : "Your handoff request is saved. The outgoing agency gets its notice and response window before it completes.");
     } catch (cause) { setError(cause instanceof Error ? cause.message : "The agency handoff could not be confirmed."); }
     finally { setBusy(false); }
   }
 
   const pending = data?.pending;
   const addressed = Boolean(pending && (pending.canRespond || pending.successorUserId === data?.currentActorId));
-  return <StSection title="Payer for future jobs" id="payer-transition-heading">
-    <p className="text-sm text-gray-muted">An accepted change applies only to jobs created afterward. Existing budgets, reservations, recorded costs, and unresolved holds keep their original payer and limit.</p>
-    {error ? <StNotice tone="critical">{error}<StTextButton disabled={busy} onClick={() => void load()}>Retry payer history</StTextButton></StNotice> : null}
-    {notice ? <StToast>{notice}</StToast> : null}
-    {!data && !error ? <StSkeleton label="Loading payer history" /> : null}
-    {data?.current ? <StRows><StRow kind="Current accepted successor" title={successorLabel(data.current)} detail={<>Since <StMono>{new Date(data.current.acceptedAt!).toLocaleString()}</StMono></>} /></StRows> : data ? <StEmpty>No successor payer has been accepted for future jobs.</StEmpty> : null}
-    {providerChangeEnabled && canPropose && data?.current && data.current.successorKind !== "user" ? <StNotice><p>Use this accepted payer for the agency handoff. The server rechecks the business owner and accepted payer’s current authority. The request preserves existing sites and agreements; new subscription prices and any proration need separate approval.</p><StPill variant="soft" disabled={busy || providerChange?.status === "completed"} onClick={() => void requestProviderChange(providerChange?.status === "notified")}>{providerChange?.status === "completed" ? "Agency handoff complete" : providerChange?.status === "notified" ? "Complete after the provider response window" : "Request agency handoff"}</StPill></StNotice> : null}
-    {pending ? <StSurface tone="need" label="Pending payer change"><StState kind="need">Pending · {successorLabel(pending)}</StState><p className="mt-2 text-sm text-gray-muted">Proposed by {pending.proposerEmail}. {pending.successorKind === "agency" ? "Only an owner or admin of this agency can accept." : pending.successorKind === "business" ? "A business owner accepts." : "Only this addressed verified person can accept."}</p>
-      <div className="mt-3 flex flex-wrap gap-2">{addressed ? <><StPill disabled={busy} onClick={() => void command({ action: "accept", transitionId: pending.id })}>Accept future payer role</StPill><StTextButton disabled={busy} onClick={() => void command({ action: "reject", transitionId: pending.id })}>Decline</StTextButton></> : null}{canPropose ? <StTextButton disabled={busy} onClick={() => void command({ action: "revoke", transitionId: pending.id })}>Revoke proposal</StTextButton> : null}</div>
-    </StSurface> : canPropose && data ? <StSurface label="Propose a payer change"><form className="max-w-md space-y-3" onSubmit={event => { event.preventDefault(); const form = new FormData(event.currentTarget); if (successorKind === "agency" && (agencyChoicesError || !agencyChoices.some(agency => agency.id === form.get("successorAgencyWorkspaceId")))) return; void command(successorKind === "agency" ? { action: "propose", workspaceId, successorAgencyWorkspaceId: form.get("successorAgencyWorkspaceId") } : successorKind === "business" ? { action: "propose", workspaceId, successorKind: "business" } : { action: "propose", workspaceId, successorEmail: form.get("successorEmail") }); }}>
-      <SelectInput label="Who pays for future jobs?" value={successorKind} onChange={event => setSuccessorKind(event.target.value)} options={[{ value: "business", label: "This business" }, { value: "agency", label: "An agency" }, { value: "user", label: "A named business signer" }]} />
-      {successorKind === "agency" ? <><SelectInput label="Agency" name="successorAgencyWorkspaceId" value={successorAgencyWorkspaceId} onChange={event => setSuccessorAgencyWorkspaceId(event.target.value)} options={[{ value: "", label: "Choose your serving agency" }, ...agencyChoices.map(agency => ({ value: agency.id, label: agency.name }))]} disabled={busy || !agencyChoices.length} required helperText="The agency accepts from its billing page. You do not need to join its team." />{agencyChoicesError ? <StNotice tone="critical">{agencyChoicesError}<StTextButton href={`/workspace/billing?workspaceId=${encodeURIComponent(workspaceId)}`}>Reload serving agencies</StTextButton></StNotice> : !agencyChoices.length ? <StEmpty>No agency is serving this business yet. Bring in an agency before asking it to pay.<StTextButton href={`/workspace?view=help&workspaceId=${encodeURIComponent(workspaceId)}`}>Choose an agency</StTextButton></StEmpty> : null}</> : successorKind === "user" ? <TextInput label="Verified payer email" name="successorEmail" type="email" maxLength={254} required /> : <p className="text-sm text-gray-muted">A business owner accepts this change. Existing job limits and billing agreements are preserved.</p>}
-      <StPill variant="soft" type="submit" disabled={busy || (successorKind === "agency" && (Boolean(agencyChoicesError) || !agencyChoices.some(agency => agency.id === successorAgencyWorkspaceId)))}>Propose new payer</StPill>
-    </form></StSurface> : !canPropose && data && !pending ? <StNotice>Only a business owner can propose a new payer.</StNotice> : null}
-    {data?.transitions.length ? <details><summary className="cursor-pointer text-sm">Payer change history</summary><StRows>{data.transitions.map(item => <StRow key={item.id} title={`${item.status} · ${successorLabel(item)}`} detail={<>Proposed <StMono>{new Date(item.proposedAt).toLocaleString()}</StMono></>} />)}</StRows></details> : null}
-  </StSection>;
+  const agencyMissing = successorKind === "agency" && (Boolean(agencyChoicesError) || !agencyChoices.some(agency => agency.id === successorAgencyWorkspaceId));
+  return <section className={styles.section} aria-labelledby="payer-transition-heading">
+    <XaLabel as="h2" id="payer-transition-heading">Who pays for future jobs</XaLabel>
+    {!data && !error ? <p className={styles.note} role="status">Reading who pays…</p> : null}
+    {data ? <p className={styles.body}>{data.current ? <>{successorLabel(data.current)} pays for jobs started after {when(data.current.acceptedAt)}.</> : "This business pays. No other payer has accepted future jobs."} Existing budgets, holds and recorded costs keep their original payer.</p> : null}
+    {error ? <p className={styles.critical} role="alert">{error} <XaTextLink onClick={() => void load()}>Try again</XaTextLink></p> : null}
+    {notice ? <p className={styles.body} role="status">{notice}</p> : null}
+    {providerChangeEnabled && canPropose && data?.current && data.current.successorKind !== "user" ? <div className={styles.section}>
+      <p className={styles.body}>Use {successorLabel(data.current)} for an agency handoff. Strelva checks again that you own the business and that this payer still accepts. Existing sites and agreements stay as they are; any new price needs its own yes.</p>
+      <div className={styles.actions}><XaButton size="sm" disabled={busy || providerChange?.status === "completed"} onClick={() => void requestProviderChange(providerChange?.status === "notified")}>{providerChange?.status === "completed" ? "Agency handoff complete" : providerChange?.status === "notified" ? "Complete after the response window" : "Request agency handoff"}</XaButton></div>
+    </div> : null}
+    {pending ? <div className={styles.waiting} role="group" aria-label="Payer change waiting for an answer">
+      <div className={styles.waitingHead}><p className={styles.waitingTitle}>{successorLabel(pending)} as payer for future jobs</p><XaStatus kind="waits" size="sm">Waiting for {pending.successorKind === "business" ? "a business owner" : successorLabel(pending)}</XaStatus></div>
+      <p className={styles.note}>Proposed by {pending.proposerEmail}. {pending.successorKind === "agency" ? "Only an owner or admin of this agency can accept." : pending.successorKind === "business" ? "A business owner accepts." : "Only this person can accept, after confirming their email."}</p>
+      <div className={styles.actions}>{addressed ? <><XaButton size="sm" disabled={busy} onClick={() => void command({ action: "accept", transitionId: pending.id })}>Accept future payer role</XaButton><XaButton size="sm" variant="quiet" disabled={busy} onClick={() => void command({ action: "reject", transitionId: pending.id })}>Decline</XaButton></> : null}{canPropose ? <XaButton size="sm" variant="quiet" disabled={busy} onClick={() => void command({ action: "revoke", transitionId: pending.id })}>Withdraw proposal</XaButton> : null}</div>
+    </div> : canPropose && data ? <form className={styles.form} onSubmit={event => { event.preventDefault(); const form = new FormData(event.currentTarget); if (successorKind === "agency" && agencyMissing) return; void command(successorKind === "agency" ? { action: "propose", workspaceId, successorAgencyWorkspaceId: form.get("successorAgencyWorkspaceId") } : successorKind === "business" ? { action: "propose", workspaceId, successorKind: "business" } : { action: "propose", workspaceId, successorEmail: form.get("successorEmail") }); }}>
+      <XaDoors label="Change who pays for future jobs" name="payerKind" value={successorKind} onChange={setSuccessorKind} options={[
+        { value: "business", label: "This business", detail: "A business owner accepts. Existing job limits and agreements stay." },
+        { value: "agency", label: "An agency serving you", detail: "The agency accepts from its billing page. You do not need to join its team." },
+        { value: "user", label: "A named person who signs for the business", detail: "They accept after confirming their email." },
+      ]} />
+      {successorKind === "agency" ? agencyChoicesError ? <p className={styles.critical} role="alert">{agencyChoicesError} <XaTextLink href={`/workspace/billing?workspaceId=${encodeURIComponent(workspaceId)}`}>Reload</XaTextLink></p>
+        : agencyChoices.length ? <XaSelect label="Agency" name="successorAgencyWorkspaceId" value={successorAgencyWorkspaceId} onChange={event => setSuccessorAgencyWorkspaceId(event.target.value)} disabled={busy} required options={[{ value: "", label: "Choose your agency" }, ...agencyChoices.map(agency => ({ value: agency.id, label: agency.name }))]} />
+          : <p className={styles.body}>No agency is serving this business yet. Bring in an agency before asking it to pay. <XaTextLink href={`/workspace?view=help&workspaceId=${encodeURIComponent(workspaceId)}`}>Choose an agency</XaTextLink></p>
+        : successorKind === "user" ? <XaField label="Their email" name="successorEmail" type="email" maxLength={254} required /> : null}
+      <div className={styles.actions}><XaButton type="submit" disabled={busy || agencyMissing}>Propose this payer</XaButton></div>
+    </form> : !canPropose && data && !pending ? <p className={styles.note}>Only a business owner can propose a new payer.</p> : null}
+    {data?.transitions.length ? <details className={styles.history}><summary className={styles.detailsToggle}>Earlier payer changes</summary><XaRows label="Earlier payer changes">{data.transitions.map(item => <XaRow key={item.id} title={successorLabel(item)} detail={`Proposed ${when(item.proposedAt)} by ${item.proposerEmail}`} meta={STATUS_WORDS[item.status]} />)}</XaRows></details> : null}
+  </section>;
 }

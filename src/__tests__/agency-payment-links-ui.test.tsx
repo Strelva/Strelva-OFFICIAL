@@ -129,14 +129,14 @@ it("creates a fixed link with the exact cents and confirms it", async () => {
 it("blocks a range whose span is not whole $50 steps before any request", async () => {
   const request = vi.fn<typeof fetch>(async () => Response.json(ready()));
   const node = await render(request, { name: "Harbor Dental", description: "Care plan" });
-  await type(node, "Amount", "range"); await type(node, "Minimum in whole dollars", "100"); await type(node, "Maximum in whole dollars", "175"); await submit(node);
+  await act(async () => [...node.querySelectorAll<HTMLButtonElement>('[role="radio"]')].find(item => item.textContent === "Client picks within a range")!.click()); await type(node, "Minimum in whole dollars", "100"); await type(node, "Maximum in whole dollars", "175"); await submit(node);
   expect(node.textContent).toContain("$50 steps"); expect(request.mock.calls.every(([, init]) => !init?.method)).toBe(true);
 });
 it("sends a valid range as cents", async () => {
   const bodies: Record<string, unknown>[] = [];
   const request = vi.fn<typeof fetch>(async (_url, init) => { if (init?.method !== "POST") return Response.json(ready()); const body = JSON.parse(String(init.body)); bodies.push(body); return Response.json({ payLink: row({ clientName: body.clientName }) }); });
   const node = await render(request, { name: "Harbor Dental", description: "Care plan" });
-  await type(node, "Amount", "range"); await type(node, "Minimum in whole dollars", "100"); await type(node, "Maximum in whole dollars", "300"); await submit(node);
+  await act(async () => [...node.querySelectorAll<HTMLButtonElement>('[role="radio"]')].find(item => item.textContent === "Client picks within a range")!.click()); await type(node, "Minimum in whole dollars", "100"); await type(node, "Maximum in whole dollars", "300"); await submit(node);
   expect(bodies[0]).toMatchObject({ minCents: 10000, maxCents: 30000 }); expect(bodies[0]).not.toHaveProperty("amountCents");
 });
 it("lists connected links with their invoice number, status and actions", async () => {

@@ -5,8 +5,8 @@
  * L0 · Segmented (qIVLf). Native controls underneath, so labels, errors,
  * keyboard and form submission behave the way browsers already do.
  */
-import { forwardRef, useId, useLayoutEffect, useRef, useState, type InputHTMLAttributes, type ReactNode, type TextareaHTMLAttributes } from "react";
-import { Check } from "lucide-react";
+import { forwardRef, useId, useLayoutEffect, useRef, useState, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes, type TextareaHTMLAttributes } from "react";
+import { Check, ChevronDown } from "lucide-react";
 import styles from "./xa.module.css";
 
 /* ---------- Field ---------- */
@@ -31,6 +31,27 @@ export const XaTextArea = forwardRef<HTMLTextAreaElement, Omit<TextareaHTMLAttri
   return <div className={styles.field}>
     <label htmlFor={id} className={styles.fieldLabel}>{label}</label>
     <textarea {...props} ref={ref} id={id} className={styles.fieldControl} aria-invalid={error ? true : props["aria-invalid"]} aria-describedby={[describedBy, messageId].filter(Boolean).join(" ") || undefined} />
+    {messageId ? <p id={messageId} className={styles.fieldHint} data-error={error ? true : undefined} role={error ? "alert" : undefined}>{error || hint}</p> : null}
+  </div>;
+});
+
+/**
+ * A native select in the field look, for a choice from a list too long or too
+ * dynamic for XaChoices (recorded agreements, payments, listings). Added by
+ * the money lane (xs-money, Oct 15).
+ */
+export const XaSelect = forwardRef<HTMLSelectElement, Omit<SelectHTMLAttributes<HTMLSelectElement>, "children"> & FieldBase & { options: readonly { value: string; label: string; disabled?: boolean }[] }>(function XaSelect({ label, hint, error, options, id: givenId, "aria-describedby": describedBy, ...props }, ref) {
+  const generated = useId();
+  const id = givenId || generated;
+  const messageId = hint || error ? `${id}-message` : undefined;
+  return <div className={styles.field}>
+    <label htmlFor={id} className={styles.fieldLabel}>{label}</label>
+    <span className={styles.selectWrap}>
+      <select {...props} ref={ref} id={id} className={styles.fieldControl} data-select aria-invalid={error ? true : props["aria-invalid"]} aria-describedby={[describedBy, messageId].filter(Boolean).join(" ") || undefined}>
+        {options.map(option => <option key={option.value} value={option.value} disabled={option.disabled}>{option.label}</option>)}
+      </select>
+      <ChevronDown size={16} aria-hidden="true" className={styles.selectChevron} />
+    </span>
     {messageId ? <p id={messageId} className={styles.fieldHint} data-error={error ? true : undefined} role={error ? "alert" : undefined}>{error || hint}</p> : null}
   </div>;
 });

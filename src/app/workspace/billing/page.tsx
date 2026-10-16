@@ -1,7 +1,8 @@
-import Link from "next/link";
 import { StrelvaShell } from "@/experience/app-frame/StrelvaShell";
 import { notFound, redirect } from "next/navigation";
-import { StPage, StHead, StNotice, StPillLink, StTextButton } from "@/components/ui/strelva/Kit";
+import { XaHeadline, XaTextLink } from "@/components/ui/strelva/Xa";
+import { MoneyLoadFailure } from "@/experience/workspace/money/MoneyLoadFailure";
+import styles from "@/experience/workspace/money/money.module.css";
 import { BusinessBillingView } from "@/experience/workspace/billing/BusinessBillingView";
 import { businessBillingEnabled, readAgencyBilling, readBusinessBilling } from "@/platform/business-billing";
 import { AgencyInvoiceAcceptance } from "@/experience/workspace/billing/AgencyInvoiceControls";
@@ -19,6 +20,7 @@ import { AgencyPayerRequests } from "@/experience/workspace/billing/AgencyPayerR
 import { aiControlsReleaseEnabled } from "@/platform/infra/ai-controls-release";
 import { businessAiCapUsd, readBusinessAiBudget, type AiControlsState, type BusinessAiBudget } from "@/platform/infra/business-ai-budget";
 import { workspaceHttpActor } from "@/platform/workspaces/http";
+import { resolveOwnerBrand } from "@/platform/agency-brand/server";
 
 export const dynamic = "force-dynamic";
 
@@ -32,15 +34,31 @@ export default async function BusinessBillingPage({ searchParams }: { searchPara
   const workspaces = await listWorkspaces(actor);
   const workspace = workspaces.find(item => item.id === workspaceId);
   if (workspace?.kind === "agency") {
+    const id = encodeURIComponent(workspaceId);
+    const brand = await resolveOwnerBrand(workspaceId).catch(() => null);
+    const agencyShell = (children: React.ReactNode) => <StrelvaShell title="" workspaceId={workspaceId} workspaceName={workspace.name} ownerBrand={brand ?? undefined} agencyNavigation={{}} detailsPlace="plan">{children}</StrelvaShell>;
     let agency;
     try { agency = await readAgencyBilling(actor, workspaceId); }
-    catch { return <main className="mx-auto max-w-3xl px-6 py-12"><h1 className="font-display text-3xl">Agency billing</h1><p role="alert" className="mt-6">Only an agency owner or admin can read its billing. Reload after confirming your access.</p></main>; }
+    catch { return agencyShell(<div className={styles.screen}><MoneyLoadFailure title="Agency billing did not load." quiet="Only an agency owner or admin can read its billing." retryHref={`/workspace/billing?workspaceId=${id}`} /></div>); }
     const checkoutAvailability = await readCheckoutAvailability(workspaceId);
-    return <main className="mx-auto max-w-3xl px-6 py-12 text-warm-black"><Link className="inline-flex min-h-12 items-center underline" href={`/workspace?workspaceId=${encodeURIComponent(workspaceId)}`}>Back to the agency</Link>{process.env.STRELVA_CONNECT === "1" ? <Link className="ml-4 inline-flex min-h-12 items-center underline" href={`/workspace/payments?workspaceId=${encodeURIComponent(workspaceId)}`}>Agency payments</Link> : null}{process.env.STRELVA_PROVIDER_CHANGE === "1" ? <Link className="ml-4 inline-flex min-h-12 items-center underline" href={`/workspace/provider-change?workspaceId=${encodeURIComponent(workspaceId)}`}>Agency handoffs</Link> : null}{process.env.STRELVA_REVENUE_SPLITS === "1" ? <Link className="mt-4 inline-flex min-h-12 items-center underline" href={`/workspace/creator-maintenance?workspaceId=${encodeURIComponent(workspaceId)}`}>Creator maintenance</Link> : null}<Link className="ml-4 inline-flex min-h-12 items-center underline" href={`/workspace/payment-links?workspaceId=${encodeURIComponent(workspaceId)}`}>Payment links</Link>{agency ? <AgencyBillingView billing={agency} checkoutAvailability={checkoutAvailability} /> : <><StHead title="Agency billing" /><p className="mt-8">Agency billing is not recorded yet.</p><AgencyCheckoutStatus availability={checkoutAvailability} paymentsHref={`/workspace/payments?workspaceId=${encodeURIComponent(workspaceId)}`} /></>}<AgencyPayerRequests agencyWorkspaceId={workspaceId} /></main>;
+    return agencyShell(<div className={styles.screen}>
+      <div className={styles.split}>
+        <div className={styles.column}>
+          {agency ? <AgencyBillingView billing={agency} checkoutAvailability={checkoutAvailability} /> : <section className={styles.section} aria-labelledby="agency-billing-heading"><XaHeadline id="agency-billing-heading" quiet="No client has your agency as payer yet.">Agency billing</XaHeadline><AgencyCheckoutStatus availability={checkoutAvailability} paymentsHref={`/workspace/payments?workspaceId=${id}`} /></section>}
+          <nav aria-label="More about agency money" className={styles.links}>
+            <XaTextLink href={`/workspace/payment-links?workspaceId=${id}`}>Payment links</XaTextLink>
+            {process.env.STRELVA_CONNECT === "1" ? <><span aria-hidden="true">·</span><XaTextLink href={`/workspace/payments?workspaceId=${id}`}>Agency payments</XaTextLink></> : null}
+            {process.env.STRELVA_PROVIDER_CHANGE === "1" ? <><span aria-hidden="true">·</span><XaTextLink href={`/workspace/provider-change?workspaceId=${id}`}>Agency handoffs</XaTextLink></> : null}
+            {process.env.STRELVA_REVENUE_SPLITS === "1" ? <><span aria-hidden="true">·</span><XaTextLink href={`/workspace/creator-maintenance?workspaceId=${id}`}>Creator maintenance</XaTextLink></> : null}
+          </nav>
+        </div>
+        <aside className={styles.side} aria-label="Owners asking your agency to pay"><AgencyPayerRequests agencyWorkspaceId={workspaceId} /></aside>
+      </div>
+    </div>);
   }
   let billing;
   try { billing = await readBusinessBilling(actor, workspaceId); }
-  catch { return <StrelvaShell title="" workspaceId={workspaceId} active="settings" detailsPlace="plan" systemsReleased={process.env.STRELVA_SYSTEMS_RELEASE === "1"}><StPage><StHead title="Plan and billing" /><StNotice tone="critical">Billing could not be loaded. Confirm your access and try again.</StNotice><StPillLink variant="soft" href={`/workspace?workspaceId=${encodeURIComponent(workspaceId)}`}>Back to the business</StPillLink></StPage></StrelvaShell>; }
+  catch { return <StrelvaShell title="" workspaceId={workspaceId} active="settings" detailsPlace="plan" systemsReleased={process.env.STRELVA_SYSTEMS_RELEASE === "1"}><div className={styles.screen}><MoneyLoadFailure title="Billing could not be loaded." quiet="Your sites and inquiries keep running. Confirm your access and try again." retryHref={`/workspace/billing?workspaceId=${encodeURIComponent(workspaceId)}`} /></div></StrelvaShell>; }
   // The service-role budget read needs an authorized customer member first.
   const customerMember = workspace?.kind === "customer" && workspace.access === "member";
   const canManage = customerMember && workspace.role === "owner";
@@ -74,16 +92,23 @@ export default async function BusinessBillingPage({ searchParams }: { searchPara
       invoiceCheckoutAvailability = invoice.business_workspace_id === workspaceId ? await readCheckoutAvailability(invoice.agency_workspace_id) : { status: "unavailable" };
     } catch { invoiceCheckoutAvailability = { status: "unavailable" }; }
   }
-  return <StrelvaShell title="" workspaceId={workspaceId} businessContext={workspace?.name} active="settings" detailsPlace="plan" systemsReleased={process.env.STRELVA_SYSTEMS_RELEASE === "1"}><StPage>
-    <BusinessBillingView workspaceId={workspaceId} canManage={canManage} billing={billing} businessName={workspace?.name} backHref={`/workspace/business-details?workspaceId=${encodeURIComponent(workspaceId)}`} />
-    {showStartPlan ? <StartWorkspacePlan workspaceId={workspaceId} budget={budget} capUsd={capUsd} budgetEnforced={budgetEnforced} controls={controlsOn ? budget?.controls ?? null : null} /> : customerMember ? <BusinessAiBudgetSummary budget={budget} capUsd={capUsd} enforced={budgetEnforced} controls={controlsOn ? budget?.controls ?? null : null} /> : null}
-    {needsPlan && !showStartPlan ? <WorkspacePlanUnavailable workspaceId={workspaceId} /> : null}
-    <nav aria-label="Payment and agency settings" className="flex flex-wrap gap-4">
-      {process.env.STRELVA_REVENUE_SPLITS === "1" ? <><StTextButton href={`/workspace/creator-maintenance?workspaceId=${encodeURIComponent(workspaceId)}`}>Creator maintenance</StTextButton><StTextButton href={`/workspace/money-terms?workspaceId=${encodeURIComponent(workspaceId)}`}>Recorded money terms</StTextButton></> : null}
-      {process.env.STRELVA_CONNECT === "1" ? <StTextButton href={`/workspace/payments?workspaceId=${encodeURIComponent(workspaceId)}`}>Payments and merchant account</StTextButton> : null}
-      {process.env.STRELVA_PROVIDER_CHANGE === "1" ? <StTextButton href={`/workspace/provider-change?workspaceId=${encodeURIComponent(workspaceId)}`}>Agency handoff</StTextButton> : null}
-    </nav>
-    {query.invoiceId ? <AgencyInvoiceAcceptance invoiceId={query.invoiceId} checkoutAvailability={invoiceCheckoutAvailability} /> : null}
-    <WorkspacePayerTransition key={workspaceId} workspaceId={workspaceId} canPropose={workspace?.role === "owner"} agencyChoices={agencyChoices} agencyChoicesError={agencyChoicesError} providerChangeEnabled={process.env.STRELVA_PROVIDER_CHANGE === "1"} />
-  </StPage></StrelvaShell>;
+  const id = encodeURIComponent(workspaceId);
+  const splits = process.env.STRELVA_REVENUE_SPLITS === "1", connect = process.env.STRELVA_CONNECT === "1", handoff = process.env.STRELVA_PROVIDER_CHANGE === "1";
+  return <StrelvaShell title="" workspaceId={workspaceId} businessContext={workspace?.name} active="settings" detailsPlace="plan" systemsReleased={process.env.STRELVA_SYSTEMS_RELEASE === "1"}><div className={styles.screen}>
+    <div className={query.invoiceId ? styles.split : styles.column}>
+      <div className={styles.column}>
+        <BusinessBillingView workspaceId={workspaceId} canManage={canManage} billing={billing} businessName={workspace?.name} backHref={`/workspace/business-details?workspaceId=${id}`} />
+        {showStartPlan ? <StartWorkspacePlan workspaceId={workspaceId} budget={budget} capUsd={capUsd} budgetEnforced={budgetEnforced} controls={controlsOn ? budget?.controls ?? null : null} /> : customerMember ? <BusinessAiBudgetSummary budget={budget} capUsd={capUsd} enforced={budgetEnforced} controls={controlsOn ? budget?.controls ?? null : null} /> : null}
+        {needsPlan && !showStartPlan ? <WorkspacePlanUnavailable workspaceId={workspaceId} /> : null}
+        <WorkspacePayerTransition key={workspaceId} workspaceId={workspaceId} canPropose={workspace?.role === "owner"} agencyChoices={agencyChoices} agencyChoicesError={agencyChoicesError} providerChangeEnabled={handoff} />
+        {splits || connect || handoff ? <nav aria-label="Payment and agency settings" className={styles.links}>
+          {connect ? <XaTextLink href={`/workspace/payments?workspaceId=${id}`}>Deposits and payments</XaTextLink> : null}
+          {splits ? <>{connect ? <span aria-hidden="true">·</span> : null}<XaTextLink href={`/workspace/money-terms?workspaceId=${id}`}>Recorded money terms</XaTextLink><span aria-hidden="true">·</span><XaTextLink href={`/workspace/creator-maintenance?workspaceId=${id}`}>Creator maintenance</XaTextLink></> : null}
+          {handoff ? <>{connect || splits ? <span aria-hidden="true">·</span> : null}<XaTextLink href={`/workspace/provider-change?workspaceId=${id}`}>Agency handoff</XaTextLink></> : null}
+        </nav> : null}
+      </div>
+      {query.invoiceId ? <aside className={styles.side} aria-label="A price from your agency"><AgencyInvoiceAcceptance invoiceId={query.invoiceId} checkoutAvailability={invoiceCheckoutAvailability} /></aside> : null}
+    </div>
+  </div></StrelvaShell>;
 }
+

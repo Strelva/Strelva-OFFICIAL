@@ -1,4 +1,4 @@
-import { StHead, StPage, StSkeleton } from "@/components/ui/strelva/Kit";
+import { MoneyLoading } from "@/experience/workspace/money/MoneyLoading";
 export default function PaymentsLoading() {
-  return <main data-workspace-theme="linen"><StPage><StHead title="Take deposits and payments" /><StSkeleton label="Loading payment details" /><StSkeleton width="60%" /></StPage></main>;
+  return <main data-workspace-theme="linen"><MoneyLoading label="Reading deposits and payments" /></main>;
 }

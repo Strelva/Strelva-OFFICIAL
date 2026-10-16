@@ -66,7 +66,7 @@ export default function BusinessPayment({ token, initialRequest, preview = false
         <h1 className={visitor.title}>{title}</h1>
         <p className={visitor.intro}>Review the agreed details before paying.</p>
         {loading ? <div className={`${visitor.section} ${styles.state}`} role="status" aria-label="Loading payment details"><StSkeleton width="75%" /><StSkeleton width="50%" /><span>Loading payment details…</span></div> : null}
-        {request ? request.lines.length ? <dl className={`${visitor.summary} ${visitor.section}`}>{request.lines.map((line, index) => <div key={index} className={styles.line}><dt>{line.name}<span className={visitor.muted}>Quantity {line.quantity}</span></dt><dd>{formatMoney(line.quantity * line.unitCents, request.currency)}</dd></div>)}</dl> : <p className={visitor.notice}>No item details supplied. The business has not added item details to this request.</p> : null}
+        {request ? request.lines.length ? <dl className={`${visitor.summary} ${visitor.section}`}>{request.lines.map((line, index) => <div key={index} className={styles.line}><dt>{line.name}<span className={visitor.muted}>Quantity {line.quantity}</span></dt><dd>{formatMoney(line.quantity * line.unitCents, request.currency)}</dd></div>)}</dl> : <p className={visitor.note}>No item details supplied. The business has not added item details to this request.</p> : null}
       </section>
       <div>
         {error ? <p className={`${visitor.notice} ${visitor.error}`} role="alert">{error}</p> : null}

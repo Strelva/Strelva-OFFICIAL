@@ -1,11 +1,10 @@
 "use client";
+import { XaButton, XaField, XaSelect } from "@/components/ui/strelva/Xa";
+import xa from "@/experience/workspace/money/money.module.css";
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { z } from "zod";
 import { beginFocusRecovery, type FocusRecovery } from "@/experience/websites/focus-recovery";
-import { Button } from "@/components/ui/Button";
-import { Card } from "@/components/ui/Card";
-import { SelectInput, TextInput } from "@/components/ui/TextInput";
 import type { CreatorMaintenanceGraph } from "@/platform/connect/creator-maintenance";
 
 // The existing wire receipt, validated without importing the server/db module.
@@ -15,6 +14,7 @@ const receiptSchema = z.object({
   effective_from: z.string().datetime({ offset: true }), recorded_by: z.uuid(),
   recorded_at: z.string().datetime({ offset: true }),
 }).strict();
+const recordedDay = (iso: string | null | undefined) => { const value = iso ? new Date(iso) : null; return value && Number.isFinite(value.getTime()) ? new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit", timeZone: "UTC", timeZoneName: "short" }).format(value) : "not recorded"; };
 const unknownMessage = "This maintenance change could not be confirmed. Reload its history before recording different terms.";
 
 export default function CreatorMaintenance({ graph }: { graph: CreatorMaintenanceGraph }) {
@@ -97,7 +97,7 @@ export default function CreatorMaintenance({ graph }: { graph: CreatorMaintenanc
       if (!parsed.success || parsed.data.listing_id !== command.listingId || parsed.data.maintainer_state !== command.state || parsed.data.agreement_version !== (command.agreementVersion ?? null) || parsed.data.rate_reference !== (command.rateReference ?? null) || Date.parse(parsed.data.effective_from) !== Date.parse(command.effectiveFrom)) {
         blocked.current = true; setUnconfirmed(true); setError(unknownMessage); return;
       }
-      setReceipt(`Maintenance terms recorded for ${parsed.data.effective_from}. No payment or agency change was made.`);
+      setReceipt(`Maintenance terms recorded for ${recordedDay(parsed.data.effective_from)}. No payment or agency change was made.`);
       submittedGraph.current = null;
       router.refresh();
     } catch {
@@ -108,17 +108,17 @@ export default function CreatorMaintenance({ graph }: { graph: CreatorMaintenanc
       if (pending.current === controller) pending.current = null;
     }
   }
-  return <div ref={sectionRef} className="mt-8 grid gap-6">
-    <Card padding="lg"><h2 ref={historyRef} tabIndex={-1} className="font-display text-xl">Recorded listings</h2>{graph.listings.length ? <ul className="mt-4 space-y-6">{graph.listings.map(item => <li key={item.id}><h3 className="font-medium">{item.definitionId}</h3><p className="mt-2 break-all text-sm text-gray-muted">Source revision: {item.sourceRevisionId}</p><p className="mt-2 text-sm">Initial maintenance: {item.maintainerState}. Agreement: {item.agreementVersion ?? "Not configured"}.</p>{item.history.length ? <ul className="mt-3 space-y-2 text-sm" aria-label={`Maintenance history for ${item.definitionId}`}>{item.history.map(entry => <li key={entry.id}>{entry.maintainer_state} · effective {entry.effective_from} · agreement {entry.agreement_version ?? "None"}</li>)}</ul> : <p className="mt-3 text-sm text-gray-muted">No later maintenance terms are recorded.</p>}</li>)}</ul> : <p className="mt-4">No creator royalty listing is recorded. Source qualification and a written agreement remain separate prerequisites.</p>}</Card>
-    {graph.listings.length && graph.canMaintain ? <Card padding="lg"><h2 className="font-display text-xl">Record future maintenance terms</h2><p className="mt-4 text-sm text-gray-muted">Takeover ends this listing’s future creator eligibility. Creator and tapered states use an existing recorded agreement. This records royalty maintenance terms; it does not carry out a software handoff, create rates, or pay royalties.</p>{!draftGraph.agreements.length ? <p className="mt-4" role="status">No creator agreement is configured. A creator or tapered royalty cannot be selected until its written agreement and rate are recorded.</p> : null}<form onSubmit={save} className="mt-6 grid gap-4">
-      <SelectInput label="Listing" required disabled={busy || unconfirmed} className="min-h-12" value={listingId} onChange={event => changeDraft(() => setListingId(event.target.value))} options={[{ value: "", label: "Choose a listing" }, ...draftGraph.listings.map(item => ({ value: item.id, label: item.definitionId }))]} />
-      <SelectInput label="Maintenance state" required disabled={busy || unconfirmed} className="min-h-12" value={state} onChange={event => changeDraft(() => setState(event.target.value))} options={[{ value: "", label: "Choose a state" }, { value: "takeover", label: "Takeover — end future creator eligibility" }, ...(draftGraph.agreements.length ? [{ value: "creator", label: "Creator — recorded agreement" }, { value: "tapered", label: "Tapered — recorded agreement" }] : [])]} />
-      {state && state !== "takeover" ? <SelectInput label="Recorded agreement" required disabled={busy || unconfirmed} className="min-h-12" value={agreementIndex} onChange={event => changeDraft(() => setAgreementIndex(event.target.value))} options={[{ value: "", label: "Choose an agreement" }, ...draftGraph.agreements.map((item, index) => ({ value: String(index), label: `${item.version} · ${item.rateBps / 100}% · ${item.rateReference}` }))]} /> : null}
-      <TextInput label="Effective date and time" type="datetime-local" required disabled={busy || unconfirmed} className="min-h-12" value={effective} onChange={event => changeDraft(() => setEffective(event.target.value))} helperText="Your local time. Strelva records the exact UTC instant and checks the agreement again." />
-      <Button type="submit" size="lg" disabled={busy || unconfirmed}>{busy ? "Recording…" : "Record maintenance terms"}</Button>
-    </form></Card> : graph.listings.length ? <p role="status">Future maintenance changes are unavailable after workspace exit. Recorded history remains available.</p> : null}
+  return <div ref={sectionRef} className={xa.form}>
+    <div className={xa.block}><h2 ref={historyRef} tabIndex={-1} className={xa.heading}>Recorded listings</h2>{graph.listings.length ? <ul className={xa.section}>{graph.listings.map(item => <li key={item.id}><h3 className={xa.heading}>{item.definitionId}</h3><p className={xa.body}>Initial maintenance: {item.maintainerState}. Agreement: {item.agreementVersion ?? "Not configured"}.</p>{item.history.length ? <ul className={xa.section} aria-label={`Maintenance history for ${item.definitionId}`}>{item.history.map(entry => <li key={entry.id}>{entry.maintainer_state} · effective {recordedDay(entry.effective_from)} · agreement {entry.agreement_version ?? "None"}</li>)}</ul> : <p className={xa.note}>No later maintenance terms are recorded.</p>}</li>)}</ul> : <p className={xa.body}>No creator royalty listing is recorded. Source qualification and a written agreement remain separate prerequisites.</p>}</div>
+    {graph.listings.length && graph.canMaintain ? <div className={xa.block}><h2 className={xa.heading}>Record future maintenance terms</h2><p className={xa.note}>Takeover ends this listing’s future creator eligibility. Creator and tapered states use an existing recorded agreement. This records royalty maintenance terms; it does not carry out a software handoff, create rates, or pay royalties.</p>{!draftGraph.agreements.length ? <p className={xa.body} role="status">No creator agreement is configured. A creator or tapered royalty cannot be selected until its written agreement and rate are recorded.</p> : null}<form onSubmit={save} className={xa.form}>
+      <XaSelect label="Listing" required disabled={busy || unconfirmed} value={listingId} onChange={event => changeDraft(() => setListingId(event.target.value))} options={[{ value: "", label: "Choose a listing" }, ...draftGraph.listings.map(item => ({ value: item.id, label: item.definitionId }))]} />
+      <XaSelect label="Maintenance state" required disabled={busy || unconfirmed} value={state} onChange={event => changeDraft(() => setState(event.target.value))} options={[{ value: "", label: "Choose a state" }, { value: "takeover", label: "Takeover: end future creator eligibility" }, ...(draftGraph.agreements.length ? [{ value: "creator", label: "Creator: recorded agreement" }, { value: "tapered", label: "Tapered: recorded agreement" }] : [])]} />
+      {state && state !== "takeover" ? <XaSelect label="Recorded agreement" required disabled={busy || unconfirmed} value={agreementIndex} onChange={event => changeDraft(() => setAgreementIndex(event.target.value))} options={[{ value: "", label: "Choose an agreement" }, ...draftGraph.agreements.map((item, index) => ({ value: String(index), label: `${item.version} · ${item.rateBps / 100}% · ${item.rateReference}` }))]} /> : null}
+      <XaField label="Effective date and time" type="datetime-local" required disabled={busy || unconfirmed} value={effective} onChange={event => changeDraft(() => setEffective(event.target.value))} hint="Your local time. Strelva records the exact UTC instant and checks the agreement again." />
+      <XaButton type="submit" disabled={busy || unconfirmed}>{busy ? "Recording…" : "Record maintenance terms"}</XaButton>
+    </form></div> : graph.listings.length ? <p role="status">Future maintenance changes are unavailable after workspace exit. Recorded history remains available.</p> : null}
     {error ? <p ref={errorRef} tabIndex={-1} role="alert">{error}</p> : null}
-    {unconfirmed ? <div><Button ref={reloadRef} type="button" variant="secondary" size="lg" onClick={() => { if (!inFlight.current) window.location.reload(); }}>Reload maintenance history</Button></div> : null}
+    {unconfirmed ? <div><XaButton ref={reloadRef} type="button" variant="quiet" onClick={() => { if (!inFlight.current) window.location.reload(); }}>Reload maintenance history</XaButton></div> : null}
     {receipt ? <p ref={receiptRef} tabIndex={-1} role="status">{receipt}</p> : null}
   </div>;
 }

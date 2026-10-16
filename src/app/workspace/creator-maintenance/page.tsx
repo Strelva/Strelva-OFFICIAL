@@ -1,10 +1,13 @@
-import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
+import { StrelvaShell } from "@/experience/app-frame/StrelvaShell";
+import { XaHeadline, XaTextLink } from "@/components/ui/strelva/Xa";
 import { workspaceReleaseEnabled } from "@/platform/workspace-release";
 import { workspaceHttpActor } from "@/platform/workspaces/http";
 import { readCreatorMaintenance } from "@/platform/connect/creator-maintenance";
 import { readNeutralCreatorSources } from "@/platform/connect/neutral-creator-money";
 import { SourceListing } from "@/experience/workspace/money/SourceListing";
+import { MoneyLoadFailure } from "@/experience/workspace/money/MoneyLoadFailure";
+import styles from "@/experience/workspace/money/money.module.css";
 import CreatorMaintenance from "./CreatorMaintenance";
 export const dynamic = "force-dynamic";
 export default async function CreatorMaintenancePage({ searchParams }: { searchParams: Promise<{ workspaceId?: string }> }) {
@@ -12,8 +15,14 @@ export default async function CreatorMaintenancePage({ searchParams }: { searchP
   const actor = await workspaceHttpActor();
   if (!actor) redirect("/sign-in");
   const { workspaceId = "" } = await searchParams;
+  const id = encodeURIComponent(workspaceId);
   let graph, sourceGraph;
-  try { graph = await readCreatorMaintenance(actor, workspaceId); sourceGraph = await readNeutralCreatorSources(actor,workspaceId); }
-  catch { return <main className="mx-auto max-w-3xl px-6 py-12"><h1 className="font-display text-3xl">Creator maintenance</h1><p className="mt-6" role="alert">Maintenance records could not be loaded. Confirm owner or admin access and try again.</p></main>; }
-  return <main className="mx-auto max-w-3xl px-6 py-12"><Link href={`/workspace/billing?workspaceId=${encodeURIComponent(workspaceId)}`} className="inline-flex min-h-12 items-center underline">Back to billing</Link><Link href={`/workspace?${new URLSearchParams({ workspaceId, agencyView: "library" })}`} className="ml-4 inline-flex min-h-12 items-center underline">Back to Library sources</Link><h1 className="mt-6 font-display text-3xl">Creator maintenance</h1><p className="mt-4">Your source listings and immutable maintenance history. These records grant no customer data access and establish no provider or commercial qualification.</p><SourceListing graph={sourceGraph} actorId={actor.userId}/><CreatorMaintenance key={workspaceId} graph={graph} /></main>;
+  try { graph = await readCreatorMaintenance(actor, workspaceId); sourceGraph = await readNeutralCreatorSources(actor, workspaceId); }
+  catch { return <StrelvaShell title="" workspaceId={workspaceId} detailsPlace="plan"><div className={styles.screen}><MoneyLoadFailure title="Maintenance records could not be loaded." quiet="Confirm owner or admin access and try again." retryHref={`/workspace/creator-maintenance?workspaceId=${id}`} /></div></StrelvaShell>; }
+  return <StrelvaShell title="" workspaceId={workspaceId} detailsPlace="plan"><div className={styles.screen}>
+    <nav aria-label="Back" className={styles.links}><XaTextLink href={`/workspace/billing?workspaceId=${id}`}>Billing</XaTextLink><span aria-hidden="true">·</span><XaTextLink href={`/workspace?${new URLSearchParams({ workspaceId, agencyView: "library" })}`}>Library sources</XaTextLink></nav>
+    <XaHeadline quiet="These records grant no access to client data and set no payment on their own.">Creator maintenance</XaHeadline>
+    <SourceListing graph={sourceGraph} actorId={actor.userId} />
+    <CreatorMaintenance key={workspaceId} graph={graph} />
+  </div></StrelvaShell>;
 }

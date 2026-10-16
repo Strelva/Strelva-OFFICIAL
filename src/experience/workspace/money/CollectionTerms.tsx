@@ -1,11 +1,11 @@
 "use client";
+import { XaButton, XaField, XaSelect } from "@/components/ui/strelva/Xa";
+import xa from "@/experience/workspace/money/money.module.css";
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { Button } from "@/components/ui/Button";
-import { Card } from "@/components/ui/Card";
-import { SelectInput, TextInput } from "@/components/ui/TextInput";
 import { formatMoney } from "@/platform/connect/money-format";
 import { governedCollectionReceiptSchema, governedMoneyGraphSchema, sameRecordedMoneyInstant, type GovernedMoneyGraph } from "@/platform/connect/governed-money-contract";
 
+const recordedDay = (iso: string | null | undefined) => { const value = iso ? new Date(iso) : null; return value && Number.isFinite(value.getTime()) ? new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit", timeZone: "UTC", timeZoneName: "short" }).format(value) : "not recorded"; };
 type Command = { action: "accept_collection_terms"; workspaceId: string; lineId: string; priceVersion: string; amountCents: number; currency: string; installationId: string | null; periodStart: string; periodEnd: string };
 type Phase = "ready" | "pending" | "loading" | "uncertain" | "blocked";
 function message(value: unknown) { return value && typeof value === "object" && "error" in value && typeof value.error === "string" ? value.error : "The accepted terms could not be confirmed. Reload to check what was recorded."; }
@@ -66,23 +66,23 @@ function ScopedCollectionTerms({ graph: initial, actorId, request = fetch }: { g
     } catch (cause) { if (!controller.signal.aborted && alive.current) { setPhase("uncertain"); setError(cause instanceof Error ? cause.message : "Acceptance could not be confirmed."); focusFeedback(origin); } }
     finally { if (!controller.signal.aborted && alive.current) inflight.current = null; }
   }
-  return <section className="mt-8 space-y-6" aria-labelledby="collection-terms-heading">
-    <h2 id="collection-terms-heading" className="font-medium">Recorded price and period</h2>
-    <p className="text-sm text-gray-muted">Review the written price and the exact period it covers. Accepting records these terms. Payment collection is not configured here.</p>
-    {graph.payer ? <p className="text-sm">Payer: {graph.payer.kind === "agency" ? "Your agency" : "This business"}.{graph.payer.kind === "agency" ? " Agency approval to charge and the payment mandate remain separate." : " A payment mandate remains separate."}</p> : null}
+  return <section className={xa.section} aria-labelledby="collection-terms-heading">
+    <h2 id="collection-terms-heading" className={xa.heading}>Recorded price and period</h2>
+    <p className={xa.note}>Review the written price and the exact period it covers. Accepting records these terms. Payment collection is not configured here.</p>
+    {graph.payer ? <p className={xa.body}>Payer: {graph.payer.kind === "agency" ? "Your agency" : "This business"}.{graph.payer.kind === "agency" ? " Agency approval to charge and the payment mandate remain separate." : " A payment mandate remains separate."}</p> : null}
     {!graph.canPrepare ? <p>Recorded history remains available. Only a current business owner with future work enabled can accept new terms.</p> : !graph.payer?.customerConfigured ? <p>Payment details have not been configured. No terms can be accepted yet.</p> : !graph.prices.length ? <p>No approved written price is recorded for this business.</p> : null}
-    {admitted ? <Card padding="md"><form className="grid gap-4" onSubmit={event => void accept(event)}>
-      <SelectInput label="Written price" value={priceVersion} disabled={locked} onChange={event => { setPriceVersion(event.target.value); setInstallationId(""); }} options={[{ value: "", label: "Choose a recorded price" }, ...graph.prices.map(item => ({ value: item.version, label: `${item.version} · ${formatMoney(item.amountCents, item.currency)}` }))]} required />
-      {price ? <p className="text-sm">{formatMoney(price.amountCents, price.currency)} · {price.version}{price.definitionId ? ` · ${price.definitionId}` : ""}</p> : null}
-      {price?.definitionId || options.length ? <SelectInput label="Covered installation" value={installationId} disabled={locked} required={!!price?.definitionId} onChange={event => setInstallationId(event.target.value)} options={[{ value: "", label: price?.definitionId ? "Choose the covered installation" : "General business terms" }, ...options.map(item => ({ value: item.id, label: item.definitionId }))]} /> : null}
-      <div className="grid gap-4 sm:grid-cols-2"><TextInput label="Period starts (your local time)" type="datetime-local" value={start} onChange={event => setStart(event.target.value)} required disabled={locked} /><TextInput label="Period ends (your local time)" type="datetime-local" value={end} onChange={event => setEnd(event.target.value)} required disabled={locked} /></div>
-      {start && end && !Number.isNaN(Date.parse(start)) && !Number.isNaN(Date.parse(end)) ? <p className="break-words text-sm text-gray-muted">Exact period: {new Date(start).toISOString()} to {new Date(end).toISOString()}.</p> : null}
-      {!attempt.current ? <Button type="submit" disabled={locked || !price || !start || !end}>Accept these terms and period</Button> : phase === "ready" ? <Button type="button" onClick={() => void accept()}>Retry the exact acceptance</Button> : null}
-    </form></Card> : null}
-    {error || notice ? <p ref={feedback} tabIndex={-1} role={error ? "alert" : "status"} className={error ? "text-critical" : "text-sm"}>{error || notice}</p> : <p ref={feedback} tabIndex={-1} className="sr-only">Current recorded terms loaded.</p>}
+    {admitted ? <div className={xa.block}><form className={xa.form} onSubmit={event => void accept(event)}>
+      <XaSelect label="Written price" value={priceVersion} disabled={locked} onChange={event => { setPriceVersion(event.target.value); setInstallationId(""); }} options={[{ value: "", label: "Choose a recorded price" }, ...graph.prices.map(item => ({ value: item.version, label: `${item.version} · ${formatMoney(item.amountCents, item.currency)}` }))]} required />
+      {price ? <p className={xa.body}>{formatMoney(price.amountCents, price.currency)} · {price.version}{price.definitionId ? ` · ${price.definitionId}` : ""}</p> : null}
+      {price?.definitionId || options.length ? <XaSelect label="Covered installation" value={installationId} disabled={locked} required={!!price?.definitionId} onChange={event => setInstallationId(event.target.value)} options={[{ value: "", label: price?.definitionId ? "Choose the covered installation" : "General business terms" }, ...options.map(item => ({ value: item.id, label: item.definitionId }))]} /> : null}
+      <div className={xa.pair}><XaField label="Period starts (your local time)" type="datetime-local" value={start} onChange={event => setStart(event.target.value)} required disabled={locked} /><XaField label="Period ends (your local time)" type="datetime-local" value={end} onChange={event => setEnd(event.target.value)} required disabled={locked} /></div>
+      {start && end && !Number.isNaN(Date.parse(start)) && !Number.isNaN(Date.parse(end)) ? <p className={xa.note}>Exact period: {recordedDay(new Date(start).toISOString())} to {recordedDay(new Date(end).toISOString())}.</p> : null}
+      {!attempt.current ? <XaButton type="submit" disabled={locked || !price || !start || !end}>Accept these terms and period</XaButton> : phase === "ready" ? <XaButton type="button" onClick={() => void accept()}>Retry the exact acceptance</XaButton> : null}
+    </form></div> : null}
+    {error || notice ? <p ref={feedback} tabIndex={-1} role={error ? "alert" : "status"} className={error ? xa.critical : xa.body}>{error || notice}</p> : <p ref={feedback} tabIndex={-1} className="sr-only">Current recorded terms loaded.</p>}
     {phase === "pending" ? <p role="status">Recording the exact terms…</p> : null}{phase === "loading" ? <p role="status">Checking current terms and permission…</p> : null}
-    <Button variant="secondary" disabled={phase === "pending" || phase === "loading"} onClick={() => void reload()}>Reload recorded terms</Button>
-    {attempt.current ? <p className="text-sm text-gray-muted">The previous acceptance is uncertain. Reload to inspect it; any retry sends the same terms and command.</p> : null}
-    <div><h3 className="font-medium">Accepted history</h3>{graph.terms.length ? <ul className="mt-3 space-y-4">{graph.terms.map(term => <li key={term.lineId} className="break-words text-sm"><p>{term.priceVersion} · {formatMoney(term.amountCents, term.currency)}</p><p className="text-gray-muted">{term.periodStart && term.periodEnd ? `${term.periodStart} to ${term.periodEnd}` : "Period not recorded"}</p></li>)}</ul> : <p className="mt-3 text-sm text-gray-muted">No collection terms have been accepted.</p>}</div>
+    <XaButton variant="quiet" disabled={phase === "pending" || phase === "loading"} onClick={() => void reload()}>Reload recorded terms</XaButton>
+    {attempt.current ? <p className={xa.note}>The previous acceptance is uncertain. Reload to inspect it; any retry sends the same terms and command.</p> : null}
+    <div><h3 className={xa.heading}>Accepted history</h3>{graph.terms.length ? <ul className={xa.section}>{graph.terms.map(term => <li key={term.lineId} className={xa.body}><p>{term.priceVersion} · {formatMoney(term.amountCents, term.currency)}</p><p className={xa.note}>{term.periodStart && term.periodEnd ? `${recordedDay(term.periodStart)} to ${recordedDay(term.periodEnd)}` : "Period not recorded"}</p></li>)}</ul> : <p className={xa.note}>No collection terms have been accepted.</p>}</div>
   </section>;
 }

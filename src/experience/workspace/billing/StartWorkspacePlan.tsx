@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { StNotice, StPill, StRow, StRows, StSection, StTextButton } from "@/components/ui/strelva/Kit";
+import { XaAnswers, XaButton, XaLabel, XaSays, XaTextLink } from "@/components/ui/strelva/Xa";
+import styles from "@/experience/workspace/money/money.module.css";
 
 import type { AiControlsState, BusinessAiBudget } from "@/platform/infra/business-ai-budget";
 
@@ -15,7 +16,7 @@ function AgencyUsageControlLines({ controls, resetsAt }: { controls: AiControlsS
   const lines: string[] = [];
   if (controls.paused) lines.push(`${agency ?? "A Strelva operator"} paused Strelva work for this business${controls.changedAt && Number.isFinite(Date.parse(controls.changedAt)) ? ` on ${monthDay(controls.changedAt)}` : ""}.`);
   if (controls.monthlyCapCents !== null) lines.push(`Usage limit ${dollars(controls.monthlyCapCents / 100)} set by ${agency ?? "Strelva"}.${resetsAt && Number.isFinite(Date.parse(resetsAt)) ? ` Resets ${monthDay(resetsAt)}.` : ""}`);
-  return lines.length ? <StNotice tone={controls.paused ? "critical" : undefined}>{lines.map(line => <p key={line}>{line}</p>)}</StNotice> : null;
+  return lines.length ? <div className={styles.section}>{lines.map(line => <p key={line} className={controls.paused ? styles.critical : styles.body}>{line}</p>)}</div> : null;
 }
 
 /** Server-authorized budget projection; never infer a cap or a reset from the browser. */
@@ -24,16 +25,18 @@ export function BusinessAiBudgetSummary({ budget, capUsd, enforced, controls = n
   const spent = known ? Number(budget.spentUsd) : null;
   const reserved = known ? Number(budget.reservedUsd) : null;
   const remaining = spent !== null && reserved !== null && capUsd !== null && Number.isFinite(capUsd) ? Math.max(0, capUsd - spent - reserved) : null;
-  return <StSection title="Monthly usage">
-    <StRows label="Business AI budget">
-      <StRow value="Recorded spend" title={spent === null ? "Unavailable" : dollars(spent)} />
-      <StRow value="Reserved for work" title={reserved === null ? "Unavailable" : dollars(reserved)} />
-      <StRow value="Remaining budget" title={!known || budget.unknownCostCalls > 0 ? "Unavailable" : capUsd === null ? "No spending limit recorded" : remaining === null ? "Unavailable" : dollars(remaining)} />
-      <StRow value="Resets" title={known ? new Intl.DateTimeFormat("en-US", { month: "long", day: "numeric", year: "numeric", timeZone: "UTC" }).format(new Date(budget.resetsAt)) + " (UTC)" : "Unavailable"} />
-    </StRows>
+  const reading = !known ? "Usage could not be confirmed. Budgeted building stays paused until the budget can be checked." : budget.unknownCostCalls > 0 ? capUsd === null ? "Some past calls have no confirmed cost. Recorded spend is incomplete. No spending limit is recorded for this business." : "Usage could not be confirmed. Budgeted building stays paused until the budget can be checked." : "Budgeted calls reserve their maximum cost before running. Reserved amounts stay committed until the reset date, including calls whose outcome is not confirmed.";
+  return <section className={styles.section} aria-label="Monthly usage">
+    <XaLabel as="h2">Monthly usage</XaLabel>
+    <XaAnswers labelWidth={160} rows={[
+      ["Recorded spend", spent === null ? "Unavailable" : dollars(spent)],
+      ["Reserved for work", reserved === null ? "Unavailable" : dollars(reserved)],
+      ["Remaining budget", !known || budget.unknownCostCalls > 0 ? "Unavailable" : capUsd === null ? "No spending limit recorded" : remaining === null ? "Unavailable" : dollars(remaining)],
+      ["Resets", known ? new Intl.DateTimeFormat("en-US", { month: "long", day: "numeric", year: "numeric", timeZone: "UTC" }).format(new Date(budget.resetsAt)) + " (UTC)" : "Unavailable"],
+    ]} />
     {controls ? <AgencyUsageControlLines controls={controls} resetsAt={budget?.resetsAt ?? null} /> : null}
-    {enforced ? <StNotice tone={!known || budget.unknownCostCalls > 0 ? "critical" : undefined}>{!known ? "Usage could not be confirmed. Budgeted building stays paused until the budget can be checked." : budget.unknownCostCalls > 0 ? capUsd === null ? "Some past calls have no confirmed cost. Recorded spend is incomplete. No spending limit is recorded for this business." : "Usage could not be confirmed. Budgeted building stays paused until the budget can be checked." : "Budgeted calls reserve their maximum cost before running. Reserved amounts stay committed until the reset date, including calls whose outcome is not confirmed."}</StNotice> : <StNotice>{enforced === false ? "Usage limits are not enabled here." : "Your current usage limit has not been confirmed."} No plan price is published yet. Nothing is charged until you see one and agree to it.</StNotice>}
-  </StSection>;
+    {enforced ? (!known || budget.unknownCostCalls > 0 ? <XaSays>{reading}</XaSays> : <p className={styles.note}>{reading}</p>) : <p className={styles.note}>{enforced === false ? "Usage limits are not enabled here." : "Your current usage limit has not been confirmed."} No plan price is published yet. Nothing is charged until you see one and agree to it.</p>}
+  </section>;
 }
 
 type Transport = (input: string, init?: RequestInit) => Promise<Response>;
@@ -54,15 +57,16 @@ export function StartWorkspacePlan({ workspaceId, budget = null, capUsd = null, 
       setBusy(false);
     }
   }
-  return <><StSection title="Run your business on Strelva" meta="Your plan’s price and included usage are shown before you pay. You can bring in an agency anytime.">
-    <StPill busy={busy} disabled={busy} onClick={() => void start()}>Start your plan</StPill>
-    {error ? <StNotice tone="critical">{error}</StNotice> : null}
-  </StSection><BusinessAiBudgetSummary budget={budget} capUsd={capUsd} enforced={budgetEnforced} controls={controls} /></>;
+  return <><section className={styles.section} aria-label="Run your business on Strelva">
+    <p className={styles.body}>Run your business on Strelva. Your plan’s price and included usage are shown before you pay. You can bring in an agency anytime.</p>
+    <div className={styles.actions}><XaButton variant="primary" busy={busy} disabled={busy} onClick={() => void start()}>Start your plan</XaButton></div>
+    {error ? <p className={styles.critical} role="alert">{error}</p> : null}
+  </section><BusinessAiBudgetSummary budget={budget} capUsd={capUsd} enforced={budgetEnforced} controls={controls} /></>;
 }
 
 /** An unconfigured sale never renders a checkout control or an invented price. */
 export function WorkspacePlanUnavailable({ workspaceId }: { workspaceId: string }) {
-  return <StSection title="Your plan" meta="No plan price is published yet. Self-serve plans are not available yet.">
-    <StTextButton href={`/workspace?view=help&workspaceId=${encodeURIComponent(workspaceId)}`}>Bring in an agency</StTextButton>
-  </StSection>;
+  return <section className={styles.section} aria-label="Your plan">
+    <p className={styles.body}>No plan price is published yet. Self-serve plans are not available yet. <XaTextLink href={`/workspace?view=help&workspaceId=${encodeURIComponent(workspaceId)}`}>Bring in an agency</XaTextLink></p>
+  </section>;
 }

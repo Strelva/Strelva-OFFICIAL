@@ -51,7 +51,7 @@ it("late accepted invoice commands cannot change a newly selected invoice or its
 it("offers agency names from scoped server options with no workspace UUID textbox",async()=>{
  const {node,root}=host();const request=vi.fn<typeof fetch>(async()=>Response.json({transitions:[],current:null,pending:null,currentActorId:"owner"}));
  await act(async()=>root.render(createElement(WorkspacePayerTransition,{workspaceId:"business",canPropose:true,agencyChoices:[{id:"agency-id",name:"Cedar Studio"}],request})));
- await act(async()=>{const select=node.querySelector("select")!;select.value="agency";select.dispatchEvent(new Event("change",{bubbles:true}));});
+ await act(async()=>node.querySelector<HTMLInputElement>('input[type="radio"][value="agency"]')!.click());
  expect(node.textContent).toContain("Cedar Studio");expect(node.querySelector('input[name="successorAgencyWorkspaceId"]')).toBeNull();expect(node.textContent).not.toContain("agency-id");
 });
 it("shows receipt review without inviting another payment",async()=>{
@@ -84,7 +84,7 @@ it("keeps checkout fail-closed when the caller omits payment readiness",async()=
 it("offers serving agencies without suggesting the owner join their team",async()=>{
  const {node,root}=host();const request=vi.fn<typeof fetch>(async()=>Response.json({transitions:[],current:null,pending:null,currentActorId:"owner"}));
  await act(async()=>root.render(createElement(WorkspacePayerTransition,{workspaceId:"business",canPropose:true,request})));
- await act(async()=>{const select=node.querySelector("select")!;select.value="agency";select.dispatchEvent(new Event("change",{bubbles:true}));});
+ await act(async()=>node.querySelector<HTMLInputElement>('input[type="radio"][value="agency"]')!.click());
  expect(node.textContent).toContain("No agency is serving this business yet");expect(node.textContent).toContain("You do not need to join its team");expect(node.textContent).not.toContain("Ask its owner for an invitation");
 });
 it("filters the response inbox to the current business after accepting an agency payer",async()=>{

@@ -288,6 +288,10 @@ textarea.fieldControl { min-height: 96px; resize: vertical; field-sizing: conten
 .fieldControl:disabled { cursor: not-allowed; }
 .fieldHint { margin: 0; color: var(--st-text-2); font-size: 13px; line-height: 1.45; }
 .fieldHint[data-error="true"] { color: var(--st-critical); }
+.selectWrap { position: relative; display: block; }
+.fieldControl[data-select] { appearance: none; padding-right: 40px; cursor: pointer; }
+.fieldControl[data-select]:not(:disabled) { background: var(--st-surface); color: var(--st-text); }
+.selectChevron { position: absolute; top: 50%; right: 14px; translate: 0 -50%; color: var(--st-text-2); pointer-events: none; }
 @media (max-width: 767px) { .fieldControl { font-size: 16px; } }
 
 .choices { display: flex; flex-direction: column; gap: 8px; margin: 0; padding: 0; border: 0; min-width: 0; }

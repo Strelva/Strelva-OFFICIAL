@@ -1,14 +1,33 @@
 import { StrelvaShell } from "@/experience/app-frame/StrelvaShell";
-import {formatMoney} from "@/platform/connect/money-format";
-import {notFound,redirect} from "next/navigation";
-import { StEmpty, StHead, StMono, StNotice, StPage, StRow, StRows, StSection } from "@/components/ui/strelva/Kit";
-import MerchantControls from "./MerchantControls";
-import RefundManager from "./RefundManager";
-import PaymentManager,{type PaymentSource,type IssuedRequest} from "./PaymentManager";
-import {moneyRpc} from "@/platform/connect";
-import {connectEnabled} from "@/platform/connect";
-import {readBusinessMoney} from "@/platform/connect/requests";
-import {workspaceHttpActor} from "@/platform/workspaces/http";
-import {workspaceReleaseEnabled} from "@/platform/workspace-release";
-export const dynamic="force-dynamic";
-export default async function Payments({searchParams}:{searchParams:Promise<{workspaceId?:string}>}){if(!workspaceReleaseEnabled()||!connectEnabled())notFound();const actor=await workspaceHttpActor();if(!actor)redirect("/sign-in");const {workspaceId}=await searchParams;let money;let detail:{sources:PaymentSource[];requests:IssuedRequest[]};try{const [sources,approved,loadedMoney]=await Promise.all([moneyRpc<{sources:PaymentSource[];requests:IssuedRequest[]}>("read_business_payment_sources",{p_workspace_id:workspaceId,p_user_id:actor.userId,p_verified_email:actor.verifiedEmail}),moneyRpc<PaymentSource[]>("read_agent_quote_payment_terms",{p_workspace_id:workspaceId,p_user_id:actor.userId,p_verified_email:actor.verifiedEmail}),readBusinessMoney(actor,workspaceId??"")]);detail=sources;detail.sources=detail.sources.map(s=>({...s,...approved.find(a=>a.source_id===s.source_id)}));money=loadedMoney;}catch{return <StrelvaShell title="" workspaceId={workspaceId} systemsReleased={process.env.STRELVA_SYSTEMS_RELEASE === "1"}><StPage><StHead title="Take deposits and payments" crumb={{label:"Business details",href:`/workspace/business-details?workspaceId=${encodeURIComponent(workspaceId??"")}`}}/><StNotice tone="critical">Payments could not be loaded. Confirm your access and try again.</StNotice></StPage></StrelvaShell>;}return <StrelvaShell title="" workspaceId={workspaceId} systemsReleased={process.env.STRELVA_SYSTEMS_RELEASE === "1"}><StPage><StHead crumb={{label:"Systems",href:`/workspace?workspaceId=${encodeURIComponent(workspaceId??"")}`}} title="Take deposits and payments" meta="Money goes straight to your bank through Stripe · Strelva never holds it"/><MerchantControls key={`merchant:${workspaceId}`} workspaceId={workspaceId??""} state={money?.account?.state??"pending"}/><StSection title="Customer payments">{money?.payments.length?<StRows label="Customer payments">{money.payments.map(p=><StRow key={p.id} title={p.purpose.replaceAll("_"," ")} end={<StMono tone="text">{formatMoney(p.amount_cents,p.currency)}</StMono>}/>)}</StRows>:<StEmpty>No customer payments have been recorded.</StEmpty>}</StSection><RefundManager key={`refund:${workspaceId}`} workspaceId={workspaceId??""} payments={(money?.payments??[]).filter(p=>money?.events.some(e=>e.payment_id===p.id&&e.kind==="paid")).map(p=>({...p,remainingCents:p.amount_cents-(money?.events.filter(e=>e.payment_id===p.id&&e.kind==="refund").reduce((s,e)=>s+e.amount_cents,0)??0)})).filter(p=>p.remainingCents>0)}/><PaymentManager key={workspaceId} workspaceId={workspaceId??""} sources={detail.sources} requests={detail.requests}/></StPage></StrelvaShell>;}
+import { notFound, redirect } from "next/navigation";
+import { type PaymentSource, type IssuedRequest } from "./PaymentManager";
+import { PaymentsScreen } from "./PaymentsScreen";
+import { moneyRpc } from "@/platform/connect";
+import { connectEnabled } from "@/platform/connect";
+import { readBusinessMoney } from "@/platform/connect/requests";
+import { workspaceHttpActor } from "@/platform/workspaces/http";
+import { workspaceReleaseEnabled } from "@/platform/workspace-release";
+import { MoneyLoadFailure } from "@/experience/workspace/money/MoneyLoadFailure";
+import styles from "@/experience/workspace/money/money.module.css";
+export const dynamic = "force-dynamic";
+export default async function Payments({ searchParams }: { searchParams: Promise<{ workspaceId?: string }> }) {
+  if (!workspaceReleaseEnabled() || !connectEnabled()) notFound();
+  const actor = await workspaceHttpActor();
+  if (!actor) redirect("/sign-in");
+  const { workspaceId } = await searchParams;
+  const id = workspaceId ?? "";
+  let money; let detail: { sources: PaymentSource[]; requests: IssuedRequest[] };
+  try {
+    const [sources, approved, loadedMoney] = await Promise.all([
+      moneyRpc<{ sources: PaymentSource[]; requests: IssuedRequest[] }>("read_business_payment_sources", { p_workspace_id: workspaceId, p_user_id: actor.userId, p_verified_email: actor.verifiedEmail }),
+      moneyRpc<PaymentSource[]>("read_agent_quote_payment_terms", { p_workspace_id: workspaceId, p_user_id: actor.userId, p_verified_email: actor.verifiedEmail }),
+      readBusinessMoney(actor, id),
+    ]);
+    detail = sources; detail.sources = detail.sources.map(s => ({ ...s, ...approved.find(a => a.source_id === s.source_id) })); money = loadedMoney;
+  } catch {
+    return <StrelvaShell title="" workspaceId={workspaceId} detailsPlace="plan" systemsReleased={process.env.STRELVA_SYSTEMS_RELEASE === "1"}><div className={styles.screen}><MoneyLoadFailure title="Payments did not load." quiet="Payments already made are safe in Stripe. Confirm your access and try again." retryHref={`/workspace/payments?workspaceId=${encodeURIComponent(id)}`} /></div></StrelvaShell>;
+  }
+  return <StrelvaShell title="" workspaceId={workspaceId} detailsPlace="plan" systemsReleased={process.env.STRELVA_SYSTEMS_RELEASE === "1"}>
+    <PaymentsScreen workspaceId={id} money={money} sources={detail.sources} requests={detail.requests} />
+  </StrelvaShell>;
+}

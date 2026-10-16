@@ -1,7 +1,8 @@
 import { headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import { StrelvaShell } from "@/experience/app-frame/StrelvaShell";
-import { StHead, StNotice, StPage } from "@/components/ui/strelva/Kit";
+import { XaHeadline, XaTextLink } from "@/components/ui/strelva/Xa";
+import styles from "@/experience/workspace/money/money.module.css";
 import { workspaceReleaseEnabled } from "@/platform/workspace-release";
 import { workspaceReturnTarget } from "@/platform/workspaces/location";
 import { workspaceHttpActor } from "@/platform/workspaces/http";
@@ -25,8 +26,12 @@ export async function MoneyDocumentPage({ kind, params, searchParams }: { kind: 
   if (!link) notFound();
   const brand = await resolveOwnerBrand(agency.id);
   const back = { label: "Payment links", href: `/workspace/payment-links?workspaceId=${encodeURIComponent(agency.id)}` };
-  const shell = (children: React.ReactNode) => <StrelvaShell title="" workspaceId={agency.id} workspaceName={brand.agencyId === agency.id ? brand.name : "Agency identity unavailable"} ownerBrand={brand} agencyNavigation={{ paymentLinksCurrent: true, leadsAvailable: true }}><StPage>{children}</StPage></StrelvaShell>;
-  if (kind === "payment_receipt" && link.status !== "paid") return shell(<><StHead title="Payment receipt" crumb={back} /><StNotice>No payment is recorded for this link yet. Stripe confirms payments; this page updates when it does.</StNotice></>);
+  const shell = (children: React.ReactNode) => <StrelvaShell title="" workspaceId={agency.id} workspaceName={brand.agencyId === agency.id ? brand.name : "Agency identity unavailable"} ownerBrand={brand} agencyNavigation={{ paymentLinksCurrent: true, leadsAvailable: true }}><div className={styles.screen}>{children}</div></StrelvaShell>;
+  if (kind === "payment_receipt" && link.status !== "paid") return shell(<div className={styles.docFrame}>
+    <p className={styles.note}><XaTextLink href={back.href}>{back.label}</XaTextLink></p>
+    <XaHeadline quiet="Stripe confirms payments; this page fills in when it does.">No payment is recorded for this link yet.</XaHeadline>
+    <p className={styles.body}>{link.clientName} has not paid this link. The invoice stays open until they do or you expire it. <XaTextLink href={`/workspace/payment-links/${link.id}/invoice?workspaceId=${encodeURIComponent(agency.id)}`}>See the invoice</XaTextLink></p>
+  </div>);
   const doc = kind === "invoice" ? await readMoneyDocument("invoice", link.id) : await issueAgencyPayLinkReceipt(link.id);
   if (!doc) notFound();
   // Only an open Invoice prints a pay URL. NEXT_PUBLIC_APP_URL, else the request origin, so it is always absolute.

@@ -1,18 +1,19 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { SelectInput, TextArea, TextInput } from "@/components/ui/TextInput";
-import { StCopy, StEmpty, StMono, StNotice, StPill, StRow, StRows, StSection, StSkeleton, StState, StTextButton } from "@/components/ui/strelva/Kit";
+import { XaButton, XaField, XaHeadline, XaInitial, XaLabel, XaPage, XaRow, XaRows, XaSays, XaSegmented, XaStatus, XaTextArea, XaTextLink } from "@/components/ui/strelva/Xa";
 import { formatDocumentNumber, type AgencyPayLink } from "@/platform/agency-pay-links/types";
 import { AgencyMerchantSetup } from "./AgencyMerchantSetup";
 import type { PayLinkConfig } from "@/platform/infra/pay-links";
 import type { readAgencyPaymentLinks } from "./payment-links-server";
+import styles from "@/experience/workspace/money/money.module.css";
 
 type Snapshot = Awaited<ReturnType<typeof readAgencyPaymentLinks>>;
 const money = (cents: number) => new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(cents / 100);
 const exact = (cents: number) => new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", minimumFractionDigits: cents % 100 ? 2 : 0, maximumFractionDigits: 2 }).format(cents / 100);
-const connectedPrice = (link: AgencyPayLink) => link.amountCents !== null ? exact(link.amountCents) : `${exact(link.minCents ?? 0)}–${exact(link.maxCents ?? 0)}`;
-const price = (link: PayLinkConfig) => link.amountCents !== undefined ? money(link.amountCents) : `${money(link.minCents ?? 0)}–${money(link.maxCents ?? 0)}`;
+const connectedPrice = (link: AgencyPayLink) => link.amountCents !== null ? exact(link.amountCents) : `${exact(link.minCents ?? 0)} to ${exact(link.maxCents ?? 0)}`;
+const price = (link: PayLinkConfig) => link.amountCents !== undefined ? money(link.amountCents) : `${money(link.minCents ?? 0)} to ${money(link.maxCents ?? 0)}`;
+const day = (iso: string | null) => { const value = iso ? new Date(iso) : null; return value && Number.isFinite(value.getTime()) ? new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" }).format(value) : ""; };
 
 function confirmedLink(value: unknown, body: Record<string, unknown>, agencyId: string): value is PayLinkConfig {
   if (!value || typeof value !== "object") return false;
@@ -28,6 +29,13 @@ function confirmedLink(value: unknown, body: Record<string, unknown>, agencyId: 
 type LinkForm = { clientName: string; description: string; kind: "fixed" | "range"; dollars: string; minDollars: string; maxDollars: string };
 const blankForm: LinkForm = { clientName: "", description: "", kind: "fixed", dollars: "", minDollars: "", maxDollars: "" };
 type ProspectPrefill = { token?: string; name: string; description: string };
+
+/** What the client will see, drawn from the form as it is typed (Stripe and Square show the page beside the form). */
+function previewAmount(form: LinkForm) {
+  if (form.kind === "fixed") return /^\d+(\.\d{1,2})?$/.test(form.dollars.trim()) ? exact(Math.round(Number(form.dollars) * 100)) : "$0";
+  const low = Number(form.minDollars), high = Number(form.maxDollars);
+  return Number.isFinite(low) && Number.isFinite(high) && low > 0 && high >= low ? `${money(low * 100)} to ${money(high * 100)}` : "$0 to $0";
+}
 
 export function AgencyPaymentLinks({ agencyWorkspaceId, initialProspect, request = fetch }: { agencyWorkspaceId: string; initialProspect?: ProspectPrefill; request?: typeof fetch }) {
   return <ScopedPaymentLinks key={agencyWorkspaceId} agencyWorkspaceId={agencyWorkspaceId} request={request} initialProspect={initialProspect} />;
@@ -70,13 +78,13 @@ function ScopedPaymentLinks({ agencyWorkspaceId, request, initialProspect }: { a
       if (!mounted.current) return;
       if (!response.ok || !confirmedLink(value.payLink, body, agencyWorkspaceId)) {
         if (!replaying && [400, 409, 403, 401].includes(response.status)) setPending(null);
-        throw new Error(value.error || "This request could not be confirmed. Retry the same request to check its receipt.");
+        throw new Error(value.error || "This request could not be confirmed. Retry the same request to check what was saved.");
       }
       setPending(null); setRevoking(null);
-      if (body.action === "create") { setForm(blankForm); setMessage("Payment link created. Copy it and send it yourself. Strelva does not email payment links."); }
-      else setMessage("Payment link expired. New checkouts are refused; payments already started in Stripe may still complete.");
+      if (body.action === "create") { setForm(blankForm); setMessage(`Payment link made for ${String(body.clientName)}. Copy it and send it yourself. Strelva does not email payment links.`); }
+      else setMessage("Payment link expired. New checkouts are refused. Payments already started in Stripe may still complete.");
       await load();
-    } catch (cause) { if (mounted.current) setError(cause instanceof Error ? cause.message : "Request unconfirmed. Retry the same request to check its receipt."); }
+    } catch (cause) { if (mounted.current) setError(cause instanceof Error ? cause.message : "Request unconfirmed. Retry the same request to check what was saved."); }
     finally { flight.current = false; if (mounted.current) setBusy(false); }
   }
   async function copy(slug: string) {
@@ -99,59 +107,80 @@ function ScopedPaymentLinks({ agencyWorkspaceId, request, initialProspect }: { a
     }
     void command(body);
   }
-  return <>
-    <StTextButton onClick={() => void load()} disabled={busy || loading}>Refresh payment links</StTextButton>
-    {error ? <StNotice tone="critical">{error}{stale && snapshot ? " Retained links may be out of date. Refresh before changing anything." : ""}</StNotice> : null}
-    {message ? <StNotice>{message}</StNotice> : null}
-    {pending ? <StNotice>This exact request is awaiting confirmation. Its terms are held.<StTextButton disabled={busy || loading || stale} onClick={() => void command(pending)}>Retry the same request</StTextButton></StNotice> : null}
-    {loading && !snapshot ? <StSkeleton label="Reading payment links" /> : !snapshot ? <StEmpty>Payment links are unavailable. Confirm your agency owner or admin access, then refresh.</StEmpty> : <>
-      {snapshot.creation.reason === "off" ? <StNotice>Payment links · Coming soon. New payment links need your agency&apos;s Stripe Connect account. Checkout for new links is not available yet.</StNotice> : null}
+  const expireConfirm = (slug: string) => <span className={styles.links} role="group" aria-label="Expire this link">
+    <span>New checkouts stop. Payments already started in Stripe may still complete.</span>
+    <XaButton size="sm" disabled={disabled} onClick={() => void command({ action: "revoke", agencyWorkspaceId, expectedActorId: snapshot!.currentActorId, slug, idempotencyKey: crypto.randomUUID() })}>Confirm expire</XaButton>
+    <XaButton size="sm" variant="quiet" disabled={disabled} onClick={() => setRevoking(null)}>Keep link</XaButton>
+  </span>;
+  const agencyName = snapshot?.agency && "name" in snapshot.agency && typeof snapshot.agency.name === "string" ? snapshot.agency.name : "your agency";
+  const openCount = snapshot?.connectedLinks.filter(link => link.status === "open").length ?? 0;
+
+  return <div className={`${styles.column} ${styles.wide}`}>
+    <div className={styles.brief}>
+      <XaHeadline quiet={snapshot?.creation.reason === "ready" ? "Money goes to your own Stripe account. Strelva never holds it." : "Clients pay by card, straight to your agency's Stripe account."}>
+        {snapshot?.connectedLinks.length ? `${snapshot.connectedLinks.length === 1 ? "1 payment link" : `${snapshot.connectedLinks.length} payment links`}, ${openCount} open.` : "Payment links"}
+      </XaHeadline>
+    </div>
+    {error ? <p className={styles.critical} role="alert">{error}{stale && snapshot ? " These links may be out of date. Refresh before changing anything." : ""}</p> : null}
+    {message ? <XaSays>{message}</XaSays> : null}
+    {pending ? <p className={styles.body} role="status">This exact request is awaiting confirmation. Its terms are held. <XaTextLink onClick={() => { if (!busy && !loading && !stale) void command(pending); }}>Retry the same request</XaTextLink></p> : null}
+    <div className={styles.links}><XaTextLink onClick={() => { if (!busy && !loading) void load(); }}>Refresh payment links</XaTextLink><span aria-hidden="true">·</span><XaTextLink href={`/workspace?workspaceId=${encodeURIComponent(agencyWorkspaceId)}&agencyView=clients`}>Your clients</XaTextLink></div>
+    {loading && !snapshot ? <p className={styles.note} role="status">Reading payment links…</p> : !snapshot ? <p className={styles.body}>Payment links are unavailable. Confirm your agency owner or admin access, then refresh.</p> : <>
+      {snapshot.creation.reason === "off" ? <p className={`${styles.body} ${styles.statusLine}`}><XaStatus kind="draft" size="sm">Coming soon</XaStatus><span>New payment links need your agency&apos;s own Stripe Connect account. Checkout for new links is not available yet.</span></p> : null}
       {snapshot.creation.reason === "setup_required" ? <AgencyMerchantSetup agencyWorkspaceId={agencyWorkspaceId} onChange={() => void load()} /> : null}
-      {snapshot.creation.reason === "unavailable" ? <StNotice>Payment readiness could not be confirmed. Refresh to check again. No payment link can be created right now.</StNotice> : null}
-      {snapshot.creation.reason === "ready" ? <StSection title="New payment link">
-        <form onSubmit={submitCreate} className="flex flex-col gap-4">
-          <TextInput label="Client name" value={form.clientName} maxLength={160} required disabled={disabled} onChange={event => setForm({ ...form, clientName: event.target.value })} />
-          <TextArea label="What it is for" value={form.description} maxLength={1000} required disabled={disabled} onChange={event => setForm({ ...form, description: event.target.value })} />
-          <SelectInput label="Amount" value={form.kind} disabled={disabled} onChange={event => setForm({ ...form, kind: event.target.value === "range" ? "range" : "fixed" })} options={[{ value: "fixed", label: "Fixed amount" }, { value: "range", label: "Client chooses within a range" }]} />
-          {form.kind === "fixed" ? <TextInput label="Amount in dollars" inputMode="decimal" value={form.dollars} disabled={disabled} onChange={event => setForm({ ...form, dollars: event.target.value })} />
-            : <><TextInput label="Minimum in whole dollars" inputMode="numeric" value={form.minDollars} disabled={disabled} onChange={event => setForm({ ...form, minDollars: event.target.value })} /><TextInput label="Maximum in whole dollars" inputMode="numeric" helperText="The client picks in $50 steps." value={form.maxDollars} disabled={disabled} onChange={event => setForm({ ...form, maxDollars: event.target.value })} /></>}
-          <StPill type="submit" variant="primary" disabled={disabled}>Create payment link</StPill>
+      {snapshot.creation.reason === "unavailable" ? <p className={styles.body}>Payment readiness could not be confirmed. Refresh to check again. No payment link can be made right now.</p> : null}
+      {snapshot.creation.reason === "ready" ? <section className={styles.maker} aria-labelledby="new-link-heading">
+        <form onSubmit={submitCreate} className={styles.form}>
+          <XaLabel as="h2" id="new-link-heading">New payment link</XaLabel>
+          <XaField label="Client name" value={form.clientName} maxLength={160} required disabled={disabled} onChange={event => setForm({ ...form, clientName: event.target.value })} />
+          <XaTextArea label="What it is for" value={form.description} maxLength={1000} required disabled={disabled} onChange={event => setForm({ ...form, description: event.target.value })} />
+          <XaSegmented label="How much the client pays" value={form.kind} onChange={kind => { if (!disabled) setForm({ ...form, kind }); }} options={[{ value: "fixed", label: "A set amount" }, { value: "range", label: "Client picks within a range" }]} />
+          {form.kind === "fixed" ? <XaField label="Amount in dollars" inputMode="decimal" value={form.dollars} disabled={disabled} onChange={event => setForm({ ...form, dollars: event.target.value })} />
+            : <div className={styles.pair}><XaField label="Minimum in whole dollars" inputMode="numeric" value={form.minDollars} disabled={disabled} onChange={event => setForm({ ...form, minDollars: event.target.value })} /><XaField label="Maximum in whole dollars" inputMode="numeric" hint="The client picks in $50 steps." value={form.maxDollars} disabled={disabled} onChange={event => setForm({ ...form, maxDollars: event.target.value })} /></div>}
+          <div className={styles.actions}><XaButton type="submit" variant="primary" busy={busy && pending?.action === "create"} disabled={disabled}>Create payment link</XaButton></div>
+          <p className={styles.note}>Stripe&apos;s fees apply. Strelva charges no fee on these payments. Strelva does not email the link; you send it.</p>
         </form>
-      </StSection> : null}
-      <StTextButton href={`/workspace?workspaceId=${encodeURIComponent(agencyWorkspaceId)}&agencyView=clients`}>Open agency clients</StTextButton>
-      {snapshot.connectedLinks.length ? <StSection title="Payment links">
-        <StRows label="Agency payment links">{snapshot.connectedLinks.map(link => {
-          const when = (iso: string | null) => iso ? new Date(iso).toLocaleDateString() : "";
-          return <StRow key={link.id} title={link.clientName} detail={<>
-            <StMono>{connectedPrice(link)} · /pay/{link.slug}{link.invoiceNumber !== null ? ` · ${formatDocumentNumber("invoice", link.invoiceNumber)}` : ""}</StMono>
-            <StCopy>{link.description}</StCopy>
-            {link.status === "paid" ? <StState kind="live">Paid {exact(link.paidAmountCents ?? 0)} · {when(link.paidAt)}</StState> : link.status === "expired" ? <StState kind="down">Expired {when(link.revokedAt)}</StState> : <StState kind="need">Open</StState>}
-            {link.status === "open" ? <><StTextButton disabled={disabled} onClick={() => void copy(link.slug)}>Copy link</StTextButton><StTextButton href={`/pay/${link.slug}`}>Open payment link</StTextButton></> : null}
-            <StTextButton href={`/workspace/payment-links/${link.id}/invoice?workspaceId=${encodeURIComponent(agencyWorkspaceId)}`}>View invoice</StTextButton>
-            {link.status === "paid" ? <StTextButton href={`/workspace/payment-links/${link.id}/receipt?workspaceId=${encodeURIComponent(agencyWorkspaceId)}`}>View payment receipt</StTextButton> : null}
-            {link.status === "open" ? (revoking === link.slug ? <StNotice>Expire this link? New checkouts will stop. Payments already started in Stripe may still complete.<StTextButton disabled={disabled} onClick={() => void command({ action: "revoke", agencyWorkspaceId, expectedActorId: snapshot.currentActorId, slug: link.slug, idempotencyKey: crypto.randomUUID() })}>Confirm expire</StTextButton><StTextButton disabled={disabled} onClick={() => setRevoking(null)}>Keep link</StTextButton></StNotice> : <StTextButton disabled={disabled} onClick={() => setRevoking(link.slug)}>Expire link</StTextButton>) : null}
-          </>} />;
-        })}</StRows>
-      </StSection> : null}
-      {snapshot.legacyMerchant ? <>
-      <StCopy>Existing one-time payment links remain available below. A payment link does not start a subscription.</StCopy>
-      <StSection title={snapshot.connectedLinks.length ? "Earlier payment links" : "Payment links"}>
-        {!snapshot.paymentStatusAvailable ? <StNotice>Payment status could not be read. Refresh to check the payment trail.</StNotice> : null}
-        {!snapshot.payLinks.length ? <StEmpty>No payment links recorded yet.</StEmpty> : <StRows label="Agency payment links">{snapshot.payLinks.map(link => {
+        <div className={styles.preview}>
+          <XaLabel>What {form.clientName.trim() || "your client"} sees</XaLabel>
+          <XaPage address={`strelva.com/pay/${(form.clientName.trim() || "client").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "client"}`} title={`Pay ${agencyName}`} flat>
+            <div className={styles.previewPay}>
+              <p className={styles.note}>{form.clientName.trim() || "Client name"}</p>
+              <p className={styles.body}>{form.description.trim() || "What it is for appears here."}</p>
+              <p className={styles.amount}>{previewAmount(form)}</p>
+              <span className={styles.previewPill} aria-hidden="true">Pay {form.kind === "fixed" ? previewAmount(form) : "the amount they choose"}</span>
+            </div>
+          </XaPage>
+        </div>
+      </section> : null}
+      {snapshot.connectedLinks.length ? <section className={styles.section} aria-labelledby="links-heading">
+        <XaLabel as="h2" id="links-heading">Payment links</XaLabel>
+        <XaRows label="Agency payment links">{snapshot.connectedLinks.map(link => <XaRow key={link.id} lead={<XaInitial name={link.clientName} size={32} />} title={link.clientName} meta={<span className={styles.figure}>{connectedPrice(link)}</span>} wrapOnPhone
+          detail={<>
+            <span>{link.description}{link.invoiceNumber !== null ? ` · ${formatDocumentNumber("invoice", link.invoiceNumber)}` : ""}</span><br />
+            {link.status === "paid" ? <XaStatus kind="live" size="sm">Paid {exact(link.paidAmountCents ?? 0)} · {day(link.paidAt)}</XaStatus> : link.status === "expired" ? <XaStatus kind="draft" size="sm">Expired {day(link.revokedAt)}</XaStatus> : <XaStatus kind="waits" size="sm">Open, waiting on {link.clientName}</XaStatus>}
+            <span className={styles.links}>
+              {link.status === "open" ? <><XaTextLink onClick={() => { if (!disabled) void copy(link.slug); }}>Copy link</XaTextLink><span aria-hidden="true">·</span><XaTextLink href={`/pay/${link.slug}`}>Open payment link</XaTextLink><span aria-hidden="true">·</span></> : null}
+              <XaTextLink href={`/workspace/payment-links/${link.id}/invoice?workspaceId=${encodeURIComponent(agencyWorkspaceId)}`}>Invoice</XaTextLink>
+              {link.status === "paid" ? <><span aria-hidden="true">·</span><XaTextLink href={`/workspace/payment-links/${link.id}/receipt?workspaceId=${encodeURIComponent(agencyWorkspaceId)}`}>Payment receipt</XaTextLink></> : null}
+              {link.status === "open" && revoking !== link.slug ? <><span aria-hidden="true">·</span><XaTextLink onClick={() => { if (!disabled) setRevoking(link.slug); }}>Expire link</XaTextLink></> : null}
+            </span>
+            {link.status === "open" && revoking === link.slug ? expireConfirm(link.slug) : null}
+          </>} />)}</XaRows>
+      </section> : snapshot.creation.reason === "ready" && !snapshot.legacyMerchant ? <p className={styles.body}>No payment links yet. The first one you make appears here with its invoice.</p> : null}
+      {snapshot.legacyMerchant ? <section className={styles.section} aria-labelledby="earlier-heading">
+        <XaLabel as="h2" id="earlier-heading">{snapshot.connectedLinks.length ? "Earlier payment links" : "Payment links"}</XaLabel>
+        <p className={styles.note}>One-time payment links made before agency Stripe accounts. A payment link does not start a subscription.</p>
+        {!snapshot.paymentStatusAvailable ? <p className={styles.body}>Payment status could not be read. Refresh to check again.</p> : null}
+        {!snapshot.payLinks.length ? <p className={styles.body}>No payment links recorded yet.</p> : <XaRows label="Earlier payment links">{snapshot.payLinks.map(link => {
           const paid = snapshot.paidPayments[link.slug];
-          return <StRow key={link.slug} title={link.clientName} detail={<>
-            <StMono>{price(link)} · /pay/{link.slug}</StMono>
-            <StCopy>{link.customCopy}</StCopy>
-            <StCopy muted>{link.agencyWorkspaceId ? `${link.agencyDisplayName || "Agency identity not recorded"} · Runs on Strelva` : "Created before agency ownership was recorded · Actor not recorded"} · {new Date(link.createdAt).toLocaleDateString()}</StCopy>
-            {link.revokedAt ? <StCopy>Expired {new Date(link.revokedAt).toLocaleString()}</StCopy> : null}
-            {paid ? <StState kind="live">Paid {money(paid.amountCents)} · {new Date(paid.paidAt).toLocaleDateString()}</StState> : <StCopy>{snapshot.paymentStatusAvailable ? "No payment found in the available trail" : "Payment status unavailable"}</StCopy>}
-            {!link.revokedAt ? <><StTextButton disabled={disabled} onClick={() => void copy(link.slug)}>Copy link</StTextButton><StTextButton href={`/pay/${link.slug}`}>Open payment link</StTextButton>
-              {revoking === link.slug ? <StNotice>Expire this link? New checkouts will stop. Payments already started in Stripe may still complete.<StTextButton disabled={disabled} onClick={() => void command({ action: "revoke", agencyWorkspaceId, expectedActorId: snapshot.currentActorId, slug: link.slug, idempotencyKey: crypto.randomUUID() })}>Confirm expire</StTextButton><StTextButton disabled={disabled} onClick={() => setRevoking(null)}>Keep link</StTextButton></StNotice> : <StTextButton disabled={disabled} onClick={() => setRevoking(link.slug)}>Expire link</StTextButton>}
-            </> : null}
+          return <XaRow key={link.slug} lead={<XaInitial name={link.clientName} size={32} />} title={link.clientName} meta={<span className={styles.figure}>{price(link)}</span>} wrapOnPhone detail={<>
+            <span>{link.customCopy ? `${link.customCopy} · ` : ""}{link.agencyWorkspaceId ? `${link.agencyDisplayName || "Agency identity not recorded"} · Runs on Strelva` : "Created before agency ownership was recorded · Actor not recorded"} · {day(link.createdAt)}</span><br />
+            {link.revokedAt ? <><XaStatus kind="draft" size="sm">Expired {day(link.revokedAt)}</XaStatus>{paid ? <> · Paid {money(paid.amountCents)}</> : !snapshot.paymentStatusAvailable ? <> · Payment status unavailable</> : null}</> : paid ? <XaStatus kind="live" size="sm">Paid {money(paid.amountCents)} · {day(paid.paidAt)}</XaStatus> : <span>{snapshot.paymentStatusAvailable ? "No payment found yet" : "Payment status unavailable"}</span>}
+            {!link.revokedAt ? <span className={styles.links}><XaTextLink onClick={() => { if (!disabled) void copy(link.slug); }}>Copy link</XaTextLink><span aria-hidden="true">·</span><XaTextLink href={`/pay/${link.slug}`}>Open payment link</XaTextLink>{revoking !== link.slug ? <><span aria-hidden="true">·</span><XaTextLink onClick={() => { if (!disabled) setRevoking(link.slug); }}>Expire link</XaTextLink></> : null}</span> : null}
+            {!link.revokedAt && revoking === link.slug ? expireConfirm(link.slug) : null}
           </>} />;
-        })}</StRows>}
-      </StSection>
-      </> : null}
+        })}</XaRows>}
+      </section> : null}
     </>}
-  </>;
+  </div>;
 }

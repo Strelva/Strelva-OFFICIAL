@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { z } from "zod";
-import { StEmpty, StNotice, StPill, StSection, StSkeleton, StSurface, StTextButton, StToast } from "@/components/ui/strelva/Kit";
+import { XaButton, XaLabel, XaStatus, XaTextLink } from "@/components/ui/strelva/Xa";
+import styles from "@/experience/workspace/money/money.module.css";
 
 const inboxSchema = z.object({ transitions: z.array(z.object({
   id: z.string().min(1), workspaceId: z.string().min(1), workspaceName: z.string().optional(),
@@ -74,14 +75,16 @@ function ScopedAgencyPayerRequests({ agencyWorkspaceId, request }: { agencyWorks
     }
   }
 
-  return <StSection title="Requests for your agency to pay" meta="A business owner proposes; your agency accepts. Neither person needs to join the other's workspace.">
-    {error ? <StNotice tone="critical">{error}<StTextButton disabled={busy} onClick={() => void load().catch(() => setError("Payer requests could not be loaded."))}>Check payer requests</StTextButton></StNotice> : null}
-    {notice ? <StToast>{notice}</StToast> : null}
-    {requests === null && !error ? <StSkeleton label="Loading agency payer requests" /> : requests?.length === 0 ? <StEmpty>No payer requests are waiting for this agency.</StEmpty> : null}
-    {requests?.map(item => <StSurface key={item.id} label={`Future jobs for ${item.workspaceName ?? "this business"}`}>
-      <h3 className="mb-3 font-medium">Future jobs for {item.workspaceName ?? "this business"}</h3>
-      <p>{item.proposerEmail} asks your agency to pay for future jobs. Existing job limits and costs keep their original payer. Accepting does not grant access to the business’s work.</p>
-      <div className="mt-4 flex flex-wrap gap-3"><StPill disabled={busy || Boolean(error)} onClick={() => void respond("accept", item.id)}>Accept future payer role</StPill><StTextButton disabled={busy || Boolean(error)} onClick={() => void respond("reject", item.id)}>Not yet</StTextButton></div>
-    </StSurface>)}
-  </StSection>;
+  return <section className={styles.section} aria-labelledby="payer-requests-heading">
+    <XaLabel as="h2" id="payer-requests-heading">Owners asking your agency to pay</XaLabel>
+    <p className={styles.note}>An owner proposes; your agency accepts here. Neither of you has to join the other&apos;s workspace.</p>
+    {error ? <p className={styles.critical} role="alert">{error} <XaTextLink onClick={() => { if (!busy) void load().catch(() => setError("Payer requests could not be loaded.")); }}>Check payer requests</XaTextLink></p> : null}
+    {notice ? <p className={styles.body} role="status">{notice}</p> : null}
+    {requests === null && !error ? <p className={styles.note} role="status">Reading payer requests…</p> : requests?.length === 0 ? <p className={styles.body}>No payer requests are waiting for this agency.</p> : null}
+    {requests?.map(item => <div key={item.id} className={styles.waiting} role="group" aria-label={`Future jobs for ${item.workspaceName ?? "this business"}`}>
+      <div className={styles.waitingHead}><p className={styles.waitingTitle}>Future jobs for {item.workspaceName ?? "this business"}</p><XaStatus kind="waits" size="sm">Waits for you</XaStatus></div>
+      <p className={styles.note}>{item.proposerEmail} asks your agency to pay for jobs started after you accept. Existing job limits and costs keep their payer. Accepting gives no access to the business&apos;s work.</p>
+      <div className={styles.actions}><XaButton size="sm" disabled={busy || Boolean(error)} onClick={() => void respond("accept", item.id)}>Accept future payer role</XaButton><XaButton size="sm" variant="quiet" disabled={busy || Boolean(error)} onClick={() => void respond("reject", item.id)}>Not yet</XaButton></div>
+    </div>)}
+  </section>;
 }

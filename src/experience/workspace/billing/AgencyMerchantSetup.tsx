@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import { StCopy, StNotice, StPill, StSection, StTextButton } from "@/components/ui/strelva/Kit";
+import { XaButton, XaEmpty, XaSays, XaTextLink } from "@/components/ui/strelva/Xa";
+import styles from "@/experience/workspace/money/money.module.css";
 
 /** Connect the agency's own Stripe account, then come back to Payment links. */
 export function AgencyMerchantSetup({ agencyWorkspaceId, onChange }: { agencyWorkspaceId: string; onChange?: () => void }) {
@@ -31,12 +32,12 @@ export function AgencyMerchantSetup({ agencyWorkspaceId, onChange }: { agencyWor
   }
   useEffect(() => { if (new URLSearchParams(window.location.search).get("connect") === "return") void post("refresh"); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  return <StSection title="Stripe setup">
-    <StCopy>Connect your agency&apos;s Stripe account to take payments. Money goes straight to your Stripe account; Strelva never holds it. Stripe&apos;s fees apply. Strelva charges no fee on these payments.</StCopy>
-    <div className="flex flex-wrap items-center gap-4">
-      <StPill variant="primary" disabled={busy} onClick={() => void post("onboard")}>Set up Stripe</StPill>
-      <StTextButton disabled={busy} onClick={() => void post("refresh")}>Check Stripe status</StTextButton>
-    </div>
-    {message ? <StNotice>{message}</StNotice> : null}
-  </StSection>;
+  return <div className={styles.section}>
+    <XaEmpty pose="adds" size="sm" title="Connect Stripe to make payment links." job="Pebble checks Stripe again the moment you come back"
+      action={<XaButton variant="primary" busy={busy} disabled={busy} onClick={() => void post("onboard")}>Set up Stripe</XaButton>}
+      secondary={<XaTextLink onClick={() => { if (!busy) void post("refresh"); }}>Check Stripe status</XaTextLink>}>
+      Money goes straight to your agency&apos;s Stripe account; Strelva never holds it. Stripe&apos;s fees apply. Strelva charges no fee on these payments.
+    </XaEmpty>
+    {message ? <XaSays>{message}</XaSays> : null}
+  </div>;
 }

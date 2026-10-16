@@ -1,6 +1,6 @@
 "use client";
-import { StTextButton } from "@/components/ui/strelva/Kit";
+import { XaButton } from "@/components/ui/strelva/Xa";
 
 export function PrintDocumentButton() {
-  return <StTextButton onClick={() => window.print()}>Print or save as PDF</StTextButton>;
+  return <XaButton size="sm" onClick={() => window.print()}>Print or save as PDF</XaButton>;
 }

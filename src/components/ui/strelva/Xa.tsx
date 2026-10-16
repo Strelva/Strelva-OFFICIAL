@@ -15,6 +15,6 @@ export { XaComposer, XaWaiting, type XaComposerScope, type XaComposerSystem, typ
 export { XaStream, XaWorking, type XaWorkingStep } from "./xa/working";
 export { XaDecision, XaUndo, XaUndoDock, XaYes, type XaYesState } from "./xa/yes";
 export { XaAnswers, XaEmpty, XaHeadline, XaLabel, XaLede, XaLines, XaPage, XaPageChange, XaRow, XaRows, XaSays, XaSheet } from "./xa/surfaces";
-export { XaChoices, XaDoors, XaField, XaSegmented, XaTextArea, type XaOption } from "./xa/inputs";
+export { XaChoices, XaDoors, XaField, XaSegmented, XaSelect, XaTextArea, type XaOption } from "./xa/inputs";
 export { XaCollapse, XaGlideList, XaRollingCount } from "./xa/motion";
 export { StComposerDock as XaComposerDock } from "./Kit";

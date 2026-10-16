@@ -18,7 +18,7 @@ beforeEach(() => {
 it("authorizes the opaque lead token server-side and bounds the payment description for review", async () => {
   const page = await Page({ searchParams: Promise.resolve({ workspaceId: agency, leadToken: token }) });
   expect(mocks.lead).toHaveBeenCalledWith({ userId: "owner", verifiedEmail: "owner@example.test" }, agency, token);
-  const content = page.props.children.props.children[1];
+  const content = page.props.children.props.children;
   expect(content.props.initialProspect).toEqual({ token, name: "Northside Bakery", description: "x".repeat(1000) });
 });
 it("does not fall through to unprefilled creation when the source lead is forbidden", async () => {
