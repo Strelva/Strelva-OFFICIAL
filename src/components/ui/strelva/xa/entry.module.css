@@ -1,0 +1,61 @@
+/*
+ * XA entry frame. Geometry from XA · B1/B3/B4/C1 at 1440: the column starts
+ * at 96, forms are 460 wide, the felt is 560 wide with a 24 margin and a
+ * 24 radius. Tokens only; the felt is the board's material, not decoration.
+ */
+.modeRoot { display: contents; }
+.frame { box-sizing: border-box; display: grid; min-height: 100dvh; grid-template-columns: minmax(0, 1fr); background: var(--st-canvas); color: var(--st-text); font-family: var(--font-workspace), system-ui, sans-serif; }
+.frame[data-felt="true"] { grid-template-columns: minmax(0, 1fr) minmax(420px, 584px); }
+
+.paper { display: flex; min-width: 0; min-height: 100dvh; flex-direction: column; padding: 0 clamp(20px, 6.7vw, 96px); }
+.header { display: flex; min-height: 96px; align-items: center; justify-content: space-between; gap: 24px; }
+.frame[data-felt="true"] .header { max-width: 664px; }
+.brand { display: inline-flex; min-width: 0; flex-shrink: 1; align-items: center; gap: 10px; color: var(--st-text); text-decoration: none; }
+.brand:focus-visible { outline: 2px solid var(--st-accent); outline-offset: 4px; border-radius: 8px; }
+.wordmark { font-size: 24px; font-weight: 500; letter-spacing: -0.6px; line-height: 1; }
+.brandLogo { width: 28px; height: 28px; flex-shrink: 0; border-radius: 8px; object-fit: contain; background: #ffffff; }
+.brandText { display: flex; min-width: 0; flex-direction: column; gap: 1px; font-size: 16px; font-weight: 500; line-height: 20px; }
+.brandText span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.brandText small { color: var(--st-text-3); font-size: 12px; font-weight: 400; line-height: 16px; }
+.end { display: flex; min-width: 0; flex-shrink: 1; align-items: center; gap: 16px; color: var(--st-text-2); font-size: 14px; line-height: 20px; }
+.end a { color: var(--st-text-2); text-decoration: none; }
+.end > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.end a:hover { color: var(--st-text); }
+.end a:focus-visible { outline: 2px solid var(--st-accent); outline-offset: 3px; border-radius: 6px; }
+
+.column { box-sizing: border-box; display: flex; width: 100%; max-width: 460px; flex-direction: column; gap: 24px; margin: auto 0; padding: 48px 0 72px; animation: var(--kf-enter) var(--motion-base) var(--ease-settle) both; }
+.column[data-wide="true"] { max-width: 640px; }
+.frame:not([data-felt="true"]) .column[data-wide="true"] { max-width: 1040px; }
+.phoneArt, .phoneObject { display: none; }
+
+.footnote { padding: 0 0 28px; color: var(--st-text-3); font-size: 13px; line-height: 18px; }
+.footnote a { color: inherit; }
+
+.stack { display: flex; flex-direction: column; gap: 24px; }
+.stack[data-gap="sm"] { gap: 12px; }
+.stack[data-gap="lg"] { gap: 32px; }
+.note { margin: 0; color: var(--st-text-2); font-size: 14px; line-height: 1.5; }
+.note a { color: var(--st-accent); font-weight: 500; text-decoration: none; }
+.note a:hover { text-decoration: underline; text-underline-offset: 3px; }
+
+/* ---------- Felt (the right-hand panel) ---------- */
+.feltSlot { position: sticky; top: 0; height: 100dvh; box-sizing: border-box; padding: 24px 24px 24px 0; }
+.felt { box-sizing: border-box; display: flex; height: 100%; align-items: center; justify-content: center; overflow: hidden; padding: 40px; border-radius: var(--st-r-xl); background: radial-gradient(120% 90% at 50% 40%, var(--st-felt-from), var(--st-felt-to)); }
+.feltInner { display: flex; width: 100%; max-width: 440px; flex-direction: column; align-items: center; text-align: center; }
+.feltObject { width: 100%; margin-top: 8px; text-align: left; animation: var(--kf-enter) var(--motion-slow) var(--ease-settle) both; }
+.feltTitle { margin: 24px 0 0; color: var(--st-text); font-size: 17px; font-weight: 600; letter-spacing: -0.2px; line-height: 24px; }
+.feltBody { margin: 6px 0 0; max-width: 380px; color: var(--st-text-2); font-size: 15px; line-height: 22px; }
+
+@media (max-width: 1023px) {
+  .frame[data-felt="true"] { grid-template-columns: minmax(0, 1fr); }
+  .feltSlot { display: none; }
+  .phoneArt { display: block; margin-bottom: -4px; }
+  .phoneObject { display: block; }
+}
+@media (max-width: 767px) {
+  .paper { padding: 0 20px; }
+  .header { min-height: 64px; }
+  .wordmark { font-size: 21px; }
+  .column { margin: 0; padding: 20px 0 48px; gap: 20px; }
+  .end { gap: 12px; font-size: 14px; }
+}

@@ -121,36 +121,42 @@ describe("dashboard route redirects", () => {
 
   it("gives no-access users a real account-switching path", () => {
     const source = readFileSync(path.join(process.cwd(), "src/app/no-access/page.tsx"), "utf8");
+    const view = readFileSync(path.join(process.cwd(), "src/experience/entry/AccountEntry.tsx"), "utf8");
+    const noAccess = view.slice(view.indexOf("export function NoAccessView"));
     const recoveryButton = readFileSync(
       path.join(process.cwd(), "src/components/auth/UseInvitedEmailButton.tsx"),
       "utf8",
     );
 
-    expect(source).toContain("UseInvitedEmailButton");
+    expect(source).toContain("<NoAccessView");
+    expect(source).toContain('withClientFallbackRoot(clientFallbackRoot, "/sign-in")');
     expect(recoveryButton).toContain("supabase.auth.signOut");
     expect(recoveryButton).toContain('redirectUrl = "/sign-in"');
     expect(recoveryButton).toContain("window.location.href = redirectUrl");
     expect(recoveryButton).toContain('type="button"');
     expect(recoveryButton).toContain("onClick={signOut}");
-    expect(recoveryButton).toContain("Use invited email");
-    expect(source).toContain('withClientFallbackRoot(clientFallbackRoot, "/sign-in")');
-    expect(source).toContain("Use the exact email address that received your invite");
-    expect(source).toContain("signs you out so you can choose that account");
-    expect(source).toContain("mailto:jacob@strelva.com");
-    expect(source).toContain('href="/account"');
-    expect(source).toContain("Choose another business");
-    expect(source).not.toContain('href="/"');
-    expect(source.indexOf("UseInvitedEmailButton")).toBeLessThan(source.indexOf("Choose another business"));
+    expect(recoveryButton).toContain("Use my invited email");
+    expect(noAccess).toContain("<UseInvitedEmailButton redirectUrl={signInHref} />");
+    expect(noAccess).toContain("Use the exact email address that received your invite");
+    expect(noAccess).toContain("signs you out so you can choose that account");
+    expect(noAccess).toContain("mailto:jacob@strelva.com");
+    expect(noAccess).toContain('href="/account"');
+    expect(noAccess).toContain("Choose another business");
+    expect(noAccess.indexOf("UseInvitedEmailButton")).toBeLessThan(noAccess.indexOf("Choose another business"));
   });
 
   it("gives account users without tenant access an invited-email recovery path", () => {
     const source = readFileSync(path.join(process.cwd(), "src/app/(marketing)/account/page.tsx"), "utf8");
+    const view = readFileSync(path.join(process.cwd(), "src/experience/entry/AccountEntry.tsx"), "utf8");
+    const empty = view.slice(view.indexOf("export function AccountNoBusiness"), view.indexOf("export function NoAccessView"));
 
-    expect(source).toContain("No invited sites on this account");
-    expect(source).toContain("UseInvitedEmailButton");
-    expect(source).toContain("Request your build");
-    expect(source).toContain("mailto:jacob@strelva.com");
+    expect(empty).toContain("This email isn’t on a business yet.");
+    expect(empty).toContain("<UseInvitedEmailButton />");
+    expect(empty).not.toContain("Request your build");
+    expect(empty).toContain('href="/agencies"');
+    expect(empty).toContain("mailto:jacob@strelva.com");
     expect(source).toContain("!tenantConfigs.some(({ config }) => config)");
     expect(source).toContain("return <NoAccessState />");
+    expect(source).toContain("<AccountNoBusiness />");
   });
 });

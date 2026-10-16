@@ -1,12 +1,20 @@
 "use client";
 
-import { useEffect, useId, useRef, useState } from "react";
-import { StCopy, StEmpty, StHead, StMono, StNotice, StPage, StPill, StPillLink, StRow, StRows, StSection, StState, StSteps, StTextButton, StTextField } from "@/components/ui/strelva/Kit";
+/**
+ * The free check (XA, designed from B3 "read the site" and B4 "is this
+ * right"). One column of words on paper, the felt on the right. While the
+ * check runs Pebble works on the site; when it lands, the felt holds the
+ * site as Gemini reads it, with what was found and what was missing labelled
+ * in place. The one ink pill carries the result forward (into a workspace,
+ * or to the agency whose check this is). Nothing here changes the site.
+ */
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { XaButton, XaButtonLink, XaField, XaHeadline, XaLabel, XaPage, XaPebbleScene, XaRow, XaRows, XaSays, XaStatus, XaTextLink, XaWorking } from "@/components/ui/strelva/Xa";
+import { XaEntryFelt, XaEntryFrame, XaEntryNote } from "@/components/ui/strelva/xa/entry";
 import styles from "./website-audit.module.css";
 import type { AgencyAttribution } from "@/platform/infra/agency-attribution";
-import { OwnerBrandIdentity } from "@/components/brand/OwnerBrandIdentity";
-import { STRELVA_BRAND } from "@/platform/infra/agency-brand";
-import { AiVisibilityResultView } from "@/products/ai-visibility";
+import { STRELVA_BRAND, type OwnerBrand } from "@/platform/infra/agency-brand";
+import { AiVisibilityResultView, AiVisibilitySignals } from "@/products/ai-visibility";
 import type { AiVisibilityResult } from "@/products/ai-visibility/client";
 import { runPublicBusinessCheck } from "./business-check";
 import { withGeminiReportSection } from "./report";
@@ -30,26 +38,69 @@ export function auditDisplayCopy(value: string): string {
     .replace(/\btasks?\b/gi, "work");
 }
 
-const checkState: Record<CheckStatus, { kind: "live" | "need" | "down"; label: string }> = {
-  pass: { kind: "live", label: "Passed" }, warn: { kind: "need", label: "Needs attention" }, fail: { kind: "down", label: "Failed" },
+const checkState: Record<CheckStatus, { kind: "live" | "waits" | "down"; label: string }> = {
+  pass: { kind: "live", label: "Passed" }, warn: { kind: "waits", label: "Needs attention" }, fail: { kind: "down", label: "Failed" },
 };
 
+function hostOf(value: string): string {
+  try { return new URL(/^https?:\/\//i.test(value) ? value : `https://${value}`).host.replace(/^www\./, ""); } catch { return value; }
+}
+
+function agencyBrand(agency: AgencyAttribution): OwnerBrand {
+  return { ...STRELVA_BRAND, agencyId: agency.workspaceId, name: agency.name, logoUrl: agency.brand.logoUrl, accentColor: agency.brand.accentColor ?? STRELVA_BRAND.accentColor, replyTo: agency.replyTo ?? null };
+}
+
+/** One category as a disclosure: the row says how many checks need attention; opening it lists every check. */
 function CategoryChecks({ category }: { category: CategoryResult }) {
   const [expanded, setExpanded] = useState(false);
   const checksId = useId();
-  return <StSection title={auditDisplayCopy(category.name)} meta={<StMono>{category.score}/100</StMono>} action={<StTextButton aria-expanded={expanded} aria-controls={checksId} onClick={() => setExpanded(!expanded)}>{expanded ? "Hide checks" : "See checks"}</StTextButton>}>
-    {expanded ? <div id={checksId}><StRows>{category.checks.map((check, index) => <StRow key={`${check.name}-${index}`} title={auditDisplayCopy(check.name)} detail={auditDisplayCopy(check.message)} end={<StState kind={checkState[check.status].kind}>{checkState[check.status].label}</StState>}>
-      {check.impact && check.status !== "pass" ? <StCopy>{auditDisplayCopy(check.impact)}</StCopy> : null}
-      {check.details ? <StCopy muted>{auditDisplayCopy(check.details)}</StCopy> : null}
-    </StRow>)}</StRows></div> : null}
-  </StSection>;
+  const open = category.checks.filter(check => check.status !== "pass").length;
+  return <li className={styles.category}>
+    <button type="button" className={styles.categoryRow} aria-expanded={expanded} aria-controls={checksId} onClick={() => setExpanded(!expanded)}>
+      <span className={styles.categoryText}><span className={styles.categoryName}>{auditDisplayCopy(category.name)}</span><span className={styles.categoryDetail} data-tone={open ? "waits" : undefined}>{open ? `${open} of ${category.checks.length} need attention` : `All ${category.checks.length} passed`}</span></span>
+      <span className={styles.categoryScore}>{category.score}/100</span>
+      <span className={styles.categoryAction}>{expanded ? "Hide checks" : "See checks"}</span>
+    </button>
+    {expanded ? <ul id={checksId} className={styles.checks}>
+      {category.checks.map((check, index) => <li key={`${check.name}-${index}`}>
+        <span className={styles.checkHead}><span className={styles.checkName}>{auditDisplayCopy(check.name)}</span>{check.status === "pass" ? <span className={styles.passed}>Passed</span> : <XaStatus kind={checkState[check.status].kind} size="sm">{checkState[check.status].label}</XaStatus>}</span>
+        <span className={styles.checkBody}>{auditDisplayCopy(check.message)}</span>
+        {check.impact && check.status !== "pass" ? <span className={styles.checkBody}>{auditDisplayCopy(check.impact)}</span> : null}
+        {check.details ? <span className={styles.checkMuted}>{auditDisplayCopy(check.details)}</span> : null}
+      </li>)}
+    </ul> : null}
+  </li>;
 }
 
 export function WebsiteAuditPending({ url, headingRef }: { url: string; headingRef?: React.Ref<HTMLHeadingElement> }) {
-  return <><StHead titleRef={headingRef} title="Checking your website" meta={<StMono>{url}</StMono>} /><div role="status"><StCopy>Reading the website and running its checks. Results appear when the scan completes.</StCopy><StSteps label="Website check" steps={[{ title: "Reading the public website", state: "active" }, { title: "Checking website health and one Gemini answer when available", state: "pending" }, { title: "Preparing the findings", state: "pending" }]} /></div></>;
+  const host = hostOf(url);
+  return <>
+    <XaHeadline ref={headingRef} quiet="Nothing on your site changes.">Checking {host}</XaHeadline>
+    <XaWorking title="Reading the website and running its checks" steps={[
+      { id: "read", label: `Reading the public pages of ${host}`, state: "active" },
+      { id: "health", label: "Checking website health and one Gemini answer when available", state: "pending" },
+      { id: "findings", label: "Preparing the findings", state: "pending" },
+    ]} />
+    <XaEntryNote>Results appear here when the check completes, usually within a minute.</XaEntryNote>
+  </>;
 }
 
-export function WebsiteAuditPage({ initialUrl = "", initialBusiness = "", initialCategory = "", initialCity = "", initialResult, initialReportId, initialAiResult, initialScanId, initialError, attributionError, workspaceEnabled = false, saved = false, agency }: { agency?: AgencyAttribution; initialUrl?: string; initialBusiness?: string; initialCategory?: string; initialCity?: string; initialResult?: AuditResult; initialReportId?: string; initialAiResult?: AiVisibilityResult; initialScanId?: string; initialError?: string; attributionError?: string; workspaceEnabled?: boolean; saved?: boolean }) {
+/** The site as Gemini reads it: the felt's object once a check has landed. */
+function ReadPage({ url, business, ai, aiError }: { url: string; business: string; ai: AiVisibilityResult | null; aiError: string }) {
+  const host = hostOf(url);
+  return <XaPage address={host} title={ai ? `What Gemini can read about ${ai.business}` : business || host} label={`${host}, as Gemini reads it`}>
+    {ai?.signals.length ? <AiVisibilitySignals signals={ai.signals} />
+      : <p className={styles.pageNote}>{ai ? "Readability was not measured for this site." : aiError ? `Gemini check unavailable: ${aiError}` : "This saved report has no Gemini section."}</p>}
+  </XaPage>;
+}
+
+export function WebsiteAuditPage({ initialUrl = "", initialBusiness = "", initialCategory = "", initialCity = "", initialResult, initialReportId, initialAiResult, initialScanId, initialError, attributionError, workspaceEnabled = false, saved = false, agency, frame = "page", signedIn = false, mode, initialState }: {
+  agency?: AgencyAttribution; initialUrl?: string; initialBusiness?: string; initialCategory?: string; initialCity?: string; initialResult?: AuditResult; initialReportId?: string; initialAiResult?: AiVisibilityResult; initialScanId?: string; initialError?: string; attributionError?: string; workspaceEnabled?: boolean; saved?: boolean;
+  /** "embed" sits inside an iframe on the agency's own site: no frame, no felt. */
+  frame?: "page" | "embed"; signedIn?: boolean; mode?: "light" | "dark";
+  /** Preview fixtures only: open on the running state. */
+  initialState?: "scanning";
+}) {
   const [url, setUrl] = useState(initialUrl);
   const [business, setBusiness] = useState(initialBusiness);
   const [category, setCategory] = useState(initialCategory);
@@ -63,7 +114,7 @@ export function WebsiteAuditPage({ initialUrl = "", initialBusiness = "", initia
   const pending = useRef(false);
   const mounted = useRef(true);
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
-  const [state, setState] = useState<ScanState>(initialResult || initialAiResult ? "done" : "idle");
+  const [state, setState] = useState<ScanState>(initialState ?? (initialResult || initialAiResult ? "done" : "idle"));
   const [result, setResult] = useState<AuditResult | null>(initialResult || null);
   const [reportId, setReportId] = useState<string | null>(initialReportId || null);
   const [error, setError] = useState(initialError || "");
@@ -147,7 +198,7 @@ export function WebsiteAuditPage({ initialUrl = "", initialBusiness = "", initia
       setState("done");
     } catch (err) {
       if (!mounted.current) return;
-      setError(err instanceof Error ? err.message : "Scan failed. Try again.");
+      setError(err instanceof Error ? err.message : "The check didn’t finish. Try again.");
       setState("error");
     } finally {
       pending.current = false;
@@ -191,7 +242,7 @@ export function WebsiteAuditPage({ initialUrl = "", initialBusiness = "", initia
       const blobUrl = URL.createObjectURL(blob);
       const opened = window.open(blobUrl, "_blank", "noopener,noreferrer");
       if (!opened) {
-        // Popup blocked — fall back to a same-tab navigation.
+        // Popup blocked: fall back to a same-tab navigation.
         window.location.href = blobUrl;
       }
       // Revoke after the new tab has had time to load the document.
@@ -205,52 +256,94 @@ export function WebsiteAuditPage({ initialUrl = "", initialBusiness = "", initia
 
   const fixes = result ? topFixes(result.categories, 4) : [];
   const statuses = result?.categories.flatMap(category => category.checks.map(check => check.status)) ?? [];
-  const summaryState = statuses.includes("fail") ? { kind: "down", label: "Some checks failed" } as const : statuses.includes("warn") ? { kind: "need", label: "Needs attention" } as const : statuses.length ? { kind: "live", label: "Website checks passed" } as const : { kind: "draft", label: "No checks returned" } as const;
-  return <StPage className={state === "idle" || state === "error" ? styles.entry : undefined}>
-    {agency && !attributionError ? <OwnerBrandIdentity brand={{ ...STRELVA_BRAND, agencyId: agency.workspaceId, name: agency.name, logoUrl: agency.brand.logoUrl, accentColor: agency.brand.accentColor ?? STRELVA_BRAND.accentColor, replyTo: agency.replyTo ?? null }} /> : null}
-    {(state === "idle" || state === "error") ? <>
-      <StHead title="Check your website and business" meta="See what needs fixing on your website and whether Gemini names your business. Free, no account." />
-      {attributionError ? <StNotice tone="critical">{attributionError} Ask the agency for a working check link.</StNotice> : <form onSubmit={handleScan} aria-describedby={error ? errorId : undefined} className={styles.form}>
-        <StTextField label="Website address" aria-label="Website address" type="text" ref={addressRef} aria-invalid={invalidUrl || undefined} aria-describedby={error ? errorId : undefined} required value={url} onChange={event => setUrl(event.target.value)} placeholder="example.com" autoComplete="url" inputMode="url" />
-        <StTextField label="Business name" id="business-name" ref={businessRef} required autoComplete="organization" value={business} onChange={event => setBusiness(event.target.value)} aria-invalid={invalidBusiness || undefined} aria-describedby={invalidBusiness ? errorId : undefined} description="Gemini needs your business name to check whether it appears in an answer." />
-        <StTextField label="Business category (optional)" value={category} onChange={event => setCategory(event.target.value)} placeholder="Your service" />
-        <StTextField label="City and state (optional)" autoComplete="address-level2" value={city} onChange={event => setCity(event.target.value)} />
-        <div className={styles.actions}><StPill type="submit" size="lg">Check</StPill></div>
-        {error ? <StNotice id={errorId} tone="critical">{auditDisplayCopy(error)}</StNotice> : null}
-        <StCopy muted>Strelva reads the public website and asks Gemini once when available. This check does not change your site or turn on monitoring.</StCopy>
-      </form>}
-      <StSection title="What you get back"><StCopy>Checks for speed, search, mobile use, structured data, security and accessibility, with the first fixes to consider and a website report you can export. The same check includes whether Gemini names your business in one sampled answer.</StCopy></StSection>
-    </> : null}
-    {state === "scanning" ? <WebsiteAuditPending url={url} headingRef={headingRef} /> : null}
-    {state === "done" ? <>
-      {!result ? <StHead titleRef={headingRef} title="Your business check" meta="Website health could not be measured." /> : null}
-      {error && !result ? <StNotice tone="need">{error}</StNotice> : null}
-      {websiteError ? <StNotice tone="critical">Website check unavailable: {websiteError}</StNotice> : null}
-      {result ? <>
-      <StHead titleRef={headingRef} title="Your website check" meta={<><StMono>{result.url}</StMono> · checked <StMono>{new Date(result.scannedAt).toLocaleString()}</StMono></>} />
-      <div className={styles.summary}><StMono tone="text" size="value">{result.overallScore}/100</StMono><StState kind={summaryState.kind}>Grade {result.grade} · {summaryState.label}</StState></div>
-      <div className={styles.split}>
-        <div className={styles.stack}>
-          <StSection title="Start here">{fixes.length ? <StRows>{fixes.map(fix => <StRow key={`${fix.category}-${fix.name}`} kind={auditDisplayCopy(fix.category)} title={auditDisplayCopy(fix.name)} detail={auditDisplayCopy(fix.message)}>
-            {fix.impact ? <StCopy>{auditDisplayCopy(fix.impact)}</StCopy> : null}
-            {fix.quantified ? <StCopy muted>Estimated impact: {auditDisplayCopy(fix.quantified)}</StCopy> : null}
-            {fix.guides?.map(guide => <StTextButton key={guide.slug} href={`/guides/${guide.slug}`}>Fix it: {auditDisplayCopy(guide.title)}</StTextButton>)}
-          </StRow>)}</StRows> : <StEmpty>No fixes were flagged in the checks that completed.</StEmpty>}</StSection>
-          <StCopy muted>This assessment does not change your website or activate monitoring.</StCopy>
-          {saved ? <StState kind="live">Saved privately to this workspace</StState> : reportId && workspaceEnabled ? <StPillLink href={`/workspace?save=${encodeURIComponent(reportId)}`}>Start with this fix</StPillLink> : <StCopy muted>Account saving is unavailable for this result. You can still export it.</StCopy>}
-          {result.agency ? <StTextButton href={result.agency.contactUrl} target="_blank" rel="noopener noreferrer">Get this fixed by {result.agency.name}</StTextButton> : null}
-          <div className={styles.actions}><StPill variant="soft" onClick={handleDownloadReport} busy={reportLoading}>{reportLoading ? "Preparing…" : "Save as PDF"}</StPill>{!saved ? <StTextButton onClick={handleReset}>Check another site</StTextButton> : null}</div>
-          {error ? <StNotice tone="critical">{auditDisplayCopy(error)}</StNotice> : null}
-        </div>
-        <div className={styles.stack}>{result.categories.length ? result.categories.map(category => <CategoryChecks key={category.slug} category={category} />) : <StEmpty>No category checks were returned.</StEmpty>}</div>
+  const summaryState = statuses.includes("fail") ? { kind: "down", label: "Some checks failed" } as const : statuses.includes("warn") ? { kind: "waits", label: "Needs attention" } as const : statuses.length ? { kind: "live", label: "Website checks passed" } as const : { kind: "draft", label: "No checks returned" } as const;
+  const embed = frame === "embed";
+  const brand = agency && !attributionError ? agencyBrand(agency) : undefined;
+  const checkedAt = result ? new Date(result.scannedAt).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : null;
+  const shownUrl = result?.url || aiResult?.url || url;
+  const shownBusiness = aiResult?.business || result?.businessName || business;
+  const resultsPrimary = !saved && Boolean(result) && Boolean((reportId && workspaceEnabled) || result?.agency);
+
+  const form = attributionError
+    ? <XaSays>{attributionError} Ask the agency for a working check link.</XaSays>
+    : <form onSubmit={handleScan} aria-describedby={error ? errorId : undefined} className={styles.form}>
+      <XaField label="Website address" aria-label="Website address" type="text" ref={addressRef} aria-invalid={invalidUrl || undefined} aria-describedby={error ? errorId : undefined} required value={url} onChange={event => setUrl(event.target.value)} placeholder="yourbusiness.com" autoComplete="url" inputMode="url" />
+      <XaField label="Business name" id="business-name" ref={businessRef} required autoComplete="organization" value={business} onChange={event => setBusiness(event.target.value)} aria-invalid={invalidBusiness || undefined} aria-describedby={invalidBusiness ? errorId : undefined} hint="Gemini needs your business name to check whether it appears in an answer." />
+      <div className={styles.pair}>
+        <XaField label="What you do (optional)" value={category} onChange={event => setCategory(event.target.value)} placeholder="Family dentist" />
+        <XaField label="City and state (optional)" autoComplete="address-level2" value={city} onChange={event => setCity(event.target.value)} placeholder="Buffalo, NY" />
       </div>
-      </> : null}
-      <StSection title="Gemini visibility" id="ai-visibility">
-        {aiResult ? <AiVisibilityResultView embedded result={aiResult} scanId={scanId} shareUrl={shareUrl} workspaceEnabled={workspaceEnabled} onReset={handleReset} /> : <>
-          <StNotice tone="need">{aiError ? `Gemini check unavailable: ${aiError}` : "Gemini visibility was not included in this saved report. Check again with your business name to include it."}</StNotice>
-          {!saved ? <StTextButton onClick={handleReset}>Run a complete check</StTextButton> : null}
-        </>}
-      </StSection>
+      {error ? <p id={errorId} role="alert" className={styles.error}>{auditDisplayCopy(error)}</p> : null}
+      <XaButton type="submit" variant="primary" size="lg" block>Check</XaButton>
+    </form>;
+
+  const idle = <>
+    <XaHeadline quiet="And what your website gets wrong. Free, no account.">See whether Gemini names your business.</XaHeadline>
+    {form}
+    <XaEntryNote>Strelva reads the public website and asks Gemini once when available. Nothing on your site changes, and no monitoring starts.</XaEntryNote>
+  </>;
+
+  const done = <>
+    <XaLabel>{result ? <>Your website check{checkedAt ? ` · ${checkedAt}` : ""}</> : "Your business check"}</XaLabel>
+    {result ? <XaHeadline ref={headingRef} quiet={fixes.length ? `${fixes.length === 1 ? "One fix comes" : `${fixes.length} fixes come`} first.` : "Nothing urgent turned up."}>{hostOf(result.url)} scores {result.overallScore} out of 100.</XaHeadline>
+      : <XaHeadline ref={headingRef} quiet="Website health could not be measured.">{shownBusiness ? `${shownBusiness}, as Gemini sees it.` : "Your business check."}</XaHeadline>}
+    {result ? <XaStatus kind={summaryState.kind}>Grade {result.grade} · {summaryState.label}</XaStatus> : null}
+    {!embed ? <div className={styles.phoneOnly}><ReadPage url={shownUrl || ""} business={shownBusiness} ai={aiResult} aiError={aiError} /></div> : null}
+    {error && !result ? <XaSays>{error}</XaSays> : null}
+    {websiteError ? <XaSays>Website check unavailable: {websiteError}</XaSays> : null}
+    {result ? <>
+      <section className={styles.section} aria-labelledby="audit-start">
+        <XaLabel as="h2" id="audit-start">Start here</XaLabel>
+        {fixes.length ? <XaRows label="First fixes">{fixes.map(fix => <XaRow key={`${fix.category}-${fix.name}`} title={auditDisplayCopy(fix.name)}
+          detail={<>{auditDisplayCopy(fix.impact || fix.message)}{fix.quantified ? ` Estimated impact: ${auditDisplayCopy(fix.quantified)}.` : ""}</>}
+          meta={auditDisplayCopy(fix.category)}
+          action={fix.guides?.[0] ? <XaTextLink href={`/guides/${fix.guides[0].slug}`} aria-label={`How to fix: ${auditDisplayCopy(fix.guides[0].title)}`}>How to fix it</XaTextLink> : undefined} />)}</XaRows>
+          : <p className={styles.quiet}>No fixes were flagged in the checks that completed.</p>}
+      </section>
+      <div className={styles.actions}>
+        {saved ? <XaStatus kind="live">Saved privately to this workspace</XaStatus>
+          : reportId && workspaceEnabled ? <XaButtonLink variant="primary" size="lg" href={`/workspace?save=${encodeURIComponent(reportId)}`}>Start with this fix</XaButtonLink>
+            : result.agency ? <XaButtonLink variant="primary" size="lg" href={result.agency.contactUrl} target="_blank" rel="noopener noreferrer">Get this fixed by {result.agency.name}</XaButtonLink> : null}
+        <XaButton variant="secondary" onClick={() => void handleDownloadReport()} busy={reportLoading}>{reportLoading ? "Preparing…" : "Save as PDF"}</XaButton>
+        {!saved ? <XaTextLink onClick={handleReset}>Check another site</XaTextLink> : null}
+      </div>
+      {!saved && !(reportId && workspaceEnabled) && !result.agency ? <XaEntryNote>Saving to an account is unavailable for this result. You can still save it as a PDF.</XaEntryNote> : null}
+      {result.agency && reportId && workspaceEnabled && !saved ? <XaEntryNote><XaTextLink href={result.agency.contactUrl}>Get this fixed by {result.agency.name}</XaTextLink></XaEntryNote> : null}
+      <XaEntryNote>This check does not change your website or turn on monitoring.</XaEntryNote>
+      {error ? <p role="alert" className={styles.error}>{auditDisplayCopy(error)}</p> : null}
+      <section className={styles.section} aria-labelledby="audit-every">
+        <XaLabel as="h2" id="audit-every">Every check</XaLabel>
+        {result.categories.length ? <ul className={styles.categories} aria-label="Checks by area">{result.categories.map(category => <CategoryChecks key={category.slug} category={category} />)}</ul> : <p className={styles.quiet}>No category checks were returned.</p>}
+      </section>
     </> : null}
-  </StPage>;
+    <section className={styles.section} id="ai-visibility" aria-labelledby="audit-gemini">
+      <XaLabel as="h2" id="audit-gemini">What Gemini says</XaLabel>
+      {aiResult ? <AiVisibilityResultView embedded result={aiResult} scanId={scanId} shareUrl={shareUrl} workspaceEnabled={workspaceEnabled} onReset={handleReset} primaryAction={!resultsPrimary && !saved && !result} showSignals={embed} />
+        : <>
+          <XaSays>{aiError ? `Gemini check unavailable: ${aiError}` : "Gemini visibility was not included in this saved report. Check again with your business name to include it."}</XaSays>
+          {!saved ? <div><XaTextLink onClick={handleReset}>Run a complete check</XaTextLink></div> : null}
+        </>}
+    </section>
+  </>;
+
+  const body = state === "scanning" ? <WebsiteAuditPending url={url} headingRef={headingRef} /> : state === "done" ? done : idle;
+  const host = hostOf(shownUrl || "");
+  const felt: ReactNode = state === "done"
+    ? <XaEntryFelt object={<ReadPage url={shownUrl || ""} business={shownBusiness} ai={aiResult} aiError={aiError} />} title={`Read from ${hostOf(shownUrl || "") || "your site"}.`}>What Gemini could read is checked. What is missing is where the fixes start.</XaEntryFelt>
+    : state === "scanning"
+      ? <XaEntryFelt pose="fixing" title={`Pebble is reading ${host || "your site"}.`}>Up to five public pages, then one question to Gemini. Nothing on your site changes.</XaEntryFelt>
+      : <XaEntryFelt pose="fixing" title="Two checks, one answer.">Website health across speed, search, phones, structured data, security and accessibility. Then whether Gemini names your business when someone asks.</XaEntryFelt>;
+
+  if (embed) return <div data-workspace-theme="linen" data-workspace-mode={mode} className={styles.embed}>
+    {brand ? <p className={styles.embedBrand} data-agency-brand={brand.agencyId ?? undefined}>{state === "done" ? null : <XaPebbleScene pose="fixing" size={64} bare />}<span>Prepared by {brand.name}. Runs on Strelva.</span></p> : null}
+    <div className={styles.embedColumn}>{body}</div>
+  </div>;
+
+  return <XaEntryFrame brand={brand} mode={mode} wide={state === "done"} label="Website and business check"
+    end={<>{!brand ? <XaTextLink href="/agencies">For agencies</XaTextLink> : null}<XaTextLink href={signedIn ? "/workspace" : "/sign-in"}>{signedIn ? "Your workspace" : "Sign in"}</XaTextLink></>}
+    phoneArt={state === "done" ? undefined : "fixing"}
+    felt={felt}
+    footnote={brand ? `Prepared by ${brand.name}.` : undefined}>
+    {body}
+  </XaEntryFrame>;
 }

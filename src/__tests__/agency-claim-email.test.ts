@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { agencyClaimEmailReleased, emailOwnerClaim } from "@/products/agency-clients/claim-email";
+import { agencyClaimEmailReleased, claimEmailOptions, emailOwnerClaim } from "@/products/agency-clients/claim-email";
 import type { OwnerClaim } from "@/products/agency-clients/contracts";
 const actor = { userId: "00000000-0000-4000-8000-000000000001", verifiedEmail: "member@agency.example" };
 const agency = "00000000-0000-4000-8000-000000000002";
@@ -46,5 +46,18 @@ describe("explicit agency owner-link email", () => {
   it("keeps provider acceptance after receipt-write loss", async () => {
     const d = ports(); d.rpc.mockResolvedValueOnce({ data: true, error: null }).mockRejectedValueOnce(new Error("lost receipt write"));
     expect(await emailOwnerClaim(actor, agency, claim, d)).toMatchObject({ status: "accepted" }); expect(d.send).toHaveBeenCalledTimes(1);
+  });
+  it("names the agency that set the business up, and says the link alone grants nothing", async () => {
+    const named = claimEmailOptions(claim, "https://app.strelva.com/workspace/claim/x", "North Studio");
+    expect(named.heading).toBe("Bakery is ready for its owner.");
+    expect(named.paragraphs[0]).toContain("North Studio set up Bakery on Strelva for you.");
+    expect(named.button.label).toBe("Claim Bakery");
+    expect(named.footerNote).toContain("The link alone grants nothing");
+    const unnamed = claimEmailOptions(claim, "https://app.strelva.com/workspace/claim/x");
+    expect(unnamed.paragraphs[0]).toContain("Your agency set up Bakery");
+    expect(JSON.stringify([named, unnamed])).not.toMatch(/\u2014|—/);
+    const d = { ...ports(), agencyName: "North Studio" };
+    await emailOwnerClaim(actor, agency, claim, d);
+    expect(d.send).toHaveBeenCalledWith(expect.objectContaining({ subject: "Claim Bakery on Strelva", options: expect.objectContaining({ heading: "Bakery is ready for its owner." }) }));
   });
 });

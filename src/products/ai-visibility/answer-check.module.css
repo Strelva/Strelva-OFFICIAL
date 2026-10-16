@@ -1,11 +1,32 @@
+/* Composition only; buttons, fields, labels and states come from the XA kit. */
 .entry { padding-top: 120px; }
 .form { display: flex; flex-direction: column; gap: 16px; max-width: 640px; }
-.address { display: grid; grid-template-columns: 1fr auto; align-items: end; gap: 12px; }
+.address { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 12px; }
 .details { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 .split { display: grid; grid-template-columns: minmax(0, 2fr) minmax(260px, 1fr); gap: 48px; align-items: start; }
-.stack { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
-.actions { display: flex; align-items: center; flex-wrap: wrap; gap: 16px; }
+.result, .stack { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.result { gap: 32px; }
+.actions { display: flex; align-items: center; flex-wrap: wrap; gap: 12px 20px; }
 .continuation { max-width: 496px; padding-top: 88px; }
+.head { display: flex; flex-direction: column; gap: 6px; }
+.heading { margin: 0; color: var(--st-text); font-size: 28px; font-weight: 600; letter-spacing: -0.6px; line-height: 1.2; text-wrap: balance; }
+.heading[data-embedded="true"] { font-size: 20px; letter-spacing: -0.3px; }
+.heading:focus { outline: none; }
+.verdict { margin: 0; color: var(--st-text-2); font-size: 15px; line-height: 1.5; }
+.answer { display: flex; flex-direction: column; gap: 8px; margin: 0; padding: 0 0 0 16px; border-left: 2px solid var(--st-line-strong); }
+.answerText { margin: 0; color: var(--st-text); font-size: 16px; line-height: 1.5; }
+.muted { margin: 0; color: var(--st-text-2); font-size: 14px; line-height: 1.5; }
+.saved { margin: 0; color: var(--st-accent); font-size: 15px; font-weight: 500; }
 .wrong { color: var(--st-critical); }
-.quote { margin: 0; font-size: 14px; line-height: 24px; }
-@media (max-width: 767px) { .entry { padding-top: 48px; } .split { grid-template-columns: 1fr; gap: 28px; } .address, .details { grid-template-columns: 1fr; } .continuation { padding-top: 32px; } }
+.quote { margin: 0; font-size: 15px; line-height: 24px; }
+
+.signals { display: flex; flex-direction: column; gap: 10px; margin: 0; padding: 0; list-style: none; }
+.signals li { display: grid; grid-template-columns: 22px minmax(0, 1fr); gap: 8px; align-items: start; font-size: 15px; line-height: 21px; }
+.signalMark { display: grid; width: 20px; height: 20px; margin-top: 1px; place-items: center; border-radius: 999px; background: var(--st-tint); color: var(--st-accent); }
+.signals li:not([data-pass]) .signalMark { background: none; }
+.signals li:not([data-pass]) .signalMark::after { width: 7px; height: 7px; border-radius: 999px; background: var(--st-need-dot); content: ""; }
+.signalLabel { color: var(--st-text); font-weight: 500; }
+.signalState { color: var(--st-text-3); }
+.signals li:not([data-pass]) .signalState { color: var(--st-need); }
+.signalDetail { display: block; color: var(--st-text-2); font-size: 13px; line-height: 19px; }
+@media (max-width: 767px) { .entry { padding-top: 48px; } .split { grid-template-columns: 1fr; gap: 28px; } .address, .details { grid-template-columns: 1fr; } .continuation { padding-top: 32px; } .heading { font-size: 24px; } }

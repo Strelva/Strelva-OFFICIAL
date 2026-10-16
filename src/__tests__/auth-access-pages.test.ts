@@ -120,7 +120,7 @@ describe("auth access pages", () => {
     mockGetStoredContent.mockResolvedValue({ fontDisplay: "Georgia, serif" });
     for (const page of [SignInPage, SignUpPage]) {
       const html = renderToStaticMarkup(await page({ searchParams: Promise.resolve({}) }));
-      expect(html).toMatch(/<a[^>]+style="font-family:Georgia, serif"[^>]*>Agency identity unavailable<\/a>/);
+      expect(html).toMatch(/<a[^>]+style="font-family:Georgia, serif"[^>]*>(?:(?!<\/a>).)*Agency identity unavailable/);
       expect(html).toContain("&quot;next&quot;:&quot;/client/gldf/dashboard&quot;");
     }
     expect(mockGetStoredContent).toHaveBeenCalledWith("theme", "gldf");

@@ -361,3 +361,4 @@ textarea.fieldControl { min-height: 96px; resize: vertical; field-sizing: conten
 .roll { display: inline-block; overflow: hidden; vertical-align: top; font-variant-numeric: tabular-nums; }
 .roll > span { display: inline-block; }
 .rollIn { animation: var(--kf-enter-float) var(--motion-fast) var(--ease-settle) both; }
+.headline[tabindex="-1"]:focus { outline: none; }

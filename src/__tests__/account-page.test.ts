@@ -1,4 +1,6 @@
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { beforeAll, describe, expect, it, vi, beforeEach } from "vitest";
+import { createElement, isValidElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 
 const mockGetAuthUserId = vi.hoisted(() => vi.fn());
 const mockGetCurrentUserTenants = vi.hoisted(() => vi.fn());
@@ -17,18 +19,8 @@ vi.mock("next/navigation", () => ({
   redirect: mockRedirect,
 }));
 
-vi.mock("next/link", () => ({
-  default: ({ children, href }: { children: unknown; href: string }) => ({
-    type: "a",
-    props: { href, children },
-  }),
-}));
-
 vi.mock("@/components/auth/UseInvitedEmailButton", () => ({
-  UseInvitedEmailButton: () => ({
-    type: "button",
-    props: { children: "Use invited email" },
-  }),
+  UseInvitedEmailButton: () => createElement("button", { type: "button" }, "Use my invited email"),
 }));
 
 vi.mock("@/platform/infra/auth", async (importOriginal) => {
@@ -59,24 +51,15 @@ vi.mock("@/lib/tenants", () => ({
   isActiveTenant: (tenant: { active?: boolean }) => tenant.active !== false,
 }));
 
+/** The rendered page as text; the XA views are real React components with hooks. */
 function textFrom(node: unknown): string {
-  if (node == null || typeof node === "boolean") return "";
-  if (typeof node === "string" || typeof node === "number") return String(node);
-  if (Array.isArray(node)) return node.map(textFrom).join(" ");
-  if (typeof node === "object" && "props" in node) {
-    const element = node as {
-      type?: unknown;
-      props?: { children?: unknown };
-    };
-    if (typeof element.type === "function") {
-      return textFrom(element.type(element.props || {}));
-    }
-    return textFrom(element.props?.children);
-  }
-  return "";
+  if (!isValidElement(node)) return "";
+  return renderToStaticMarkup(node).replace(/<[^>]+>/g, " ").replace(/&#x27;|&rsquo;/g, "’").replace(/\s+/g, " ");
 }
 
 describe("account page access handoff", () => {
+  // The first import compiles the XA entry views; keep it out of each test's time budget.
+  beforeAll(async () => { await import("@/app/(marketing)/account/page"); }, 60_000);
   beforeEach(() => {
     vi.clearAllMocks();
     mockWorkspaceReleaseEnabled.mockReturnValue(false);
@@ -99,11 +82,26 @@ describe("account page access handoff", () => {
     expect(mockGetTenantConfig).toHaveBeenCalledWith("missing-a");
     expect(mockGetTenantConfig).toHaveBeenCalledWith("missing-b");
     expect(mockRedirect).not.toHaveBeenCalled();
-    expect(text).toContain("No invited sites on this account");
+    expect(text).toContain("This email isn’t on a business yet.");
     expect(text).toContain("Use the exact email address that received your invite");
     expect(text).toContain("signs you out so you can choose that account");
-    expect(text).toContain("Use invited email");
+    expect(text).toContain("Use my invited email");
     expect(text).toContain("jacob@strelva.com");
+    expect(text).not.toContain("Request your build");
+  });
+
+  it("asks which business to open when several use this email, without builder words", async () => {
+    mockGetCurrentUserTenants.mockResolvedValue(["harbor", "lakeview"]);
+    mockGetTenantConfig.mockImplementation(async (id: string) => ({ id, active: true, siteName: id === "harbor" ? "Harbor Dental" : "Lakeview Yoga" }));
+    const { default: AccountPage } = await import("@/app/(marketing)/account/page");
+    const page = await AccountPage({});
+    const html = renderToStaticMarkup(page as never);
+    expect(html).toContain("Which business do you want to open?");
+    expect(html).toContain("2 businesses use this email.");
+    expect(html).toContain('href="https://app.strelva.com/client/harbor/dashboard"');
+    expect(html).toContain("admin.lakeview.example.com");
+    expect(html).not.toContain("Fallback via strelva.com");
+    expect(html).not.toContain("Choose a site");
   });
 
   it("sends super-admins straight to the operator console", async () => {
@@ -128,7 +126,7 @@ describe("account page access handoff", () => {
     mockInquiryReleaseEnabled.mockReturnValue(true);
     const { default: AccountPage } = await import("@/app/(marketing)/account/page");
     const page = await AccountPage({ searchParams: Promise.resolve({ managed: "1" }) });
-    expect(textFrom(page)).toContain("No invited sites on this account");
+    expect(textFrom(page)).toContain("This email isn’t on a business yet.");
   });
 
   it("claims a managed invitation before the shared workspace landing", async () => {
@@ -180,7 +178,7 @@ describe("account page access handoff", () => {
     const { default: AccountPage } = await import("@/app/(marketing)/account/page");
 
     const page = await AccountPage({ searchParams: Promise.resolve({ managed: "1" }) });
-    expect(textFrom(page)).toContain("No invited sites on this account");
+    expect(textFrom(page)).toContain("This email isn’t on a business yet.");
     expect(mockRedirect).not.toHaveBeenCalled();
   });
 

@@ -1,6 +1,27 @@
+/* The signed Try page (XA). Composition only; parts come from the XA kit. */
+.modeRoot { display: contents; }
 .shell { min-height: 100dvh; background: var(--st-canvas); color: var(--st-text); font-family: var(--font-workspace, system-ui), sans-serif; }
-.topBar { display: flex; align-items: center; gap: 20px; padding: 12px 24px; background: var(--st-surface); border-bottom: 1px solid var(--st-line); }
-.topBar > div { flex: 1; min-width: 0; }
-.topBar strong { font-size: 14px; font-weight: 600; line-height: 20px; }
-.topBar p { margin: 2px 0 0; color: var(--st-text-2); font-size: 13px; line-height: 20px; }
-@media (max-width: 767px) { .topBar { flex-wrap: wrap; gap: 12px; padding: 16px 20px; } .topBar > div { flex-basis: calc(100% - 48px); } .topBar > button { margin-left: 36px; } }
+.topBar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 24px; padding: 20px clamp(20px, 4.5vw, 64px); }
+.who { display: flex; min-width: 0; align-items: center; gap: 12px; }
+.who strong { display: block; font-size: 16px; font-weight: 600; line-height: 22px; }
+.who p { margin: 0; color: var(--st-text-3); font-size: 13px; line-height: 18px; }
+.layout { display: grid; grid-template-columns: minmax(0, 1fr) 380px; align-items: start; gap: 48px; padding: 24px clamp(20px, 4.5vw, 64px) 72px; animation: var(--kf-enter) var(--motion-base) var(--ease-settle) both; }
+.main { display: flex; min-width: 0; flex-direction: column; gap: 28px; }
+.aside { position: sticky; top: 24px; }
+.site { overflow: hidden; border: 1px solid var(--st-line); border-radius: var(--st-r-xl); background: var(--st-surface); box-shadow: var(--st-shadow-sm); }
+/* The candidate's own "Preview page: /" status reads as the Page address bar (XaPage geometry). */
+.site > section > p[role="status"] { display: flex; height: 40px; align-items: center; justify-content: center; margin: 0 !important; padding: 0 16px; background: color-mix(in srgb, var(--st-surface) 96%, var(--st-text)); color: var(--st-text-2); font-size: 13px; line-height: 18px; }
+.changes { display: flex; flex-direction: column; gap: 10px; }
+.changes ul { display: flex; flex-direction: column; gap: 10px; margin: 0; padding: 0; list-style: none; color: var(--st-text-body); font-size: 15px; line-height: 1.45; }
+.newSystem { display: flex; align-items: center; gap: 10px; }
+.newSystem small { display: block; color: var(--st-text-3); font-size: 13px; }
+.quiet { margin: 0; color: var(--st-text-2); font-size: 14px; line-height: 1.5; }
+.followUp, .rehearsal, .form { display: flex; flex-direction: column; gap: 16px; }
+.rehearsal ul { display: flex; flex-direction: column; gap: 12px; margin: 0; padding: 0; list-style: none; }
+.checkName { color: var(--st-text); font-size: 15px; font-weight: 500; }
+.message { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--st-text); font-size: 15px; line-height: 1.55; }
+@media (max-width: 1023px) {
+  .layout { grid-template-columns: minmax(0, 1fr); gap: 28px; }
+  .aside { position: static; }
+}
+@media (max-width: 767px) { .topBar { padding: 16px 20px; } .layout { padding: 8px 20px 48px; } }

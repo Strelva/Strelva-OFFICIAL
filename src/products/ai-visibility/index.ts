@@ -7,7 +7,7 @@
  */
 
 export { AiVisibilityPage } from "./AiVisibilityPage";
-export { AiVisibilityResultView } from "./AiVisibilityResultView";
+export { AiVisibilityResultView, AiVisibilitySignals } from "./AiVisibilityResultView";
 export { AiVisibilityAssessmentForm } from "./AiVisibilityAssessmentForm";
 export { AiVisibilityAssessmentResult } from "./AiVisibilityAssessmentResult";
 export { probeStatusLine, renderAiVisibilityHtml, slugify } from "./html";

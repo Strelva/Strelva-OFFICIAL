@@ -65,7 +65,7 @@ describe("authenticated public start continuation", () => {
 
   it("preserves callback failures so another session cannot silently hide failed sign-in", async () => {
     const html = renderToStaticMarkup(await page({ next: start, error: "auth_callback" }));
-    expect(html).toContain("Sign-in did not complete.");
+    expect(html).toContain("Sign-in didn’t finish.");
     expect(user).not.toHaveBeenCalled();
     expect(redirect).not.toHaveBeenCalled();
   });

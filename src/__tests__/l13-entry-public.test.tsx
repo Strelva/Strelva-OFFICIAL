@@ -81,7 +81,8 @@ describe("L13 retained entry and report actions", () => {
     vi.stubGlobal("URL", class extends URL { static createObjectURL = vi.fn(() => "blob:fixture"); static revokeObjectURL = vi.fn(); });
     vi.spyOn(window, "open").mockReturnValue(window);
     await act(async () => root.render(createElement(WebsiteAuditPage, { initialResult: audit })));
-    await click("See checks");
+    await click("Readability for assistants");
+    expect(container.textContent).toContain("Hide checks");
     expect(container.textContent).not.toMatch(/\b(?:AI|agent|automation|workflow|task)\b/i);
     expect(container.querySelector('[aria-expanded="true"]')).not.toBeNull();
     await click("Save as PDF");

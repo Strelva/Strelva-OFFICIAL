@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
+<title>Your Strelva sign-in code</title>
+</head>
+<!--
+  Strelva sign-in email (XA). Supabase Auth "Magic Link" template.
+  {{ .Token }} is the code the sign-in page accepts at /auth/code;
+  {{ .ConfirmationURL }} is the same sign-in as a link.
+  Local: supabase/config.toml [auth.email.template.magic_link].
+  Hosted: paste into Supabase Auth > Email Templates > Magic Link. That is a
+  production auth change and needs Jacob's yes; turn on STRELVA_AUTH_EMAIL_CODE
+  only after the hosted template carries {{ .Token }}.
+-->
+<body style="margin:0;padding:0;background:#f3f2ee;">
+<div style="display:none;max-height:0;overflow:hidden;color:#f3f2ee;">Your code is {{ .Token }}. It signs you in to Strelva.</div>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#f3f2ee;">
+  <tr>
+    <td align="center" style="padding:40px 16px;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:520px;background:#ffffff;border-radius:24px;">
+        <tr>
+          <td style="padding:36px 36px 8px 36px;font-family:'DM Sans',Helvetica,Arial,sans-serif;color:#161715;">
+            <p style="margin:0 0 28px 0;font-size:17px;font-weight:600;letter-spacing:-0.3px;">Strelva</p>
+            <h1 style="margin:0;font-size:26px;line-height:32px;font-weight:600;letter-spacing:-0.6px;color:#161715;">Your code is {{ .Token }}</h1>
+            <p style="margin:12px 0 0 0;font-size:16px;line-height:24px;color:#6b6f68;">Type it on the sign-in page to finish signing in. It works once.</p>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:24px 36px 8px 36px;">
+            <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+              <tr>
+                <td style="border-radius:999px;background:#161715;">
+                  <a href="{{ .ConfirmationURL }}" style="display:inline-block;padding:14px 28px;font-family:'DM Sans',Helvetica,Arial,sans-serif;font-size:16px;font-weight:600;color:#ffffff;text-decoration:none;border-radius:999px;">Sign in on this device</a>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:24px 36px 36px 36px;font-family:'DM Sans',Helvetica,Arial,sans-serif;">
+            <p style="margin:0;padding-top:20px;border-top:1px solid #e6e5e0;font-size:13px;line-height:20px;color:#81847d;">Didn’t ask to sign in? You can ignore this email. Nobody can sign in without this code or link.</p>
+          </td>
+        </tr>
+      </table>
+      <p style="margin:20px 0 0 0;font-family:'DM Sans',Helvetica,Arial,sans-serif;font-size:12px;line-height:18px;color:#81847d;">Strelva · updates.strelva.com</p>
+    </td>
+  </tr>
+</table>
+</body>
+</html>

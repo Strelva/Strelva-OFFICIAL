@@ -4,6 +4,7 @@ import { StrelvaSidebar } from "@/experience/app-frame/StrelvaSidebar";
 import { readOwnerBrand } from "@/experience/app-frame/workspace-header";
 import { WorkspacePhoneTabs } from "@/experience/app-frame/WorkspacePhoneTabs";
 import { PossibilityTry } from "@/experience/systems/PossibilityTry";
+import { XA_YES_LABELS } from "@/platform/presentation/place-labels";
 import { AgencyClientChanges } from "@/experience/workspace/AgencyClientHomeSections";
 import { agencyClientHomeSchema } from "@/experience/workspace/agency-client-home";
 import { readAskResult, receiptLines } from "@/experience/ask/ask-model";
@@ -71,12 +72,12 @@ describe("recorded actors survive chrome projections", () => {
   });
   it("names the business, serving agency and original proposer on a shared Possibility", () => {
     const html = renderToStaticMarkup(<PossibilityTry state={{ kind: "ready", view: { title: "Consult booking", intent: "Try a booking page", businessName: "Harbor Dental", agencyBrand: brand, proposingActor: { kind: "agency", displayName: "Original Studio" }, changes: [], introduces: [], takesSubmissions: false } }} />);
-    for (const label of ["Harbor Dental", "North Studio", "Proposed by Original Studio", "Make it live"]) expect(html).toContain(label);
+    for (const label of ["Harbor Dental", "North Studio", "Proposed by Original Studio", XA_YES_LABELS.yes]) expect(html).toContain(label);
     expect(html).not.toContain("not recorded");
   });
   it("does not infer a proposer from the serving agency", () => {
     const html = renderToStaticMarkup(<PossibilityTry state={{ kind: "ready", view: { title: "Consult booking", intent: "Try a booking page", businessName: "Harbor Dental", agencyBrand: brand, changes: [], introduces: [], takesSubmissions: false } }} />);
-    expect(html).toContain("Proposed by Actor not recorded");
+    expect(html).toContain("Who proposed this wasn’t recorded");
     expect(html).not.toContain("Proposed by North Studio");
   });
   it("keeps the recorded recipient and filer in an Ask receipt", () => {

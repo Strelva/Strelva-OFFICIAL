@@ -4,6 +4,7 @@ import type { Metadata } from "next";
 import { getPublicWebsiteAudit } from "@/products/website-audit/server";
 import { getAiVisibilityResult } from "@/products/ai-visibility/server";
 import { WebsiteAuditPage } from "@/products/website-audit";
+import { getSessionUser } from "@/platform/infra/db/server-client";
 export const metadata: Metadata = { title: "Website and business check", description: "Check website health and whether Gemini names your business. No signup required." };
 export default async function Page({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const params = await searchParams;
@@ -33,7 +34,8 @@ export default async function Page({ searchParams }: { searchParams: Promise<Rec
     attributionError = error instanceof AgencyProspectingError ? error.message : "This agency check is temporarily unavailable.";
   }
   const text = (key: string, max = 2048) => typeof params[key] === "string" ? params[key].slice(0, max) : "";
-  return <WebsiteAuditPage agency={agency} attributionError={attributionError} workspaceEnabled={workspaceReleaseEnabled()}
+  const signedIn = Boolean(await getSessionUser().catch(() => null));
+  return <WebsiteAuditPage signedIn={signedIn} agency={agency} attributionError={attributionError} workspaceEnabled={workspaceReleaseEnabled()}
     initialUrl={text("url") || result?.url || aiStored?.result.url || ""}
     initialBusiness={text("business", 200) || aiStored?.result.business || ""} initialCategory={text("category", 200)} initialCity={text("city", 200)}
     initialResult={!attributionError ? result || undefined : undefined} initialReportId={!attributionError && result ? reportId || undefined : undefined}

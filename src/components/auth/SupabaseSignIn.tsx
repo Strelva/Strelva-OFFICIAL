@@ -1,32 +1,55 @@
 "use client";
 
 /**
- * Supabase sign-in (migration Phase 4) — replaces Clerk's <SignIn> when the
- * Supabase auth path is active. Google OAuth (the primary method) + email
- * magic-link fallback. Both redirect through /auth/callback, which exchanges the
- * code for a session; the handle_new_user trigger provisions the user on first
- * sign-in.
+ * Supabase sign-in in the XA entry column. Email first (a code, or a link
+ * while the hosted email carries only a link), Google second. Both land
+ * on `next`: the link and Google through /auth/callback, the code through
+ * /auth/code. Nothing here decides access; the destination still checks it.
  */
 
-import { StField, StHead, StMono, StPill, StPillLink, StTextButton, StNotice } from "@/components/ui/strelva/Kit";
-import { useState, type ReactNode } from "react";
-import { signInErrorCopy } from "./sign-in-errors";
+import { XaButton, XaButtonLink, XaField, XaHeadline, XaSays, XaTextLink } from "@/components/ui/strelva/Xa";
+import { XaEntryNote, XaEntryStack } from "@/components/ui/strelva/xa/entry";
+import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
+import { signInCodeErrorCopy, signInErrorCopy } from "./sign-in-errors";
 import { createBrowserSupabase } from "@/platform/infra/db/browser-client";
+
+type Status = "idle" | "google" | "sending" | "sent" | "error";
 
 export function SupabaseSignIn({
   next = "/account",
   prefillEmail = "",
   heading,
   emailReady = false,
+  codeReady = false,
+  resume,
+  initialStatus = "idle",
 }: {
   next?: string;
   prefillEmail?: string;
   heading?: ReactNode;
   emailReady?: boolean;
+  /** The email carries a code as well as the link. Server-owned: authEmailCodeReady(). */
+  codeReady?: boolean;
+  /** Where the person lands after signing in, in plain words ("your invitation to Harbor Dental"). */
+  resume?: ReactNode;
+  /** Preview fixtures only: open on the sent step. */
+  initialStatus?: "idle" | "sent";
 }) {
   const [email, setEmail] = useState(prefillEmail);
-  const [status, setStatus] = useState<"idle" | "google" | "sending" | "sent" | "error">("idle");
+  const [status, setStatus] = useState<Status>(initialStatus);
   const [error, setError] = useState<string | null>(null);
+  const [resent, setResent] = useState(false);
+  const [code, setCode] = useState("");
+  const [codeError, setCodeError] = useState<string | null>(null);
+  const [verifying, setVerifying] = useState(false);
+  const codeRef = useRef<HTMLInputElement>(null);
+  const headRef = useRef<HTMLDivElement>(null);
+  const lastTried = useRef("");
+
+  useEffect(() => {
+    if (status !== "sent") return;
+    (codeReady ? codeRef.current : headRef.current)?.focus();
+  }, [status, codeReady]);
 
   function redirectTo() {
     if (typeof window === "undefined") return undefined;
@@ -35,26 +58,42 @@ export function SupabaseSignIn({
 
   async function signInWithGoogle() {
     const supabase = createBrowserSupabase();
-    if (!supabase) return fail("Sign-in is not configured.");
+    if (!supabase) return fail("Sign-in is not set up here yet.");
     setStatus("google");
     setError(null);
     try {
       const { error } = await supabase.auth.signInWithOAuth({ provider: "google", options: { redirectTo: redirectTo() } });
       if (error) fail(signInErrorCopy(error, "google"));
-    } catch { fail("Sign-in is temporarily unavailable. Try again."); }
+    } catch { fail("Sign-in is unavailable just now. Try again."); }
   }
 
-  async function sendMagicLink(event?: React.FormEvent) {
+  async function sendEmail(event?: FormEvent) {
     event?.preventDefault();
     if (!emailReady) return;
     const supabase = createBrowserSupabase();
-    if (!supabase) return fail("Sign-in is not configured.");
-    setStatus("sending"); setError(null);
+    if (!supabase) return fail("Sign-in is not set up here yet.");
+    const again = status === "sent";
+    setStatus("sending"); setError(null); setCodeError(null); setCode(""); lastTried.current = "";
     try {
       const { error } = await supabase.auth.signInWithOtp({ email, options: { emailRedirectTo: redirectTo() } });
       if (error) fail(signInErrorCopy(error, "email"));
-      else setStatus("sent");
-    } catch { fail("The sign-in link could not be sent. Try again."); }
+      else { setStatus("sent"); setResent(again); }
+    } catch { fail(codeReady ? "The code could not be sent. Try again." : "The sign-in link could not be sent. Try again."); }
+  }
+
+  async function verify(value = code) {
+    const token = value.replace(/\s+/g, "");
+    if (verifying || token.length < 6 || token === lastTried.current) return;
+    lastTried.current = token;
+    setVerifying(true); setCodeError(null);
+    try {
+      const response = await fetch("/auth/code", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email, code: token, next }) });
+      const body = await response.json().catch(() => null) as { ok?: boolean; next?: string; reason?: string } | null;
+      if (response.ok && body?.ok && typeof body.next === "string") { window.location.assign(body.next); return; }
+      setCodeError(signInCodeErrorCopy(body?.reason));
+    } catch { setCodeError(signInCodeErrorCopy("unavailable")); }
+    setVerifying(false);
+    codeRef.current?.focus();
   }
 
   function fail(message: string) {
@@ -62,21 +101,34 @@ export function SupabaseSignIn({
     setStatus("error");
   }
 
-  if (status === "sent") return <div className="flex flex-col gap-5">
-    <StHead title="Check your email" meta="We sent a sign-in link to" />
-    <StMono tone="text">{email}</StMono>
-    <p className="text-sm text-gray-muted">Open it on this device to continue.</p>
-    <div className="flex flex-wrap gap-3"><StPillLink href="https://mail.google.com" variant="soft">Open Gmail</StPillLink><StPillLink href="https://outlook.live.com/mail" variant="soft">Open Outlook</StPillLink></div>
-    <div className="flex flex-wrap gap-5"><StTextButton tone="accent" onClick={() => void sendMagicLink()}>Send again</StTextButton><StTextButton tone="accent" onClick={() => { setEmail(""); setStatus("idle"); }}>Use a different email</StTextButton></div>
-  </div>;
+  if (status === "sent") return <XaEntryStack>
+    <div ref={headRef} tabIndex={-1} className="outline-none"><XaHeadline quiet={<>We sent {codeReady ? "a code" : "a sign-in link"} to <span data-sent-to>{email}</span>.</>}>Check your email.</XaHeadline></div>
+    {codeReady ? <form className="contents" onSubmit={event => { event.preventDefault(); void verify(); }}>
+      <XaEntryStack gap="sm">
+        <XaField ref={codeRef} label="Code from the email" name="code" inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]*" maxLength={10} required
+          value={code} disabled={verifying} error={codeError ?? undefined} hint={codeError ? undefined : "Six digits, from the newest email."}
+          data-code-field style={{ fontSize: 24, letterSpacing: "0.32em", fontVariantNumeric: "tabular-nums", fontWeight: 500 }}
+          onChange={event => { const digits = event.target.value.replace(/\D/g, "").slice(0, 10); setCode(digits); setCodeError(null); if (digits.length === 6) void verify(digits); }} />
+        <XaButton type="submit" variant="primary" size="lg" block busy={verifying}>Sign in</XaButton>
+      </XaEntryStack>
+    </form> : <XaEntryNote>Open the link in that email on this device. It signs you in{resume ? <> and takes you to {resume}</> : null}.</XaEntryNote>}
+    <div className="flex flex-wrap gap-2">
+      <XaButtonLink href="https://mail.google.com" variant="secondary" size="sm" target="_blank" rel="noopener noreferrer">Open Gmail</XaButtonLink>
+      <XaButtonLink href="https://outlook.live.com/mail" variant="secondary" size="sm" target="_blank" rel="noopener noreferrer">Open Outlook</XaButtonLink>
+    </div>
+    <XaEntryNote role="status">{resent ? "Sent again. Use the newest email. " : "Nothing there after a minute? Check spam, then "}<XaTextLink onClick={() => void sendEmail()}>{codeReady ? "send a new code" : "send a new link"}</XaTextLink> · <XaTextLink onClick={() => { setEmail(""); setStatus("idle"); setResent(false); }}>use a different email</XaTextLink></XaEntryNote>
+  </XaEntryStack>;
 
-  return <div className="flex flex-col gap-5">
+  return <XaEntryStack>
     {heading}
-    {emailReady ? <form onSubmit={sendMagicLink} className="flex flex-col gap-5">
-      <StField label="Email"><input type="email" required autoComplete="email" value={email} onChange={event => setEmail(event.target.value)} placeholder="you@business.com" disabled={status === "sending" || status === "google"} /></StField>
-      <StPill type="submit" block busy={status === "sending"} disabled={status === "google"}>Email me a sign-in link</StPill>
+    {emailReady ? <form onSubmit={sendEmail} className="contents">
+      <XaEntryStack gap="sm">
+        <XaField label="Email" type="email" name="email" required autoComplete="email" value={email} onChange={event => setEmail(event.target.value)} placeholder="you@yourbusiness.com" disabled={status === "sending" || status === "google"} />
+        <XaButton type="submit" variant="primary" size="lg" block busy={status === "sending"} disabled={status === "google"}>{codeReady ? "Email me a code" : "Email me a sign-in link"}</XaButton>
+      </XaEntryStack>
     </form> : null}
-    <StPill variant="soft" block onClick={() => void signInWithGoogle()} busy={status === "google"} disabled={status === "sending"}>Continue with Google</StPill>
-    {error ? <StNotice tone="critical">{error}</StNotice> : null}
-  </div>;
+    <XaButton variant={emailReady ? "secondary" : "primary"} size="lg" block onClick={() => void signInWithGoogle()} busy={status === "google"} disabled={status === "sending"}>Continue with Google</XaButton>
+    {error ? <div role="alert"><XaSays>{error}</XaSays></div> : null}
+    {resume ? <XaEntryNote>After you sign in, you go straight to {resume}.</XaEntryNote> : null}
+  </XaEntryStack>;
 }

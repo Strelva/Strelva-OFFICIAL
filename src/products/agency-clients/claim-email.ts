@@ -14,6 +14,27 @@ export interface ClaimEmailDeps {
   rpc(name: string, args: Record<string, unknown>): PromiseLike<{ data: unknown; error: unknown }>;
   send(input: SendEmailInput): Promise<SendEmailResult>;
   released(): boolean;
+  /** The agency's display name when the caller has it. Without it the email says "Your agency". */
+  agencyName?: string;
+}
+
+/**
+ * The claim email's words (XA · C1 in an inbox): what is ready, who set it up,
+ * that the site keeps running, and that the link alone grants nothing. One
+ * button. Template only while client email stays off during the rollout.
+ */
+export function claimEmailOptions(claim: Pick<OwnerClaim, "workspaceName">, claimUrl: string, agencyName?: string) {
+  const agency = agencyName?.trim() || "Your agency";
+  return {
+    preheader: `${agency} set up ${claim.workspaceName} on Strelva. Claim it to own the workspace and its data.`,
+    heading: `${claim.workspaceName} is ready for its owner.`,
+    paragraphs: [
+      `${agency} set up ${claim.workspaceName} on Strelva for you. Review what they found and prepared, confirm your details, then choose what ${agencyName?.trim() || "your agency"} can do.`,
+      "Your site keeps running whether or not you claim it. Claiming does not publish your website or accept a price.",
+    ],
+    button: { label: `Claim ${claim.workspaceName}`, url: claimUrl },
+    footerNote: "Sign in with the email this was sent to. The link alone grants nothing and shows nothing private.",
+  };
 }
 
 /** The persisted reservation prevents a lost response from becoming a fresh send.
@@ -35,9 +56,7 @@ export async function emailOwnerClaim(actor: WorkspaceActor, agencyWorkspaceId: 
     const result = await deps.send({ audience: "client", authorship: "platform", workspaceId: claim.customerWorkspaceId,
       fromAddress: "hello@updates.strelva.com", to: claim.recipientEmail,
       subject: `Claim ${claim.workspaceName} on Strelva`, idempotencyKey: `agency-owner-claim:${claim.claimId}`,
-      options: { heading: `Your business workspace is ready to claim`,
-        paragraphs: [`Review the details prepared for ${claim.workspaceName}, then choose what your agency can do. Sign in with the email this link was addressed to.`, "Claiming does not publish your website or accept a price."],
-        button: { label: "Review and claim your business", url: new URL(claim.claimPath, origin.origin).toString() } } });
+      options: claimEmailOptions(claim, new URL(claim.claimPath, origin.origin).toString(), deps.agencyName) });
     delivery = result.status === "accepted"
       ? { ...claim.delivery, status: "accepted", reason: "provider_accepted", providerMessageId: result.providerMessageId, acceptedAt: result.acceptedAt }
       : { ...held, reason: "email_suppressed" };

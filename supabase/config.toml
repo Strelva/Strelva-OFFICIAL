@@ -227,6 +227,12 @@ otp_expiry = 3600
 # subject = "You have been invited"
 # content_path = "./supabase/templates/invite.html"
 
+# Strelva sign-in email (XA): the code and the link in one message. Local only;
+# the hosted project's template is changed by hand with Jacob's yes.
+[auth.email.template.magic_link]
+subject = "Your Strelva sign-in code"
+content_path = "./supabase/templates/magic-link.html"
+
 # Uncomment to customize notification email template
 # [auth.email.notification.password_changed]
 # enabled = true

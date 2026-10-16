@@ -3,10 +3,11 @@ import { OwnerBrandIdentity } from "@/components/brand/OwnerBrandIdentity";
 import { STRELVA_BRAND } from "@/platform/infra/agency-brand";
 
 import { useState, type FormEvent, type Ref } from "react";
-import { StCopy, StEmpty, StTextField, StHead, StLabel, StMono, StNotice, StPill, StPillLink, StRow, StRows, StSection, StState, StSurface, StTextButton } from "@/components/ui/strelva/Kit";
+import { Check } from "lucide-react";
+import { XaButton, XaButtonLink, XaField, XaLabel, XaSays, XaStatus, XaTextLink } from "@/components/ui/strelva/Xa";
 import styles from "./answer-check.module.css";
 import { attributedAiVisibility } from "./attribution";
-import type { AiVisibilityResult } from "./contracts";
+import type { AiVisibilityResult, Signal } from "./contracts";
 
 interface AiVisibilityResultViewProps {
   result: AiVisibilityResult;
@@ -18,16 +19,30 @@ interface AiVisibilityResultViewProps {
   sample?: { prompt: string; lines: { text: string; wrong?: boolean }[]; explanation: string };
   continuationHref?: string;
   embedded?: boolean;
+  /** Whether this view owns the screen's one ink pill. The combined check gives it to the website fix when there is one. */
+  primaryAction?: boolean;
+  /** The combined check shows readability on the felt Page instead. */
+  showSignals?: boolean;
 }
 
 type MonitorState = "idle" | "saving" | "saved" | "error";
 
 /** Change legacy model terminology for display only; saved contracts stay unchanged. */
-function publicCopy(value: string) {
+export function publicCopy(value: string) {
   return value.replace(/\bAI[- ]crawler/gi, "assistant crawler").replace(/\bAI\b/g, "assistants").replace(/\bagent(s?)\b/gi, (_, plural: string) => `assistant${plural.toLowerCase()}`).replace(/\bautomation\b/gi, "scheduled work").replace(/\bworkflow\b/gi, "process").replace(/\btask\b/gi, "work");
 }
 
-export function AiVisibilityResultView({ result: raw, scanId, shareUrl, workspaceEnabled = false, onReset, headingRef, sample, continuationHref, embedded = false }: AiVisibilityResultViewProps) {
+/** What Gemini could read on the site, labelled in place: found reads quietly, missing reads clay. */
+export function AiVisibilitySignals({ signals }: { signals: readonly Signal[] }) {
+  return <ul className={styles.signals} aria-label="Website readability">
+    {signals.map(signal => <li key={signal.id} data-pass={signal.pass || undefined}>
+      <span className={styles.signalMark} aria-hidden="true">{signal.pass ? <Check size={14} strokeWidth={2.4} /> : null}</span>
+      <span><span className={styles.signalLabel}>{publicCopy(signal.label)}</span><span className={styles.signalState}>{signal.pass ? " · Found" : " · Missing"}</span><span className={styles.signalDetail}>{publicCopy(signal.detail)}</span></span>
+    </li>)}
+  </ul>;
+}
+
+export function AiVisibilityResultView({ result: raw, scanId, shareUrl, workspaceEnabled = false, onReset, headingRef, sample, continuationHref, embedded = false, primaryAction = !embedded, showSignals = true }: AiVisibilityResultViewProps) {
   const result = attributedAiVisibility(raw, raw.agency);
   const agency = result.agency;
   const [shareStatus, setShareStatus] = useState<"idle" | "copied">("idle");
@@ -83,26 +98,48 @@ export function AiVisibilityResultView({ result: raw, scanId, shareUrl, workspac
   }
 
   const nextHref = continuationHref || (scanId && workspaceEnabled ? `/workspace?save=${encodeURIComponent(scanId)}` : agency?.contactUrl || `/access-request?ref=ai-visibility${scanId ? `&scan=${encodeURIComponent(scanId)}` : ""}`);
-  return <>
+  const Heading = embedded ? "h3" : "h1";
+  const wrong = sample ? sample.lines.filter(line => line.wrong).length : 0;
+  return <div className={styles.result}>
     {agency && !embedded ? <OwnerBrandIdentity brand={{ ...STRELVA_BRAND, agencyId: agency.workspaceId, name: agency.name, logoUrl: agency.brand.logoUrl, accentColor: agency.brand.accentColor ?? STRELVA_BRAND.accentColor, replyTo: agency.replyTo ?? null }} /> : null}
-    <div className={styles.split}>
-      <div className={styles.stack}>
-        {result.url ? <StMono>{result.url}</StMono> : null}
-        <StHead as={embedded ? "h3" : "h1"} titleRef={headingRef} title={sample ? `Gemini gets ${sample.lines.filter(line => line.wrong).length} things wrong about ${result.business}.` : `Gemini check for ${result.business}`} meta={sample ? undefined : publicCopy(result.verdict)} />
-        <StSurface label="Gemini result"><div className={styles.stack}>
-          {sample ? <><StLabel>We asked: “{sample.prompt}”</StLabel><blockquote className={styles.quote}>{sample.lines.map((line, index) => <p key={index} className={line.wrong ? styles.wrong : undefined}>{line.text}</p>)}</blockquote><StCopy muted>{sample.explanation}</StCopy></> : <><StLabel>{result.citation.probed ? "One sampled Gemini answer" : "Gemini answer unavailable"}</StLabel><StCopy>{publicCopy(result.citation.note)}</StCopy><StCopy muted>The saved check records whether Gemini named your business. Its full answer and claim-by-claim accuracy were not saved.</StCopy></>}
-          <StCopy muted>One answer, sampled once. Asking again can give a different one.</StCopy>
-        </div></StSurface>
-        {result.measurementStatus === "unavailable" ? <StNotice tone="need">{publicCopy(result.measurementNote || "This check could not measure the website or a Gemini answer.")}</StNotice> : result.measurementStatus === "partial" ? <StNotice>{publicCopy(result.measurementNote || "Only part of this check completed.")}</StNotice> : null}
-        <StSection title={measured ? "The one fix that matters most" : "Next step"}><StCopy>{publicCopy(result.topFix)}</StCopy><div className={styles.actions}><StPillLink href={nextHref}>{scanId && workspaceEnabled || continuationHref ? "Start with this fix" : "Get this fixed"}</StPillLink>{scanId ? <StTextButton onClick={handleShare}>{shareStatus === "copied" ? "Link copied" : "Send this to whoever runs your site"}</StTextButton> : null}</div>{scanId && workspaceEnabled && !continuationHref ? <StCopy muted>Start your business with its website and this check saved. You review any change before it goes live.</StCopy> : null}</StSection>
-      </div>
-      <div className={styles.stack}>
-        <StSection title="Can Google read your site?">{result.signals.length ? <StRows label="Website readability">{result.signals.map(signal => <StRow key={signal.id} title={publicCopy(signal.label)} detail={publicCopy(signal.detail)} lead={<StState kind={signal.pass ? "live" : "down"}>{signal.pass ? "Found" : "Missing"}</StState>} />)}</StRows> : <StEmpty>Website readability was not measured. Try a reachable public website.</StEmpty>}</StSection>
-        {measured ? <StCopy muted>Website check: <StMono>{result.grade} · {result.score}/100</StMono></StCopy> : null}
-        {result.agentBookingAvailability ? <StSection title="Can an assistant request a booking through Strelva?"><StState kind={result.agentBookingAvailability.status === "yes" ? "live" : "draft"}>{result.agentBookingAvailability.status === "yes" ? "Available" : result.agentBookingAvailability.status === "no" ? "Not available" : "Not verified"}</StState><StCopy muted>{publicCopy(result.agentBookingAvailability.detail)}</StCopy></StSection> : null}
-      </div>
+    <div className={styles.stack}>
+      {result.url && !embedded ? <XaLabel>{result.url}</XaLabel> : null}
+      <header className={styles.head}>
+        <Heading ref={headingRef} tabIndex={headingRef ? -1 : undefined} className={styles.heading} data-embedded={embedded || undefined}>{sample ? `Gemini gets ${wrong} things wrong about ${result.business}.` : `Gemini check for ${result.business}`}</Heading>
+        {sample ? null : <p className={styles.verdict}>{publicCopy(result.verdict)}</p>}
+      </header>
+      <figure className={styles.answer} aria-label="Gemini result">
+        {sample ? <><XaLabel>We asked: “{sample.prompt}”</XaLabel><blockquote className={styles.quote}>{sample.lines.map((line, index) => <p key={index} className={line.wrong ? styles.wrong : undefined}>{line.text}</p>)}</blockquote><p className={styles.muted}>{sample.explanation}</p></>
+          : <><XaLabel>{result.citation.probed ? "One sampled Gemini answer" : "Gemini answer unavailable"}</XaLabel><p className={styles.answerText}>{publicCopy(result.citation.note)}</p><p className={styles.muted}>The saved check records whether Gemini named your business. Its full answer and claim-by-claim accuracy were not saved.</p></>}
+        <figcaption className={styles.muted}>One answer, sampled once. Asking again can give a different one.</figcaption>
+      </figure>
+      {result.measurementStatus === "unavailable" ? <XaSays>{publicCopy(result.measurementNote || "This check could not measure the website or a Gemini answer.")}</XaSays> : result.measurementStatus === "partial" ? <p className={styles.muted}>{publicCopy(result.measurementNote || "Only part of this check completed.")}</p> : null}
+      <section className={styles.stack} aria-labelledby="gemini-fix">
+        <XaLabel as="h3" id="gemini-fix">{measured ? "The one fix that matters most" : "Next step"}</XaLabel>
+        <p className={styles.answerText}>{publicCopy(result.topFix)}</p>
+        <div className={styles.actions}>
+          <XaButtonLink href={nextHref} variant={primaryAction ? "primary" : "secondary"}>{scanId && workspaceEnabled || continuationHref ? "Start with this fix" : "Get this fixed"}</XaButtonLink>
+          {scanId ? <XaTextLink onClick={() => void handleShare()}>{shareStatus === "copied" ? "Link copied" : "Send this to whoever runs your site"}</XaTextLink> : null}
+        </div>
+        {scanId && workspaceEnabled && !continuationHref ? <p className={styles.muted}>Start your business with its website and this check saved. You review any change before it goes live.</p> : null}
+      </section>
+      {showSignals ? <section className={styles.stack} aria-labelledby="gemini-readability">
+        <XaLabel as="h3" id="gemini-readability">Can Google read your site?</XaLabel>
+        {result.signals.length ? <AiVisibilitySignals signals={result.signals} /> : <p className={styles.muted}>Website readability was not measured. Try a reachable public website.</p>}
+      </section> : null}
+      {measured && !embedded ? <p className={styles.muted}>Website check: {result.grade} · {result.score}/100</p> : null}
+      {result.agentBookingAvailability ? <section className={styles.stack} aria-labelledby="gemini-booking">
+        <XaLabel as="h3" id="gemini-booking">Can an assistant request a booking through Strelva?</XaLabel>
+        <XaStatus kind={result.agentBookingAvailability.status === "yes" ? "live" : "draft"} size="sm">{result.agentBookingAvailability.status === "yes" ? "Available" : result.agentBookingAvailability.status === "no" ? "Not available" : "Not verified"}</XaStatus>
+        <p className={styles.muted}>{publicCopy(result.agentBookingAvailability.detail)}</p>
+      </section> : null}
     </div>
-    {scanId && !continuationHref ? <StSection title={agency ? `Contact ${agency.name}` : "Recurring checks pilot"}><StCopy muted>{agency ? `Leave your email to ask ${agency.name} about recurring Gemini checks.` : "Recurring checks are a pilot. Leave your email to register your interest."}</StCopy>{monitorState === "saved" ? <StNotice>{agency ? `Your request was sent to ${agency.name}.` : "Your interest is saved."}</StNotice> : <form onSubmit={handleMonitor} className={styles.address}><StTextField label="Your email" type="email" required value={email} onChange={event => setEmail(event.target.value)} autoComplete="email" /><StPill variant="soft" type="submit" busy={monitorState === "saving"}>{agency ? "Send request" : "Join pilot"}</StPill></form>}{monitorError ? <StNotice tone="critical">{monitorError}</StNotice> : null}</StSection> : null}
-    <StTextButton onClick={onReset}>Check another business</StTextButton>
-  </>;
+    {scanId && !continuationHref ? <section className={styles.stack} aria-labelledby="gemini-follow">
+      <XaLabel as="h3" id="gemini-follow">{agency ? `Contact ${agency.name}` : "Recurring checks pilot"}</XaLabel>
+      <p className={styles.muted}>{agency ? `Leave your email to ask ${agency.name} about recurring Gemini checks.` : "Recurring checks are a pilot. Leave your email to register your interest."}</p>
+      {monitorState === "saved" ? <p className={styles.saved} role="status">{agency ? `Your request was sent to ${agency.name}.` : "Your interest is saved."}</p>
+        : <form onSubmit={handleMonitor} className={styles.address}><XaField label="Your email" type="email" required value={email} onChange={event => setEmail(event.target.value)} autoComplete="email" error={monitorError || undefined} /><XaButton variant="secondary" type="submit" busy={monitorState === "saving"}>{agency ? "Send request" : "Join pilot"}</XaButton></form>}
+    </section> : null}
+    <div><XaTextLink onClick={onReset}>Check another business</XaTextLink></div>
+  </div>;
 }
