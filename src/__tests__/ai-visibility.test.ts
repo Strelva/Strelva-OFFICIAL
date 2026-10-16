@@ -232,3 +232,28 @@ describe("slugify", () => {
     expect(slugify("  ")).toBe("business");
   });
 });
+
+describe("scoreAiVisibility — structured data", () => {
+  it("reads business and FAQ types nested in an @graph block", async () => {
+    delete process.env.GOOGLE_GENERATIVE_AI_API_KEY;
+    const graph = {
+      "@context": "https://schema.org",
+      "@graph": [
+        { "@type": "Organization", name: "Acme Plumbing" },
+        { "@type": "FAQPage", mainEntity: [{ "@type": "Question", name: "Do you do drains?" }] },
+      ],
+    };
+    mockFetch.mockImplementation((input: string | URL) => {
+      const u = String(input);
+      if (u.includes("robots.txt")) return Promise.resolve(new Response("", { status: 404 }));
+      return Promise.resolve(htmlResponse(
+        `<html><head><title>Acme Plumbing</title><script type="application/ld+json">${JSON.stringify(graph)}</script></head><body><p>Welcome</p></body></html>`,
+      ));
+    });
+
+    const result = await scoreAiVisibility({ business: "Acme Plumbing", url: "example.com" });
+    const byId = Object.fromEntries(result.signals.map((s: Signal) => [s.id, s]));
+    expect(byId.structured_data?.pass).toBe(true);
+    expect(byId.answerable?.pass).toBe(true);
+  });
+});
