@@ -180,12 +180,12 @@ export function AskChangePanel({ item, site, decider, outcome, initialView = "ch
 
 /* ---------- After the decision (AS5) ---------- */
 
-/** "North Studio sent it at 10:14, Dr. Lin said yes at 10:41, and Strelva put it live and read it back at 10:43." */
+/** "North Studio sent it at 10:14, Dr. Lin said yes at 10:41, and Strelva made it live at 10:43." */
 function storySentence(outcome: AskChangeOutcome, who: string, live: boolean): ReactNode {
   const parts: ReactNode[] = [];
   if (outcome.sentBy && outcome.sentAt) parts.push(<>{outcome.sentBy} sent it at <Clock at={outcome.sentAt} /></>);
   if (outcome.state === "approved") parts.push(<>{who} said yes at <Clock at={outcome.decidedAt} /></>);
-  if (live && outcome.liveAt) parts.push(<>{outcome.liveBy ?? ACTOR_NOT_RECORDED} put it live{outcome.readBackAt ? " and read it back" : ""} at <Clock at={outcome.liveAt} /></>);
+  if (live && outcome.liveAt) parts.push(<>{outcome.liveBy ?? ACTOR_NOT_RECORDED} made it live at <Clock at={outcome.liveAt} /></>);
   if (!parts.length) return null;
   return <>{parts.map((part, index) => <span key={index}>{index === 0 ? null : index === parts.length - 1 ? (parts.length > 2 ? ", and " : " and ") : ", "}{part}</span>)}.</>;
 }
@@ -195,7 +195,7 @@ function storySteps(outcome: AskChangeOutcome, who: string): { at: string; text:
   if (outcome.sentAt) steps.push({ at: outcome.sentAt, text: outcome.sentBy ? `${outcome.sentBy} sent it for a yes` : `Sent for a yes (${ACTOR_NOT_RECORDED.toLowerCase()})` });
   const verb = outcome.state === "approved" ? "said yes" : outcome.state === "declined" ? `chose ${XA_YES_LABELS.notYet}` : outcome.state === "expired" ? "didn't answer in time" : "withdrew it";
   steps.push({ at: outcome.decidedAt, text: outcome.state === "expired" ? "The yes expired unanswered" : `${who} ${verb}` });
-  if (outcome.liveAt && outcome.outcome !== "failed") steps.push({ at: outcome.liveAt, text: `${outcome.liveBy ?? ACTOR_NOT_RECORDED} put it live` });
+  if (outcome.liveAt && outcome.outcome !== "failed") steps.push({ at: outcome.liveAt, text: `${outcome.liveBy ?? ACTOR_NOT_RECORDED} made it live` });
   if (outcome.readBackAt) steps.push({ at: outcome.readBackAt, text: "Read it back on the live page" });
   return steps;
 }
@@ -213,7 +213,8 @@ export function AskChangeStory({ outcome, site, decider, title, onUndo, onChange
   const going = outcome.state === "approved" && outcome.outcome === null;
   const yesOf = decider.you ? "your yes" : `${decider.name}'s yes`;
 
-  const headline = live ? <XaHeadline as="h2" size="sm" quiet={<>{who} said yes at <Clock at={outcome.decidedAt} />.</>}>Live on {site}.</XaHeadline>
+  // The subhead says what the headline can't (whether the live page was read back); the sentence below names who did what.
+  const headline = live ? <XaHeadline as="h2" size="sm" quiet={outcome.readBackAt ? <>Strelva read the live page back at <Clock at={outcome.readBackAt} />.</> : "The live page isn't read back yet."}>Live on {site}.</XaHeadline>
     : failed ? <XaHeadline as="h2" size="sm" quiet="Nothing changed on the site.">It didn&apos;t go live.</XaHeadline>
     : going ? <XaHeadline as="h2" size="sm" quiet="It's going live now.">{who} said yes.</XaHeadline>
     : outcome.state === "declined" ? <XaHeadline as="h2" size="sm" quiet="Nothing changed on the site.">{who} said not yet.</XaHeadline>
@@ -223,7 +224,7 @@ export function AskChangeStory({ outcome, site, decider, title, onUndo, onChange
   const steps = storySteps(outcome, who);
 
   const next = live
-    ? outcome.undo === "available" && onUndo ? <p className={styles.next}><XaTextLink onClick={onUndo}>{XA_YES_LABELS.undo}</XaTextLink> <span>puts it back after {yesOf}.</span></p>
+    ? outcome.undo === "available" && onUndo ? <p className={styles.next}><XaTextLink onClick={onUndo}>{XA_YES_LABELS.undo}</XaTextLink> <span>takes it back off {site}. What changed keeps the record.</span></p>
       : outcome.undo === "undone" ? <p className={styles.next}>It has since been undone.</p>
       : <p className={styles.next}>To reverse it, ask Strelva to change it back. That goes to {yesOf} too.</p>
     : failed ? <XaSays links={[<XaTextLink key="help" href={helpHref}>Ask for help</XaTextLink>]}>{outcome.reason ? `The page refused it: ${outcome.reason.replace(/\.$/, "")}. ` : ""}I won&apos;t try again on my own, so nothing changes until someone asks.</XaSays>

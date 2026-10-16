@@ -161,7 +161,8 @@ describe("The prepared change and right after (O3, O4)", () => {
     expect(member).not.toContain("data-xa-primary");
     const stale = decisionView({ needs: ready({ items: [decision({ review: null })] }) });
     expect(stale).toContain("This changed or could not be loaded.");
-    expect(stale).toMatch(/data-xa-primary="true" disabled=""/);
+    expect(stale).not.toContain("data-xa-primary");
+    expect(stale).toContain("Check again");
   });
 
   it("names more waiting decisions and says so honestly when one is gone", () => {
@@ -176,6 +177,19 @@ describe("The prepared change and right after (O3, O4)", () => {
     expect(html).toContain("Insurance we take: Cigna, MetLife, Delta Dental (new)");
   });
 
+  it("after a turn-on with no one-tap undo, offers Roll it back, which asks Strelva for it", async () => {
+    vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+    const node = document.createElement("div"); document.body.append(node);
+    const root = createRoot(node);
+    const onAsk = vi.fn();
+    const receipt = { ...yesReceipt(), undo: { state: "undo_needs_review" as const, reason: "Rolling it back is its own change. Ask Strelva and it rolls back step by step." } };
+    await act(async () => root.render(createElement(OwnerDecisionView, { businessName: HARBOR.name, needs: ready({ items: [], handled: [...SINCE, receipt] }), pending: null, notices: { [decision().id]: { tone: "done", text: "Done." } }, initialDecided: decision(), selectedId: decision().id, now: PREVIEW_NOW, onDecide: noop, onUndo: noop, onRetry: noop, onToday: noop, onWhatChanged: noop, onOpenDecision: noop, onAsk })));
+    expect([...node.querySelectorAll("button")].some(button => button.textContent === "Undo")).toBe(false);
+    await act(async () => [...node.querySelectorAll("button")].find(button => button.textContent === "Roll it back")!.click());
+    expect(onAsk).toHaveBeenCalledWith(expect.stringContaining("Roll back"));
+    await act(async () => root.unmount());
+  });
+
   it("after the yes, says what is true, how Strelva knows, and offers Undo only when the receipt allows it", async () => {
     vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
     const node = document.createElement("div"); document.body.append(node);
@@ -184,7 +198,8 @@ describe("The prepared change and right after (O3, O4)", () => {
     const live = ready({ items: [], handled: [...SINCE, yesReceipt()] });
     await act(async () => root.render(createElement(OwnerDecisionView, { businessName: HARBOR.name, needs: live, pending: null, notices: { [decision().id]: { tone: "done", text: "Done." } }, initialDecided: decision(), selectedId: decision().id, now: PREVIEW_NOW, onDecide: noop, onUndo, onRetry: noop, onToday: noop, onWhatChanged: noop, onOpenDecision: noop })));
     expect(node.textContent).toContain("Online booking is closed for Thanksgiving. Strelva read the page back at 8:11.");
-    expect(node.textContent).toContain("Read back at 8:11");
+    // The read-back time is said once, in the subhead.
+    expect(node.textContent?.match(/back at 8:11/g)).toHaveLength(1);
     expect(node.textContent).toContain("What patients see now");
     expect(node.textContent).toContain("Thursday and Friday show Closed on harbordental.com/book");
     expect(node.textContent).toContain("Prepared byMaya at North Studio");

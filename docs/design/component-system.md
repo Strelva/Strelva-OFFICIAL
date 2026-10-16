@@ -138,8 +138,10 @@ XA-4 Systems up close (October 16, branch xa/lane-xa4-systems):
 - **E5, patient form:** [VisitorIntakeForm](../../src/experience/vertical-intake/VisitorIntakeForm.tsx)
   renders a real `PublicIntakeForm`, checks with `validateIntakeAnswers`, and is
   the "What patients see" preview on the Dental intake panel.
-- **E6, Today on the phone:** [OwnerPhoneToday](../../src/experience/workspace/OwnerPhoneToday.tsx)
-  on `NeedsYouState` and `SystemView[]`. Not yet mounted by `BusinessHome`.
+- **E6, Today on the phone:** the real owner Home, [OwnerToday](../../src/experience/workspace/today/OwnerToday.tsx),
+  which `BusinessHome` mounts at `/workspace`; below 768 px it is the phone
+  layout with one composer carrying what waits (October 16: the separate
+  `OwnerPhoneToday` was retired so there is one Home).
 - Previews: `/preview/strelva/xa/xa7-outside/{waits-email,phone-yes,monday-email,booking,patient-form,today-phone}`.
 - **October 16 fixes:** the business (name, owner, logo or initial) heads every
   E2 page, never the platform's mark; an agency adds its logo or initial,

@@ -17,7 +17,7 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { Lock } from "lucide-react";
 import {
-  XaAnswers, XaButton, XaButtonLink, XaField, XaHeadline, XaInitial, XaLabel, XaPebbleScene, XaSays, XaSheet, XaTextLink,
+  XaAnswers, XaButton, XaButtonLink, XaField, XaHeadline, XaInitial, XaLabel, XaPebbleScene, XaSays, XaTextLink, XaYes,
 } from "@/components/ui/strelva/Xa";
 import { StSkeleton } from "@/components/ui/strelva/Kit";
 import { accessReviewSchema, type AccessReview } from "@/platform/access-review/contracts";
@@ -311,26 +311,44 @@ function AgencyPage({ agency, businessName, seats, assigned, owner, workspaceId,
         <li className={styles.can} data-lock><Lock size={16} aria-hidden="true" /><span className={styles.canTitle}>Take your data or your domain</span><span className={styles.canEnd}>Stays yours</span></li>
       </ul>
     </section>
-    {failure ? <div role="alert"><XaSays>{failure}</XaSays></div> : null}
-    {owner ? <div className={styles.removeLine}><XaSays links={[<button key="remove" type="button" className={styles.danger} onClick={() => setRemoving(true)}>Remove {agency.label}</button>]}>{handoff ? `If ${agency.label} goes, a handoff moves their work first.` : `If ${agency.label} goes, their access ends at once; your Systems keep running.`}</XaSays></div>
+    {failure && !removing ? <div role="alert"><XaSays>{failure}</XaSays></div> : null}
+    {owner ? removing ? <RemoveAgencyInline agency={agency} businessName={businessName} handoff={handoff} handoffOpen={handoffOpen} workspaceId={workspaceId} ends={ends} busy={busy} failure={failure}
+      onKeep={() => setRemoving(false)} onRemove={() => void onRemove().then(ok => { if (ok) setRemoving(false); })} />
+      : <div className={styles.removeLine}><XaSays links={[<button key="remove" type="button" className={styles.danger} onClick={() => setRemoving(true)}>Remove {agency.label}</button>]}>{handoff ? `If ${agency.label} goes, a handoff moves their work first.` : `If ${agency.label} goes, their access ends at once; your Systems keep running.`}</XaSays></div>
       : <p className={styles.quietNote}>Only the owner can remove an agency.</p>}
-    <XaSheet open={removing} onClose={() => setRemoving(false)} title={`Remove ${agency.label}?`}
-      actions={handoff
-        ? <>{handoffOpen
-          ? <XaButtonLink variant="primary" size="lg" block href={`/workspace/provider-change?${new URLSearchParams({ workspaceId })}`}>Start the handoff</XaButtonLink>
-          : <XaButtonLink variant="primary" size="lg" block href={`/workspace?${new URLSearchParams({ workspaceId, view: "help" })}`}>Ask Strelva to start the handoff</XaButtonLink>}
-          <XaButton variant="quiet" size="lg" data-sheet-focus onClick={() => setRemoving(false)}>Keep them</XaButton></>
-        : <><XaButton variant="primary" size="lg" block busy={busy} onClick={() => void onRemove().then(ok => { if (ok) setRemoving(false); })}>Remove {agency.label}</XaButton><XaButton variant="quiet" size="lg" data-sheet-focus onClick={() => setRemoving(false)}>Keep them</XaButton></>}>
-      <div className={styles.sheetPebble}>
-        <XaPebbleScene pose="fixing" size={80} label="Pebble, keeping your Systems running" />
-        <div className={styles.sheetPebbleText}>
-          <p className={styles.sheetLede}>{ends}</p>
-          <XaAnswers labelWidth={64} rows={handoff
-            ? [["Now", `${agency.label} keeps working until the handoff completes.`], ["Stays", "Your Systems and records, running as they are."]]
-            : [["Stays", "Your Systems and records, running as they are."], ["Ends", `${agency.label}'s access to ${businessName}.`]]} />
-        </div>
-      </div>
-      {failure && removing ? <p className={styles.quietNote} role="alert">{failure}</p> : null}
-    </XaSheet>
   </div>;
+}
+
+/**
+ * XA · R5, in place. Removing an agency opens right where "Remove" was, not in
+ * a sheet over the page: what stays, what ends, and the one yes. Access ends
+ * the moment the owner confirms and there is no server undo, so the yes asks
+ * its one question and the pill is the confirmation; Keep them backs out.
+ */
+function RemoveAgencyInline({ agency, businessName, handoff, handoffOpen, workspaceId, ends, busy, failure, onKeep, onRemove }: {
+  agency: Entry; businessName: string; handoff: boolean; handoffOpen: boolean; workspaceId: string; ends: string; busy: boolean; failure: string | null;
+  onKeep: () => void; onRemove: () => void;
+}) {
+  const heading = useRef<HTMLHeadingElement>(null);
+  useEffect(() => { heading.current?.focus(); }, []);
+  return <section className={styles.removeInline} aria-labelledby="remove-agency-title">
+    <div className={styles.removeHead}>
+      <XaPebbleScene pose="fixing" size={96} bare label="Pebble, keeping your Systems running" />
+      <div>
+        <h2 id="remove-agency-title" ref={heading} tabIndex={-1} className={styles.removeTitle}>Remove {agency.label}?</h2>
+        <p className={styles.sheetLede}>{ends}</p>
+      </div>
+    </div>
+    <XaAnswers labelWidth={64} rows={handoff
+      ? [["Now", `${agency.label} keeps working until the handoff completes.`], ["Stays", "Your Systems and records, running as they are."]]
+      : [["Stays", "Your Systems and records, running as they are."], ["Ends", `${agency.label}'s access to ${businessName}.`]]} />
+    {failure ? <p className={styles.quietNote} role="alert">{failure}</p> : null}
+    {handoff
+      ? <div className={styles.removeActions}>{handoffOpen
+        ? <XaButtonLink variant="primary" size="lg" href={`/workspace/provider-change?${new URLSearchParams({ workspaceId })}`}>Start the handoff</XaButtonLink>
+        : <XaButtonLink variant="primary" size="lg" href={`/workspace?${new URLSearchParams({ workspaceId, view: "help" })}`}>Ask Strelva to start the handoff</XaButtonLink>}
+        <XaButton variant="quiet" size="lg" onClick={onKeep}>Keep them</XaButton></div>
+      : <XaYes state={busy ? "going" : "waiting"} block={false} shortcut={false} yesLabel={`Remove ${agency.label}`} notYetLabel="Keep them" onYes={onRemove} onNotYet={onKeep}
+        working={{ title: `Removing ${agency.label}`, steps: [{ id: "revoke", label: `Ending ${agency.label}'s access to ${businessName}`, state: "active" }] }} />}
+  </section>;
 }

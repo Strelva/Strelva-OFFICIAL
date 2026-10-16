@@ -39,8 +39,17 @@ describe("XA kit", () => {
     const { node } = await mount(createElement(XaYes, { state: "waiting", onYes, disabledReason: "Only Dr. Lin can put this live." }));
     await act(async () => { document.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", ctrlKey: true, bubbles: true })); });
     expect(onYes).not.toHaveBeenCalled();
-    expect(node.querySelector("button[data-xa-primary]")?.hasAttribute("disabled")).toBe(true);
+    // No disabled gray pill: Pebble says why, and what unblocks it sits beside Not yet.
+    expect(node.querySelector("button[data-xa-primary]")).toBeNull();
     expect(node.textContent).toContain("Only Dr. Lin can put this live.");
+  });
+
+  it("offers what unblocks a blocked yes beside Not yet", async () => {
+    const onNotYet = vi.fn();
+    const { node } = await mount(createElement(XaYes, { state: "waiting", onYes: vi.fn(), onNotYet, disabledReason: "Google is disconnected.", unblock: createElement("button", { type: "button" }, "Reconnect Google") }));
+    const buttons = [...node.querySelectorAll("button")].map(button => button.textContent);
+    expect(buttons).toEqual(["Reconnect Google", "Not yet"]);
+    expect(node.querySelector("[data-xa-primary]")).toBeNull();
   });
 
   it("shows the real steps while going, and Pebble with one way forward when it fails", async () => {

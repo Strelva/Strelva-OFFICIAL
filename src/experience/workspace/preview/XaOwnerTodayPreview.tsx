@@ -60,7 +60,7 @@ export function XaOwnerTodayPreview({ screen: initial, state, mode }: { screen: 
       if (choice === "not_yet") { setNotices(current => ({ ...current, [item.id]: { tone: "done", text: `${item.title}: Not yet. Nothing changed.` } })); return; }
       if (state === "failed") { setItems(current => [item, ...current]); setNotices(current => ({ ...current, [item.id]: { tone: "error", text: "The booking page did not accept the change. Nothing changed for patients." } })); return; }
       setNotices(current => ({ ...current, [item.id]: { tone: "done", text: `${item.title}: Done.` } }));
-      later(700, () => setHandled(current => [...current.filter(receipt => receipt.id !== `decision:${item.id}`), item.id === decision().id ? yesReceipt("undo", PREVIEW_NOW + 60_000) : { ...yesReceipt("undo", PREVIEW_NOW + 60_000), id: `decision:${item.id}`, source: undefined, sentence: `Maya at North Studio did "${item.title}" as you approved`, changed: item.approveEffect }]));
+      later(700, () => setHandled(current => [...current.filter(receipt => receipt.id !== `decision:${item.id}`), item.id === decision().id ? yesReceipt("undo", PREVIEW_NOW + 60_000) : { ...yesReceipt("undo", PREVIEW_NOW + 60_000), id: `decision:${item.id}`, source: undefined, sentence: `Maya at North Studio finished it after your yes: ${item.title.replace(/[.?!]+$/, "")}.`, changed: item.approveEffect }]));
     });
   };
   const undo = (receipt: HandledReceipt) => {

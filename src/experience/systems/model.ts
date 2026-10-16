@@ -216,7 +216,7 @@ export function systemHref(base: string, workspaceId: string, systemId: string):
 export type MakeRealOutcome =
   | { kind: "result"; result: WorkspaceMakeRealResult }
   /** Live Make real started (or why not): the result settles on the page as it runs. */
-  | { kind: "live"; headline: string; started: boolean }
+  | { kind: "live"; headline: string; started: boolean; activationId?: string | null }
   | { kind: "permission"; message: string }
   | { kind: "error"; message: string };
 

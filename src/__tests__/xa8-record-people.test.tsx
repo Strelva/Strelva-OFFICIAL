@@ -119,7 +119,11 @@ describe("People & access (XA · R3–R5)", () => {
     expect(node.textContent).toContain("Your agency since October 9");
     await act(async () => button("Remove North Studio")!.click());
     expect(posts).toHaveLength(0);
-    const confirm = [...document.querySelectorAll("dialog button")].find(item => item.textContent === "Remove North Studio") as HTMLButtonElement;
+    // R5 opens in place (no dialog): the question, what stays and ends, and the one yes.
+    expect(document.querySelector("dialog[open]")).toBeNull();
+    expect(node.textContent).toContain("Remove North Studio?");
+    const confirm = node.querySelector("button[data-xa-primary]") as HTMLButtonElement;
+    expect(confirm.textContent).toContain("Remove North Studio");
     await act(async () => confirm.click());
     expect(posts).toEqual([{ workspaceId, organization: false, businessId: workspaceId, kind: "provider", recordId: providerId }]);
     expect(node.textContent).toContain("North Studio no longer has access to Harbor Dental.");
@@ -129,14 +133,14 @@ describe("People & access (XA · R3–R5)", () => {
     const request = vi.fn(async (input: RequestInfo | URL) => String(input).startsWith("/api/workspace/access-review") ? Response.json(review(false)) : Response.json({ invitations: [] })) as unknown as typeof fetch;
     const released = { ...snapshot, releases: { systems: false, providerChange: true } } as WorkspaceSnapshot;
     await act(async () => root.render(createElement(PeopleAndAccess, { snapshot: released, currentRole: "owner", request, postAction: vi.fn(), initialAgency: providerId, initialRemoving: true })));
-    const handoff = [...document.querySelectorAll("dialog a")].find(item => item.textContent === "Start the handoff");
+    const handoff = [...node.querySelectorAll("section[aria-labelledby='remove-agency-title'] a")].find(item => item.textContent === "Start the handoff");
     expect(handoff?.getAttribute("href")).toBe(`/workspace/provider-change?workspaceId=${workspaceId}`);
   });
 
   it("never links a handoff page that is closed; asks Strelva instead", async () => {
     const request = vi.fn(async (input: RequestInfo | URL) => String(input).startsWith("/api/workspace/access-review") ? Response.json(review(false)) : Response.json({ invitations: [] })) as unknown as typeof fetch;
     await act(async () => root.render(createElement(PeopleAndAccess, { snapshot, currentRole: "owner", request, postAction: vi.fn(), initialAgency: providerId, initialRemoving: true })));
-    const links = [...document.querySelectorAll("dialog a")];
+    const links = [...node.querySelectorAll("section[aria-labelledby='remove-agency-title'] a")];
     expect(links.some(item => item.getAttribute("href")?.includes("provider-change"))).toBe(false);
     expect(links.find(item => item.textContent === "Ask Strelva to start the handoff")?.getAttribute("href")).toBe(`/workspace?workspaceId=${workspaceId}&view=help`);
   });

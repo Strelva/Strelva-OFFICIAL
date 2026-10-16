@@ -24,7 +24,7 @@ import type { SystemView } from "@/experience/systems/model";
 import type { ItemNotice, NeedsYouState } from "../useNeedsYou";
 import { decisionPresentation } from "../needs-you-presentation";
 import { DecisionPreviewView } from "./DecisionPreview";
-import { actedBy, afterYesQuiet, clockTime, decisionAnswers, decisionHeadline, decisionReceipt, liveHeadline, nowTrue, previewLabel, relativeWhen, yesConsequence, yesLabel, yesPhase } from "./today-model";
+import { actedBy, afterYesQuiet, decisionAnswers, decisionHeadline, decisionReceipt, liveHeadline, nowTrue, previewLabel, relativeWhen, yesConsequence, yesLabel, yesPhase } from "./today-model";
 import styles from "./today.module.css";
 
 export interface OwnerDecisionViewProps {
@@ -115,11 +115,13 @@ export function OwnerDecisionView({ businessName, needs, pending, notices, selec
     : phase === "undone" ? { headline: undoneHere === item.id ? "You took it back." : "It was taken back.", quiet: "Strelva recorded the undo in What changed." }
       : { headline: decisionHeadline(item), quiet: yesConsequence(item) };
   const canUndo = canDecide && ready?.authority !== "agency" && receipt?.undo.state === "undo";
+  // No one-tap undo, but a way back exists as its own change (Make real, a release, a revert): the pill asks Strelva for it.
+  const rollBack = !canUndo && canDecide && ready?.authority !== "agency" && receipt?.undo.state === "undo_needs_review" && onAsk ? () => onAsk(`Roll back "${item.title}".`) : undefined;
   const undoReason = receipt && "reason" in receipt.undo ? receipt.undo.reason : null;
   const answers: [string, string][] = after
     ? [
       ...(by ? [["Prepared by", by] as [string, string]] : []),
-      ...(canUndo ? [["Take it back", "Undo here, or any time from What changed."] as [string, string]] : undoReason ? [["Take it back", undoReason] as [string, string]] : []),
+      ...(canUndo ? [["Take it back", "Any time from What changed."] as [string, string]] : undoReason ? [["Take it back", undoReason] as [string, string]] : []),
     ]
     : phase === "undone"
       ? [...(by ? [["Prepared by", by] as [string, string]] : []), ...(undoneHere === item.id ? [["Undone by", "You"] as [string, string]] : [])]
@@ -131,7 +133,8 @@ export function OwnerDecisionView({ businessName, needs, pending, notices, selec
       : phase === "failed" ? <XaStatus kind="down">Did not go through</XaStatus>
         : phase === "undone" ? <XaStatus kind="draft">Undone</XaStatus>
           : <XaStatus kind="live" breathe>{live ? "Live" : "Done"}</XaStatus>;
-  const meta = after ? receipt?.evidence?.readBack === "verified" ? `Read back at ${clockTime(receipt.at)}` : undefined
+  // After the yes the subhead already says when Strelva read it back; the panel doesn't say it again.
+  const meta = after ? undefined
     : phase === "undone" ? undefined
       : [byShort ? `Prepared by ${byShort}` : null, now === null ? "" : relativeWhen(item.openedAt, now)].filter(Boolean).join(", ") || undefined;
   const disabledReason = item.review === null ? <>This changed or could not be loaded. <XaTextLink onClick={onRetry}>Check again</XaTextLink> to see the latest before deciding.</> : undefined;
@@ -163,7 +166,8 @@ export function OwnerDecisionView({ businessName, needs, pending, notices, selec
         yes={!canDecide && phase === "waiting" ? <p className={styles.recordNote}>Only the owner can decide this. You can see what waits and what each choice does.</p> : <XaYes state={phase} yesLabel={label} disabledReason={disabledReason}
           onYes={() => { setDecided(item); setExpired(false); onDecide(item, "approve"); }}
           onNotYet={canDecide && item.review !== null ? () => { onDecide(item, "not_yet"); onToday(); } : undefined}
-          onUndo={canUndo && receipt ? () => { setUndoneHere(item.id); onUndo(receipt); } : undefined}
+          onUndo={canUndo && receipt ? () => { setUndoneHere(item.id); onUndo(receipt); } : rollBack}
+          undoLabel={rollBack ? "Roll it back" : undefined}
           onUndoExpired={() => setExpired(true)}
           working={phase === "going" ? { title: "Going ahead", steps: [] } : undefined}
           liveLabel={where ? `${live ? "Live" : "Done"} on ${where}` : `${live ? "Live" : "Done"}: ${item.title}`}
@@ -177,8 +181,8 @@ export function OwnerDecisionView({ businessName, needs, pending, notices, selec
       </XaDecision>
     </div>
     <div className={styles.briefBody}>
+      {/* The panel's status and the Undo pill already say Live and where; the truths say what is now so. */}
       {truths.length ? <div className={styles.truths}>
-        <XaStatus kind="live">{where ? `${live ? "Live" : "Done"} on ${where}` : live ? "Live" : "Done"}</XaStatus>
         <ul aria-label="What is true now">{truths.map(line => <li key={line}><Check size={15} strokeWidth={2.2} aria-hidden="true" />{line}</li>)}</ul>
       </div> : null}
       {answers.length ? <XaAnswers rows={answers} labelWidth={156} /> : null}

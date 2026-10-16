@@ -102,7 +102,7 @@ export const SINCE: HandledReceipt[] = [
 export function yesReceipt(state: "undo" | "undone" = "undo", when = YES_AT): HandledReceipt {
   return {
     id: `decision:${THANKSGIVING_ID}`, store: "owner_decisions", systemId: SYSTEM_IDS.bookings, actor: MAYA,
-    sentence: 'Maya at North Studio did "Close online booking for Thanksgiving" as you approved', at: new Date(when).toISOString(),
+    sentence: "Maya at North Studio finished it after your yes: Close online booking for Thanksgiving.", at: new Date(when).toISOString(),
     changed: "Thursday and Friday show Closed on harbordental.com/book. No open times on Nov 26 and 27. Saturday stays 9 to 1.",
     evidence: { providerAccepted: true, readBack: "verified" }, undo: state === "undo" ? { state: "undo" } : { state: "undone" },
     source: { lifecycle: "service_request", id: `${REQUEST.thanksgiving}:ready_for_review` },
@@ -127,7 +127,7 @@ export function harborDeliveries(options: { thanksgivingWaits?: boolean } = {}):
 
 /** A finite job Strelva runs itself (saved operations work), as businessRequestRows makes it. */
 export const STRELVA_JOB_ROW: BusinessRequestRow = {
-  id: "work-w4", title: "Check that every page patients can reach loads", stage: "in_progress", detail: "Strelva runs it · started Nov 14", workId: "w4", sortAt: daysAgo(9), provider: "strelva-run",
+  id: "work-w4", title: "Check each morning that every page opens", stage: "in_progress", detail: "Strelva runs it · started Nov 14", workId: "w4", sortAt: daysAgo(9), provider: "strelva-run",
 };
 
 /** Thirty days of checks, Oct 25 to Nov 23, with one slip on Nov 3 (a new-patient form bounced). */

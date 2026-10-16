@@ -123,7 +123,7 @@ describe("decided Needs you items in What changed", () => {
 
   it("names who decided when it wasn't the owner", () => {
     expect(handledFromStore(decision({ decidedByKind: "operator", sourceLifecycle: "website_document", title: "Fix the hours copy" }))!.sentence)
-      .toBe('Strelva did "Fix the hours copy" after Platform operator (support) reviewed it.');
+      .toBe('Strelva finished it after Platform operator (support) reviewed it: Fix the hours copy.');
     expect(handledFromStore(decision({ decidedByKind: "admin_session" }))!.sentence)
       .toBe("Strelva confirmed the booking (an admin decided): Dana Reed, Tue, Oct 15 3:00 PM");
   });

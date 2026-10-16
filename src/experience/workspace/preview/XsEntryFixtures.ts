@@ -31,7 +31,7 @@ export function xsAudit(agency?: AgencyAttribution): AuditResult {
     businessName: XA_HARBOR.name, agency, url: "https://harbordental.com/", scannedAt: "2026-11-23T19:14:00.000Z", overallScore: 62, grade: "C",
     categories: [
       { name: "Search", slug: "seo", weight: 25, score: 58, guides: [{ slug: "local-seo-basics", title: "Local search basics" }], checks: [
-        { name: "Opening hours in structured data", status: "fail", score: 0, priority: "high", message: "Your hours appear only as an image, so search engines and assistants can't read them.", impact: "People asking “is Harbor Dental open Saturday” get no answer from your site." },
+        { name: "Opening hours search engines can read", status: "fail", score: 0, priority: "high", message: "Your hours appear only as an image, so search engines and assistants can't read them.", impact: "People asking “is Harbor Dental open Saturday” get no answer from your site." },
         { name: "Page titles", status: "warn", score: 60, priority: "medium", message: "Three pages share the title “Home”.", impact: "Search results show the same line for different pages." },
         { name: "Sitemap", status: "pass", score: 100, message: "Found at /sitemap.xml with 14 pages." },
       ] },

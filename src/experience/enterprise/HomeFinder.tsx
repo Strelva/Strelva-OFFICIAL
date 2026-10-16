@@ -107,9 +107,10 @@ function HomeFinderLoader({ workspaceId, agencies, request }: { workspaceId: str
       </XaBlock> : <XaNote tone="done">The license, the feed and the inquiry address are all confirmed.</XaNote> : null}
       <XaNote>On {host(selected.approvedOrigin)}, with listings from {selected.sourceName}. Licensed until {dateLabel(selected.licenseExpiresAt)}. Inquiries go to {selected.brokerageName}.</XaNote>
       {selected.status === "active" ? <div className={styles.quiet}>
-        <XaTextLink onClick={() => void change({ action: "check", workspaceId, bindingId: selected.id })}>{busy && lastAction === "check" ? "Checking" : "Check with the feed again"}</XaTextLink>
-        {selected.lifecycle === "live" ? <> · <XaTextLink onClick={() => void change({ action: "pause", workspaceId, bindingId: selected.id, expectedChange: selected.changeNumber })}>Pause new inquiries</XaTextLink></> : null}
-        {" · "}<RevokeControl key={selected.id} binding={selected} locked={locked} onRevoke={() => void change({ action: "revoke", workspaceId, bindingId: selected.id, expectedRevision: selected.revision })} />
+        {/* While the yes is blocked, checking again sits beside it (the unblock), not here too. */}
+        {unmet.length && selected.lifecycle !== "live" ? null : <><XaTextLink onClick={() => void change({ action: "check", workspaceId, bindingId: selected.id })}>{busy && lastAction === "check" ? "Checking" : "Check with the feed again"}</XaTextLink>{" · "}</>}
+        {selected.lifecycle === "live" ? <><XaTextLink onClick={() => void change({ action: "pause", workspaceId, bindingId: selected.id, expectedChange: selected.changeNumber })}>Pause new inquiries</XaTextLink>{" · "}</> : null}
+        <RevokeControl key={selected.id} binding={selected} locked={locked} onRevoke={() => void change({ action: "revoke", workspaceId, bindingId: selected.id, expectedRevision: selected.revision })} />
       </div> : null}
       {selected.status === "active" ? <HomeFinderConfiguration key={`${selected.id}:${selected.revision}`} binding={selected} changeNumber={selected.changeNumber} locked={locked} onChange={change} /> : null}
       {bindings.length > 1 ? <XaBlock label="Other brokerages">
@@ -121,20 +122,23 @@ function HomeFinderLoader({ workspaceId, agencies, request }: { workspaceId: str
       </p>
     </>}
     object={<BuyerPreview binding={selected} busy={busy && lastAction === "publish"} failed={Boolean(error) && lastAction === "publish"} error={error} locked={locked}
+      checking={busy && lastAction === "check"} onCheck={() => void change({ action: "check", workspaceId, bindingId: selected.id })}
       onPublish={() => void change({ action: "publish", workspaceId, bindingId: selected.id, expectedChange: selected.changeNumber })} />} />;
 }
 
 /** The search as a buyer sees it on the brokerage's site, with the one yes beside it. */
-function BuyerPreview({ binding, busy, failed, error, locked, onPublish }: { binding: Binding; busy: boolean; failed: boolean; error: string; locked: boolean; onPublish: () => void }) {
+function BuyerPreview({ binding, busy, failed, error, locked, checking, onCheck, onPublish }: { binding: Binding; busy: boolean; failed: boolean; error: string; locked: boolean; checking: boolean; onCheck: () => void; onPublish: () => void }) {
   const live = binding.lifecycle === "live";
   const canPublish = binding.status === "active" && !live;
   const blocked = binding.readiness?.find(item => item.state !== "confirmed");
+  const unconfirmed = binding.readiness?.filter(item => item.state !== "confirmed").length ?? 0;
   return <XaDecision label={`${binding.brokerageName} Home Finder, as buyers see it`}
     status={binding.status === "revoked" ? <XaStatus kind="down">Stopped</XaStatus> : live ? <XaStatus kind="live" breathe={binding.runtimeAllowed}>Live</XaStatus> : binding.lifecycle === "paused" ? <XaStatus kind="waits">Paused</XaStatus> : <XaStatus kind="draft">Draft</XaStatus>}
     meta={live && binding.runtimeAllowed ? <XaTextLink href={binding.approvedOrigin}>Open the brokerage website</XaTextLink> : "Buyers can't see it yet"}
     yes={canPublish ? <XaYes state={busy ? "going" : failed ? "failed" : "waiting"} onYes={onPublish} failure={error || "It didn't go live. Buyers still can't search."}
       working={{ title: "Checking the feed and making it live", steps: [{ id: "check", label: "Checking the license, the feed and the inquiry address", state: "active" }] }}
-      disabledReason={locked && !busy ? "Another change is still being confirmed." : blocked ? `${readinessSentence(blocked, binding.brokerageName)} Strelva checks again when you press it.` : undefined} /> : null}>
+      disabledReason={locked && !busy ? "Another change is still being confirmed. This waits until it is." : blocked ? `It goes live once ${unconfirmed === 1 ? "that is" : `those ${unconfirmed} are`} confirmed. Strelva asks the feed each time you check.` : undefined}
+      unblock={blocked && !(locked && !busy) ? <XaButton variant="primary" size="lg" block busy={checking} onClick={onCheck}>{checking ? "Checking" : "Check with the feed again"}</XaButton> : undefined} /> : null}>
     <XaPage address={`${host(binding.approvedOrigin)}/homes`} title="Find your home" flat>
       <p className={styles.pageSub}>{binding.brokerageName} · {binding.sourceName}</p>
       <div className={styles.fakeSearch} aria-hidden="true"><span>City, area or address</span><span className={styles.fakeButton}>Search homes</span></div>

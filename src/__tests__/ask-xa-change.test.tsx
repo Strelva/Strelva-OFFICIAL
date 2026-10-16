@@ -142,7 +142,7 @@ describe("After the decision (XA · AS5)", () => {
     const page = html(props(live));
     expect(page).toContain("Live on harbordental.com.");
     expect(page).toContain("North Studio sent it at");
-    expect(page).toContain("Strelva put it live and read it back at");
+    expect(page).toContain("Strelva made it live at");
     expect(page).toContain("Show every step");
     expect(page).toContain("Read back at");
     expect(page).toContain(">Undo<");

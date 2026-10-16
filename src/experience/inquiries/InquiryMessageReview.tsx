@@ -189,14 +189,14 @@ function outcomeAllowsNewReview(outcome: InquiryMessageReviewOutcome): boolean {
 
 function undeliveredCause(outcome: InquiryMessageReviewOutcome): string {
   if (outcome.status === "bounced") return "The recipient's mail server refused it.";
-  if (outcome.status === "suppressed") return "The provider would not send to this address.";
-  return "The provider reported that delivery failed.";
+  if (outcome.status === "suppressed") return "The email service won't send to this address.";
+  return "The email service says delivery failed.";
 }
 
 export function messageReviewCompletionCopy(outcome: InquiryMessageReviewOutcome): { title: string; detail: string; tone: "success" | "warning" | "error" } {
   if (outcome.status === "accepted_unverified") {
     return {
-      title: "The provider accepted this message, but verification needs attention.",
+      title: "The email service accepted this message, but checking it needs attention.",
       detail: "Do not retry this send. Check the delivery evidence before taking another action.",
       tone: "warning",
     };
@@ -211,8 +211,8 @@ export function messageReviewCompletionCopy(outcome: InquiryMessageReviewOutcome
   const { delivery } = classifyInquiryMessageOutcome(outcome);
   if (delivery === "deferred") {
     return {
-      title: "The provider is still trying to deliver this message.",
-      detail: "Nothing to do. The provider accepted it and keeps trying on its own.",
+      title: "The email service is still trying to deliver this message.",
+      detail: "Nothing to do. The email service accepted it and keeps trying on its own.",
       tone: "warning",
     };
   }
@@ -225,21 +225,21 @@ export function messageReviewCompletionCopy(outcome: InquiryMessageReviewOutcome
   }
   if (outcome.status === "accepted") {
     return {
-      title: "The provider accepted this message.",
+      title: "The email service accepted this message.",
       detail: "Verification is still pending. This review cannot be sent again.",
       tone: "success",
     };
   }
   if (outcome.status === "verified") {
     return {
-      title: "The provider accepted and verified this message.",
+      title: "The email service accepted this message, and it is confirmed.",
       detail: "The verified delivery receipt is attached to this inquiry.",
       tone: "success",
     };
   }
   if (outcome.status === "delivered") {
     return {
-      title: "The provider reported delivery.",
+      title: "The email service says it was delivered.",
       detail: "The delivery receipt is attached to this inquiry.",
       tone: "success",
     };
@@ -253,7 +253,7 @@ export function messageReviewCompletionCopy(outcome: InquiryMessageReviewOutcome
   }
   if (outcome.status === "blocked") {
     return {
-      title: "The message was blocked before provider send.",
+      title: "The message was stopped before it was sent.",
       detail: outcome.reason || "Resolve the responsibility or recipient issue before preparing another review.",
       tone: "error",
     };

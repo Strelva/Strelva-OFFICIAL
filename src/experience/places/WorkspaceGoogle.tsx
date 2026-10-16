@@ -50,7 +50,9 @@ function NeverWithoutYou({ paused }: { paused?: boolean }) {
   </>;
 }
 
-export function WorkspaceGoogle({ workspaceId, state, result, action, reviewId, replyText, reviews, listingPreview, reviewRequest, connect }: { workspaceId: string; state: PublishingState<Listings>; result?: string; action: (form: FormData) => Promise<void>; reviewId?: string; replyText?: string; reviews?: PublishingState<SiteReviews[]>; listingPreview?: GoogleListingPreview; reviewRequest?: typeof fetch; connect?: ReactNode }) {
+export function WorkspaceGoogle({ workspaceId, state, result, action, reviewId, replyText, reviews, listingPreview, reviewRequest, connect, reconnect }: { workspaceId: string; state: PublishingState<Listings>; result?: string; action: (form: FormData) => Promise<void>; reviewId?: string; replyText?: string; reviews?: PublishingState<SiteReviews[]>; listingPreview?: GoogleListingPreview; reviewRequest?: typeof fetch; connect?: ReactNode;
+  /** Google sign-in again, for an owner whose listing is disconnected (STRELVA_GOOGLE_OWNER_CONNECT). Absent: the sentence says the draft waits. */
+  reconnect?: (form: FormData) => Promise<void> }) {
   const listings = state.kind === "ready" ? state.data : [];
   const said = result ? <p role="status" className={styles.result}>{result}</p> : null;
 
@@ -93,14 +95,14 @@ export function WorkspaceGoogle({ workspaceId, state, result, action, reviewId, 
 
   return <>{listings.map(listing => {
     const blocked = listing.control.paused || !listing.connected || listing.control.accessPending;
-    const blockedReason = !listing.connected ? "Google is disconnected. Reconnect Google to continue; your drafts are kept." : listing.control.accessPending ? "Google hasn't approved access yet. Your draft is kept and nothing was sent." : listing.control.paused ? "This listing is paused. Resume it to put changes on Google." : undefined;
+    const blockedReason = !listing.connected ? (reconnect && listing.canManage ? "Google is disconnected, so this can't reach your listing yet. Your draft is kept; it waits here until you reconnect." : "Google is disconnected, so this can't reach your listing yet. Your draft is kept until Google is reconnected.") : listing.control.accessPending ? "Google hasn't approved access yet. Your draft is kept and nothing was sent." : listing.control.paused ? "This listing is paused. Resume it to put changes on Google." : undefined;
     const site = reviews?.kind === "ready" ? reviews.data.find(item => item.tenantId === listing.tenantId && listings.filter(other => other.tenantId === listing.tenantId).length === 1) : undefined;
     const status = !listing.connected ? <XaStatus kind="down" size="sm">Disconnected</XaStatus> : listing.control.accessPending ? <XaStatus kind="waits" size="sm">Waiting for Google</XaStatus> : listing.control.paused ? <XaStatus kind="draft" size="sm">Paused</XaStatus> : <XaStatus kind="live" size="sm">Live</XaStatus>;
     return <div key={`${listing.tenantId}:${listing.locationId}`} className={styles.place} aria-label={listing.name} role="region">
       <div className={styles.main}>
         <Head title={listing.name} meta={<>{status}<span>{listingPreview ? `${listingPreview.category} · ${listingPreview.rating} from ${listingPreview.reviews} reviews` : "On Google Search and Maps"}</span></>} />
         {said}
-        {listing.drafts.length ? <GoogleDrafts drafts={listing.drafts} listingName={listing.name} canManage={listing.canManage} blockedReason={blocked ? blockedReason : undefined} action={action}
+        {listing.drafts.length ? <GoogleDrafts drafts={listing.drafts} listingName={listing.name} canManage={listing.canManage} blockedReason={blocked ? blockedReason : undefined} reconnect={!listing.connected && listing.canManage ? reconnect : undefined} action={action}
           context={{ workspaceId, tenantId: listing.tenantId, locationId: listing.locationId }} /> : null}
         {connect}
 
@@ -160,7 +162,8 @@ export function WorkspaceGoogle({ workspaceId, state, result, action, reviewId, 
       </div>
 
       <aside className={styles.side} aria-label="Google listing details">
-        {blocked && blockedReason ? <XaSays>{blockedReason}</XaSays> : null}
+        {/* With a draft waiting, the reason sits in the decision beside it; said once. */}
+        {blocked && blockedReason && !listing.drafts.length ? <XaSays>{blockedReason}</XaSays> : null}
         {listingPreview ? <ul className={styles.group}><li className={styles.groupRow}><span className={styles.groupText}><span className={styles.groupTitle}>Hours on Google</span><span className={styles.groupDetail} data-tone="waits">{listingPreview.googleHours}</span><span className={styles.groupDetail}>Your record says {listingPreview.recordHours}</span></span></li></ul> : null}
         {listingPreview && listing.canManage ? <form action={action}><Context workspaceId={workspaceId} listing={listing} /><XaButton size="sm" block type="submit" name="action" value="hours" disabled={blocked}>{listingPreview.fixLabel}</XaButton></form> : null}
         <NeverWithoutYou paused={listing.control.paused} />

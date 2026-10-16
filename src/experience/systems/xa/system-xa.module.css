@@ -232,6 +232,11 @@
 .visitName s { color: var(--st-text-3); }
 .visitDetail { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; color: var(--st-text-2); font-size: 13px; line-height: 19px; }
 .visitEnd { display: flex; justify-content: flex-end; }
+/* S2: a row's actions show on the row you point at or tab into, not on every row at once. Touch keeps them. */
+@media (hover: hover) and (pointer: fine) {
+  .visit .visitEnd { opacity: 0; transition: opacity var(--motion-fast) var(--ease-settle); }
+  .visit:hover .visitEnd, .visit:focus-within .visitEnd, .visitEnd:has([data-xa-primary], [role="alert"]) { opacity: 1; }
+}
 .visit + .bookingMore { margin: -6px 0 8px 108px; }
 .waitsFor { display: flex; flex-direction: column; gap: 10px; padding: 16px 18px 18px; border-radius: 16px; background: var(--st-surface); box-shadow: var(--st-shadow-sm); }
 .waitsFor .visit { min-height: 0; padding: 0; grid-template-columns: 124px minmax(0, 1fr) auto; }

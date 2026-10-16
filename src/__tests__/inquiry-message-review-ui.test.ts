@@ -97,7 +97,7 @@ describe("InquiryMessageReview", () => {
     expect(bounced.detail).toContain("refused it");
     expect(messageReviewCompletionCopy({ inquiryId: review.inquiryId, action: review.action, status: "deferred", retryable: true }).title).toContain("still trying");
     const suppressed = messageReviewCompletionCopy({ inquiryId: review.inquiryId, action: "owner_notification", status: "suppressed", retryable: false });
-    expect(suppressed.detail).toContain("would not send to this address");
+    expect(suppressed.detail).toContain("won't send to this address");
     expect(suppressed.detail).toContain("Let your team know another way.");
     expect(messageReviewCompletionCopy({ inquiryId: review.inquiryId, action: review.action, status: "failed", retryable: true }).title).toBe("Message delivery failed.");
   });

@@ -10,8 +10,9 @@
 import { useMemo, useRef, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import {
-  XaButton, XaChoices, XaField, XaHeadline, XaSays, XaSegmented, XaStatus, XaSystemTile, XaTextLink, type XaStatusKind,
+  XaButton, XaChoices, XaField, XaHeadline, XaSays, XaSegmented, XaStatus, XaSystemTile, XaTextLink, XaUndo, XaUndoDock, type XaStatusKind,
 } from "@/components/ui/strelva/Xa";
+import { strelvaUndoWindowMs } from "@/platform/infra/motion";
 import type { BusinessRecord, FactValues } from "@/platform/business-record/contracts";
 import type { RecordGoogleEffect } from "@/products/publishing/client";
 import { clock, GOOGLE_APPROVAL_LINE, longDate, shortDate, upcomingHolidays, weeklySummary } from "@/experience/record/record-words";
@@ -67,6 +68,9 @@ export function RecordPublishingFields({ record, approvalCopy, readOnly = false,
   const [fieldError, setFieldError] = useState<{ date?: string; times?: string }>({});
   const [result, setResult] = useState<{ google: RecordGoogleEffect[]; propagationError?: string; record: { revision: number; changeCount: number } }>();
   const commandId = useRef<string | null>(null);
+  // Undo after a save: the hours as they were, written back as a new revision through the same route.
+  const [undo, setUndo] = useState<{ before: Hours; sentence: string } | null>(null);
+  const [undone, setUndone] = useState<"done" | "failed" | null>(null);
   const connected = listingConnected ?? Boolean(approvalCopy);
   const disabled = readOnly || busy;
 
@@ -95,7 +99,8 @@ export function RecordPublishingFields({ record, approvalCopy, readOnly = false,
       setFieldError(problems);
       if (Object.keys(problems).length) return;
     }
-    setBusy(true); setError(""); setResult(undefined);
+    setBusy(true); setError(""); setResult(undefined); setUndo(null); setUndone(null);
+    const before = hours;
     try {
       if (!changed) { setError(mode === "week" ? "Change an hour first. Nothing is saved yet." : "Pick a day or change its hours first. Nothing is saved yet."); return; }
       commandId.current ??= crypto.randomUUID();
@@ -103,8 +108,25 @@ export function RecordPublishingFields({ record, approvalCopy, readOnly = false,
         body: JSON.stringify({ workspaceId: record.workspaceId, revision, commandId: commandId.current, patch: { facts: { hours: { value: nextHours } } }, googleApprovalDisclosed: Boolean(approvalCopy) }) });
       const data = await response.json(); if (!response.ok) throw new Error(data.error || "Your hours could not be confirmed. Reload before trying again.");
       setResult(data.result); setRevision(data.result.record.revision); setHours(nextHours); setWeekChanged(false); commandId.current = null;
+      if (data.result.record.changeCount) setUndo({ before, sentence: mode === "day" ? `${date ? shortDate(date) : "That day"} saved: ${dayHours.toLowerCase()}` : "Your usual week is saved" });
       router.refresh();
     } catch (cause) { setError(cause instanceof Error ? cause.message : "Your hours could not be saved."); }
+    finally { setBusy(false); }
+  }
+
+  async function takeBack() {
+    if (!undo || busy) return;
+    const { before } = undo;
+    setUndo(null); setBusy(true); setError("");
+    try {
+      const response = await request("/api/workspace/publishing/record", { method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ workspaceId: record.workspaceId, revision, commandId: crypto.randomUUID(), patch: { facts: { hours: { value: before } } }, googleApprovalDisclosed: Boolean(approvalCopy) }) });
+      const data = await response.json(); if (!response.ok) throw new Error(data.error || "That couldn't be undone. Your saved hours are still there.");
+      setResult(data.result); setRevision(data.result.record.revision); setHours(before); setUndone("done");
+      const found = before.overrides?.find(item => item.date === date);
+      setDayOpen(found && !found.closed ? "open" : "closed"); if (found?.opens) setOpens(found.opens); if (found?.closes) setCloses(found.closes); setNote(found?.label ?? "");
+      router.refresh();
+    } catch (cause) { setUndone("failed"); setError(cause instanceof Error ? cause.message : "That couldn't be undone. Your saved hours are still there."); }
     finally { setBusy(false); }
   }
 
@@ -165,7 +187,7 @@ export function RecordPublishingFields({ record, approvalCopy, readOnly = false,
     <aside className={styles.changes} aria-labelledby="hours-changes">
       <div className={styles.changesHead}><h2 id="hours-changes">{result ? "What changed" : "This will change"}</h2><span className={styles.changesWhen}>{result ? "Just now" : "Before you save"}</span></div>
       {result ? <div className={styles.result} role="status">
-        <XaSays>{result.record.changeCount ? `Saved. ${mode === "day" ? `${dayText} reads ${dayHours.toLowerCase()}.` : "Your usual week is updated."}` : "Nothing changed in your record."}</XaSays>
+        <XaSays>{undone === "done" ? `Undone. ${mode === "day" ? `${dayText} is back to what it was.` : "Your usual week is back to what it was."}` : result.record.changeCount ? `Saved. ${mode === "day" ? `${dayText} reads ${dayHours.toLowerCase()}.` : "Your usual week is updated."}` : "Nothing changed in your record."}</XaSays>
         {result.propagationError ? <p className={styles.quietNote}>{result.propagationError}</p> : null}
         <ul className={styles.changesList}>{result.google.map((effect, index) => { const words = GOOGLE_WORDS[effect.status]; return <li key={index} className={styles.change}><XaSystemTile kind="listing" size={40} /><span className={styles.changeText}><span className={styles.changeTitle}>Google listing{result.google.length > 1 ? ` ${index + 1}` : ""}</span><span className={styles.changeDetail}>{effect.kind === "hours" ? "Hours" : "Business info"}{effect.reason ? `. ${effect.reason}` : ""}</span></span><XaStatus kind={words.kind} size="sm">{words.text}</XaStatus></li>; })}</ul>
         {result.google.length ? <XaTextLink href={`/workspace/google?workspaceId=${encodeURIComponent(record.workspaceId)}`}>See each Google change</XaTextLink> : null}
@@ -177,5 +199,6 @@ export function RecordPublishingFields({ record, approvalCopy, readOnly = false,
         {backHref && !result ? <XaTextLink href={backHref}>Cancel</XaTextLink> : null}
       </div>
     </aside>
+    {undo ? <XaUndoDock><XaUndo onUndo={() => void takeBack()} windowMs={strelvaUndoWindowMs} onExpire={() => setUndo(null)} shortcut>{undo.sentence}</XaUndo></XaUndoDock> : null}
   </div>;
 }

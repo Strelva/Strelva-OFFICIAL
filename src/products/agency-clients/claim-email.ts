@@ -35,7 +35,7 @@ export function claimEmailOptions(claim: Pick<OwnerClaim, "workspaceName">, clai
   const footer = "Sign in with the email this was sent to. The link alone grants nothing and shows nothing private.";
   const button = { label: `Claim ${claim.workspaceName}`, url: claimUrl };
   return {
-    preheader: `${agency} set up ${claim.workspaceName} on Strelva. Claim it to own the workspace and its data.`,
+    preheader: `${agency} set up ${claim.workspaceName} on Strelva. Claim it to own the business and its records.`,
     heading: subject,
     paragraphs,
     button,

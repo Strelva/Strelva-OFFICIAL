@@ -30,7 +30,7 @@ export async function requestMakeReal(request: typeof fetch, workspaceId: string
     const body: unknown = await response.json().catch(() => null);
     const parsed = makeRealResponseSchema.safeParse(body);
     if (response.ok && parsed.success) {
-      if ("live" in parsed.data) return { kind: "live", headline: parsed.data.live.headline, started: Boolean(parsed.data.live.activationId) };
+      if ("live" in parsed.data) return { kind: "live", headline: parsed.data.live.headline, started: Boolean(parsed.data.live.activationId), activationId: parsed.data.live.activationId };
       return { kind: "result", result: parsed.data.result };
     }
     const error = z.object({ error: z.string() }).safeParse(body);

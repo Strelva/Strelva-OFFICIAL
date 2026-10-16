@@ -14,7 +14,7 @@ import { systemHref } from "@/experience/systems/model";
 import { WorkspaceInquiries } from "@/experience/places/WorkspaceInquiries";
 import { WorkspaceInquirySystem } from "@/experience/places/WorkspaceInquirySystem";
 import { WorkspaceRequestContext } from "../WorkspaceRequest";
-import { XA4_INBOX, XA4_SITE, XA4_WORKSPACE, type Xa4Screen, type Xa4State, harborBookingRequestDecision, harborForm, harborFormDetail, harborInbox, harborLeads, harborPossibility, harborWebsite, harborWebsiteDetail } from "./xa4-systems-fixture";
+import { XA4_INBOX, XA4_POSSIBILITY, XA4_SITE, XA4_WORKSPACE, type Xa4Screen, type Xa4State, harborBookingRequestDecision, harborForm, harborFormDetail, harborInbox, harborLeads, harborPossibility, harborWebsite, harborWebsiteDetail } from "./xa4-systems-fixture";
 import { xaSearchItems, XA_SYSTEMS } from "./xa-day";
 
 
@@ -25,6 +25,7 @@ const never = () => new Promise<Response>(() => undefined);
 function fixtureFetch(screen: Xa4Screen, state: Xa4State): typeof fetch {
   // The one booking request is decided once; afterwards Needs you no longer lists it.
   let bookingDecided = false;
+  let reads = 0;
   return async (input, init) => {
     const url = new URL(typeof input === "string" ? input : input instanceof URL ? input.href : input.url, window.location.origin);
     const method = init?.method ?? (input instanceof Request ? input.method : "GET");
@@ -40,6 +41,13 @@ function fixtureFetch(screen: Xa4Screen, state: Xa4State): typeof fetch {
       await new Promise(resolve => setTimeout(resolve, 900));
       if (state === "error") return Response.json({ error: "harbordental.com did not answer." }, { status: 502 });
       return Response.json({ live: { live: true, status: "done", headline: screen === "form" ? "The new-patient form is live" : "Live on harbordental.com", activationId: "fixture-activation" } });
+    }
+    // S5 read-back after Make real: one read while it runs, then the receipt of what landed.
+    if (path === "/api/workspace" && method === "GET" && screen === "possibility") {
+      reads += 1;
+      const lines = [{ label: "Moved Book a visit above the photo", state: "Done", detail: null }, { label: "Published harbordental.com", state: reads > 1 ? "Done" : "Running", detail: reads > 1 ? null : "Running now." }, { label: "Read the live page back", state: reads > 1 ? "Done" : "Not started", detail: null }];
+      return Response.json({ workspaceId: XA4_WORKSPACE, systems: { status: "ready", systems: [], connections: [], possibilities: [], activations: reads > 1 ? [] : [{ id: "fixture-activation", possibilityId: XA4_POSSIBILITY, title: "Put booking at the top of your home page.", status: "in_progress", headline: "Making it live: 1 of 3 done", partlyLive: false, done: 1, total: 3, affects: [XA4_SITE], lines }],
+        handled: reads > 1 ? [{ id: "receipt-booking-top", systemId: XA4_SITE, sentence: "Book a visit is at the top of harbordental.com. Strelva read the live page back and it matches.", at: new Date().toISOString(), undo: "Rolling it back is its own change." }] : [] } });
     }
     if (path === "/api/workspace/site-changes") return Response.json({ requestId: "4a000000-0000-4000-8000-0000000000aa", requests: [] }, { status: 201 });
     if (path === "/api/workspace/inquiries/reply" && method === "POST") return Response.json({ outcome: { status: "suppressed", providerMessageId: null, acceptedAt: null, retryable: false } });

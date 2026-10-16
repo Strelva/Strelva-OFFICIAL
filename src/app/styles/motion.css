@@ -131,6 +131,9 @@
 }
 @media (prefers-reduced-motion: reduce) {
   @keyframes st-xa-palette { from { opacity: 0; } to { opacity: 1; } }
+  /* A spinner still says "working" under reduced motion, but by fading in
+     place instead of turning. Every spinner reads --kf-spin, so this is the one switch. */
+  @keyframes st-spin { 0%, 100% { opacity: 1; } 50% { opacity: .4; } }
 }
 
 /* Utilities for TSX. `st-enter` with `--i` set staggers within a group (cap 6). */

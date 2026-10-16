@@ -383,7 +383,7 @@ export function WebsiteAuditPage({ initialUrl = "", initialBusiness = "", initia
         ? <XaEntryFelt pose="fixing" title={agency ? `${agency.name}’s link needs a fix.` : "This agency link needs a fix."}>Nothing was checked, and nothing on any site changed.</XaEntryFelt>
         : error
           ? <XaEntryFelt pose="fixing" title="The check didn’t finish.">Run it again with the same website and business name. Nothing on your site changed.</XaEntryFelt>
-          : <XaEntryFelt pose="fixing" title="Two checks, one answer.">Website health across speed, search, phones, structured data, security and accessibility. Then whether Gemini names your business when someone asks.</XaEntryFelt>;
+          : <XaEntryFelt pose="fixing" title="Two checks, one answer.">Website health across speed, search, phones, security and accessibility. Then whether Gemini names your business when someone asks.</XaEntryFelt>;
 
   if (embed) return <div data-workspace-theme="linen" data-workspace-mode={mode} className={styles.embed}>
     {brand ? <p className={styles.embedBrand} data-agency-brand={brand.agencyId ?? undefined}><span>Prepared by {brand.name}. Runs on Strelva.</span></p> : null}
@@ -391,7 +391,7 @@ export function WebsiteAuditPage({ initialUrl = "", initialBusiness = "", initia
   </div>;
 
   return <XaEntryFrame brand={brand} brandCredit={false} mode={mode} wide={state === "done"} label="Website and business check"
-    end={<>{!brand ? <XaTextLink href="/agencies">For agencies</XaTextLink> : null}<XaTextLink href={signedIn ? "/workspace" : "/sign-in"}>{signedIn ? "Your workspace" : "Sign in"}</XaTextLink></>}
+    end={<>{!brand ? <XaTextLink href="/agencies">For agencies</XaTextLink> : null}<XaTextLink href={signedIn ? "/workspace" : "/sign-in"}>{signedIn ? "Your business" : "Sign in"}</XaTextLink></>}
     phoneSays={state === "scanning" ? "Reading the site now. Nothing on it changes." : state !== "done" && (error || attributionError) ? (attributionError ? "This agency link needs a fix." : "The check didn’t finish.") : undefined}
     felt={felt}
     footnote={brand ? `Prepared by ${brand.name}. Runs on Strelva.` : undefined}>
