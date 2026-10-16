@@ -83,7 +83,7 @@ describe("agency client shared read", () => {
     const names = await servingAgencyNames(actor, rows, { rpc });
     const item = businessDeliveryItems(rows, new Map(names.map(row => [row.requestId, row.displayName])))[0]!;
     expect(deliveryProviderName(item, new Map())).toBe("North Studio");
-    expect(deliveryProviderName({ ...item, servingAgencyName: null }, new Map([[agencyId, "Viewer’s other agency"]]))).toBe("your agency"); // XA: never the viewer's other agency, never a builder phrase
+    expect(deliveryProviderName({ ...item, servingAgencyName: null }, new Map([[agencyId, "Viewer’s other agency"]]))).toBe(""); // XA: never the viewer's other agency, never a stand-in; the row leaves the name out
     expect(deliveryProviderName({ ...item, provider: { kind: "strelva" } }, new Map())).toBe("Strelva Agency");
     expect(requestStageLabel("asked", { agencySeat: true, businessName: "Harbor Dental", agencyName: "North Studio" })).toBe("Ready for North Studio's review");
     expect(requestStageLabel("ready_for_review", { agencySeat: true, businessName: "Harbor Dental" })).toBe("Waiting on Harbor Dental");

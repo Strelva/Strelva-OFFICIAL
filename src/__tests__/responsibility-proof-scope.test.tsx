@@ -7,7 +7,9 @@ let root:Root | undefined;
 beforeEach(()=>vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT",true));
 afterEach(async()=>{await act(async()=>root?.unmount());root=undefined;document.body.innerHTML="";vi.unstubAllGlobals();});
 const a="99100000-0000-4000-8000-000000000011",b="99100000-0000-4000-8000-000000000022";
-const data=(id:string):ResponsibilityProofData=>({proof:{cards:[],verdict:`Proof for ${id}`},state:{businessId:id,providerWorkspaceId:a,canSetCadence:true,cadence:"weekly",mandates:[{serviceRequestId:a,providerWorkspaceId:a,investigations:{},everySeconds:604800,nextAt:"2026-10-09T00:00:00.000Z",idempotencyKey:"mandate:1"}]}});
+// XA-3: the owner view names each condition (card title), not the server verdict, so the title marks which business is shown.
+const card=(id:string)=>({responsibilityId:`r-${id}`,title:`Proof for ${id}`,from:"2026-10-01T00:00:00.000Z",to:"2026-10-08T00:00:00.000Z",status:"verified" as const,did:"Checked.",verified:"Held.",receiptRefs:[],openHref:"#",undoHref:null});
+const data=(id:string):ResponsibilityProofData=>({proof:{cards:[card(id)],verdict:`Verdict for ${id}`},state:{businessId:id,providerWorkspaceId:a,canSetCadence:true,cadence:"weekly",mandates:[{serviceRequestId:a,providerWorkspaceId:a,investigations:{},everySeconds:604800,nextAt:"2026-10-09T00:00:00.000Z",idempotencyKey:"mandate:1"}]}});
 const response=(id:string)=>new Response(JSON.stringify(data(id)),{status:200});
 function deferred(){let resolve!:(value:Response)=>void;const promise=new Promise<Response>(r=>{resolve=r;});return {promise,resolve};}
 async function render(id:string){if(!root){const node=document.createElement("div");document.body.append(node);root=createRoot(node);}await act(async()=>root!.render(createElement(ResponsibilityProof,{workspaceId:id,readOnly:false})));}
@@ -15,7 +17,7 @@ it("hides the prior workspace immediately and ignores a late manual reload",asyn
  const old=deferred(),current=deferred();const signals: AbortSignal[]=[];
  vi.stubGlobal("fetch",vi.fn((_url:string,options?:RequestInit)=>{if(options?.signal)signals.push(options.signal);return signals.length===1?Promise.resolve(response(a)):signals.length===2?old.promise:current.promise;}));
  await render(a);expect(document.body.textContent).toContain(`Proof for ${a}`);
- await act(async()=>{[...document.querySelectorAll("button")].find(x=>x.textContent==="Reload proof")!.click();});
+ await act(async()=>{[...document.querySelectorAll("button")].find(x=>x.textContent==="Check again")!.click();});
  await render(b);expect(document.body.textContent).not.toContain(`Proof for ${a}`);expect(document.body.textContent).not.toContain("Turn on Keep me found");expect(signals[1]!.aborted).toBe(true);
  await act(async()=>old.resolve(response(a)));expect(document.body.textContent).not.toContain(`Proof for ${a}`);
  await act(async()=>current.resolve(response(b)));expect(document.body.textContent).toContain(`Proof for ${b}`);
@@ -31,7 +33,7 @@ it("does not carry a delayed mutation result or error into another business",asy
 });
 it("retains same-workspace proof on a transient reload failure and locks changes until reload",async()=>{
  let calls=0;vi.stubGlobal("fetch",vi.fn(async()=>++calls===1?response(a):new Response(JSON.stringify({error:"Proof unavailable"}),{status:503})));
- await render(a);await act(async()=>{[...document.querySelectorAll("button")].find(x=>x.textContent==="Reload proof")!.click();});
+ await render(a);await act(async()=>{[...document.querySelectorAll("button")].find(x=>x.textContent==="Check again")!.click();});
  expect(document.body.textContent).toContain(`Proof for ${a}`);expect(document.body.textContent).toContain("Proof unavailable");expect([...document.querySelectorAll("button")].find(x=>x.textContent==="Turn on Keep me found")!.disabled).toBe(true);
 });
 

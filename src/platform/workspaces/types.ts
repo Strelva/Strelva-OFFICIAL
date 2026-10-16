@@ -3,7 +3,8 @@ import { z } from "zod";
 /** Identity recorded for an action, independent of runtime and presentation. */
 export const recordedActorSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("platform") }),
-  z.object({ kind: z.literal("agency"), displayName: z.string().trim().min(1), agencyId: z.string().uuid().optional(), userId: z.string().uuid().optional() }),
+  /** `personName`: the agency member who acted, recorded at the action ("Maya at North Studio"). Absent stays the agency alone. */
+  z.object({ kind: z.literal("agency"), displayName: z.string().trim().min(1), agencyId: z.string().uuid().optional(), userId: z.string().uuid().optional(), personName: z.string().trim().min(1).max(80).optional() }),
   z.object({ kind: z.literal("person"), displayName: z.string().trim().min(1) }),
   z.object({ kind: z.literal("operator"), displayName: z.string().trim().min(1).optional() }),
 ]);

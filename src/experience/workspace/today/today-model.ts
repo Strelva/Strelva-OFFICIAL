@@ -23,6 +23,17 @@ export function countWord(count: number, lower = false): string {
   return lower ? word.toLowerCase() : word;
 }
 
+/**
+ * How Today greets someone, from their account's recorded name: "Amy" from
+ * "Amy Lin", "Dr. Lin" from "Dr. Amy Lin". Null without a name (never the email).
+ */
+export function greetingName(displayName: string | null | undefined): string | null {
+  const words = displayName?.trim().split(/\s+/).filter(Boolean) ?? [];
+  if (!words.length) return null;
+  if (/^(dr|doctor)\.?$/i.test(words[0]!) && words.length > 1) return `Dr. ${words.at(-1)}`;
+  return words[0]!;
+}
+
 /** "Good morning, Dr. Lin." The name only when one is recorded; never the email. */
 export function todayGreeting(minute: number | null, name?: string | null): string {
   const who = name?.trim() ? `, ${name.trim()}` : "";
@@ -82,8 +93,9 @@ export interface TodayLedeInput {
 /** One plain sentence under the greeting. Exceptions first; never "all good" without a check. */
 export function todayLede({ waiting, canDecide, systems, unchecked, decisionsKnown = true }: TodayLedeInput): string {
   const { checkedAt, down } = systemsCheck(systems);
+  const failedAt = down.length === 1 && down[0]!.health.lastVerifiedAt ? clockTime(down[0]!.health.lastVerifiedAt) : "";
   const rest = down.length
-    ? `${down.length === 1 ? down[0]!.name : `${countWord(down.length)} Systems`} ${down.length === 1 ? "needs" : "need"} a look. Strelva is on it.`
+    ? down.length === 1 ? `${down[0]!.name} failed its check${failedAt ? ` at ${failedAt}` : ""}.` : `${countWord(down.length)} Systems failed their checks.`
     : checkedAt ? `${waiting ? "The rest" : "Everything"} passed ${waiting ? "their" : "its"} checks at ${clockTime(checkedAt)}.` : "";
   if (!decisionsKnown) return rest || "Ask Strelva for what your business needs.";
   // Pebble says the failed check beside the composer; the lede keeps to what is known.
@@ -95,20 +107,21 @@ export function todayLede({ waiting, canDecide, systems, unchecked, decisionsKno
 }
 
 /**
- * The latest recorded changes, oldest first, each naming whoever acted. A time
- * for today, a day for earlier ones. Without a clock (server render) every
- * line shows its day, so nothing claims "since yesterday" it cannot know.
+ * The latest recorded changes, newest first, each naming whoever acted. A time
+ * for today, "yesterday" with its time for the day before, a day for earlier
+ * ones. Without a clock (server render) every line shows its day, so nothing
+ * claims "since yesterday" it cannot know.
  */
 export function sinceLines(handled: readonly Pick<HandledReceipt, "at" | "sentence">[], now: number | null, limit = 4): { time: string; dateTime: string; text: string; recent: boolean }[] {
   return handled
     .filter(receipt => Number.isFinite(Date.parse(receipt.at)))
-    .sort((a, b) => Date.parse(a.at) - Date.parse(b.at))
-    .slice(-limit)
+    .sort((a, b) => Date.parse(b.at) - Date.parse(a.at))
+    .slice(0, limit)
     .map(receipt => {
       const at = Date.parse(receipt.at);
       const recent = now !== null && at <= now && now - at < 36 * 3_600_000;
       const sameDay = now !== null && new Date(at).toDateString() === new Date(now).toDateString();
-      return { time: sameDay || recent ? clockTime(at) : shortDay(at), dateTime: receipt.at, text: receipt.sentence.trim().replace(/([^.!?])$/, "$1."), recent };
+      return { time: sameDay ? clockTime(at) : recent ? `Yesterday ${clockTime(at)}` : shortDay(at), dateTime: receipt.at, text: receipt.sentence.trim().replace(/([^.!?])$/, "$1."), recent };
     });
 }
 
@@ -123,11 +136,14 @@ export function ownerSystemRank(system: Pick<SystemView, "health" | "lifecycle">
 }
 
 /** The yes label: the consequence, in the board's words (XA_YES_LABELS). */
+/**
+ * The yes label, in GLOSSARY words. The XA yes is a press (with ⌘↵), not a
+ * hold, so a "Hold to …" verb reads without "Hold to": Make it live, Confirm.
+ */
 export function yesLabel(item: OwnerDecision): string {
   const verb = decisionPresentation(item).verb;
   if (verb === "Hold to make it live") return XA_YES_LABELS.yes;
-  if (verb === "Hold to confirm") return "Confirm it";
-  if (verb === "Send") return "Send it";
+  if (verb === "Hold to confirm") return "Confirm";
   return verb;
 }
 
@@ -135,8 +151,8 @@ export function yesLabel(item: OwnerDecision): string {
 export function yesConsequence(item: OwnerDecision): string {
   const label = yesLabel(item);
   if (label === XA_YES_LABELS.yes) return "Your yes puts it live.";
-  if (label === "Send it") return "Your yes sends it.";
-  if (label === "Confirm it") return "Your yes confirms it.";
+  if (label === "Send") return "Your yes sends it.";
+  if (label === "Confirm") return "Your yes confirms it.";
   if (label === "Approve this preview") return "Your yes approves the preview. Nothing goes live yet.";
   if (label === "Acknowledge") return "Nothing changes when you acknowledge it.";
   return "It waits for your yes.";
@@ -185,24 +201,68 @@ export function yesPhase({ itemId, open, pending, notice, receipt, saidYes, expi
   return "waiting";
 }
 
-/** The Working trail after a yes: only steps the records prove. */
-export function yesSteps(receipt: HandledReceipt | undefined, phase: XaYesState): { id: string; label: string; state: "done" | "active" | "failed" }[] {
-  if (phase === "going") return [{ id: "yes", label: "Recording your yes", state: "active" }];
-  if (phase === "failed") return [{ id: "yes", label: "Strelva tried it once", state: "failed" }];
-  if (!receipt) return [{ id: "yes", label: "Your yes is recorded", state: "done" }, { id: "read", label: "Waiting for the receipt", state: "active" }];
-  const steps: { id: string; label: string; state: "done" | "active" | "failed" }[] = [{ id: "yes", label: `Your yes is recorded at ${clockTime(receipt.at)}`, state: "done" }];
-  if (receipt.evidence?.providerAccepted) steps.push({ id: "accepted", label: "Accepted where it lives", state: "done" });
-  if (receipt.evidence?.readBack === "verified") steps.push({ id: "read", label: "Strelva read it back", state: "done" });
-  else if (receipt.evidence?.readBack === "not_verified") steps.push({ id: "read", label: "Reading it back", state: "active" });
-  return steps;
+const PAST: Readonly<Record<string, string>> = {
+  add: "added", approve: "approved", change: "changed", close: "closed", confirm: "confirmed", fix: "fixed", hide: "hid", move: "moved", open: "opened",
+  pause: "paused", post: "posted", publish: "published", put: "put", remove: "removed", reply: "replied", send: "sent", set: "set", show: "showed",
+  turn: "turned", update: "updated", replace: "replaced", rename: "renamed", reopen: "reopened", connect: "connected", list: "listed",
+};
+const PARTICIPLE: Readonly<Record<string, string>> = { hide: "hidden", show: "shown", send: "sent" };
+const SPLIT = /\s(for|to|on|in|from|at|with)\s/;
+
+function upperFirst(text: string): string { return text.charAt(0).toUpperCase() + text.slice(1); }
+function verbOf(title: string): { verb: string; rest: string } | null {
+  const match = /^([A-Z][a-z]+)\s+(.+?)[.!?]?$/.exec(title.trim());
+  const verb = match?.[1]?.toLowerCase();
+  return verb && PAST[verb] ? { verb, rest: match![2]! } : null;
 }
 
-/** The headline after the yes: what is true now, then how Strelva knows. */
-export function afterYesHeadline(item: Pick<OwnerDecision, "title" | "kind">, receipt: HandledReceipt | undefined): { headline: string; quiet: string } {
-  const live = yesLabel(item as OwnerDecision) === XA_YES_LABELS.yes;
-  const headline = live ? "It's live." : "Done.";
-  if (!receipt) return { headline, quiet: "Strelva is recording the receipt." };
-  if (receipt.evidence?.readBack === "verified") return { headline, quiet: `Strelva read it back at ${clockTime(receipt.at)}.` };
-  if (receipt.evidence?.readBack === "not_verified") return { headline, quiet: "Strelva is still reading it back." };
-  return { headline, quiet: receipt.sentence.trim().replace(/([^.!?])$/, "$1.") };
+/**
+ * The prepared change as something a person did (XA · O3): "Maya at North
+ * Studio closed online booking for Thanksgiving." Only with a recorded actor
+ * and a title that starts with a plain verb; otherwise the title stands.
+ */
+export function decisionHeadline(item: Pick<OwnerDecision, "title" | "actor">): string {
+  const who = actedBy(item.actor);
+  const parts = verbOf(item.title);
+  if (!who || !parts) return `${item.title.trim().replace(/[.!?]$/, "")}.`;
+  return `${who} ${PAST[parts.verb]} ${parts.rest}.`;
+}
+
+/**
+ * What is true after the yes, naming the thing (XA · O4): "Online booking is
+ * closed for Thanksgiving." Falls back to the System: "It's live on Bookings."
+ */
+export function liveHeadline(item: Pick<OwnerDecision, "title">, place: string | null, live: boolean): string {
+  const parts = verbOf(item.title);
+  if (parts) {
+    const split = SPLIT.exec(parts.rest);
+    const object = split ? parts.rest.slice(0, split.index) : parts.rest;
+    const tail = split ? parts.rest.slice(split.index) : "";
+    const participle = PARTICIPLE[parts.verb] ?? PAST[parts.verb]!;
+    const plural = /[^s]s$/.test(object.split(" ").at(-1) ?? "") && !/^(this|the page|its)/i.test(object);
+    return `${upperFirst(object)} ${plural ? "are" : "is"} ${participle}${tail}.`;
+  }
+  return live ? place ? `It's live on ${place}.` : "It's live." : "Done.";
+}
+
+/** The quiet half after the yes: how Strelva knows, with the read-back time folded in. */
+export function afterYesQuiet(receipt: HandledReceipt | undefined, thing: "page" | "change"): string {
+  if (!receipt) return "Strelva is recording it in What changed.";
+  if (receipt.evidence?.readBack === "verified") return `Strelva read the ${thing} back at ${clockTime(receipt.at)}.`;
+  if (receipt.evidence?.readBack === "not_verified") return `Strelva is still reading the ${thing} back.`;
+  return `Strelva recorded it at ${clockTime(receipt.at)}.`;
+}
+
+/** What is now true, one plain sentence each, from what the receipt recorded. */
+export function nowTrue(receipt: HandledReceipt | undefined): string[] {
+  return (receipt?.changed ?? "").split(/(?<=[.!?])\s+/).map(line => line.trim().replace(/[.!?]$/, "")).filter(Boolean);
+}
+
+export type DecisionPhase = XaYesState;
+
+/** The label over the changed thing, in the tense of the phase. Never built from a source token. */
+export function previewLabel(phase: DecisionPhase, audience: string): string {
+  if (phase === "live" || phase === "expired") return `What ${audience} see now`;
+  if (phase === "undone") return "Back to how it was";
+  return `What ${audience} will see`;
 }

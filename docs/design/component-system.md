@@ -31,6 +31,20 @@ people, agency seats keep their shared-status view), `OwnerDecisionView`
 Words and states are pure functions in `today-model.ts`. Preview:
 `/preview/strelva/xa/xa3-owner-today/o1..o6?state=…&mode=dark`.
 
+October 16 review pass: `DecisionPreviewView` renders `OwnerDecision.preview`
+(a source adapter's `preview`, not stored; `bookings_week` first) as the O3/O4
+dominant element, with review lines flat beside it and no inner box. After the
+yes the panel says what is true now, never a process trail; the composer
+belongs to the waiting state. `RunningChecksView` leads with the thirty-day
+strip built from proof-card `checkDays`/`slipDays`, then value and time
+columns (`value`, `checkedAt`, `nextAt` on `ResponsibilityProofCard`); one ink
+pill even with several Keep me found offers. Requests lead with the System's
+clay tile and carry Review (open decision) and Undo (the decision receipt's
+`source`). `XaSidebar` marks a waiting System with a dot only and drops the
+Today count when a System row already carries it. The composer mic uses the
+browser's own speech recognition (`useDictation`) and is drawn only where it
+works; the plus stays undrawn until attachments exist.
+
 ## October 11 coherence amendment
 
 [GLOSSARY.md](../../GLOSSARY.md) and

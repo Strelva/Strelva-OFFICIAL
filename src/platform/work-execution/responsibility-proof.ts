@@ -23,6 +23,26 @@ export interface ResponsibilityProofCard {
   responsibilityId: string; title: string; from: string; to: string;
   status: "verified" | "partial" | "failed" | "unverified";
   did: string; verified: string; receiptRefs: string[]; openHref: string; undoHref: string | null;
+  /** XA · O6. The latest recorded check in the window; null when none ran. */
+  checkedAt?: string | null;
+  /** The check's result in a few plain words ("41 of 41", "2 of 2 read back"); null when nothing was measured. */
+  value?: string | null;
+  /** When the next scheduled check runs, from the responsibility's own trigger. */
+  nextAt?: string | null;
+  /** UTC days (YYYY-MM-DD) in the window with a recorded check, and those with a check that did not hold. */
+  checkDays?: string[];
+  slipDays?: string[];
+  /** The latest check that did not hold. */
+  lastSlipAt?: string | null;
+}
+
+/** Check history from recorded observations only: what ran, when, and which did not hold. */
+export function withCheckHistory(card: ResponsibilityProofCard, events: readonly { at: string; held: boolean }[]): ResponsibilityProofCard {
+  const valid = events.filter(event => Number.isFinite(Date.parse(event.at)));
+  const day = (at: string) => new Date(at).toISOString().slice(0, 10);
+  const latest = (list: readonly { at: string }[]) => list.length ? list.reduce((a, b) => (Date.parse(b.at) > Date.parse(a.at) ? b : a)).at : null;
+  const slips = valid.filter(event => !event.held);
+  return { ...card, checkedAt: latest(valid), checkDays: [...new Set(valid.map(event => day(event.at)))].sort(), slipDays: [...new Set(slips.map(event => day(event.at)))].sort(), lastSlipAt: latest(slips) };
 }
 
 /** A completed runner is not evidence of a Google write. Investigation receipts
@@ -46,14 +66,28 @@ export function responsibilityProofCard(record: StandingRunsRecord, from: string
   const nativeFailed = native.some(receipt => receipt.status === "failed");
   const status = native.length ? posted.length === native.length ? "verified" : posted.length ? "partial" : nativeFailed ? "failed" : "unverified" : !runs.length || !receipts.length ? "unverified" : verified.length === receipts.length && runs.every(run => run.status === "completed")
     ? "unverified" : verified.length ? "partial" : failures ? "failed" : "unverified";
-  return { responsibilityId: record.policy.id, title: record.policy.policy.title, from, to, status,
+  const trigger = record.policy.policy.trigger;
+  const events = [
+    ...receipts.map(({ receipt }) => ({ at: receipt.finishedAt ?? receipt.createdAt, held: verified.some(entry => entry.receipt === receipt) })),
+    ...native.filter(receipt => receipt.status === "posted" || receipt.status === "failed").map(receipt => ({ at: receipt.createdAt, held: receipt.status === "posted" && receipt.readback === "matched" })),
+  ];
+  return withCheckHistory({ responsibilityId: record.policy.id, title: record.policy.policy.title, from, to, status,
+    value: native.length ? `${posted.length} of ${native.length} read back` : receipts.length ? `${verified.length} of ${receipts.length}` : null,
+    nextAt: trigger.kind === "interval" ? trigger.nextAt : null,
     did: native.length ? `${posted.length} Google changes read back; ${pending.length} awaiting verification. This proves these actions, not every expected outcome.` : !runs.length ? "No run recorded in this period." : `${runs.length} run${runs.length === 1 ? "" : "s"} recorded; ${receipts.length} action receipt${receipts.length === 1 ? "" : "s"}.`,
     verified: native.length ? `${posted.length} Google receipt${posted.length === 1 ? "" : "s"} matched on read-back. ${nativeFailed ? "A provider action failed." : pending.length ? "Accepted changes will not be retried." : ""}` : verified.length ? `${verified.length} saved-source check${verified.length === 1 ? "" : "s"} verified. Google replies and hours changes require their own provider receipts.` : "No verified outcome receipt in this period.",
     receiptRefs: [...native.map(receipt => `google_listing_receipt:${receipt.id}`), ...receipts.map(({ receipt, run }) => `standing:${record.policy.id}:run:${run.id}:receipt:${receipt.id}`)],
     openHref: native.length ? `/workspace/google?workspaceId=${record.policy.workspaceId}#google-receipt-${native[0]!.id}` : `/workspace?workspaceId=${record.policy.workspaceId}&standingId=${record.policy.id}&view=operations`,
     // Read-only investigation checks have nothing to undo. Do not invent an undo link.
     undoHref: posted.some(receipt => receipt.undo) ? `/workspace/google?workspaceId=${record.policy.workspaceId}#google-receipt-${posted.find(receipt => receipt.undo)!.id}` : null,
-  };
+  }, events);
+}
+
+/** "4 min", "36 s", "2 h": a reply time in the few words a row can hold. */
+function shortDuration(seconds: number): string {
+  if (seconds < 90) return `${Math.round(seconds)} s`;
+  if (seconds < 5_400) return `${Math.round(seconds / 60)} min`;
+  return `${Math.round(seconds / 3_600)} h`;
 }
 export function addNativeResponsibilityEvidence(card: ResponsibilityProofCard, evidence: unknown): ResponsibilityProofCard {
   const row = z.object({ responsibilityId: z.string(), key: z.enum(KEEP_ME_FOUND_KEYS),
@@ -66,12 +100,13 @@ export function addNativeResponsibilityEvidence(card: ResponsibilityProofCard, e
     const health = row.data.health.filter(item => Date.parse(item.checkedAt) >= Date.parse(card.from) && Date.parse(item.checkedAt) < Date.parse(card.to));
     if (!health.length) return card;
     const passed = health.filter(item => item.status === "healthy").length;
-    return { ...card, status: passed === health.length ? "verified" : passed ? "partial" : "failed",
-      did: `${health.length} website health observations recorded.`, verified: `${passed} observations verified the published content. This describes those observations, not continuous uptime.`, receiptRefs: [...card.receiptRefs, ...health.map(item => item.evidence)] };
+    return withCheckHistory({ ...card, status: passed === health.length ? "verified" : passed ? "partial" : "failed", value: `${passed} of ${health.length}`,
+      did: `${health.length} website health observations recorded.`, verified: `${passed} observations verified the published content. This describes those observations, not continuous uptime.`, receiptRefs: [...card.receiptRefs, ...health.map(item => item.evidence)] },
+    health.map(item => ({ at: item.checkedAt, held: item.status === "healthy" })));
   }
   if (row.data.key === "inquiry_reply_time" && row.data.inquiries) {
     const inquiry = row.data.inquiries;
-    return { ...card, status: inquiry.inquiries ? "verified" : "unverified",
+    return { ...card, status: inquiry.inquiries ? "verified" : "unverified", value: inquiry.medianReplySeconds === null ? null : `Replied in ${shortDuration(inquiry.medianReplySeconds)}`,
       did: `${inquiry.inquiries} inquiries; ${inquiry.answered} first replies accepted by the mail provider.`,
       verified: inquiry.averageReplySeconds === null ? "No reply duration measured; no accepted service target is inferred." : `${inquiry.averageReplySeconds} seconds average; ${inquiry.medianReplySeconds} seconds median. Provider acceptance is measured; customer delivery and an agreed service target are separate.`, receiptRefs: [...card.receiptRefs, `inquiry_outcome_cohort:${inquiry.workspaceId}:${card.from}:${card.to}`] };
   }
@@ -79,8 +114,9 @@ export function addNativeResponsibilityEvidence(card: ResponsibilityProofCard, e
     const reports = row.data.reports.filter(item => Date.parse(item.at) >= Date.parse(card.from) && Date.parse(item.at) < Date.parse(card.to));
     if (!reports.length) return card;
     const accepted = reports.filter(item => item.status === "accepted").length;
-    return { ...card, status: accepted === reports.length ? "verified" : accepted ? "partial" : reports.some(item => item.status === "failed") ? "failed" : "unverified",
-      did: `${reports.length} report send receipts recorded.`, verified: `${accepted} reports accepted by the mail provider. Inbox delivery and owner readership are not verified.`, receiptRefs: [...card.receiptRefs, ...reports.map(item => item.evidence)] };
+    return withCheckHistory({ ...card, status: accepted === reports.length ? "verified" : accepted ? "partial" : reports.some(item => item.status === "failed") ? "failed" : "unverified", value: `${accepted} of ${reports.length} sent`,
+      did: `${reports.length} report send receipts recorded.`, verified: `${accepted} reports accepted by the mail provider. Inbox delivery and owner readership are not verified.`, receiptRefs: [...card.receiptRefs, ...reports.map(item => item.evidence)] },
+    reports.filter(item => item.status !== "suppressed").map(item => ({ at: item.at, held: item.status === "accepted" })));
   }
   return card;
 }

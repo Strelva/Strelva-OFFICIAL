@@ -24,14 +24,14 @@ it("uses the agency's places and caller-owned navigation without changing owner 
   expect([...node.querySelectorAll('nav[aria-label="Main"] a')].map(link => link.textContent)).toEqual(["Home", "Requests", "Running"]);
 });
 
-it("gives the XA agency sidebar Today, Queue, Library and Minutes, with clients and caller-owned navigation", async () => {
+it("gives the XA agency sidebar Today, Queue, Library and Running, with clients and caller-owned navigation", async () => {
   const node = document.createElement("div"); document.body.appendChild(node);
   const root = createRoot(node); roots.push(root);
   const onNavigate = vi.fn();
   const clients = [{ id: "a", name: "Harbor Dental", href: "/preview/a", detail: "Dr. Lin" }, { id: "b", name: "North Coast Realty", href: "/preview/b", waits: true }];
   await act(async () => root.render(createElement(StrelvaSidebar, { accountName: "Maya", signOut: null, workspaceId: "w1", agencyNavigation: { active: "queue", onNavigate, queueCount: 3, clients, hrefs: { library: "/preview/strelva/agency-library" } } })));
   const links = [...node.querySelectorAll<HTMLAnchorElement>('nav[aria-label="Main"] a')];
-  expect(links.map(link => link.querySelector("span")?.textContent)).toEqual(["Today", "Queue", "Library", "Minutes"]);
+  expect(links.map(link => link.querySelector("span")?.textContent)).toEqual(["Today", "Queue", "Library", "Running"]);
   expect(links[1]?.getAttribute("aria-current")).toBe("page");
   expect(links[1]?.getAttribute("aria-label")).toBe("Queue, 3 waiting");
   expect(links[2]?.getAttribute("href")).toBe("/preview/strelva/agency-library");

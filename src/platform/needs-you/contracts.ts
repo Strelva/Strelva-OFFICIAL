@@ -180,6 +180,34 @@ export const SOURCE_LIFECYCLES = [
 export type SourceLifecycle = (typeof SOURCE_LIFECYCLES)[number];
 
 const isoSchema = z.string().min(1);
+
+/**
+ * The thing a decision changes, the way the people who use it will see it
+ * (XA · O3). Not stored: a source adapter builds it from the same revision the
+ * review lines come from (SourceAdapter.preview). One kind per artifact; a
+ * decision without one shows its review lines instead.
+ */
+export const decisionPreviewSchema = z.discriminatedUnion("kind", [
+  z.object({
+    kind: z.literal("bookings_week"),
+    /** Who sees the page, plural and lower case: "patients", "customers". */
+    audience: z.string().trim().min(1).max(40),
+    /** The public address, without the scheme: "harbordental.com/book". */
+    address: z.string().trim().min(1).max(200),
+    title: z.string().trim().min(1).max(120),
+    /** One line under the title, as the page says it: "Week of Nov 23 · Closed Thu–Fri for Thanksgiving". */
+    note: z.string().trim().max(200).nullable(),
+    days: z.array(z.object({
+      weekday: z.string().trim().min(1).max(12),
+      date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+      closed: z.boolean(),
+      /** Open times as the page shows them ("8:00", "1:30"). */
+      times: z.array(z.string().trim().min(1).max(12)).max(12),
+    })).min(1).max(7),
+  }),
+]);
+export type DecisionPreview = z.infer<typeof decisionPreviewSchema>;
+
 export const ownerDecisionSchema = z.object({
   id: z.string().uuid(),
   workspaceId: z.string().uuid(),
@@ -221,6 +249,8 @@ export const ownerDecisionSchema = z.object({
    * Null: the review could not be shown, so the item can't be decided here.
    */
   review: z.array(z.string()).nullable().optional(),
+  /** Not stored. The changed thing as its audience will see it (SourceAdapter.preview); absent or null shows the review lines. */
+  preview: decisionPreviewSchema.nullable().optional().catch(null),
   /** "Strelva (system)" when the hourly cron opened it for an owner who wasn't signed in (20261009100000). */
   openedBy: z.literal("Strelva (system)").nullable().optional(),
   deliveries: z.array(z.object({
@@ -298,6 +328,7 @@ export const handledReceiptSchema = z.object({
     z.object({ state: z.literal("not_undoable"), reason: z.string() }),
     z.object({ state: z.literal("undone") }),
   ]),
+  source: z.object({ lifecycle: z.string(), id: z.string() }).optional().catch(undefined),
 });
 
 export interface HandledReceipt {
@@ -316,4 +347,6 @@ export interface HandledReceipt {
   /** Outside-write evidence. `null` when the change was inside Strelva. */
   evidence: { providerAccepted: boolean; readBack: "verified" | "not_verified" | "not_checked" } | null;
   undo: UndoState;
+  /** For an owner decision: the record it decided (`sourceLifecycle`, `sourceId`), so a Request can find its own receipt. */
+  source?: { lifecycle: string; id: string };
 }

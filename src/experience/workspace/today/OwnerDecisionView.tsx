@@ -2,25 +2,29 @@
 /**
  * The prepared change (XA · O3) and right after the yes (XA · O4).
  *
- * The brief on the left says what happened and what each choice does, in the
+ * The brief on the left says who did what and what each choice does, in the
  * decision's own words. The decision on the right is the page's one object:
- * what changes, then the one yes (XaYes). After the yes, the same panel
- * settles to Live with the Undo pill; Undo is the real reversal of the
- * recorded receipt (`decision:<id>`), offered only while that receipt says it
- * can be undone. Authority stays with the caller (useNeedsYou).
+ * the changed thing the way its audience will see it (OwnerDecision.preview;
+ * the review lines when there is none), then the one yes (XaYes). After the
+ * yes the same panel says what is true now and settles to Live with the Undo
+ * pill; Undo is the real reversal of the recorded receipt (`decision:<id>`),
+ * offered only while that receipt says it can be undone. Authority stays with
+ * the caller (useNeedsYou).
  */
 import { useState, useSyncExternalStore } from "react";
+import { Check } from "lucide-react";
 import {
-  XaAnswers, XaButton, XaComposer, XaComposerDock, XaDecision, XaEmpty, XaHeadline, XaLabel, XaPebbleScene, XaSays, XaStatus, XaSystemTile, XaTextLink, XaYes,
+  XaAnswers, XaButton, XaComposer, XaDecision, XaEmpty, XaHeadline, XaLabel, XaPebbleScene, XaSays, XaStatus, XaSystemTile, XaTextLink, XaYes,
 } from "@/components/ui/strelva/Xa";
 import { StSkeleton } from "@/components/ui/strelva/Kit";
 import { XA_YES_LABELS } from "@/platform/presentation/place-labels";
-import { actorCopy } from "@/platform/presentation/actor";
+import { actorCopy, actorShortName } from "@/platform/presentation/actor";
 import type { HandledReceipt, OwnerDecision } from "@/platform/needs-you/contracts";
 import type { SystemView } from "@/experience/systems/model";
 import type { ItemNotice, NeedsYouState } from "../useNeedsYou";
 import { decisionPresentation } from "../needs-you-presentation";
-import { actedBy, afterYesHeadline, decisionAnswers, decisionReceipt, relativeWhen, yesConsequence, yesLabel, yesPhase, yesSteps } from "./today-model";
+import { DecisionPreviewView } from "./DecisionPreview";
+import { actedBy, afterYesQuiet, clockTime, decisionAnswers, decisionHeadline, decisionReceipt, liveHeadline, nowTrue, previewLabel, relativeWhen, yesConsequence, yesLabel, yesPhase } from "./today-model";
 import styles from "./today.module.css";
 
 export interface OwnerDecisionViewProps {
@@ -57,9 +61,14 @@ function decides(state: NeedsYouState): boolean {
   return state.status === "ready" && (state.authority === "agency" ? state.canDecide === true : state.canDecide !== false && state.role !== "member");
 }
 
+function firstSentence(text: string): string {
+  return (text.split(/(?<=[.!?])\s+/)[0] ?? text).trim();
+}
+
 export function OwnerDecisionView({ businessName, needs, pending, notices, selectedId, systems = [], appBase = "", onDecide, onUndo, onRetry, onToday, onWhatChanged, onOpenDecision, onAsk, initialDecided, now: fixedNow }: OwnerDecisionViewProps) {
   const [decided, setDecided] = useState<OwnerDecision | null>(initialDecided ?? null);
   const [expired, setExpired] = useState(false);
+  const [undoneHere, setUndoneHere] = useState<string | null>(null);
   const [ask, setAsk] = useState("");
   const ready = needs.status === "ready" ? needs : null;
   const items = ready?.items ?? [];
@@ -69,11 +78,11 @@ export function OwnerDecisionView({ businessName, needs, pending, notices, selec
   const now = fixedNow ?? (clock === null ? null : clock * 60_000);
 
   if (needs.status === "loading") return <div className={styles.decisionLayout} aria-busy="true">
-    <div className={styles.brief}><StSkeleton width="40%" label="Loading what waits for you" /><StSkeleton width="90%" /><StSkeleton width="70%" /></div>
+    <div className={styles.briefHead}><StSkeleton width="40%" label="Loading what waits for you" /><StSkeleton width="90%" /><StSkeleton width="70%" /></div>
   </div>;
 
   if (needs.status === "error") return <div className={styles.decisionLayout}>
-    <section className={styles.brief} aria-labelledby="decision-error-title">
+    <section className={styles.briefHead} aria-labelledby="decision-error-title">
       <XaPebbleScene pose="fixing" size={180} label="Pebble checking the connection" />
       <XaHeadline as="h1" size="sm" id="decision-error-title" quiet="Nothing was decided while it was unavailable.">Strelva could not load what waits for you.</XaHeadline>
       <span><XaButton onClick={onRetry}>Check again</XaButton></span>
@@ -81,7 +90,7 @@ export function OwnerDecisionView({ businessName, needs, pending, notices, selec
   </div>;
 
   if (!item) return <div className={styles.decisionLayout}>
-    <div className={styles.brief}>
+    <div className={styles.briefHead}>
       <XaEmpty pose="resting" job={selectedId ? "Pebble keeps the record in What changed" : "Pebble is keeping everything else running"}
         title={selectedId ? "This no longer waits for you." : "Nothing waits for you."}
         action={<XaButton onClick={selectedId ? onWhatChanged : onToday}>{selectedId ? "What changed" : "Back to Today"}</XaButton>}>
@@ -97,34 +106,82 @@ export function OwnerDecisionView({ businessName, needs, pending, notices, selec
   const system = systems.find(entry => entry.id === item.systemId);
   const tileKind = system?.kind ?? SOURCE_KIND[look.source] ?? "form";
   const by = actedBy(item.actor);
+  const byShort = actorShortName(item.actor);
   const label = yesLabel(item);
+  const live = label === XA_YES_LABELS.yes;
   const after = phase === "live" || phase === "expired";
-  const headline = after ? afterYesHeadline(item, receipt)
-    : phase === "undone" ? { headline: "You took it back.", quiet: "Strelva recorded the undo in What changed." }
-      : { headline: `${item.title.replace(/[.!?]$/, "")}.`, quiet: yesConsequence(item) };
+  const preview = item.preview ?? null;
+  const headline = after ? { headline: liveHeadline(item, system?.name ?? null, live), quiet: afterYesQuiet(receipt, preview ? "page" : "change") }
+    : phase === "undone" ? { headline: undoneHere === item.id ? "You took it back." : "It was taken back.", quiet: "Strelva recorded the undo in What changed." }
+      : { headline: decisionHeadline(item), quiet: yesConsequence(item) };
   const canUndo = canDecide && ready?.authority !== "agency" && receipt?.undo.state === "undo";
-  const answers: [string, string][] = after || phase === "undone"
+  const undoReason = receipt && "reason" in receipt.undo ? receipt.undo.reason : null;
+  const answers: [string, string][] = after
     ? [
-      ...(receipt?.changed ? [[phase === "undone" ? "What was undone" : "What changed", receipt.changed] as [string, string]] : []),
-      ["Who did it", receipt ? actedBy(receipt.actor) ?? "Recorded without a name" : by ?? "Recorded without a name"],
-      ["Take it back", phase === "undone" ? "Already undone." : canUndo ? "Undo here, or any time from What changed." : receipt && "reason" in receipt.undo ? receipt.undo.reason : "Strelva is still recording whether it can be undone."],
+      ...(by ? [["Prepared by", by] as [string, string]] : []),
+      ...(canUndo ? [["Take it back", "Undo here, or any time from What changed."] as [string, string]] : undoReason ? [["Take it back", undoReason] as [string, string]] : []),
     ]
-    : decisionAnswers(item);
+    : phase === "undone"
+      ? [...(by ? [["Prepared by", by] as [string, string]] : []), ...(undoneHere === item.id ? [["Undone by", "You"] as [string, string]] : [])]
+      : decisionAnswers(item);
+  const truths = after ? nowTrue(receipt) : [];
   const others = items.filter(entry => entry.id !== item.id);
   const status = phase === "waiting" ? <XaStatus kind="waits">{canDecide ? "Waits for you" : "Waits for the owner"}</XaStatus>
     : phase === "going" ? <XaStatus kind="working">Going ahead</XaStatus>
       : phase === "failed" ? <XaStatus kind="down">Did not go through</XaStatus>
         : phase === "undone" ? <XaStatus kind="draft">Undone</XaStatus>
-          : <XaStatus kind="live" breathe>{label === XA_YES_LABELS.yes ? "Live" : "Done"}</XaStatus>;
-  const meta = after || phase === "undone" ? by ? `Prepared by ${by}` : undefined
-    : [by ? `Prepared by ${by}` : "Prepared for you", now === null ? "" : relativeWhen(item.openedAt, now)].filter(Boolean).join(", ");
+          : <XaStatus kind="live" breathe>{live ? "Live" : "Done"}</XaStatus>;
+  const meta = after ? receipt?.evidence?.readBack === "verified" ? `Read back at ${clockTime(receipt.at)}` : undefined
+    : phase === "undone" ? undefined
+      : [byShort ? `Prepared by ${byShort}` : null, now === null ? "" : relativeWhen(item.openedAt, now)].filter(Boolean).join(", ") || undefined;
   const disabledReason = item.review === null ? <>This changed or could not be loaded. <XaTextLink onClick={onRetry}>Check again</XaTextLink> to see the latest before deciding.</> : undefined;
+  const audience = preview?.audience;
+  const where = preview?.address ?? system?.name ?? null;
+  const panelLabel = audience ? previewLabel(phase, audience)
+    : after ? "What changed" : phase === "undone" ? "Back to how it was" : "What your yes changes";
+  const lines = item.review?.length ? item.review : item.detail && look.shape !== "message" ? [item.detail] : !item.detail ? [actorCopy(item.approveEffect, item.actor)] : [];
 
-  return <div className={styles.decisionLayout}>
-    <div className={styles.brief}>
-      <XaSystemTile kind={tileKind} size={64} label={system?.name ?? look.source} />
+  const body = phase === "undone"
+    ? <p className={styles.changeLine}>{firstSentence(actorCopy(item.notYetEffect, item.actor))}</p>
+    : preview ? <>
+      <DecisionPreviewView preview={preview} changed={!after} />
+      {!after && lines.length ? <ul className={styles.changeLines} data-quiet aria-label="Every change you approve">{lines.map((line, index) => <li key={index}>{line}</li>)}</ul> : null}
+    </>
+      : <>
+        {look.amount && !item.review?.length ? <p className={styles.amount}>{look.amount}</p> : null}
+        {item.detail && look.shape === "message" && !item.review?.length ? <blockquote className={styles.quote}>{item.detail}</blockquote> : null}
+        {lines.length ? <ul className={styles.changeLines} aria-label="Every change you approve">{lines.map((line, index) => <li key={index}>{line}</li>)}</ul> : null}
+      </>;
+
+  return <div className={styles.decisionLayout} data-phase={phase}>
+    <div className={styles.briefHead}>
+      <span className={styles.briefTile}><XaSystemTile kind={tileKind} size={64} label={system?.name ?? look.source} /></span>
       <XaHeadline quiet={headline.quiet}>{headline.headline}</XaHeadline>
-      <XaAnswers rows={answers} labelWidth={156} />
+    </div>
+    <div className={styles.panel}>
+      <XaDecision label={`Decision for ${businessName}: ${item.title}`} status={status} meta={meta}
+        yes={!canDecide && phase === "waiting" ? <p className={styles.recordNote}>Only the owner can decide this. You can see what waits and what each choice does.</p> : <XaYes state={phase} yesLabel={label} disabledReason={disabledReason}
+          onYes={() => { setDecided(item); setExpired(false); onDecide(item, "approve"); }}
+          onNotYet={canDecide && item.review !== null ? () => { onDecide(item, "not_yet"); onToday(); } : undefined}
+          onUndo={canUndo && receipt ? () => { setUndoneHere(item.id); onUndo(receipt); } : undefined}
+          onUndoExpired={() => setExpired(true)}
+          working={phase === "going" ? { title: "Going ahead", steps: [] } : undefined}
+          liveLabel={where ? `${live ? "Live" : "Done"} on ${where}` : `${live ? "Live" : "Done"}: ${item.title}`}
+          failure={notices[item.id]?.text ?? "It did not go through. Nothing changed."}
+          settled={phase === "undone" ? "Undone. Nothing else changed." : canUndo ? "Take it back any time from What changed." : "Its record is in What changed."} />}>
+        <div className={styles.decisionBody}>
+          <XaLabel>{panelLabel}</XaLabel>
+          {body}
+          {item.openHref ? <span><XaTextLink href={`${appBase}${item.openHref}`}>Open it in full</XaTextLink></span> : null}
+        </div>
+      </XaDecision>
+    </div>
+    <div className={styles.briefBody}>
+      {truths.length ? <div className={styles.truths}>
+        <XaStatus kind="live">{where ? `${live ? "Live" : "Done"} on ${where}` : live ? "Live" : "Done"}</XaStatus>
+        <ul aria-label="What is true now">{truths.map(line => <li key={line}><Check size={15} strokeWidth={2.2} aria-hidden="true" />{line}</li>)}</ul>
+      </div> : null}
+      {answers.length ? <XaAnswers rows={answers} labelWidth={156} /> : null}
       {phase === "waiting" && others.length ? <XaSays links={others.slice(0, 2).map(other => <XaTextLink key={other.id} onClick={() => onOpenDecision(other.id)}>{other.title}</XaTextLink>)}>
         {others.length === 1 ? "One more waits after this:" : `${others.length} more wait after this:`}
       </XaSays> : null}
@@ -132,29 +189,8 @@ export function OwnerDecisionView({ businessName, needs, pending, notices, selec
         {phase === "undone" ? "It is back the way it was before your yes." : others.length ? `${others.length === 1 ? "One more waits" : `${others.length} more wait`} for you on Today.` : "Nothing else waits for you."}
       </XaSays> : null}
     </div>
-    <XaDecision label={`Decision for ${businessName}: ${item.title}`} status={status} meta={meta}
-      yes={!canDecide && phase === "waiting" ? <p className={styles.recordNote}>Only the owner can decide this. You can see what waits and what each choice does.</p> : <XaYes state={phase} yesLabel={label} disabledReason={disabledReason}
-        onYes={() => { setDecided(item); setExpired(false); onDecide(item, "approve"); }}
-        onNotYet={canDecide && item.review !== null ? () => { onDecide(item, "not_yet"); onToday(); } : undefined}
-        onUndo={canUndo && receipt ? () => onUndo(receipt) : undefined}
-        onUndoExpired={() => setExpired(true)}
-        working={{ title: phase === "going" ? "Going ahead" : "What Strelva checked", steps: yesSteps(receipt, phase) }}
-        liveLabel={label === XA_YES_LABELS.yes ? `Live: ${item.title}` : `Done: ${item.title}`}
-        failure={notices[item.id]?.text ?? "It did not go through. Nothing changed."}
-        settled={phase === "undone" ? "Undone. Nothing else changed." : canUndo ? "Take it back any time from What changed." : "Its record is in What changed."} />}>
-      <div className={styles.decisionBody}>
-        <XaLabel>{look.source} · what changes</XaLabel>
-        {look.amount && !item.review?.length ? <p className={styles.amount}>{look.amount}</p> : null}
-        {item.review?.length ? <ul className={styles.changes} aria-label="Every change you approve">{item.review.map((line, index) => <li key={index}>{line}</li>)}</ul>
-          : item.detail ? look.shape === "message" ? <blockquote className={styles.quote}>{item.detail}</blockquote> : <ul className={styles.changes}><li>{item.detail}</li></ul>
-            : <ul className={styles.changes}><li>{actorCopyFallback(item)}</li></ul>}
-        {item.openHref ? <span><XaTextLink href={`${appBase}${item.openHref}`}>Open it in full</XaTextLink></span> : null}
-      </div>
-    </XaDecision>
-    {onAsk ? <XaComposerDock><div className={styles.dock}><XaComposer value={ask} onChange={setAsk} onSubmit={() => { const text = ask.trim(); if (text) { onAsk(text); setAsk(""); } }} placeholder="Ask for a different change" inputLabel={`Ask Strelva for a different change to ${item.title}`} /></div></XaComposerDock> : null}
+    {onAsk && phase === "waiting" && canDecide ? <div className={styles.briefDock}>
+      <XaComposer value={ask} onChange={setAsk} onSubmit={() => { const text = ask.trim(); if (text) { onAsk(text); setAsk(""); } }} placeholder="Ask for a different change" inputLabel={`Ask Strelva for a different change to ${item.title}`} />
+    </div> : null}
   </div>;
-}
-
-function actorCopyFallback(item: OwnerDecision): string {
-  return actorCopy(item.approveEffect, item.actor);
 }

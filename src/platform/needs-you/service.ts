@@ -11,7 +11,7 @@ import type { SendEmailInput, SendEmailResult } from "@/platform/infra/email/sen
 import type { EmailDecision, EmailOptions } from "@/platform/infra/email/layout";
 import { buildWorkspaceApproveUrl, type WorkspaceApproveLinkClaims } from "@/lib/approve-link";
 import type { WorkspaceActor } from "@/platform/workspaces/types";
-import { nextChaseStep, type Decision, type OwnerDecision, type PolicyItem } from "./contracts";
+import { decisionPreviewSchema, nextChaseStep, type Decision, type DecisionPreview, type OwnerDecision, type PolicyItem } from "./contracts";
 import type { AdapterContext, ResolveBy, SourceAdapter } from "./adapters";
 import { ServiceSessionRefusedError, type ServiceSession } from "./service-actor";
 import { NeedsYouRefusedError, type DeliveryRow, type NeedsYouStore } from "./repository";
@@ -165,7 +165,8 @@ export function createNeedsYouService(deps: NeedsYouDeps) {
     const reviewed: OwnerDecision[] = [];
     for (const item of items) {
       const lines = await review(item, ctx);
-      reviewed.push(lines === undefined ? item : { ...item, review: lines });
+      const shown = lines === null ? null : await preview(item, ctx);
+      reviewed.push({ ...item, ...(lines === undefined ? {} : { review: lines }), ...(shown ? { preview: shown } : {}) });
     }
     return { items: reviewed, complete: synced.complete };
   }
@@ -180,6 +181,13 @@ export function createNeedsYouService(deps: NeedsYouDeps) {
     if (!adapter?.review) return undefined;
     if (ctx.workspaceId !== item.workspaceId) return null;
     return adapter.review(ctx, item).catch(() => null);
+  }
+
+  /** The changed thing as its audience will see it. Never blocks a decision: a failed preview falls back to the review lines. */
+  async function preview(item: OwnerDecision, ctx: AdapterContext): Promise<DecisionPreview | null> {
+    const adapter = adapterFor(item.sourceLifecycle);
+    if (!adapter?.preview || ctx.workspaceId !== item.workspaceId) return null;
+    return adapter.preview(ctx, item).then(value => decisionPreviewSchema.nullable().catch(null).parse(value)).catch(() => null);
   }
 
   async function decide(input: {

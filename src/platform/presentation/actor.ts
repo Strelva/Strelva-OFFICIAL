@@ -19,10 +19,25 @@ export function actorPresentation(actor: unknown): { name: string | null; credit
   if (!recorded) return { name: null, credit: null };
   switch (recorded.kind) {
     case "platform": return { name: "Strelva", credit: null };
-    case "agency": return { name: recorded.displayName, credit: "Runs on Strelva" };
+    case "agency": return { name: recorded.personName ? `${firstName(recorded.personName)} at ${recorded.displayName}` : recorded.displayName, credit: "Runs on Strelva" };
     case "person": return { name: recorded.displayName, credit: null };
     case "operator": return { name: recorded.displayName ? `${recorded.displayName} (platform support)` : "Platform operator (support)", credit: null };
   }
+}
+
+/** "Maya" from "Maya Okafor": how a person is named beside their agency. */
+export function firstName(name: string): string {
+  return name.trim().split(/\s+/)[0] ?? name.trim();
+}
+
+/**
+ * The shortest true name for whoever acted: the person when one is recorded
+ * ("Maya"), else the agency or Strelva. For a byline beside a fuller sentence.
+ */
+export function actorShortName(actor: unknown): string | null {
+  const recorded = recordedActor(actor);
+  if (recorded?.kind === "agency" && recorded.personName) return firstName(recorded.personName);
+  return actorPresentation(actor).name;
 }
 
 /** Action starts with a lower-case verb; supply a neutral form for non-verb phrases. */

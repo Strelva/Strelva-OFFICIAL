@@ -1,4 +1,5 @@
 import type { ServiceRequest } from "@/platform/service-requests/types";
+import { recordedActor, type RecordedActor } from "@/platform/presentation/actor";
 import { deliveryCommitmentStatus } from "@/platform/service-requests/delivery-commitment";
 
 /**
@@ -21,6 +22,13 @@ export interface BusinessDeliveryItem {
   servingAgencyName?: string | null;
   dueAt: string | null;
   updatedAt: string;
+  /** The delivery the agency recorded for this request, when there is one (its decision's source). */
+  deliveryId?: string | null;
+  /** XA · O5. The System the request is about, when the ask named one. */
+  systemId?: string | null;
+  /** Who asked, as recorded when the request was made. Absent stays unnamed. */
+  askedBy?: RecordedActor | null;
+  createdAt?: string;
 }
 
 export const REQUEST_STAGE_LABELS: Record<BusinessRequestStage, string> = {
@@ -65,6 +73,10 @@ export function businessDeliveryItems(requests: readonly ServiceRequest[], agenc
       servingAgencyName: agencyNames.get(request.id) ?? null,
       dueAt: commitment?.dueAt ?? null,
       updatedAt: request.updatedAt,
+      deliveryId: request.deliveryId,
+      systemId: typeof request.context?.systemId === "string" ? request.context.systemId : null,
+      askedBy: recordedActor(request.context?.actor),
+      createdAt: request.createdAt,
     };
   });
 }

@@ -136,7 +136,8 @@ export function XaSidebar(props: XaSidebarProps) {
   </div>;
 
   const ownerMain = <XaGlideList as="nav" label="Main" className={styles.group}>
-    <Item href={href("home")} icon={Sun} label={XA_PLACE_LABELS.today} current={!currentPin && (place === "home" || place === "needs-you")} count={needsYou?.count ?? null} onOpen={go("home")} onClose={close} />
+    {/* The waiting item is said once in the rail: a dot on its System. Today counts only what no System row carries. */}
+    <Item href={href("home")} icon={Sun} label={XA_PLACE_LABELS.today} current={!currentPin && (place === "home" || place === "needs-you")} count={pinned.some(entry => entry.state === "waits") ? null : needsYou?.count ?? null} onOpen={go("home")} onClose={close} />
     <Item href={href("requests")} icon={ListChecks} label={XA_PLACE_LABELS.requests} current={!currentPin && place === "requests"} onOpen={go("requests")} onClose={close} />
     <Item href={href("ongoing")} icon={ScrollText} label={XA_PLACE_LABELS.minutes} current={!currentPin && place === "ongoing"} onOpen={go("ongoing")} onClose={close} />
   </XaGlideList>;
@@ -156,7 +157,7 @@ export function XaSidebar(props: XaSidebarProps) {
       {pinned.map(entry => <Link key={entry.id} className={styles.system} href={entry.href} title={entry.title} aria-current={currentPin === entry.id ? "page" : undefined} onClick={event => { inPlace(event, entry.onOpen ? () => { close(); entry.onOpen?.(); } : undefined); if (!entry.onOpen) close(); }}>
         <XaSystemTile kind={entry.kind || "website"} size={26} />
         <span className={styles.itemLabel}>{entry.title}</span>
-        {entry.state === "waits" ? <span className={styles.aside} data-tone="waits"><span className={styles.dot} data-kind="waits" aria-hidden="true" />Waits for you</span>
+        {entry.state === "waits" ? <span className={styles.aside} data-tone="waits"><span className={styles.dot} data-kind="waits" aria-hidden="true" /><span className={styles.srOnly}>Waits for you</span></span>
           : entry.state === "down" ? <span className={styles.aside} data-tone="down">Not working</span>
             : entry.state === "draft" ? <span className={styles.aside}>Draft</span>
               : entry.detail ? <span className={styles.aside}>{entry.detail}</span> : null}

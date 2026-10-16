@@ -29,17 +29,23 @@ export async function captureAutomationActor(actor: WorkspaceActor, workspaceId:
   } catch { return null; }
 }
 
-/** Resolve the recorded principal, never the person viewing its History. */
-export async function personActor(userId: string): Promise<RecordedActor | null> {
+/** The account's own recorded name (full_name, then name). Never the email. */
+export async function accountDisplayName(userId: string): Promise<string | null> {
   try {
     const db = getSupabase();
     if (!db || !/^[0-9a-f-]{36}$/i.test(userId)) return null;
     const { data, error } = await db.auth.admin.getUserById(userId);
     if (error || data.user?.id !== userId) return null;
     const metadata = data.user.user_metadata;
-    const displayName = [metadata?.full_name, metadata?.name].find(value => typeof value === "string" && value.trim())?.trim();
-    return displayName ? recordedActor({ kind: "person", displayName }) : null;
+    const name = [metadata?.full_name, metadata?.name].find(value => typeof value === "string" && value.trim());
+    return typeof name === "string" ? name.trim().slice(0, 80) : null;
   } catch { return null; }
+}
+
+/** Resolve the recorded principal, never the person viewing its History. */
+export async function personActor(userId: string): Promise<RecordedActor | null> {
+  const displayName = await accountDisplayName(userId);
+  return displayName ? recordedActor({ kind: "person", displayName }) : null;
 }
 
 /** Capture at the action, then retain the name in the receipt. Never use this
@@ -85,7 +91,9 @@ export async function captureActionActor(actor: WorkspaceActor, workspaceId: str
         .eq("id", agencyId).eq("kind", "agency").maybeSingle();
       if (error || !workspace) return null;
       const brand = workspace.agency_brand as { displayName?: unknown } | null;
-      return recordedActor({ kind: "agency", displayName: brand?.displayName ?? workspace.name });
+      // The agency member who acted, by their own recorded name: "Maya at North Studio".
+      const personName = await accountDisplayName(actor.userId);
+      return recordedActor({ kind: "agency", displayName: brand?.displayName ?? workspace.name, ...(personName ? { personName } : {}) });
     }
     return personActor(actor.userId);
   } catch { return null; }

@@ -15,10 +15,14 @@ const responsibilityProofDataSchema = z.object({
     responsibilityId: z.string(), title: z.string(), from: z.string(), to: z.string(),
     status: z.enum(["verified", "partial", "failed", "unverified"]), did: z.string(), verified: z.string(),
     receiptRefs: z.array(z.string()), openHref: z.string(), undoHref: z.string().nullable(),
+    checkedAt: z.string().nullable().optional(), value: z.string().nullable().optional(), nextAt: z.string().nullable().optional(),
+    checkDays: z.array(z.string()).optional(), slipDays: z.array(z.string()).optional(), lastSlipAt: z.string().nullable().optional(),
   })) }),
   state: z.object({ businessId: z.string(), providerWorkspaceId: z.string().nullable(), canSetCadence: z.boolean(), cadence: z.enum(["weekly", "monthly"]),
     mandates: z.array(z.object({ serviceRequestId: z.string(), providerWorkspaceId: z.string(), investigations: z.record(z.string(), z.string()), everySeconds: z.number().int().positive(), nextAt: z.string(), idempotencyKey: z.string() })) }),
 });
+/** XA · O6 shows thirty days of checks (the API allows up to 32). */
+const PROOF_WINDOW_MS = 30 * 86_400_000;
 function readResponsibilityProof(value: unknown, workspaceId: string): ResponsibilityProofData {
   const result = responsibilityProofDataSchema.safeParse(value);
   if (!result.success || result.data.state.businessId !== workspaceId) throw new Error("What Strelva keeps true could not be checked. Reload to confirm this business.");
@@ -43,7 +47,7 @@ function ScopedResponsibilityProof({ workspaceId, readOnly, initial, children }:
   async function load() {
     const sequence = ++readSequence.current, request = controller();
     setError(""); setBusy(true);
-    const to = new Date(); const from = new Date(to.getTime() - 7 * 86_400_000);
+    const to = new Date(); const from = new Date(to.getTime() - PROOF_WINDOW_MS);
     try {
       const response = await fetch(`/api/operations?view=responsibility_proof&workspaceId=${workspaceId}&from=${encodeURIComponent(from.toISOString())}&to=${encodeURIComponent(to.toISOString())}`, { signal: request.signal });
       const result = await response.json().catch(() => { throw new Error("What Strelva keeps true could not be checked."); });
@@ -55,12 +59,22 @@ function ScopedResponsibilityProof({ workspaceId, readOnly, initial, children }:
   useEffect(() => {
     if (initial) return;
     const sequence = ++readSequence.current, request = controller(), pending = controllers.current;
-    const to = new Date(), from = new Date(to.getTime() - 7 * 86_400_000);
+    const to = new Date(), from = new Date(to.getTime() - PROOF_WINDOW_MS);
     fetch(`/api/operations?view=responsibility_proof&workspaceId=${workspaceId}&from=${encodeURIComponent(from.toISOString())}&to=${encodeURIComponent(to.toISOString())}`, { signal: request.signal })
       .then(async response => { const result = await response.json().catch(() => { throw new Error("What Strelva keeps true could not be checked."); }); if (!response.ok) throw new Error(result.error ?? "What Strelva keeps true could not be checked."); return readResponsibilityProof(result, workspaceId); })
       .then(result => { if (active.current && sequence === readSequence.current) setData(readResponsibilityProof(result, workspaceId)); }).catch(cause => { if (active.current && sequence === readSequence.current && !request.signal.aborted) setError(cause instanceof Error ? cause.message : "What Strelva keeps true could not be checked."); });
     return () => { request.abort(); pending.delete(request); };
   }, [workspaceId, initial]);
+  // The page keeps itself current: a fresh read when the tab comes back and every five minutes while it is open.
+  const reload = useRef<() => void>(() => undefined);
+  useEffect(() => { reload.current = () => { if (!initial && !busy) void load(); }; });
+  useEffect(() => {
+    if (initial) return;
+    const visible = () => { if (document.visibilityState === "visible") reload.current(); };
+    const timer = window.setInterval(visible, 300_000);
+    document.addEventListener("visibilitychange", visible);
+    return () => { window.clearInterval(timer); document.removeEventListener("visibilitychange", visible); };
+  }, [initial]);
   async function change(command: Record<string,unknown>) {
     if (initial || readOnly || busy || error) return;
     const request = controller();
