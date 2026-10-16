@@ -289,15 +289,16 @@ it("lets the real sidebar own navigation and keeps Build accessible beside the p
   expect(request.mock.calls.some(([url]) => String(url).includes("agency-proposals"))).toBe(false);
 });
 
-it("opens a distinct agency Home with the same scoped portfolio and a Clients action", async () => {
+it("opens the XA agency Today with the same scoped portfolio, one row per client", async () => {
   const request = router({ clients: () => Response.json(page([row(1), row(2)])) });
   const { node } = await render(request, true, vi.fn(), "home");
-  expect(node.querySelector("h1")?.textContent).toBe("Strelva");
+  // XA · AG1: a greeting (a role address like ops@ gets no name), one sentence, then one row per client.
+  expect(node.querySelector("h1")?.textContent).toMatch(/^Good (morning|afternoon|evening)\.$/);
   expect(node.querySelector('section[aria-label="Home"]')).not.toBeNull();
   expect(node.querySelector('[role="tablist"]')).toBeNull();
-  expect(node.textContent).toContain("2 clients");
-  expect(node.querySelectorAll('table[aria-label="Clients"] tbody > tr')).toHaveLength(2);
-  expect(button(node, "View clients")).toBeDefined();
+  expect(node.textContent).toContain("Every client is quiet.");
+  expect([...node.querySelectorAll('ul[aria-label="Clients"] > li')].map(item => item.textContent)).toEqual([expect.stringContaining("Client 1"), expect.stringContaining("Client 2")]);
+  expect(node.querySelectorAll("[data-xa-primary]")).toHaveLength(0);
   expect(clientCalls(request)).toHaveLength(1);
 });
 

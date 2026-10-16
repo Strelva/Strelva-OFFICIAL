@@ -1,5 +1,6 @@
 "use client";
 
+import { clientColor } from "./agency/xa/client-color";
 import { useEffect, useRef, useState } from "react";
 import { ChevronsUpDown } from "lucide-react";
 import { StMono, StTextButton } from "@/components/ui/strelva/Kit";
@@ -24,7 +25,7 @@ export function clientAgencyWorkspace(snapshot: WorkspaceSnapshot) {
 export function agencyClientLinks(snapshot: WorkspaceSnapshot, appBase: string, onWorkspace?: (id: string) => void): StrelvaClientLink[] {
   return snapshot.workspaces
     .filter(item => item.kind === "customer" && ["provider_seat", "delegated_read"].includes(item.access || ""))
-    .map(item => ({ id: item.id, name: item.name, href: `${appBase}/workspace?workspaceId=${encodeURIComponent(item.id)}`, onOpen: onWorkspace ? () => onWorkspace(item.id) : undefined, current: item.id === snapshot.workspaceId, detail: item.access === "delegated_read" ? "Read-only" : undefined }));
+    .map(item => ({ id: item.id, name: item.name, href: `${appBase}/workspace?workspaceId=${encodeURIComponent(item.id)}`, onOpen: onWorkspace ? () => onWorkspace(item.id) : undefined, current: item.id === snapshot.workspaceId, color: clientColor(item.id), detail: item.access === "delegated_read" ? "Read-only" : undefined }));
 }
 
 /** Only server-authorized workspaces and Systems appear in this scope picker. */

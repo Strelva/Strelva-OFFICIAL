@@ -1,8 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useState, type SyntheticEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type SyntheticEvent } from "react";
 import { z } from "zod";
-import { StEmpty, StHead, StMono, StNotice, StPage, StPill, StSection, StSkeleton, StTextButton, StToast } from "@/components/ui/strelva/Kit";
+import { StSkeleton } from "@/components/ui/strelva/Kit";
+import { XaAnswers, XaButton, XaEmpty, XaHeadline, XaLabel, XaRow, XaRows, XaSays, XaTextLink } from "@/components/ui/strelva/Xa";
+import { AgencySendPanel, type AgencyDraftChange } from "@/experience/workspace/agency/xa/AgencySendPanel";
+import xa from "@/experience/workspace/agency/xa/agency-xa.module.css";
 import { SelectInput, TextArea } from "@/components/ui/TextInput";
 import { agencyManagedWebsiteDraftGrantSchema, type AgencyManagedWebsiteDraftGrant } from "@/platform/offerings/agency-website-draft-contracts";
 import { AGENCY_DOCUMENT_NODE_SECTIONS, siteDocumentSchema, websiteRebuildSchema, type WebsiteRebuildRecord, type CatalogNode } from "@/products/websites/client";
@@ -58,7 +61,8 @@ const pointer = (id: string) => id.replace(/~/g, "~0").replace(/\//g, "~1");
 function object(value: string): Record<string, unknown> | null { try { const parsed: unknown = JSON.parse(value); return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed as Record<string, unknown> : null; } catch { return null; } }
 type Edit = { props: string; children: string[] };
 
-export function AgencyWebsiteDocumentDraftExperience({ bindingId, transport = agencyDocumentTransport }: { bindingId: string; transport?: AgencyDocumentTransport }) {
+export function AgencyWebsiteDocumentDraftExperience({ bindingId, transport = agencyDocumentTransport, clientName, initialEdits }: { bindingId: string; transport?: AgencyDocumentTransport; clientName?: string; /** Preview fixtures only: edits already made, so the send panel can be seen filled. */ initialEdits?: Record<string, Edit> }) {
+  const editorRef = useRef<HTMLDivElement>(null);
   const [state, setState] = useState<AgencyDocumentState | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -74,8 +78,9 @@ export function AgencyWebsiteDocumentDraftExperience({ bindingId, transport = ag
   const [edits, setEdits] = useState<Record<string, Edit>>({});
   useEffect(() => {
     const controller = new AbortController(); setLoading(true); setError("");
-    transport.read(bindingId, controller.signal, scope).then(value => { if (!controller.signal.aborted) { setState(value); setPermissionChecked(true); setEdits({}); setSelected(""); setSaved(""); setLoading(false); } }).catch(cause => { if (!controller.signal.aborted) { setError(cause instanceof Error ? cause.message : "Permission could not be checked."); setPermissionChecked(false); setLoading(false); } });
+    transport.read(bindingId, controller.signal, scope).then(value => { if (!controller.signal.aborted) { setState(value); setPermissionChecked(true); setEdits(initialEdits ?? {}); setSelected(""); setSaved(""); setLoading(false); } }).catch(cause => { if (!controller.signal.aborted) { setError(cause instanceof Error ? cause.message : "Permission could not be checked."); setPermissionChecked(false); setLoading(false); } });
     return () => controller.abort();
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- initialEdits seeds the first read only.
   }, [bindingId, transport, attempt, scope]);
   useEffect(() => { const tick = () => setNow(Date.now()); tick(); const timer = window.setInterval(tick, 1000); return () => window.clearInterval(timer); }, []);
   const website = state?.website;
@@ -111,30 +116,66 @@ export function AgencyWebsiteDocumentDraftExperience({ bindingId, transport = ag
     for (const [id, value] of Object.entries(edits)) { document.nodes[id]!.props = object(value.props) as CatalogNode["props"]; document.nodes[id]!.children = value.children; }
     if (!siteDocumentSchema.safeParse(document).success) { setError("The section settings do not match this website component. Correct the settings before saving."); return; }
     setSaving(true); setError(""); setSaved("");
-    try { const result = await transport.save(bindingId, website, state!.section!, ops); setState(current => current ? { ...current, ...result } : current); setEdits({}); setSaved(`Saved draft Release ${result.website.rebuild.candidate?.revision}. The client can now review it.`); }
+    try { const result = await transport.save(bindingId, website, state!.section!, ops); setState(current => current ? { ...current, ...result } : current); setEdits({}); setSaved(`Sent as draft Release ${result.website.rebuild.candidate?.revision}. ${clientName || "The client"} can now review it.`); }
     catch (cause) { setError(cause instanceof Error ? cause.message : "The draft could not be saved. Your edits are preserved."); if (cause instanceof AgencyDocumentTransportError && cause.requiresPermissionReload) setPermissionChecked(false); }
     finally { setSaving(false); }
   }
   if (!loading && state && !website && !error) return <AgencyManagedWebsiteDraftExperience bindingId={bindingId} />;
-  return <main className="min-h-screen bg-surface"><StPage>
-    <StHead title="Prepare a website update" meta="Edit the sections covered by the client’s permission and save a draft for their review." />
-    {loading ? <StSkeleton label="Checking the current website permission" width="65%" /> : null}
-    {error ? <div className="grid gap-3"><StNotice tone="critical"><p className="m-0">{error}</p>{Object.keys(edits).length ? <p className="mb-0 mt-2 text-gray-muted">Your unsaved edits are preserved. Reloading replaces them with the saved document.</p> : null}</StNotice><StPill variant="soft" disabled={saving} onClick={() => setAttempt(value => value + 1)}>Reload saved document and permission</StPill></div> : null}
-    {!loading && state && !state.grant ? <StEmpty>The client needs to enable draft editing before you can update this website.</StEmpty> : null}
-    {!loading && state?.grant && !active ? <StNotice tone="need">This draft permission is {!permissionChecked ? "unconfirmed" : state.grant.status === "revoked" ? "revoked" : "expired"}. Saving is unavailable. Website history stays with the client.</StNotice> : null}
-    {!loading && candidate && state?.grant && active ? <div className="grid min-w-0 gap-8 lg:grid-cols-2">
-      <StSection title={website!.rebuild.title}><p className="m-0 text-sm text-gray-muted"><StMono>Release {candidate.revision}</StMono> · Permission: {state.section} · Expires {new Date(state.grant.expiresAt).toLocaleString()}</p>
-        {state.sections.length > 1 ? <SelectInput label="Assigned section" value={state.section ?? ""} options={state.sections.map(value => ({ value, label: value }))} onChange={event => setScope(event.target.value)} disabled={saving || Object.keys(edits).length > 0} helperText={Object.keys(edits).length > 0 ? "Save or reload your edits before changing the assigned section." : undefined} /> : null}
-        {node && edit ? <><SelectInput label="Section to edit" value={node.id} onChange={event => setSelected(event.target.value)} options={nodes.map(item => ({ value: item.id, label: `${item.type} · ${"title" in item.props && typeof item.props.title === "string" ? item.props.title : item.id}` }))} disabled={saving} />
-          {Object.entries(props ?? {}).filter(([,value]) => typeof value === "string").map(([key,value]) => <TextArea key={key} label={key.replace(/([A-Z])/g, " $1").replace(/^./, character => character.toUpperCase())} value={String(value)} rows={key === "body" || key === "text" ? 4 : 2} onChange={event => field(key, event.target.value)} disabled={saving} />)}
-          <details><summary className="cursor-pointer py-2 text-sm font-medium text-warm-black">Section settings</summary><TextArea label="Component settings" value={edit.props} onChange={event => update({ props: event.target.value })} rows={8} spellCheck={false} disabled={saving} helperText="Use the settings already supported by this component. Facts and verification are managed by the client’s review." />{!props ? <p role="alert" className="mt-2 text-sm text-critical">Settings must be a valid JSON object.</p> : null}</details>
-          {edit.children.length > 1 ? <div><h3 className="text-base font-medium text-warm-black">Section order</h3><ol className="mt-3 divide-y divide-gray-border">{edit.children.map((id,index) => <li key={id} className="flex flex-wrap items-center gap-3 py-3"><span className="min-w-0 basis-full flex-1 break-words text-sm text-gray-muted sm:basis-auto">{candidate.document.nodes[id]?.type} · {id}</span>{[[-1,"up"],[1,"down"]].map(([direction,label]) => <StTextButton key={label} aria-label={`Move ${id} ${label}`} disabled={saving || index + Number(direction) < 0 || index + Number(direction) >= edit.children.length} onClick={() => { const children = [...edit.children]; const target = index + Number(direction); [children[index], children[target]] = [children[target]!, children[index]!]; update({ children }); }}>Move {label}</StTextButton>)}</li>)}</ol></div> : null}
-          <p className="text-sm leading-relaxed text-gray-muted">Saving creates a draft for client review. Newly written claims need review before publication.</p><StPill disabled={!ops?.length} busy={saving} onClick={() => void save()}>Save draft for client review</StPill>
-        </> : <p className="text-sm text-gray-muted">{state.section === "navigation" || state.section === "footer" ? "Navigation and footer changes need the client or Strelva to prepare them. This agency permission does not allow saving those sections." : "No editable sections match this permission."}</p>}
-      </StSection>
-      <StSection title="Saved preview"><p className="mt-2 text-sm text-gray-muted">The preview updates after your draft is saved. Forms are disabled.</p><SelectInput className="mt-4" label="Preview page" value={page} options={candidate.document.pages.map(item => ({value:item.path,label:item.title}))} onChange={event => setPage(event.target.value)} />{previewError ? <div role="alert" className="mt-4 space-y-3 text-sm text-critical"><p>The private preview is unavailable or no longer matches this candidate. Reload saved document and permission before relying on it.</p>{Object.keys(edits).length ? <p className="text-gray-muted">Reloading replaces your unsaved edits with the saved document.</p> : null}<StPill variant="soft" disabled={saving} onClick={() => setAttempt(value => value + 1)}>Reload preview and permission</StPill></div> : null}{previewHref || state.previewHtml || state.previewPages ? <iframe key={`${candidate.contentHash}:${page}`} title="Saved agency website draft preview" className="mt-4 h-[640px] w-full rounded-xl border border-gray-border bg-white" sandbox="allow-same-origin" src={previewHref} srcDoc={previewHref ? undefined : state.previewPages?.[page] ?? state.previewHtml} onLoad={checkPreview} /> : <p role="status" className="mt-4 text-sm text-gray-muted">Saved preview is unavailable. Your draft can still be prepared for client review.</p>}</StSection>
+  const client = clientName || "the client";
+  const changes = draftChanges(edits, candidate?.document.nodes);
+  const editor = node && edit ? <div className={xa.editor} ref={editorRef}>
+    <SelectInput label="Section to edit" value={node.id} onChange={event => setSelected(event.target.value)} options={nodes.map(item => ({ value: item.id, label: `${typeLabel(item.type)} · ${"title" in item.props && typeof item.props.title === "string" ? item.props.title : "Untitled"}` }))} disabled={saving} />
+    {Object.entries(props ?? {}).filter(([,value]) => typeof value === "string").map(([key,value]) => <TextArea key={key} label={fieldLabel(key)} value={String(value)} rows={key === "body" || key === "text" ? 4 : 2} onChange={event => field(key, event.target.value)} disabled={saving} />)}
+    {edit.children.length > 1 ? <div><XaLabel as="h3">Section order</XaLabel><XaRows label="Section order">{edit.children.map((id,index) => <XaRow key={id} title={typeLabel(candidate!.document.nodes[id]?.type ?? "Section")} detail={sectionTitle(candidate!.document.nodes[id]) ?? undefined} action={<>{[[-1,"up"],[1,"down"]].map(([direction,label]) => <XaTextLink key={label} aria-label={`Move ${id} ${label}`} onClick={saving || index + Number(direction) < 0 || index + Number(direction) >= edit.children.length ? undefined : () => { const children = [...edit.children]; const target = index + Number(direction); [children[index], children[target]] = [children[target]!, children[index]!]; update({ children }); }}>Move {label}</XaTextLink>)}</>} />)}</XaRows></div> : null}
+    <details><summary className="cursor-pointer py-2 text-sm text-gray-muted">Section settings</summary><TextArea label="Component settings" value={edit.props} onChange={event => update({ props: event.target.value })} rows={8} spellCheck={false} disabled={saving} helperText="Use the settings already supported by this component. Facts and verification are managed by the client’s review." />{!props ? <p role="alert" className="mt-2 text-sm text-critical">Settings must be a valid JSON object.</p> : null}</details>
+  </div> : null;
+  return <main className="min-h-screen" style={{ background: "var(--st-canvas, #faf9f6)" }}>
+    {loading ? <div className={xa.state}><StSkeleton label="Checking the current website permission" width="65%" /></div> : null}
+    {error ? <div className={xa.state}><XaSays links={[<XaTextLink key="reload" onClick={saving ? undefined : () => setAttempt(value => value + 1)}>Reload saved document and permission</XaTextLink>]}><span role="alert">{error}{Object.keys(edits).length ? " Your unsaved edits are preserved. Reloading replaces them with the saved document." : ""}</span></XaSays></div> : null}
+    {!loading && state && !state.grant ? <div className={xa.state}><XaEmpty pose="resting" size="sm" job={`Pebble opens this page for you the moment ${client} turns on draft editing.`} title={`${clientName || "The client"} needs to turn on draft editing first.`} /></div> : null}
+    {!loading && state?.grant && !active ? <div className={xa.state}><XaSays>This draft permission is {!permissionChecked ? "unconfirmed" : state.grant.status === "revoked" ? "revoked" : "expired"}. Sending is unavailable. Website history stays with {client}.</XaSays></div> : null}
+    {!loading && candidate && state?.grant && active ? <div className={xa.prepare}>
+      <div className={xa.prepareBrief}>
+        <nav aria-label="Breadcrumb"><ol className={xa.crumbs}>{clientName ? <li>{clientName}</li> : null}<li>Website</li><li aria-current="page">{state.section}</li></ol></nav>
+        <XaHeadline quiet="A draft, prepared by you.">{website!.rebuild.title}.</XaHeadline>
+        <XaAnswers labelWidth={120} rows={[
+          ["Changes", changes.length ? `${changes.length} ${changes.length === 1 ? "line" : "lines"} in ${state.section}` : "Nothing edited yet"],
+          ["Website", `Prepare. ${clientName || "The client"} puts it live.`],
+          ["Release", `Draft of Release ${candidate.revision}`],
+          ["Your access", `${state.section} · until ${new Date(state.grant.expiresAt).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}`],
+        ]} />
+        {state.sections.length > 1 ? <SelectInput label="Assigned section" value={state.section ?? ""} options={state.sections.map(value => ({ value, label: value }))} onChange={event => setScope(event.target.value)} disabled={saving || Object.keys(edits).length > 0} helperText={Object.keys(edits).length > 0 ? "Send or reload your edits before changing the assigned section." : undefined} /> : null}
+        {editor ?? <p className="text-sm text-gray-muted">{state.section === "navigation" || state.section === "footer" ? "Navigation and footer changes need the client or Strelva to prepare them. This agency permission does not allow saving those sections." : "No editable sections match this permission."}</p>}
+        <details><summary className="cursor-pointer py-2 text-sm text-gray-muted">The saved page, as {client} will see it</summary><p className="mt-2 text-sm text-gray-muted">The preview updates after you send. Forms are disabled.</p><SelectInput className="mt-4" label="Preview page" value={page} options={candidate.document.pages.map(item => ({value:item.path,label:item.title}))} onChange={event => setPage(event.target.value)} />{previewError ? <div role="alert" className="mt-4 space-y-3 text-sm text-critical"><p>The private preview is unavailable or no longer matches this candidate. Reload saved document and permission before relying on it.</p>{Object.keys(edits).length ? <p className="text-gray-muted">Reloading replaces your unsaved edits with the saved document.</p> : null}<XaButton disabled={saving} onClick={() => setAttempt(value => value + 1)}>Reload preview and permission</XaButton></div> : null}{previewHref || state.previewHtml || state.previewPages ? <iframe key={`${candidate.contentHash}:${page}`} title="Saved agency website draft preview" className={`mt-4 ${xa.preview}`} sandbox="allow-same-origin" src={previewHref} srcDoc={previewHref ? undefined : state.previewPages?.[page] ?? state.previewHtml} onLoad={checkPreview} /> : <p role="status" className="mt-4 text-sm text-gray-muted">Saved preview is unavailable. Your draft can still be sent for review.</p>}</details>
+      </div>
+      {editor ? <div className={xa.prepareSide}><AgencySendPanel clientName={clientName || "the client"} address={previewAddress(state.previewHref, page, website!.rebuild.title)} changes={changes} sending={saving}
+        blocked={ops === null ? "One section's settings aren't valid. Fix them before sending." : null}
+        sent={saved && !changes.length ? saved : undefined}
+        onSend={() => void save()} onKeepEditing={() => { setSaved(""); editorRef.current?.querySelector<HTMLElement>("select, textarea")?.focus(); }} /></div> : null}
     </div> : null}
-    {saved ? <StToast>{saved}</StToast> : null}
-    {!loading && state?.website && !candidate ? <StEmpty>This website has no candidate draft yet. The client or Strelva needs to prepare one first.</StEmpty> : null}
-  </StPage></main>;
+    {!loading && state?.website && !candidate ? <div className={xa.state}><XaEmpty pose="resting" size="sm" job="Pebble opens the draft here as soon as one is prepared." title="This website has no draft yet.">The client or Strelva needs to prepare one first.</XaEmpty></div> : null}
+  </main>;
+}
+
+/** "ServiceGrid" → "Service grid": component names read as words. */
+function typeLabel(type: string): string { const words = type.replace(/([a-z])([A-Z])/g, "$1 $2").toLowerCase(); return words.charAt(0).toUpperCase() + words.slice(1); }
+function fieldLabel(key: string): string { return key.replace(/([A-Z])/g, " $1").replace(/^./, character => character.toUpperCase()); }
+function sectionTitle(node: CatalogNode | undefined): string | null { return node && "title" in node.props && typeof node.props.title === "string" ? node.props.title : null; }
+function previewAddress(href: string | undefined, page: string, fallback: string): string { return href ? page : fallback; }
+
+/** Each changed text field and any reordering, as now and after, for the send panel. */
+export function draftChanges(edits: Record<string, { props: string; children: string[] }>, nodes: Record<string, CatalogNode> | undefined): AgencyDraftChange[] {
+  if (!nodes) return [];
+  const rows: AgencyDraftChange[] = [];
+  for (const [id, value] of Object.entries(edits)) {
+    const original = nodes[id]; const parsed = object(value.props);
+    if (!original) continue;
+    const name = sectionTitle(original) ?? typeLabel(original.type);
+    if (parsed) for (const [key, after] of Object.entries(parsed)) {
+      const before = (original.props as Record<string, unknown>)[key];
+      if (typeof after === "string" && after !== before) rows.push({ id: `${id}:${key}`, label: `${name} · ${fieldLabel(key).toLowerCase()}`, before: typeof before === "string" ? before : "", after });
+    }
+    if (JSON.stringify(value.children) !== JSON.stringify(original.children)) rows.push({ id: `${id}:order`, label: `${name} · order`, before: original.children.map(child => sectionTitle(nodes[child]) ?? typeLabel(nodes[child]?.type ?? "Section")).join(", "), after: value.children.map(child => sectionTitle(nodes[child]) ?? typeLabel(nodes[child]?.type ?? "Section")).join(", ") });
+  }
+  return rows;
 }
