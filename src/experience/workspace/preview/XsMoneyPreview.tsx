@@ -5,7 +5,7 @@
  * and `transport` seams. Nothing reaches Stripe, a server or an inbox.
  * /preview/strelva/xa/xs-money/<screen>?state=…&mode=dark
  */
-import { useMemo, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { StrelvaShell } from "@/experience/app-frame/StrelvaShell";
 import type { StrelvaClientLink } from "@/experience/app-frame/workspace-places";
 import { XaHeadline, XaTextLink } from "@/components/ui/strelva/Xa";
@@ -18,7 +18,11 @@ import { WorkspacePayerTransition } from "@/experience/workspace/WorkspacePayerT
 import { AgencyInvoiceAcceptance } from "@/experience/workspace/billing/AgencyInvoiceControls";
 import { UNRELEASED_CHECKOUT } from "@/experience/workspace/billing/AgencyCheckoutStatus";
 import { AgencyBillingView } from "@/experience/workspace/billing/AgencyBillingView";
-import { AgencyPayerRequests } from "@/experience/workspace/billing/AgencyPayerRequests";
+import {
+  AgencyPayerRequestLines,
+  AgencyPayerRequests,
+} from "@/experience/workspace/billing/AgencyPayerRequests";
+import { AgencyBillingPebble } from "@/experience/workspace/billing/AgencyBillingPebble";
 import { AgencyPaymentLinks } from "@/experience/workspace/billing/AgencyPaymentLinks";
 import { MoneyDocument } from "@/experience/workspace/billing/MoneyDocument";
 import { AccountPayerInbox } from "@/experience/workspace/AccountPayerInbox";
@@ -90,6 +94,44 @@ function fixtureFetch(
   }) as typeof fetch;
 }
 
+/**
+ * The email route refuses to be framed (frame-ancestors 'none'), so the
+ * preview reads its HTML and shows it through srcDoc: same bytes, no framing
+ * of the app itself.
+ */
+function EmailFrame({
+  src,
+  title,
+  style,
+}: {
+  src: string;
+  title: string;
+  style: React.CSSProperties;
+}) {
+  const [html, setHtml] = useState<string | null>(null);
+  useEffect(() => {
+    let live = true;
+    void fetch(src)
+      .then((response) => response.text())
+      .then((text) => {
+        if (live) setHtml(text);
+      })
+      .catch(() => {
+        if (live) setHtml("<p>The email template could not be read.</p>");
+      });
+    return () => {
+      live = false;
+    };
+  }, [src]);
+  return html === null ? (
+    <p className={styles.note} role="status">
+      Reading the email template…
+    </p>
+  ) : (
+    <iframe title={title} srcDoc={html} sandbox="" style={style} />
+  );
+}
+
 export function XsMoneyPreview({
   screen,
   state,
@@ -108,6 +150,9 @@ export function XsMoneyPreview({
     notice: (
       <p className={styles.note} style={{ padding: "8px 20px" }}>
         Fictional preview. Nothing here reaches Stripe, a client or an inbox.
+        {screen === "billing-agency" && state === "priced"
+          ? " Wholesale figures are fixture placeholders, not ADR 0017 prices."
+          : ""}
       </p>
     ),
   } as const;
@@ -361,6 +406,8 @@ export function XsMoneyPreview({
                   invoiceId={harborRetail.id}
                   checkoutAvailability={UNRELEASED_CHECKOUT}
                   request={requests.invoice}
+                  agencyNames={{ [XS.north]: "North Studio" }}
+                  planCents={harborBilling.monthlyCents}
                 />
               </aside>
             ) : null}
@@ -378,50 +425,69 @@ export function XsMoneyPreview({
             "Only an agency owner or admin can read its billing.",
           ),
         );
+      const colors = {
+        [XS.harbor]: CLIENT_COLORS.harbor,
+        [XS.coast]: CLIENT_COLORS.coast,
+        [XS.lakeview]: CLIENT_COLORS.lakeview,
+        [XS.fieldwork]: CLIENT_COLORS.fieldwork,
+      };
+      const billingRecord = agencyBilling(state === "priced");
       return agency(
-        <div className={styles.screen}>
-          <div className={styles.split}>
-            <div className={styles.column}>
-              {state === "empty" ? (
-                <section className={styles.section}>
-                  <XaHeadline quiet="No client has your agency as payer yet.">
-                    Agency billing
-                  </XaHeadline>
-                </section>
-              ) : (
-                <AgencyBillingView
-                  billing={agencyBilling(state === "priced")}
-                  checkoutAvailability={UNRELEASED_CHECKOUT}
-                />
+        <AgencyPayerRequests
+          agencyWorkspaceId={XS.north}
+          agencyName="North Studio"
+          request={
+            state === "empty"
+              ? fixtureFetch(() => ({ transitions: [] }))
+              : requests.agencyInbox
+          }
+        >
+          <div className={styles.screen}>
+            <div className={styles.split} data-phone="main-first">
+              <div className={styles.column}>
+                {state === "empty" ? (
+                  <section className={styles.section}>
+                    <XaHeadline quiet="No client has North Studio as payer yet.">
+                      Agency billing
+                    </XaHeadline>
+                    <ul
+                      className={styles.clientList}
+                      aria-label="Owners asking your agency to pay"
+                    >
+                      <AgencyPayerRequestLines listed={[]} colors={colors} />
+                    </ul>
+                  </section>
+                ) : (
+                  <AgencyBillingView
+                    billing={billingRecord}
+                    checkoutAvailability={UNRELEASED_CHECKOUT}
+                    clientColors={colors}
+                  />
+                )}
+                <nav
+                  aria-label="More about agency money"
+                  className={styles.links}
+                >
+                  <XaTextLink href={`${BASE}/payment-links`}>
+                    Payment links
+                  </XaTextLink>
+                  <span aria-hidden="true">·</span>
+                  <XaTextLink href={`${BASE}/creator-maintenance`}>
+                    Creator maintenance
+                  </XaTextLink>
+                </nav>
+              </div>
+              {state === "empty" ? null : (
+                <aside
+                  className={styles.side}
+                  aria-label="What Pebble is waiting on"
+                >
+                  <AgencyBillingPebble billing={billingRecord} />
+                </aside>
               )}
-              <nav
-                aria-label="More about agency money"
-                className={styles.links}
-              >
-                <XaTextLink href={`${BASE}/payment-links`}>
-                  Payment links
-                </XaTextLink>
-                <span aria-hidden="true">·</span>
-                <XaTextLink href={`${BASE}/creator-maintenance`}>
-                  Creator maintenance
-                </XaTextLink>
-              </nav>
             </div>
-            <aside
-              className={styles.side}
-              aria-label="Owners asking your agency to pay"
-            >
-              <AgencyPayerRequests
-                agencyWorkspaceId={XS.north}
-                request={
-                  state === "empty"
-                    ? fixtureFetch(() => ({ transitions: [] }))
-                    : requests.agencyInbox
-                }
-              />
-            </aside>
           </div>
-        </div>,
+        </AgencyPayerRequests>,
       );
     }
     case "payment-links":
@@ -646,25 +712,32 @@ export function XsMoneyPreview({
       );
     case "reconciliation":
       return (
-        <main data-workspace-theme="linen" data-workspace-mode={mode}>
+        <StrelvaShell
+          {...shell}
+          workspaceName="Strelva"
+          accountName="Priya Shah"
+          agencyNavigation={{ active: "library", leadsAvailable: false }}
+        >
           {state === "error" ? (
             failure(
               "Payment exceptions could not be loaded.",
-              "Confirm operator access and try again.",
+              "Only Strelva staff can read them. Confirm your access and try again.",
             )
           ) : (
             <div className={styles.screen}>
               <XaHeadline quiet="Check each against Stripe and the ledger, then record what you found. Recording never moves money.">
                 {state === "done"
-                  ? "Payment exceptions"
+                  ? "No payment exception waits for review."
                   : "1 payment exception waits for review."}
               </XaHeadline>
               <ReviewQueue
                 issues={state === "done" ? [] : reconciliationIssues}
+                actorId={XS.priya}
+                names={{ [XS.priya]: "Priya" }}
               />
             </div>
           )}
-        </main>
+        </StrelvaShell>
       );
     case "creator-maintenance":
       return agency(
@@ -678,7 +751,7 @@ export function XsMoneyPreview({
             <nav aria-label="Back" className={styles.links}>
               <XaTextLink href={`${BASE}/billing-agency`}>Billing</XaTextLink>
             </nav>
-            <XaHeadline quiet="These records grant no access to client data and set no payment on their own.">
+            <XaHeadline quiet="Who keeps each System you list working, and what its creator earns.">
               Creator maintenance
             </XaHeadline>
             <SourceListing
@@ -686,7 +759,15 @@ export function XsMoneyPreview({
               actorId={XS.maya}
               request={requests.money}
             />
-            <CreatorMaintenance graph={creatorMaintenance(state === "empty")} />
+            <CreatorMaintenance
+              graph={creatorMaintenance(state === "empty")}
+              listingNames={Object.fromEntries(
+                creatorSources(state === "empty").sources.map((item) => [
+                  item.sourceRevisionId,
+                  `${item.name}, Release ${item.revision}`,
+                ]),
+              )}
+            />
           </div>
         ),
       );
@@ -723,8 +804,8 @@ export function XsMoneyPreview({
     case "payer":
       return agency(
         <div className={styles.screen}>
-          <XaHeadline quiet="Requests to pay, and job limits waiting for your yes.">
-            Payer requests for Maya Okafor
+          <XaHeadline quiet="Money addressed to you, Maya, across every business.">
+            Payer requests
           </XaHeadline>
           <AccountPayerInbox request={requests.accountInbox} />
         </div>,
@@ -736,7 +817,7 @@ export function XsMoneyPreview({
             <XaHeadline quiet="A template only. Client emails stay off during the rollout.">
               Card declined email
             </XaHeadline>
-            <iframe
+            <EmailFrame
               title="Card declined email"
               src="/preview/strelva/email/html?template=declined"
               style={{

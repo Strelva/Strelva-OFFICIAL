@@ -4,11 +4,16 @@ import {
   AgencyCheckoutStatus,
   UNRELEASED_CHECKOUT,
 } from "./AgencyCheckoutStatus";
+import {
+  AgencyPayerRequestAsk,
+  AgencyPayerRequestLines,
+  AgencyPayerRequestsStatus,
+} from "./AgencyPayerRequests";
 import type { AgencyBilling } from "@/platform/business-billing";
+import { clientColor } from "@/platform/presentation/client-color";
 import {
   XaHeadline,
   XaInitial,
-  XaLabel,
   XaSays,
   XaStatus,
   XaTextLink,
@@ -16,17 +21,27 @@ import {
 import styles from "@/experience/workspace/money/money.module.css";
 
 const monthly = (cents: number) =>
-  new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(
-    cents / 100,
-  );
+  new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" })
+    .format(cents / 100)
+    .replace(/\.00$/, "");
 
-/** Agency billing (XA · AG6): one line per client the agency pays for, its number on the right, the retail price inline. */
+/**
+ * Agency billing (XA · AG6): one line per client, in the client's own color.
+ * The line says only what is particular to that client; what is true of every
+ * line (nothing priced yet, who pays) is said once in the headline. An owner's
+ * request to have the agency pay sits on that client's line, with its answers.
+ * Requests from businesses not on the list yet are extra lines in the same
+ * list. Rendered inside AgencyPayerRequests so the requests are known.
+ */
 export function AgencyBillingView({
   billing,
   checkoutAvailability = UNRELEASED_CHECKOUT,
+  clientColors = {},
 }: {
   billing: AgencyBilling;
   checkoutAvailability?: CheckoutAvailability;
+  /** The rail's colors, by client workspace id. Missing ids fall back to clientColor(). */
+  clientColors?: Readonly<Record<string, string>>;
 }) {
   const active = billing.clients.filter(
     (client) => client.lineState === "active",
@@ -36,6 +51,8 @@ export function AgencyBillingView({
     (sum, client) => sum + (client.monthlyCents ?? 0),
     0,
   );
+  const allPriced = active.length > 0 && priced.length === active.length;
+  const color = (id: string) => clientColors[id] ?? clientColor(id);
   return (
     <section
       className={styles.section}
@@ -45,7 +62,7 @@ export function AgencyBillingView({
         <XaHeadline
           id="agency-billing-heading"
           quiet={
-            priced.length === active.length && active.length
+            allPriced
               ? `${monthly(total)} a month to Strelva.`
               : "Wholesale amounts are not priced yet."
           }
@@ -54,76 +71,77 @@ export function AgencyBillingView({
           {active.length === 1 ? "1 client" : `${active.length} clients`}.
         </XaHeadline>
         <p className={styles.note}>
-          What each client pays you is a separate retail price, set on its line
-          and agreed by its owner.
+          What each client pays {billing.name} is its own retail price, on its
+          line, agreed by its owner.
         </p>
+        <AgencyCheckoutStatus
+          availability={checkoutAvailability}
+          paymentsHref={`/workspace/payments?workspaceId=${encodeURIComponent(billing.workspaceId)}`}
+        />
       </div>
       {billing.paymentStatus === "past_due" ? (
         <XaSays>
-          Your agency&apos;s payment to Strelva needs attention. Client sites
+          {billing.name}&apos;s payment to Strelva needs attention. Client sites
           stay online, and each owner can choose to pay directly for future
           work.
         </XaSays>
       ) : null}
-      <AgencyCheckoutStatus
-        availability={checkoutAvailability}
-        paymentsHref={`/workspace/payments?workspaceId=${encodeURIComponent(billing.workspaceId)}`}
-      />
-      <div className={styles.section}>
-        <XaLabel as="h2">Clients you pay for</XaLabel>
-        {billing.clients.length ? (
-          <ul className={styles.clientList} aria-label="Clients you pay for">
-            {billing.clients.map((client) => (
-              <li key={client.workspaceId} className={styles.clientLine}>
-                <XaInitial name={client.name} size={32} />
-                <div className={styles.clientText}>
-                  <XaTextLink
-                    href={`/workspace/billing?workspaceId=${encodeURIComponent(client.workspaceId)}`}
-                  >
-                    {client.name}
-                  </XaTextLink>
-                  <span className={styles.note}>
-                    {client.lineState === "ended" ? (
-                      "The owner changed the payer; this line ended"
-                    ) : client.paymentStatus === "past_due" ? (
-                      <XaStatus kind="waits" size="sm">
-                        Payment needs attention
-                      </XaStatus>
-                    ) : (
-                      "Your agency pays"
-                    )}
+      <AgencyPayerRequestsStatus />
+      <ul className={styles.clientList} aria-label="Clients and owner requests">
+        {billing.clients.map((client) => {
+          const ended = client.lineState === "ended";
+          const pastDue = client.paymentStatus === "past_due";
+          return (
+            <li key={client.workspaceId} className={styles.clientLine}>
+              <XaInitial
+                name={client.name}
+                color={color(client.workspaceId)}
+                size={32}
+              />
+              <div className={styles.clientText}>
+                <XaTextLink
+                  href={`/workspace/billing?workspaceId=${encodeURIComponent(client.workspaceId)}`}
+                >
+                  {client.name}
+                </XaTextLink>
+                {ended ? (
+                  <span className={styles.clientDetail}>
+                    Its owner changed the payer, so {billing.name} no longer
+                    pays for it.
                   </span>
-                  {client.lineState === "active" ? (
-                    <AgencyInvoiceControls
-                      agencyWorkspaceId={billing.workspaceId}
-                      businessWorkspaceId={client.workspaceId}
-                      initialInvoices={client.invoices}
-                      checkoutAvailability={checkoutAvailability}
-                    />
-                  ) : null}
-                </div>
-                <p className={styles.clientFigure}>
-                  {client.monthlyCents === null ? (
-                    <span className={styles.figureQuiet}>
-                      Wholesale price not set
-                    </span>
-                  ) : (
-                    <>
-                      {monthly(client.monthlyCents)}
-                      <span className={styles.figureQuiet}> / month</span>
-                    </>
-                  )}
-                </p>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p className={styles.body}>
-            No business has accepted your agency as payer yet. Requests from
-            owners appear beside this list.
-          </p>
-        )}
-      </div>
+                ) : pastDue ? (
+                  <XaStatus kind="waits" size="sm">
+                    Payment needs attention
+                  </XaStatus>
+                ) : allPriced && client.monthlyCents !== null ? (
+                  <span className={styles.clientDetail}>
+                    Strelva bills {billing.name} {monthly(client.monthlyCents)}{" "}
+                    a month
+                  </span>
+                ) : null}
+                <AgencyPayerRequestAsk workspaceId={client.workspaceId} />
+              </div>
+              {!ended ? (
+                <AgencyInvoiceControls
+                  agencyWorkspaceId={billing.workspaceId}
+                  businessWorkspaceId={client.workspaceId}
+                  initialInvoices={client.invoices}
+                  checkoutAvailability={checkoutAvailability}
+                />
+              ) : null}
+            </li>
+          );
+        })}
+        <AgencyPayerRequestLines
+          listed={billing.clients.map((client) => client.workspaceId)}
+          colors={clientColors}
+        />
+      </ul>
+      {!billing.clients.length ? (
+        <p className={styles.body}>
+          No business has accepted {billing.name} as payer yet.
+        </p>
+      ) : null}
     </section>
   );
 }

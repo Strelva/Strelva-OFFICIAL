@@ -33,7 +33,7 @@ describe("ordinary recorded money terms", () => {
   });
   it("keeps the exact uncertain command and blocks edits until current readback then retries identically", async () => {
     const request = vi.fn<typeof fetch>().mockResolvedValueOnce(reply({ error: "Response lost." }, 500)).mockResolvedValueOnce(reply(graph)).mockImplementation(async (_url, init) => reply(accepted(String(init!.body)))); const { node } = await mount(graph, request); await fill(node); await submit(node); const body = request.mock.calls[0]![1]!.body;
-    expect(node.querySelector("input")!.disabled).toBe(true); expect(node.textContent).not.toContain("Retry the exact acceptance"); await click(node, "Reload recorded terms"); expect(node.querySelector("input")!.disabled).toBe(true); await click(node, "Retry the exact acceptance"); expect(request.mock.calls[2]![1]!.body).toBe(body); expect(node.textContent).toContain("No card was charged");
+    expect(node.querySelector("input")!.disabled).toBe(true); expect(node.textContent).not.toContain("Retry the exact acceptance"); await click(node, "Check what was recorded"); expect(node.querySelector("input")!.disabled).toBe(true); await click(node, "Retry the exact acceptance"); expect(request.mock.calls[2]![1]!.body).toBe(body); expect(node.textContent).toContain("No card was charged");
   });
   it("refuses forged or cross-workspace acknowledgments without optimistic history", async () => {
     const request = vi.fn<typeof fetch>().mockImplementation(async (_url, init) => { const result = accepted(String(init!.body)); return reply({ ...result, receipt: { ...result.receipt, workspaceId: other } }); }); const { node } = await mount(graph, request); await fill(node); await submit(node); expect(node.querySelector("[role=alert]")!.textContent).toContain("did not match"); expect(node.textContent).toContain("No collection terms have been accepted"); expect(node.querySelector("input")!.disabled).toBe(true);
@@ -52,12 +52,12 @@ describe("ordinary recorded money terms", () => {
         if (init?.method === "POST") { receipt = { ...accepted(String(init.body)).receipt, ...change }; return reply({ error: "Lost response" }, 500); }
         return reply({ ...graph, terms: [receipt!] });
       });
-      const { node } = await mount(graph, request); await fill(node); await submit(node); await click(node, "Reload recorded terms");
+      const { node } = await mount(graph, request); await fill(node); await submit(node); await click(node, "Check what was recorded");
       expect(node.textContent).not.toContain("Your exact terms and period are recorded"); expect(node.textContent).toContain("Retry the exact acceptance"); expect(node.querySelector("input")!.disabled).toBe(true);
     }
   });
   it("withdraws stale owner controls on current readback and rejects another workspace graph", async () => {
-    const request = vi.fn<typeof fetch>().mockResolvedValueOnce(reply({ ...graph, canPrepare: false })).mockResolvedValueOnce(reply({ ...graph, workspaceId: other })); const { node } = await mount(graph, request); await click(node, "Reload recorded terms"); expect(node.querySelector("form")).toBeNull(); await click(node, "Reload recorded terms"); expect(node.querySelector("[role=alert]")!.textContent).toContain("another workspace");
+    const request = vi.fn<typeof fetch>().mockResolvedValueOnce(reply({ ...graph, canPrepare: false })).mockResolvedValueOnce(reply({ ...graph, workspaceId: other })); const { node } = await mount(graph, request); expect([...node.querySelectorAll("button")].some(item => item.textContent === "Check what was recorded")).toBe(false); await act(async () => window.dispatchEvent(new Event("focus"))); expect(node.querySelector("form")).toBeNull(); await act(async () => window.dispatchEvent(new Event("focus"))); expect(node.querySelector("[role=alert]")!.textContent).toContain("another business"); expect(document.activeElement).toBe(document.body);
   });
   it("keeps the draft on refusal and preserves focus if the user navigated during the request", async () => {
     let resolve!: (value: Response) => void; const request = vi.fn<typeof fetch>().mockReturnValue(new Promise(done => { resolve = done; })); const { node } = await mount(graph, request);
@@ -72,7 +72,7 @@ describe("ordinary recorded money terms", () => {
       if (init?.method === "POST") { recorded = accepted(String(init.body)).receipt; return reply({ error: "Lost response" }, 500); }
       return reply({ ...graph, terms: [recorded!] });
     });
-    const { node } = await mount(graph, request); await fill(node); await submit(node); await click(node, "Reload recorded terms");
+    const { node } = await mount(graph, request); await fill(node); await submit(node); await click(node, "Check what was recorded");
     expect(node.textContent).toContain("Your exact terms and period are recorded"); expect(node.textContent).not.toContain("Retry the exact acceptance"); expect(request.mock.calls.filter(call => call[1]?.method === "POST")).toHaveLength(1);
   });
   it("does not duplicate submissions and aborts old observations on workspace change", async () => {

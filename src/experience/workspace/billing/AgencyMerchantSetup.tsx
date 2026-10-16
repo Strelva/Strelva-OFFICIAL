@@ -1,11 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import {
-  XaButton,
-  XaEmpty,
-  XaSays,
-  XaTextLink,
-} from "@/components/ui/strelva/Xa";
+import { XaButton, XaPebbleScene } from "@/components/ui/strelva/Xa";
 import styles from "@/experience/workspace/money/money.module.css";
 
 /** Connect the agency's own Stripe account, then come back to Payment links. */
@@ -26,9 +21,9 @@ export function AgencyMerchantSetup({
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
-  async function post(action: "onboard" | "refresh") {
+  async function post(action: "onboard" | "refresh", quietly = false) {
     setBusy(true);
-    setMessage(null);
+    if (!quietly) setMessage(null);
     try {
       const response = await fetch("/api/billing/connect", {
         method: "POST",
@@ -45,13 +40,14 @@ export function AgencyMerchantSetup({
       if (!response.ok)
         throw Error(result.error ?? "Stripe setup is unavailable.");
       if (action === "refresh") {
-        setMessage(
-          result?.state === "ready"
-            ? "Stripe account ready."
-            : result?.state === "restricted"
-              ? "Stripe still needs details. Continue Stripe setup."
-              : "Stripe setup has not started.",
-        );
+        if (!quietly || result?.state === "ready")
+          setMessage(
+            result?.state === "ready"
+              ? "Stripe says your account is ready. You can make payment links now."
+              : result?.state === "restricted"
+                ? "Stripe still needs a few details. Continue Stripe setup to finish them."
+                : "Stripe setup has not started yet.",
+          );
         if (result?.state === "ready") onChange?.();
         return;
       }
@@ -65,7 +61,7 @@ export function AgencyMerchantSetup({
         throw Error("Stripe setup returned an invalid link.");
       window.location.assign(url.toString());
     } catch (cause) {
-      if (active.current)
+      if (active.current && !quietly)
         setMessage(
           cause instanceof Error
             ? cause.message
@@ -79,39 +75,54 @@ export function AgencyMerchantSetup({
     if (new URLSearchParams(window.location.search).get("connect") === "return")
       void post("refresh");
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  // Pebble's job here: check Stripe again whenever the agency comes back to this tab.
+  const working = useRef(false);
+  working.current = busy;
+  useEffect(() => {
+    let last = Date.now();
+    const back = () => {
+      if (document.visibilityState === "hidden" || working.current) return;
+      if (Date.now() - last < 5000) return;
+      last = Date.now();
+      void post("refresh", true);
+    };
+    window.addEventListener("focus", back);
+    document.addEventListener("visibilitychange", back);
+    return () => {
+      window.removeEventListener("focus", back);
+      document.removeEventListener("visibilitychange", back);
+    };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
-    <div className={styles.section}>
-      <XaEmpty
-        pose="adds"
-        size="sm"
-        title="Connect Stripe to make payment links."
-        job="Pebble checks Stripe again the moment you come back"
-        action={
-          <XaButton
-            variant="primary"
-            busy={busy}
-            disabled={busy}
-            onClick={() => void post("onboard")}
-          >
-            Set up Stripe
-          </XaButton>
-        }
-        secondary={
-          <XaTextLink
-            onClick={() => {
-              if (!busy) void post("refresh");
-            }}
-          >
-            Check Stripe status
-          </XaTextLink>
-        }
-      >
-        Money goes straight to your agency&apos;s Stripe account; Strelva never
-        holds it. Stripe&apos;s fees apply. Strelva charges no fee on these
-        payments.
-      </XaEmpty>
-      {message ? <XaSays>{message}</XaSays> : null}
-    </div>
+    <section className={styles.section} aria-labelledby="stripe-setup-heading">
+      <div className={styles.pebbleBeside}>
+        <XaPebbleScene pose="adds" size={140} />
+        <div className={styles.brief}>
+          <h2 id="stripe-setup-heading" className={styles.heading}>
+            Connect Stripe to make payment links.
+          </h2>
+          <p className={styles.body}>
+            Money goes straight to your agency&apos;s Stripe account; Strelva
+            never holds it. Stripe&apos;s fees apply. Strelva charges no fee on
+            these payments.
+          </p>
+          <p className={styles.body}>
+            {message ??
+              "I check Stripe again the moment you come back, and open payment links once Stripe says your account is ready."}
+          </p>
+        </div>
+      </div>
+      <div className={styles.actions}>
+        <XaButton
+          variant="primary"
+          busy={busy}
+          disabled={busy}
+          onClick={() => void post("onboard")}
+        >
+          Set up Stripe
+        </XaButton>
+      </div>
+    </section>
   );
 }

@@ -3,6 +3,7 @@ import { XaButton, XaField, XaSelect } from "@/components/ui/strelva/Xa";
 import xa from "@/experience/workspace/money/money.module.css";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { formatMoney } from "@/platform/connect/money-format";
+import { localMoment, periodWords, shortLocalDay } from "./period";
 import {
   governedCollectionReceiptSchema,
   governedMoneyGraphSchema,
@@ -10,20 +11,10 @@ import {
   type GovernedMoneyGraph,
 } from "@/platform/connect/governed-money-contract";
 
-const recordedDay = (iso: string | null | undefined) => {
-  const value = iso ? new Date(iso) : null;
-  return value && Number.isFinite(value.getTime())
-    ? new Intl.DateTimeFormat("en-US", {
-        month: "short",
-        day: "numeric",
-        year: "numeric",
-        hour: "numeric",
-        minute: "2-digit",
-        timeZone: "UTC",
-        timeZoneName: "short",
-      }).format(value)
-    : "not recorded";
-};
+const installedLabel = (definitionId: string, index: number) =>
+  definitionId.startsWith("system-source:")
+    ? `Installed System ${index + 1}`
+    : definitionId;
 type Command = {
   action: "accept_collection_terms";
   workspaceId: string;
@@ -42,7 +33,7 @@ function message(value: unknown) {
     "error" in value &&
     typeof value.error === "string"
     ? value.error
-    : "The accepted terms could not be confirmed. Reload to check what was recorded.";
+    : "Your answer could not be confirmed. Check what was recorded.";
 }
 function matches(value: unknown, command: Command, actorId: string) {
   const receipt = governedCollectionReceiptSchema.safeParse(value);
@@ -100,6 +91,20 @@ function ScopedCollectionTerms({
       inflight.current?.abort();
     };
   }, []);
+  // Read the recorded terms again whenever the owner comes back to this tab,
+  // instead of a Reload control.
+  const reloadRef = useRef<() => void>(() => undefined);
+  useEffect(() => {
+    const back = () => {
+      if (document.visibilityState !== "hidden") reloadRef.current();
+    };
+    window.addEventListener("focus", back);
+    document.addEventListener("visibilitychange", back);
+    return () => {
+      window.removeEventListener("focus", back);
+      document.removeEventListener("visibilitychange", back);
+    };
+  }, []);
   const price = graph.prices.find((item) => item.version === priceVersion);
   const options = graph.installations.filter(
     (item) => !price?.definitionId || item.definitionId === price.definitionId,
@@ -123,7 +128,7 @@ function ScopedCollectionTerms({
           feedback.current?.focus();
       });
   }
-  async function reload() {
+  async function reload(silent = false) {
     if (inflight.current) return;
     const controller = new AbortController(),
       origin = document.activeElement;
@@ -146,9 +151,7 @@ function ScopedCollectionTerms({
         next.workspaceId !== initial.workspaceId ||
         next.terms.some((term) => term.workspaceId !== initial.workspaceId)
       )
-        throw Error(
-          "The terms belong to another workspace. Sign in and reload.",
-        );
+        throw Error("These terms belong to another business. Sign in again.");
       if (controller.signal.aborted || !alive.current) return;
       setGraph(next);
       if (
@@ -161,19 +164,20 @@ function ScopedCollectionTerms({
         );
       }
       setPhase("ready");
-      focusFeedback(origin);
+      if (!silent) focusFeedback(origin);
     } catch (cause) {
       if (!controller.signal.aborted && alive.current) {
         setPhase("blocked");
         setError(
           cause instanceof Error ? cause.message : "Terms could not be loaded.",
         );
-        focusFeedback(origin);
+        if (!silent) focusFeedback(origin);
       }
     } finally {
       if (!controller.signal.aborted && alive.current) inflight.current = null;
     }
   }
+  reloadRef.current = () => void reload(true);
   async function accept(event?: FormEvent) {
     event?.preventDefault();
     if (inflight.current || phase !== "ready" || !admitted) return;
@@ -236,7 +240,7 @@ function ScopedCollectionTerms({
         !matches(body.receipt, command, actorId)
       )
         throw Error(
-          "The acceptance receipt did not match the exact terms. Reload before continuing.",
+          "The acceptance receipt did not match the exact terms. Check what was recorded before continuing.",
         );
       if (controller.signal.aborted || !alive.current) return;
       attempt.current = null;
@@ -250,7 +254,7 @@ function ScopedCollectionTerms({
       }));
       setPhase("blocked");
       setNotice(
-        "Your exact terms and period are recorded. No card was charged. Reload to check current permission before another acceptance.",
+        "Your exact terms and period are recorded. No card was charged. Check what was recorded before agreeing to another period.",
       );
       focusFeedback(origin);
     } catch (cause) {
@@ -270,33 +274,32 @@ function ScopedCollectionTerms({
   return (
     <section className={xa.section} aria-labelledby="collection-terms-heading">
       <h2 id="collection-terms-heading" className={xa.heading}>
-        Recorded price and period
+        Agree to a price for a period
       </h2>
       <p className={xa.note}>
-        Review the written price and the exact period it covers. Accepting
-        records these terms. Payment collection is not configured here.
+        Pick the written price and the dates it covers. Agreeing records it with
+        your name. It does not charge a card.
       </p>
       {graph.payer ? (
         <p className={xa.body}>
-          Payer:{" "}
-          {graph.payer.kind === "agency" ? "Your agency" : "This business"}.
           {graph.payer.kind === "agency"
-            ? " Agency approval to charge and the payment mandate remain separate."
-            : " A payment mandate remains separate."}
+            ? "Your agency pays. Agency approval to charge a card stays a separate step."
+            : "This business pays. Charging a card stays a separate step."}
         </p>
       ) : null}
       {!graph.canPrepare ? (
-        <p>
-          Recorded history remains available. Only a current business owner with
-          future work enabled can accept new terms.
+        <p className={xa.body}>
+          What you agreed to stays here. Only a current business owner can agree
+          to a new price.
         </p>
       ) : !graph.payer?.customerConfigured ? (
-        <p>
-          Payment details have not been configured. No terms can be accepted
-          yet.
+        <p className={xa.body}>
+          Payment details are not set up yet, so no price can be agreed.
         </p>
       ) : !graph.prices.length ? (
-        <p>No approved written price is recorded for this business.</p>
+        <p className={xa.body}>
+          No written price is recorded for this business.
+        </p>
       ) : null}
       {admitted ? (
         <div className={xa.block}>
@@ -310,24 +313,17 @@ function ScopedCollectionTerms({
                 setInstallationId("");
               }}
               options={[
-                { value: "", label: "Choose a recorded price" },
+                { value: "", label: "Choose a written price" },
                 ...graph.prices.map((item) => ({
                   value: item.version,
-                  label: `${item.version} · ${formatMoney(item.amountCents, item.currency)}`,
+                  label: `${item.version}, ${formatMoney(item.amountCents, item.currency)}`,
                 })),
               ]}
               required
             />
-            {price ? (
-              <p className={xa.body}>
-                {formatMoney(price.amountCents, price.currency)} ·{" "}
-                {price.version}
-                {price.definitionId ? ` · ${price.definitionId}` : ""}
-              </p>
-            ) : null}
             {price?.definitionId || options.length ? (
               <XaSelect
-                label="Covered installation"
+                label="Which System it covers"
                 value={installationId}
                 disabled={locked}
                 required={!!price?.definitionId}
@@ -336,12 +332,12 @@ function ScopedCollectionTerms({
                   {
                     value: "",
                     label: price?.definitionId
-                      ? "Choose the covered installation"
-                      : "General business terms",
+                      ? "Choose the System"
+                      : "The whole business",
                   },
-                  ...options.map((item) => ({
+                  ...options.map((item, index) => ({
                     value: item.id,
-                    label: item.definitionId,
+                    label: installedLabel(item.definitionId, index),
                   })),
                 ]}
               />
@@ -369,8 +365,8 @@ function ScopedCollectionTerms({
             !Number.isNaN(Date.parse(start)) &&
             !Number.isNaN(Date.parse(end)) ? (
               <p className={xa.note}>
-                Exact period: {recordedDay(new Date(start).toISOString())} to{" "}
-                {recordedDay(new Date(end).toISOString())}.
+                Covers {localMoment(new Date(start).toISOString())} to{" "}
+                {localMoment(new Date(end).toISOString())}, your time.
               </p>
             ) : null}
             {!attempt.current ? (
@@ -403,22 +399,28 @@ function ScopedCollectionTerms({
         </p>
       )}
       {phase === "pending" ? (
-        <p role="status">Recording the exact terms…</p>
+        <p role="status" className={xa.note}>
+          Recording the exact terms…
+        </p>
       ) : null}
       {phase === "loading" ? (
-        <p role="status">Checking current terms and permission…</p>
+        <p role="status" className={xa.note}>
+          Checking what was recorded…
+        </p>
       ) : null}
-      <XaButton
-        variant="quiet"
-        disabled={phase === "pending" || phase === "loading"}
-        onClick={() => void reload()}
-      >
-        Reload recorded terms
-      </XaButton>
+      {phase !== "ready" || attempt.current ? (
+        <XaButton
+          variant="quiet"
+          disabled={phase === "pending" || phase === "loading"}
+          onClick={() => void reload()}
+        >
+          Check what was recorded
+        </XaButton>
+      ) : null}
       {attempt.current ? (
         <p className={xa.note}>
-          The previous acceptance is uncertain. Reload to inspect it; any retry
-          sends the same terms and command.
+          Your last answer is not confirmed yet. Check what was recorded; a
+          retry sends exactly the same terms.
         </p>
       ) : null}
       <div>
@@ -428,13 +430,22 @@ function ScopedCollectionTerms({
             {graph.terms.map((term) => (
               <li key={term.lineId} className={xa.body}>
                 <p>
-                  {term.priceVersion} ·{" "}
-                  {formatMoney(term.amountCents, term.currency)}
+                  {term.priceVersion},{" "}
+                  {formatMoney(term.amountCents, term.currency).replace(
+                    /\.00$/,
+                    "",
+                  )}{" "}
+                  {periodWords(term.periodStart, term.periodEnd)
+                    ? `for ${periodWords(term.periodStart, term.periodEnd)}`
+                    : "(dates not recorded)"}
                 </p>
                 <p className={xa.note}>
-                  {term.periodStart && term.periodEnd
-                    ? `${recordedDay(term.periodStart)} to ${recordedDay(term.periodEnd)}`
-                    : "Period not recorded"}
+                  {term.acceptedBy === actorId ? "You" : "A business owner"}{" "}
+                  agreed
+                  {shortLocalDay(term.acceptedAt)
+                    ? ` on ${shortLocalDay(term.acceptedAt)}`
+                    : ""}
+                  .
                 </p>
               </li>
             ))}

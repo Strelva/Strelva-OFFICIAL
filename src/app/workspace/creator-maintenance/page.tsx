@@ -52,11 +52,20 @@ export default async function CreatorMaintenancePage({
             Library sources
           </XaTextLink>
         </nav>
-        <XaHeadline quiet="These records grant no access to client data and set no payment on their own.">
+        <XaHeadline quiet="Who keeps each System you list working, and what its creator earns.">
           Creator maintenance
         </XaHeadline>
         <SourceListing graph={sourceGraph} actorId={actor.userId} />
-        <CreatorMaintenance key={workspaceId} graph={graph} />
+        <CreatorMaintenance
+          key={workspaceId}
+          graph={graph}
+          listingNames={Object.fromEntries(
+            sourceGraph.sources.map((item) => [
+              item.sourceRevisionId,
+              `${item.name}, Release ${item.revision}`,
+            ]),
+          )}
+        />
       </div>
     </StrelvaShell>
   );

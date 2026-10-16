@@ -27,7 +27,11 @@ import {
   type CheckoutAvailability,
 } from "@/platform/connect/checkout-availability";
 import { AgencyCheckoutStatus } from "@/experience/workspace/billing/AgencyCheckoutStatus";
-import { AgencyPayerRequests } from "@/experience/workspace/billing/AgencyPayerRequests";
+import {
+  AgencyPayerRequestLines,
+  AgencyPayerRequests,
+} from "@/experience/workspace/billing/AgencyPayerRequests";
+import { AgencyBillingPebble } from "@/experience/workspace/billing/AgencyBillingPebble";
 import { aiControlsReleaseEnabled } from "@/platform/infra/ai-controls-release";
 import {
   businessAiCapUsd,
@@ -84,73 +88,89 @@ export default async function BusinessBillingPage({
     }
     const checkoutAvailability = await readCheckoutAvailability(workspaceId);
     return agencyShell(
-      <div className={styles.screen}>
-        <div className={styles.split}>
-          <div className={styles.column}>
-            {agency ? (
-              <AgencyBillingView
-                billing={agency}
-                checkoutAvailability={checkoutAvailability}
-              />
-            ) : (
-              <section
-                className={styles.section}
-                aria-labelledby="agency-billing-heading"
-              >
-                <XaHeadline
-                  id="agency-billing-heading"
-                  quiet="No client has your agency as payer yet."
-                >
-                  Agency billing
-                </XaHeadline>
-                <AgencyCheckoutStatus
-                  availability={checkoutAvailability}
-                  paymentsHref={`/workspace/payments?workspaceId=${id}`}
+      <AgencyPayerRequests
+        agencyWorkspaceId={workspaceId}
+        agencyName={workspace.name}
+      >
+        <div className={styles.screen}>
+          <div className={styles.split} data-phone="main-first">
+            <div className={styles.column}>
+              {agency ? (
+                <AgencyBillingView
+                  billing={agency}
+                  checkoutAvailability={checkoutAvailability}
                 />
-              </section>
-            )}
-            <nav aria-label="More about agency money" className={styles.links}>
-              <XaTextLink href={`/workspace/payment-links?workspaceId=${id}`}>
-                Payment links
-              </XaTextLink>
-              {process.env.STRELVA_CONNECT === "1" ? (
-                <>
-                  <span aria-hidden="true">·</span>
-                  <XaTextLink href={`/workspace/payments?workspaceId=${id}`}>
-                    Agency payments
-                  </XaTextLink>
-                </>
-              ) : null}
-              {process.env.STRELVA_PROVIDER_CHANGE === "1" ? (
-                <>
-                  <span aria-hidden="true">·</span>
-                  <XaTextLink
-                    href={`/workspace/provider-change?workspaceId=${id}`}
+              ) : (
+                <section
+                  className={styles.section}
+                  aria-labelledby="agency-billing-heading"
+                >
+                  <XaHeadline
+                    id="agency-billing-heading"
+                    quiet="No client has your agency as payer yet."
                   >
-                    Agency handoffs
-                  </XaTextLink>
-                </>
-              ) : null}
-              {process.env.STRELVA_REVENUE_SPLITS === "1" ? (
-                <>
-                  <span aria-hidden="true">·</span>
-                  <XaTextLink
-                    href={`/workspace/creator-maintenance?workspaceId=${id}`}
+                    Agency billing
+                  </XaHeadline>
+                  <AgencyCheckoutStatus
+                    availability={checkoutAvailability}
+                    paymentsHref={`/workspace/payments?workspaceId=${id}`}
+                  />
+                  <ul
+                    className={styles.clientList}
+                    aria-label="Owners asking your agency to pay"
                   >
-                    Creator maintenance
-                  </XaTextLink>
-                </>
-              ) : null}
-            </nav>
+                    <AgencyPayerRequestLines listed={[]} />
+                  </ul>
+                </section>
+              )}
+              <nav
+                aria-label="More about agency money"
+                className={styles.links}
+              >
+                <XaTextLink href={`/workspace/payment-links?workspaceId=${id}`}>
+                  Payment links
+                </XaTextLink>
+                {process.env.STRELVA_CONNECT === "1" ? (
+                  <>
+                    <span aria-hidden="true">·</span>
+                    <XaTextLink href={`/workspace/payments?workspaceId=${id}`}>
+                      Agency payments
+                    </XaTextLink>
+                  </>
+                ) : null}
+                {process.env.STRELVA_PROVIDER_CHANGE === "1" ? (
+                  <>
+                    <span aria-hidden="true">·</span>
+                    <XaTextLink
+                      href={`/workspace/provider-change?workspaceId=${id}`}
+                    >
+                      Agency handoffs
+                    </XaTextLink>
+                  </>
+                ) : null}
+                {process.env.STRELVA_REVENUE_SPLITS === "1" ? (
+                  <>
+                    <span aria-hidden="true">·</span>
+                    <XaTextLink
+                      href={`/workspace/creator-maintenance?workspaceId=${id}`}
+                    >
+                      Creator maintenance
+                    </XaTextLink>
+                  </>
+                ) : null}
+              </nav>
+            </div>
+            {agency ? (
+              <aside
+                className={styles.side}
+                aria-label="What Pebble is waiting on"
+              >
+                <AgencyBillingPebble billing={agency} />
+              </aside>
+            ) : null}
           </div>
-          <aside
-            className={styles.side}
-            aria-label="Owners asking your agency to pay"
-          >
-            <AgencyPayerRequests agencyWorkspaceId={workspaceId} />
-          </aside>
         </div>
-      </div>,
+      </AgencyPayerRequests>,
     );
   }
   let billing;
@@ -201,9 +221,14 @@ export default async function BusinessBillingPage({
   const showStartPlan = needsPlan && selfServeBillingConfig().enabled;
   let agencyChoices: { id: string; name: string }[] = [];
   let agencyChoicesError = "";
+  const agencyNames: Record<string, string> = {};
+  if (billing?.payerParty?.kind === "agency" && billing.payerParty.name)
+    agencyNames[billing.payerParty.workspaceId] = billing.payerParty.name;
   if (workspace?.role === "owner") {
     try {
       const servingAgencies = await readBusinessAgencies(actor, workspaceId);
+      for (const item of servingAgencies)
+        agencyNames[item.agencyWorkspaceId] = item.name;
       agencyChoices = servingAgencies
         .filter(
           (item) =>
@@ -260,6 +285,7 @@ export default async function BusinessBillingPage({
             />
             {showStartPlan ? (
               <StartWorkspacePlan
+                primary={!query.invoiceId}
                 workspaceId={workspaceId}
                 budget={budget}
                 capUsd={capUsd}
@@ -334,6 +360,8 @@ export default async function BusinessBillingPage({
               <AgencyInvoiceAcceptance
                 invoiceId={query.invoiceId}
                 checkoutAvailability={invoiceCheckoutAvailability}
+                agencyNames={agencyNames}
+                planCents={billing?.monthlyCents ?? null}
               />
             </aside>
           ) : null}

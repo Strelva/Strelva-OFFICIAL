@@ -35,6 +35,10 @@ const when = (iso: string | null | undefined) => {
       }).format(value)
     : "date not recorded";
 };
+/** Whoever proposed, by name; the email only when no name is recorded. */
+function proposerLabel(item: PayerTransition) {
+  return item.proposerName?.trim() || item.proposerEmail;
+}
 const STATUS_WORDS: Record<PayerTransition["status"], string> = {
   pending: "Waiting for an answer",
   accepted: "Accepted",
@@ -100,6 +104,16 @@ export function WorkspacePayerTransition({
     void load(controller.signal);
     return () => controller.abort();
   }, [load]);
+  // Pebble's "Pay directly instead" on the billing page proposes a payer; read it back here.
+  useEffect(() => {
+    const changed = (event: Event) => {
+      const detail = (event as CustomEvent<{ workspaceId?: string }>).detail;
+      if (detail?.workspaceId === workspaceId) void load();
+    };
+    window.addEventListener("strelva:payer-transition", changed);
+    return () =>
+      window.removeEventListener("strelva:payer-transition", changed);
+  }, [load, workspaceId]);
 
   async function command(body: Record<string, unknown>) {
     if (busy) return;
@@ -229,6 +243,7 @@ export function WorkspacePayerTransition({
       ));
   return (
     <section
+      id="who-pays"
       className={styles.section}
       aria-labelledby="payer-transition-heading"
     >
@@ -299,62 +314,65 @@ export function WorkspacePayerTransition({
           role="group"
           aria-label="Payer change waiting for an answer"
         >
-          <div className={styles.waitingHead}>
-            <p className={styles.waitingTitle}>
-              {successorLabel(pending)} as payer for future jobs
-            </p>
+          <p className={styles.line}>
+            <strong>{successorLabel(pending)} as payer for future jobs</strong>{" "}
             <XaStatus kind="waits" size="sm">
               Waiting for{" "}
               {pending.successorKind === "business"
                 ? "a business owner"
                 : successorLabel(pending)}
             </XaStatus>
-          </div>
+            <span className={styles.lineActions}>
+              {addressed ? (
+                <>
+                  <XaTextLink
+                    disabled={busy}
+                    onClick={() =>
+                      void command({
+                        action: "accept",
+                        transitionId: pending.id,
+                      })
+                    }
+                  >
+                    Accept future payer role
+                  </XaTextLink>
+                  <span aria-hidden="true">·</span>
+                  <XaTextLink
+                    disabled={busy}
+                    onClick={() =>
+                      void command({
+                        action: "reject",
+                        transitionId: pending.id,
+                      })
+                    }
+                  >
+                    Decline
+                  </XaTextLink>
+                </>
+              ) : null}
+              {addressed && canPropose ? (
+                <span aria-hidden="true">·</span>
+              ) : null}
+              {canPropose ? (
+                <XaTextLink
+                  disabled={busy}
+                  onClick={() =>
+                    void command({ action: "revoke", transitionId: pending.id })
+                  }
+                >
+                  Withdraw
+                </XaTextLink>
+              ) : null}
+            </span>
+          </p>
           <p className={styles.note}>
-            Proposed by {pending.proposerEmail}.{" "}
+            {proposerLabel(pending)} proposed it on {when(pending.proposedAt)}.{" "}
             {pending.successorKind === "agency"
               ? "Only an owner or admin of this agency can accept."
               : pending.successorKind === "business"
                 ? "A business owner accepts."
                 : "Only this person can accept, after confirming their email."}
           </p>
-          <div className={styles.actions}>
-            {addressed ? (
-              <>
-                <XaButton
-                  size="sm"
-                  disabled={busy}
-                  onClick={() =>
-                    void command({ action: "accept", transitionId: pending.id })
-                  }
-                >
-                  Accept future payer role
-                </XaButton>
-                <XaButton
-                  size="sm"
-                  variant="quiet"
-                  disabled={busy}
-                  onClick={() =>
-                    void command({ action: "reject", transitionId: pending.id })
-                  }
-                >
-                  Decline
-                </XaButton>
-              </>
-            ) : null}
-            {canPropose ? (
-              <XaButton
-                size="sm"
-                variant="quiet"
-                disabled={busy}
-                onClick={() =>
-                  void command({ action: "revoke", transitionId: pending.id })
-                }
-              >
-                Withdraw proposal
-              </XaButton>
-            ) : null}
-          </div>
         </div>
       ) : canPropose && data ? (
         <form
@@ -480,7 +498,7 @@ export function WorkspacePayerTransition({
               <XaRow
                 key={item.id}
                 title={successorLabel(item)}
-                detail={`Proposed ${when(item.proposedAt)} by ${item.proposerEmail}`}
+                detail={`${proposerLabel(item)} proposed it on ${when(item.proposedAt)}`}
                 meta={STATUS_WORDS[item.status]}
               />
             ))}

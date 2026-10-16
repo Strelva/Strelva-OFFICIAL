@@ -1,8 +1,10 @@
 /* Money in the XA language (xs-money lane, Oct 15).
    Workspace screens follow R1 (a column of open answers) and AG6 (rows with a
    quiet number); a decision about a price follows O3; public pages follow E4.
-   One object per screen gets --st-shadow-lg: the document, the decision, or
-   the payment panel. Nothing else is raised. */
+   Only the decision (XaDecision) is raised. Documents and the public payment
+   panel read as paper: a hairline, 12-16px corners, almost no shadow. Nothing
+   else gets a background: waiting things are plain lines with the decision on
+   the same line. */
 
 .screen {
   box-sizing: border-box;
@@ -176,10 +178,145 @@
 .waiting {
   display: flex;
   flex-direction: column;
+  gap: 8px;
+}
+/* One line: what waits, who asked, then its answers as text links. */
+.line {
+  margin: 0;
+  color: var(--st-text-body);
+  font-size: 15px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.line strong {
+  color: var(--st-text);
+  font-weight: 500;
+}
+.lineActions {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 6px;
+  margin-left: 6px;
+  color: var(--st-text-3);
+}
+.ask {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 6px 0 0;
+  color: var(--st-text-body);
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.5;
+}
+.ask > span:first-child {
+  color: var(--st-need);
+}
+
+/* AG6 right column: Pebble doing one job beside the list. */
+.pebbleAside {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 14px;
+}
+.pebbleAside p {
+  margin: 0;
+}
+.pebblePhoneAvatar {
+  display: none;
+}
+.pebbleLead {
+  display: flex;
+  align-items: center;
   gap: 10px;
-  padding: 16px 18px;
-  border-radius: var(--st-r-lg);
-  background: var(--st-inset);
+  color: var(--st-text);
+  font-size: 17px;
+  font-weight: 500;
+  line-height: 1.35;
+}
+.pebbleList {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: var(--st-text-body);
+  font-size: 15px;
+  line-height: 1.45;
+}
+.pebbleList li {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  gap: 8px;
+}
+.pebbleList b {
+  color: var(--st-text);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+.fixtureNote {
+  color: var(--st-text-3);
+  font-size: 12px;
+  font-weight: 400;
+}
+
+/* Pebble's sentence next to the clay, no dot (payment link setup, setup states). */
+.pebbleBeside {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 20px;
+}
+.pebbleBeside p {
+  margin: 0;
+}
+@media (max-width: 767px) {
+  .pebbleBeside {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 12px;
+  }
+}
+
+/* The payer inbox: one list, the decision on each line. */
+.inbox {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.inbox > li {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 18px 0;
+}
+.inbox > li + li::before {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: var(--st-line);
+  content: "";
+}
+.inboxTitle {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px 16px;
+  margin: 0;
+  color: var(--st-text);
+  font-size: 15px;
+  font-weight: 500;
+}
+.inbox .yesSlot {
+  max-width: 360px;
+  margin-top: 8px;
 }
 .waitingHead {
   display: flex;
@@ -202,6 +339,80 @@
 }
 .history > summary {
   width: max-content;
+}
+
+/* R1 answers: the detail on the left, who said it on the right. */
+.said {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+}
+.saidHead,
+.saidRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(120px, max-content);
+  column-gap: 32px;
+}
+.saidHead {
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--st-line);
+  color: var(--st-text-3);
+  font-size: 13px;
+}
+.saidRow {
+  row-gap: 2px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--st-line);
+}
+.saidRow dt {
+  grid-column: 1;
+  color: var(--st-text-3);
+  font-size: 13px;
+  line-height: 1.4;
+}
+.saidRow dd {
+  grid-column: 1;
+  margin: 0;
+  color: var(--st-text);
+  font-size: 15px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+.saidRow dd.saidBy {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  align-self: center;
+  color: var(--st-text-2);
+  font-size: 14px;
+}
+.saidWord {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+@media (max-width: 767px) {
+  .saidWord {
+    position: static;
+    width: auto;
+    height: auto;
+    overflow: visible;
+    clip: auto;
+  }
+  .saidHead {
+    display: none;
+  }
+  .saidHead,
+  .saidRow {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .saidRow dd.saidBy {
+    grid-column: 1;
+    grid-row: auto;
+    font-size: 13px;
+  }
 }
 
 /* AG6 lines: initial, name and its retail price inline, the number on the right. */
@@ -251,14 +462,48 @@
   text-align: right;
   white-space: nowrap;
 }
+/* Row placement when the retail price controls sit directly in the line:
+   the figure on the right of the name, the controls under the name. */
+.clientLine > :first-child {
+  grid-row: 1 / span 2;
+}
+.clientLine > .clientText {
+  grid-column: 2;
+  grid-row: 1;
+}
+.clientLine > .clientFigure {
+  grid-column: 3;
+  grid-row: 1;
+}
+.clientLine > details {
+  grid-column: 2 / 4;
+  grid-row: 2;
+}
+.clientDetail {
+  color: var(--st-text-2);
+  font-size: 14px;
+  font-weight: 400;
+}
 @media (max-width: 767px) {
   .clientLine {
     grid-template-columns: 32px minmax(0, 1fr);
   }
-  .clientFigure {
+  .clientFigure,
+  .clientLine > .clientFigure {
     grid-column: 2;
+    grid-row: auto;
     text-align: left;
     font-size: 20px;
+  }
+  .clientLine > details {
+    grid-column: 2;
+    grid-row: auto;
+  }
+  .clientLine {
+    row-gap: 6px;
+  }
+  .clientLine > :first-child {
+    grid-row: 1;
   }
 }
 
@@ -294,9 +539,10 @@
   flex-direction: column;
   gap: 28px;
   padding: 36px 40px 40px;
-  border-radius: var(--st-r-xl);
+  border: 1px solid var(--st-line);
+  border-radius: var(--st-r-md, 12px);
   background: var(--st-surface);
-  box-shadow: var(--st-shadow-lg);
+  box-shadow: 0 1px 2px #0000000a;
 }
 .docTop {
   display: flex;
@@ -394,6 +640,12 @@
 .previewPay p {
   margin: 0;
 }
+.previewPlaceholder {
+  margin: 0;
+  color: var(--st-text-3);
+  font-size: 17px;
+  line-height: 1.3;
+}
 .previewPill {
   display: grid;
   height: 44px;
@@ -490,9 +742,23 @@
   flex-direction: column;
   gap: 18px;
   padding: 28px 30px 24px;
-  border-radius: var(--st-r-xl);
+  border: 1px solid var(--st-line);
+  border-radius: var(--st-r-lg, 16px);
   background: var(--st-surface);
-  box-shadow: var(--st-shadow-lg);
+  box-shadow: 0 1px 2px #0000000a, 0 6px 18px #0000000a;
+}
+.covers {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: 520px;
+  margin: 12px 0 0;
+  padding: 16px 0 0;
+  border-top: 1px solid var(--st-line);
+  list-style: none;
+  color: var(--st-text-2);
+  font-size: 15px;
+  line-height: 1.45;
 }
 .secure svg {
   display: inline-block;
@@ -559,6 +825,16 @@
   .split > .side {
     order: -1;
   }
+  /* Agency billing: the headline and the list lead on a phone; Pebble follows. */
+  .split[data-phone="main-first"] > .side {
+    order: 0;
+  }
+  .pebbleArt {
+    display: none;
+  }
+  .pebblePhoneAvatar {
+    display: inline-flex;
+  }
   .doc {
     gap: 22px;
     padding: 24px 20px 28px;
@@ -595,6 +871,7 @@
     padding: 0;
   }
   .doc {
+    border: 0;
     box-shadow: none;
     padding: 0;
   }

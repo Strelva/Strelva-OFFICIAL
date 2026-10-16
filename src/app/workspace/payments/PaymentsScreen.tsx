@@ -21,13 +21,39 @@ export interface BusinessMoneyView {
     amount_cents: number;
     currency: string;
     purpose: string;
+    /** The payment request this payment answers (read_business_money returns the whole row). */
+    reference_id?: string | null;
+    created_at?: string;
   }>;
-  events: Array<{ payment_id: string; kind: string; amount_cents: number }>;
+  events: Array<{
+    payment_id: string;
+    kind: string;
+    amount_cents: number;
+    created_at?: string;
+  }>;
 }
 
+const PURPOSE_WORDS: Record<string, string> = {
+  deposit: "Booking deposit",
+  quote: "Quoted work",
+  agent: "Quoted work",
+  checkout: "Checkout",
+  pay_link: "Payment link",
+  agency_rebill: "Agency plan",
+};
 const purpose = (value: string) => {
+  if (PURPOSE_WORDS[value]) return PURPOSE_WORDS[value]!;
   const words = value.replaceAll("_", " ").trim();
   return words ? words[0]!.toUpperCase() + words.slice(1) : "Customer payment";
+};
+const shortDay = (iso: string | null | undefined) => {
+  const value = iso ? new Date(iso) : null;
+  return value && Number.isFinite(value.getTime())
+    ? new Intl.DateTimeFormat("en-US", {
+        month: "short",
+        day: "numeric",
+      }).format(value)
+    : "";
 };
 
 /** Deposits and payments for one business (XA · R1 column): its Stripe account, what customers paid, and asking for the next payment. */
@@ -59,6 +85,19 @@ export function PaymentsScreen({
     0,
   );
   const currency = settled[0]?.currency ?? "usd";
+  // Name each payment the way its request named it ("Ana R. cleaning
+  // deposit"), and date it by the day Stripe confirmed it.
+  const requestFor = new Map(requests.map((item) => [item.id, item]));
+  const title = (p: BusinessMoneyView["payments"][number]) =>
+    (p.reference_id
+      ? requestFor.get(p.reference_id)?.lines?.[0]?.name?.trim()
+      : "") || purpose(p.purpose);
+  const paidOn = (id: string) =>
+    shortDay(
+      (money?.events ?? []).find(
+        (e) => e.payment_id === id && e.kind === "paid",
+      )?.created_at,
+    );
   return (
     <div className={styles.screen}>
       <div className={styles.brief}>
@@ -87,15 +126,24 @@ export function PaymentsScreen({
               return (
                 <XaRow
                   key={p.id}
-                  title={purpose(p.purpose)}
+                  title={title(p)}
                   detail={
                     !paidIds.has(p.id) ? (
                       <XaStatus kind="waits" size="sm">
                         Not confirmed by Stripe yet
                       </XaStatus>
-                    ) : back ? (
-                      `${formatMoney(back, p.currency)} refunded`
-                    ) : undefined
+                    ) : (
+                      [
+                        title(p) !== purpose(p.purpose)
+                          ? purpose(p.purpose)
+                          : "",
+                        paidOn(p.id) ? `paid ${paidOn(p.id)}` : "",
+                        back ? `${formatMoney(back, p.currency)} refunded` : "",
+                      ]
+                        .filter(Boolean)
+                        .join(" · ")
+                        .replace(/^paid/, "Paid") || undefined
+                    )
                   }
                   meta={
                     <span className={styles.figure}>
@@ -118,7 +166,7 @@ export function PaymentsScreen({
             .map((p) => ({
               id: p.id,
               currency: p.currency,
-              label: purpose(p.purpose),
+              label: title(p),
               remainingCents: p.amount_cents - refunded(p.id),
             }))
             .filter((p) => p.remainingCents > 0)}

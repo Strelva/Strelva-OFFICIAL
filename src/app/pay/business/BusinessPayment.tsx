@@ -154,12 +154,7 @@ export default function BusinessPayment({
                   </div>
                 ))}
               </dl>
-            ) : (
-              <p className={visitor.note}>
-                No item details supplied. The business has not added item
-                details to this request.
-              </p>
-            )
+            ) : null
           ) : null}
         </section>
         <div>

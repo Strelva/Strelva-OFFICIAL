@@ -3,10 +3,24 @@ import { workspaceReleaseEnabled } from "@/platform/workspace-release";
 import { workspaceHttpActor } from "@/platform/workspaces/http";
 import { moneyRpc } from "@/platform/connect";
 import { XaHeadline } from "@/components/ui/strelva/Xa";
+import { StrelvaShell } from "@/experience/app-frame/StrelvaShell";
 import { MoneyLoadFailure } from "@/experience/workspace/money/MoneyLoadFailure";
 import styles from "@/experience/workspace/money/money.module.css";
 import ReviewQueue, { type ReconciliationIssue } from "./ReviewQueue";
 export const dynamic = "force-dynamic";
+
+/** Payment exceptions live in the Library: Strelva staff's own place, in the ordinary shell. */
+function LibraryShell({ children }: { children: React.ReactNode }) {
+  return (
+    <StrelvaShell
+      title=""
+      workspaceName="Strelva"
+      agencyNavigation={{ active: "library", leadsAvailable: false }}
+    >
+      {children}
+    </StrelvaShell>
+  );
+}
 /** Library (Strelva staff): Stripe records that did not match the ledger, reviewed one at a time. */
 export default async function Page() {
   if (
@@ -25,28 +39,32 @@ export default async function Page() {
     });
   } catch {
     return (
-      <main data-workspace-theme="linen">
+      <LibraryShell>
         <div className={styles.screen}>
           <MoneyLoadFailure
             title="Payment exceptions could not be loaded."
-            quiet="Confirm operator access and try again."
+            quiet="Only Strelva staff can read them. Confirm your access and try again."
             retryHref="/workspace/money-reconciliation"
           />
         </div>
-      </main>
+      </LibraryShell>
     );
   }
   const open = issues.filter((issue) => !issue.resolution).length;
   return (
-    <main data-workspace-theme="linen">
+    <LibraryShell>
       <div className={styles.screen}>
         <XaHeadline quiet="Check each against Stripe and the ledger, then record what you found. Recording never moves money.">
           {open
             ? `${open === 1 ? "1 payment exception waits" : `${open} payment exceptions wait`} for review.`
-            : "Payment exceptions"}
+            : "No payment exception waits for review."}
         </XaHeadline>
-        <ReviewQueue key={actor.userId} issues={issues} />
+        <ReviewQueue
+          key={actor.userId}
+          issues={issues}
+          actorId={actor.userId}
+        />
       </div>
-    </main>
+    </LibraryShell>
   );
 }

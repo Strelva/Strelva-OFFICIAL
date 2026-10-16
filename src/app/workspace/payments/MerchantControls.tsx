@@ -176,11 +176,21 @@ export default function MerchantControls({
         rows={[
           [
             "Payouts",
-            "Stripe pays out to your bank on its own schedule. Payout status is not shown here yet.",
+            <>
+              Stripe pays your bank on its own schedule.{" "}
+              <a
+                className={styles.detailsToggle}
+                href="https://dashboard.stripe.com/payouts"
+                target="_blank"
+                rel="noreferrer"
+              >
+                See payouts in Stripe
+              </a>
+            </>,
           ],
           [
             "Fees",
-            "Stripe's fees apply. Strelva's payment fee is not recorded here.",
+            "Stripe's fees apply. Strelva takes no fee on these payments.",
           ],
           [
             "Refunds",

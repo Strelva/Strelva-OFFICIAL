@@ -135,3 +135,11 @@ it("does not offer a potentially duplicate plan while paid entitlement cannot be
   expect(propsFor(page, WorkspacePlanUnavailable)).toBeUndefined();
   expect(propsFor(page, BusinessAiBudgetSummary)).toMatchObject({ budget: null });
 });
+it("keeps one ink pill when a business with no plan opens an agency price: the plan button steps down", async () => {
+  mocks.checkout.mockReturnValue({ enabled: true });
+  const withPrice = await BillingPage({ searchParams: Promise.resolve({ workspaceId: "business", invoiceId: "invoice" }) });
+  expect(propsFor(withPrice, StartWorkspacePlan)?.primary).toBe(false);
+  expect(propsFor(withPrice, AgencyInvoiceAcceptance)?.agencyNames).toEqual({ "serving-agency": "Cedar Studio", "proposed-agency": "Waiting Agency" });
+  const alone = await BillingPage({ searchParams: Promise.resolve({ workspaceId: "business" }) });
+  expect(propsFor(alone, StartWorkspacePlan)?.primary).toBe(true);
+});

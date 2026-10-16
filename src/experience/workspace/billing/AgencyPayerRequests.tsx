@@ -1,14 +1,18 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { useRouter } from "next/navigation";
 import { z } from "zod";
-import {
-  XaButton,
-  XaLabel,
-  XaStatus,
-  XaTextLink,
-} from "@/components/ui/strelva/Xa";
+import { XaInitial, XaTextLink } from "@/components/ui/strelva/Xa";
+import { clientColor } from "@/platform/presentation/client-color";
 import styles from "@/experience/workspace/money/money.module.css";
 
 const inboxSchema = z
@@ -30,38 +34,94 @@ const inboxSchema = z
           ]),
           canRespond: z.boolean(),
           proposerEmail: z.string(),
+          proposerName: z.string().nullable().optional(),
         })
         .passthrough(),
     ),
   })
   .passthrough();
 type Inbox = z.infer<typeof inboxSchema>;
+type Request = Inbox["transitions"][number];
 
+/** Whoever asked, by name; the email only when no name is recorded. */
+export function proposerLabel(item: {
+  proposerName?: string | null;
+  proposerEmail: string;
+}) {
+  return item.proposerName?.trim() || item.proposerEmail;
+}
+
+type Payer = {
+  agencyName: string;
+  requests: Request[] | null;
+  error: string;
+  notice: string;
+  busy: boolean;
+  respond: (action: "accept" | "reject", transitionId: string) => void;
+  retry: () => void;
+};
+const PayerContext = createContext<Payer | null>(null);
+
+/** Owner requests for this agency to pay, as data other parts of the page can place on the client's own line. */
+export function useAgencyPayerRequests() {
+  return useContext(PayerContext);
+}
+
+/**
+ * Owners asking the agency to pay for future jobs (XA · AG6). With children,
+ * it only provides the requests: each one is drawn on its client's own line
+ * (AgencyPayerRequestAsk) and the rest as extra lines in the same list
+ * (AgencyPayerRequestLines). Without children it draws its own list.
+ */
 export function AgencyPayerRequests({
   agencyWorkspaceId,
+  agencyName = "your agency",
   request = fetch,
+  children,
 }: {
   agencyWorkspaceId: string;
+  agencyName?: string;
   request?: typeof fetch;
+  children?: ReactNode;
 }) {
   return (
     <ScopedAgencyPayerRequests
       key={agencyWorkspaceId}
       agencyWorkspaceId={agencyWorkspaceId}
+      agencyName={agencyName}
       request={request}
-    />
+    >
+      {children ?? (
+        <section
+          className={styles.section}
+          aria-label="Owners asking your agency to pay"
+        >
+          <AgencyPayerRequestsStatus />
+          <ul
+            className={styles.clientList}
+            aria-label="Owners asking your agency to pay"
+          >
+            <AgencyPayerRequestLines listed={[]} />
+          </ul>
+        </section>
+      )}
+    </ScopedAgencyPayerRequests>
   );
 }
 
 function ScopedAgencyPayerRequests({
   agencyWorkspaceId,
+  agencyName,
   request,
+  children,
 }: {
   agencyWorkspaceId: string;
+  agencyName: string;
   request: typeof fetch;
+  children: ReactNode;
 }) {
   const router = useRouter();
-  const [requests, setRequests] = useState<Inbox["transitions"] | null>(null);
+  const [requests, setRequests] = useState<Request[] | null>(null);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
@@ -154,12 +214,13 @@ function ScopedAgencyPayerRequests({
         throw new Error("The addressed payer decision could not be confirmed.");
       }
       apply(body);
+      const business = addressed.workspaceName ?? "this business";
       setNotice(
         resolved?.status === "stale"
-          ? "The proposal expired because its proposer is no longer a business owner."
+          ? `${proposerLabel(addressed)} is no longer an owner of ${business}, so the request ended.`
           : action === "accept"
-            ? "Agency payer role accepted for future jobs. Each job limit still needs separate agreement."
-            : "Payer proposal declined.",
+            ? `Agency payer role accepted for ${business}'s future jobs. Each job limit still needs its own yes.`
+            : `You said not yet to paying for ${business}. ${proposerLabel(addressed)} can ask again.`,
       );
       router.refresh();
     } catch {
@@ -167,7 +228,7 @@ function ScopedAgencyPayerRequests({
         try {
           await load(controller.signal);
           setNotice(
-            "Outcome not confirmed. Payer requests have been checked again; review their current status before continuing.",
+            "Outcome not confirmed. Strelva checked the requests again; read where each one stands before answering.",
           );
         } catch {
           if (!controller.signal.aborted)
@@ -184,86 +245,136 @@ function ScopedAgencyPayerRequests({
     }
   }
 
+  const value: Payer = {
+    agencyName,
+    requests,
+    error,
+    notice,
+    busy,
+    respond: (action, id) => void respond(action, id),
+    retry: () => {
+      if (!busy)
+        void load().catch(() =>
+          setError("Payer requests could not be loaded."),
+        );
+    },
+  };
   return (
-    <section
-      className={styles.section}
-      aria-labelledby="payer-requests-heading"
-    >
-      <XaLabel as="h2" id="payer-requests-heading">
-        Owners asking your agency to pay
-      </XaLabel>
-      <p className={styles.note}>
-        An owner proposes; your agency accepts here. Neither of you has to join
-        the other&apos;s workspace.
+    <PayerContext.Provider value={value}>{children}</PayerContext.Provider>
+  );
+}
+
+/** Loading, failure and what just happened, said once for the whole list. */
+export function AgencyPayerRequestsStatus() {
+  const payer = useAgencyPayerRequests();
+  if (!payer) return null;
+  if (payer.error)
+    return (
+      <p className={styles.critical} role="alert">
+        {payer.error}{" "}
+        <XaTextLink onClick={payer.retry}>Check payer requests</XaTextLink>
       </p>
-      {error ? (
-        <p className={styles.critical} role="alert">
-          {error}{" "}
-          <XaTextLink
-            onClick={() => {
-              if (!busy)
-                void load().catch(() =>
-                  setError("Payer requests could not be loaded."),
-                );
-            }}
-          >
-            Check payer requests
-          </XaTextLink>
-        </p>
-      ) : null}
-      {notice ? (
-        <p className={styles.body} role="status">
-          {notice}
-        </p>
-      ) : null}
-      {requests === null && !error ? (
-        <p className={styles.note} role="status">
-          Reading payer requests…
-        </p>
-      ) : requests?.length === 0 ? (
-        <p className={styles.body}>
-          No payer requests are waiting for this agency.
-        </p>
-      ) : null}
-      {requests?.map((item) => (
-        <div
-          key={item.id}
-          className={styles.waiting}
-          role="group"
-          aria-label={`Future jobs for ${item.workspaceName ?? "this business"}`}
+    );
+  if (payer.notice)
+    return (
+      <p className={styles.body} role="status">
+        {payer.notice}
+      </p>
+    );
+  if (payer.requests === null)
+    return (
+      <p className={styles.note} role="status">
+        Reading owner requests…
+      </p>
+    );
+  return null;
+}
+
+/** The ask, on the client's own line: who asked, what, and the two answers as text links. */
+export function AgencyPayerRequestAsk({
+  workspaceId,
+}: {
+  workspaceId: string;
+}) {
+  const payer = useAgencyPayerRequests();
+  const item = payer?.requests?.find(
+    (entry) => entry.workspaceId === workspaceId,
+  );
+  if (!payer || !item) return null;
+  return <Ask item={item} payer={payer} />;
+}
+
+function Ask({ item, payer }: { item: Request; payer: Payer }) {
+  const business = item.workspaceName ?? "this business";
+  const disabled = payer.busy || Boolean(payer.error);
+  return (
+    <span
+      className={styles.ask}
+      role="group"
+      aria-label={`Request from ${business}`}
+    >
+      <span>
+        {proposerLabel(item)} asked {payer.agencyName} to pay for {business}
+        &apos;s future jobs.
+      </span>
+      <span className={styles.links}>
+        <XaTextLink
+          disabled={disabled}
+          onClick={() => payer.respond("accept", item.id)}
+          aria-label={`Accept paying for ${business}'s future jobs`}
         >
-          <div className={styles.waitingHead}>
-            <p className={styles.waitingTitle}>
-              Future jobs for {item.workspaceName ?? "this business"}
-            </p>
-            <XaStatus kind="waits" size="sm">
-              Waits for you
-            </XaStatus>
+          Accept
+        </XaTextLink>
+        <span aria-hidden="true">·</span>
+        <XaTextLink
+          disabled={disabled}
+          onClick={() => payer.respond("reject", item.id)}
+          aria-label={`Not yet for ${business}`}
+        >
+          Not yet
+        </XaTextLink>
+      </span>
+    </span>
+  );
+}
+
+/** Requests from businesses that are not on the list yet, as lines in the same list. */
+export function AgencyPayerRequestLines({
+  listed,
+  colors,
+}: {
+  listed: readonly string[];
+  colors?: Readonly<Record<string, string>>;
+}) {
+  const payer = useAgencyPayerRequests();
+  if (!payer?.requests) return null;
+  const rest = payer.requests.filter(
+    (item) => !listed.includes(item.workspaceId),
+  );
+  if (!rest.length)
+    return listed.length ? null : (
+      <li className={styles.clientLine}>
+        <span />
+        <p className={styles.body}>
+          No payer requests are waiting for {payer.agencyName}.
+        </p>
+      </li>
+    );
+  return (
+    <>
+      {rest.map((item) => (
+        <li key={item.id} className={styles.clientLine}>
+          <XaInitial
+            name={item.workspaceName ?? "Business"}
+            color={colors?.[item.workspaceId] ?? clientColor(item.workspaceId)}
+            size={32}
+          />
+          <div className={styles.clientText}>
+            <span>{item.workspaceName ?? "A business"}</span>
+            <Ask item={item} payer={payer} />
           </div>
-          <p className={styles.note}>
-            {item.proposerEmail} asks your agency to pay for jobs started after
-            you accept. Existing job limits and costs keep their payer.
-            Accepting gives no access to the business&apos;s work.
-          </p>
-          <div className={styles.actions}>
-            <XaButton
-              size="sm"
-              disabled={busy || Boolean(error)}
-              onClick={() => void respond("accept", item.id)}
-            >
-              Accept future payer role
-            </XaButton>
-            <XaButton
-              size="sm"
-              variant="quiet"
-              disabled={busy || Boolean(error)}
-              onClick={() => void respond("reject", item.id)}
-            >
-              Not yet
-            </XaButton>
-          </div>
-        </div>
+        </li>
       ))}
-    </section>
+    </>
   );
 }

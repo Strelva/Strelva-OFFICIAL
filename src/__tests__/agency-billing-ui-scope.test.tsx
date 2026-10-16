@@ -296,7 +296,7 @@ it.each(["coming_soon", "setup_required", "unavailable"] as const)(
     expect(request).not.toHaveBeenCalled();
     expect(node.textContent).not.toContain("Open payment page");
     if (status === "coming_soon")
-      expect(node.textContent).toContain("Coming soon");
+      expect(node.textContent).toContain("Checkout opens later");
   },
 );
 it("keeps checkout fail-closed when the caller omits payment readiness", async () => {
@@ -310,7 +310,8 @@ it("keeps checkout fail-closed when the caller omits payment readiness", async (
     ),
   );
   expect(button(node, "Create accepted checkout").disabled).toBe(true);
-  expect(node.textContent).toContain("Coming soon");
+  expect(node.textContent).toContain("can charge this once checkout opens");
+  expect(node.textContent).not.toContain("Status");
 });
 it("offers serving agencies without suggesting the owner join their team", async () => {
   const { node, root } = host();

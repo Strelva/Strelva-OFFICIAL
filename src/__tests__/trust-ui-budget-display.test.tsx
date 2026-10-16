@@ -5,7 +5,8 @@ import { BusinessAiBudgetSummary, StartWorkspacePlan, WorkspacePlanUnavailable }
 const budget = { spentUsd: "3.50", reservedUsd: "1.25", capCents: 1000, subscribed: true, since: "2026-10-01T00:00:00Z", resetsAt: "2026-11-01T00:00:00Z", unknownCostCalls: 0 };
 it("shows spend, conservative reservations, remaining cap and its recorded reset date", () => {
   const html = renderToStaticMarkup(<BusinessAiBudgetSummary budget={budget} capUsd={10} enforced />);
-  for (const text of ["$3.50", "$1.25", "$5.25", "November 1, 2026 (UTC)", "reserve their maximum cost", "stay committed until the reset"]) expect(html).toContain(text);
+  for (const text of ["$3.50", "$1.25", "$5.25", "of your $10 limit", "Resets November 1.", "Each job holds the most it could cost until it finishes."]) expect(html).toContain(text);
+  for (const builder of ["UTC", "calls", "Budgeted calls", "Recorded spend"]) expect(html).not.toContain(builder);
 });
 it("unknown spend does not invent remaining budget or a reset date", () => {
   const html = renderToStaticMarkup(<BusinessAiBudgetSummary budget={null} capUsd={10} enforced />);
@@ -48,14 +49,18 @@ it("renders today's output with no controls row", () => {
 });
 it("names the agency that paused Strelva work", () => {
   const html = renderToStaticMarkup(<BusinessAiBudgetSummary budget={budget} capUsd={10} enforced controls={controls({ paused: true, setBy: { kind: "agency", agencyName: "North Studio" }, changedAt: "2026-10-12T15:00:00Z" })} />);
-  expect(html).toContain("North Studio paused Strelva work for this business on October 12, 2026 (UTC).");
+  expect(html).toContain("North Studio paused Strelva work for this business on October 12.");
 });
 it("shows an agency limit with its amount, who set it and the reset", () => {
   const html = renderToStaticMarkup(<BusinessAiBudgetSummary budget={budget} capUsd={10} enforced controls={controls({ monthlyCapCents: 2500, setBy: { kind: "agency", agencyName: "North Studio" }, changedAt: "2026-10-12T15:00:00Z" })} />);
-  expect(html).toContain("Usage limit $25.00 set by North Studio. Resets November 1, 2026 (UTC).");
+  expect(html).toContain("Usage limit $25 set by North Studio. Resets November 1.");
 });
 it("names a Strelva operator without inventing an agency, and never says AI in the new lines", () => {
   const html = renderToStaticMarkup(<BusinessAiBudgetSummary budget={budget} capUsd={10} enforced controls={controls({ paused: true, monthlyCapCents: 500, setBy: { kind: "operator", agencyName: null } })} />);
   expect(html).toContain("A Strelva operator paused Strelva work for this business.");
-  expect(html).toContain("Usage limit $5.00 set by Strelva.");
+  expect(html).toContain("Usage limit $5 set by Strelva.");
+});
+it("steps the plan button down when another decision holds the screen's one primary", () => {
+  expect(renderToStaticMarkup(<StartWorkspacePlan workspaceId="a0000000-0000-4000-8000-000000000001" />)).toContain("data-xa-primary");
+  expect(renderToStaticMarkup(<StartWorkspacePlan primary={false} workspaceId="a0000000-0000-4000-8000-000000000001" />)).not.toContain("data-xa-primary");
 });

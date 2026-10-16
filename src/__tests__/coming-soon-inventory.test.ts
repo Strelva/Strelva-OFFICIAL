@@ -32,7 +32,6 @@ const ALLOWED: Record<string, string> = {
   "src/experience/connections/model.ts": "connections",
   "src/experience/places/GoogleConnect.tsx": "connections",
   "src/experience/workspace/billing/AgencyCheckoutStatus.tsx": "money",
-  "src/experience/workspace/billing/AgencyPaymentLinks.tsx": "money",
   "src/experience/workspace/billing/payment-links-server.ts": "money",
   "src/experience/workspace/leads/AgencyLeads.tsx": "money",
   "src/lib/audit/impact.ts": "detector",

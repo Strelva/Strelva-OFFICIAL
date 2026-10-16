@@ -23,6 +23,7 @@ const receiptSchema = z
     recorded_at: z.string().datetime({ offset: true }),
   })
   .strict();
+/** A moment in the owner's local time, without a zone id. */
 const recordedDay = (iso: string | null | undefined) => {
   const value = iso ? new Date(iso) : null;
   return value && Number.isFinite(value.getTime())
@@ -32,19 +33,31 @@ const recordedDay = (iso: string | null | undefined) => {
         year: "numeric",
         hour: "numeric",
         minute: "2-digit",
-        timeZone: "UTC",
-        timeZoneName: "short",
       }).format(value)
-    : "not recorded";
+    : "a date that was not recorded";
 };
+const STATE_WORDS = {
+  creator: "The creator maintains it",
+  tapered: "The creator's share tapers",
+  takeover: "Taken over; the creator stops earning on future payments",
+} as const;
 const unknownMessage =
   "This maintenance change could not be confirmed. Reload its history before recording different terms.";
 
 export default function CreatorMaintenance({
   graph,
+  listingNames = {},
 }: {
   graph: CreatorMaintenanceGraph;
+  /** "Dental intake, Release 2", by listing source revision id, from the creator's own sources. */
+  listingNames?: Readonly<Record<string, string>>;
 }) {
+  const nameOf = (listing: { sourceRevisionId: string }, index: number) =>
+    listingNames[listing.sourceRevisionId] ?? `Listed System ${index + 1}`;
+  const rateOf = (version: string | null | undefined) => {
+    const agreement = graph.agreements.find((item) => item.version === version);
+    return agreement ? `${agreement.rateBps / 100}% of each payment` : null;
+  };
   const router = useRouter();
   const active = useRef(true);
   const pending = useRef<AbortController | null>(null);
@@ -227,27 +240,33 @@ export default function CreatorMaintenance({
     <div ref={sectionRef} className={xa.form}>
       <div className={xa.block}>
         <h2 ref={historyRef} tabIndex={-1} className={xa.heading}>
-          Recorded listings
+          Systems you list
         </h2>
         {graph.listings.length ? (
           <ul className={xa.section}>
-            {graph.listings.map((item) => (
+            {graph.listings.map((item, index) => (
               <li key={item.id}>
-                <h3 className={xa.heading}>{item.definitionId}</h3>
+                <h3 className={xa.heading}>{nameOf(item, index)}</h3>
                 <p className={xa.body}>
-                  Initial maintenance: {item.maintainerState}. Agreement:{" "}
-                  {item.agreementVersion ?? "Not configured"}.
+                  {STATE_WORDS[item.maintainerState]}
+                  {item.agreementVersion
+                    ? ` under ${item.agreementVersion}${rateOf(item.agreementVersion) ? `, ${rateOf(item.agreementVersion)}` : ""}`
+                    : ", with no written agreement yet"}
+                  .
                 </p>
                 {item.history.length ? (
                   <ul
                     className={xa.section}
-                    aria-label={`Maintenance history for ${item.definitionId}`}
+                    aria-label={`Maintenance history for ${nameOf(item, index)}`}
                   >
                     {item.history.map((entry) => (
-                      <li key={entry.id}>
-                        {entry.maintainer_state} · effective{" "}
-                        {recordedDay(entry.effective_from)} · agreement{" "}
-                        {entry.agreement_version ?? "None"}
+                      <li key={entry.id} className={xa.body}>
+                        {STATE_WORDS[entry.maintainer_state]} from{" "}
+                        {recordedDay(entry.effective_from)}
+                        {entry.agreement_version
+                          ? `, under ${entry.agreement_version}`
+                          : ""}
+                        .
                       </li>
                     ))}
                   </ul>
@@ -261,30 +280,28 @@ export default function CreatorMaintenance({
           </ul>
         ) : (
           <p className={xa.body}>
-            No creator royalty listing is recorded. Source qualification and a
-            written agreement remain separate prerequisites.
+            No System is listed yet. A System needs to be published and have a
+            written creator agreement before it can be listed.
           </p>
         )}
       </div>
       {graph.listings.length && graph.canMaintain ? (
         <div className={xa.block}>
-          <h2 className={xa.heading}>Record future maintenance terms</h2>
+          <h2 className={xa.heading}>Change who maintains a listed System</h2>
           <p className={xa.note}>
-            Takeover ends this listing’s future creator eligibility. Creator and
-            tapered states use an existing recorded agreement. This records
-            royalty maintenance terms; it does not carry out a software handoff,
-            create rates, or pay royalties.
+            A takeover ends the creator&apos;s share of future payments. Keeping
+            the creator, or tapering their share, uses a written agreement. This
+            records the terms only; it moves no money and hands over no work.
           </p>
           {!draftGraph.agreements.length ? (
             <p className={xa.body} role="status">
-              No creator agreement is configured. A creator or tapered royalty
-              cannot be selected until its written agreement and rate are
-              recorded.
+              No written creator agreement is recorded yet, so only a takeover
+              can be chosen.
             </p>
           ) : null}
           <form onSubmit={save} className={xa.form}>
             <XaSelect
-              label="Listing"
+              label="System"
               required
               disabled={busy || unconfirmed}
               value={listingId}
@@ -292,15 +309,15 @@ export default function CreatorMaintenance({
                 changeDraft(() => setListingId(event.target.value))
               }
               options={[
-                { value: "", label: "Choose a listing" },
-                ...draftGraph.listings.map((item) => ({
+                { value: "", label: "Choose a listed System" },
+                ...draftGraph.listings.map((item, index) => ({
                   value: item.id,
-                  label: item.definitionId,
+                  label: nameOf(item, index),
                 })),
               ]}
             />
             <XaSelect
-              label="Maintenance state"
+              label="Who maintains it"
               required
               disabled={busy || unconfirmed}
               value={state}
@@ -308,20 +325,20 @@ export default function CreatorMaintenance({
                 changeDraft(() => setState(event.target.value))
               }
               options={[
-                { value: "", label: "Choose a state" },
+                { value: "", label: "Choose who maintains it" },
                 {
                   value: "takeover",
-                  label: "Takeover: end future creator eligibility",
+                  label: "Take it over; the creator stops earning",
                 },
                 ...(draftGraph.agreements.length
                   ? [
                       {
                         value: "creator",
-                        label: "Creator: recorded agreement",
+                        label: "The creator keeps maintaining it",
                       },
                       {
                         value: "tapered",
-                        label: "Tapered: recorded agreement",
+                        label: "The creator's share tapers",
                       },
                     ]
                   : []),
@@ -329,7 +346,7 @@ export default function CreatorMaintenance({
             />
             {state && state !== "takeover" ? (
               <XaSelect
-                label="Recorded agreement"
+                label="Written agreement"
                 required
                 disabled={busy || unconfirmed}
                 value={agreementIndex}
@@ -340,13 +357,13 @@ export default function CreatorMaintenance({
                   { value: "", label: "Choose an agreement" },
                   ...draftGraph.agreements.map((item, index) => ({
                     value: String(index),
-                    label: `${item.version} · ${item.rateBps / 100}% · ${item.rateReference}`,
+                    label: `${item.version}, ${item.rateBps / 100}% of each payment`,
                   })),
                 ]}
               />
             ) : null}
             <XaField
-              label="Effective date and time"
+              label="Starts"
               type="datetime-local"
               required
               disabled={busy || unconfirmed}
@@ -354,17 +371,17 @@ export default function CreatorMaintenance({
               onChange={(event) =>
                 changeDraft(() => setEffective(event.target.value))
               }
-              hint="Your local time. Strelva records the exact UTC instant and checks the agreement again."
+              hint="Your local time. Strelva checks the agreement again before recording it."
             />
             <XaButton type="submit" disabled={busy || unconfirmed}>
-              {busy ? "Recording…" : "Record maintenance terms"}
+              {busy ? "Recording…" : "Record these terms"}
             </XaButton>
           </form>
         </div>
       ) : graph.listings.length ? (
         <p role="status">
-          Future maintenance changes are unavailable after workspace exit.
-          Recorded history remains available.
+          This workspace has ended, so maintenance can no longer change. What
+          was recorded stays here.
         </p>
       ) : null}
       {error ? (

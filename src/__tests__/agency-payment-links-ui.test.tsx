@@ -71,7 +71,7 @@ async function expire(node: HTMLElement) {
   await act(async () => button(node, "Confirm expire").click());
 }
 it.each([true, false])(
-  "shows the same Coming soon state for legacy merchant %s without a creation form",
+  "shows the same not-yet state for legacy merchant %s without a creation form",
   async (legacyMerchant) => {
     const node = await render(
       vi
@@ -80,8 +80,8 @@ it.each([true, false])(
     );
     expect(node.querySelector("form")).toBeNull();
     expect(button(node, "Create payment link")).toBeUndefined();
-    expect(node.textContent).toContain("Coming soon");
-    expect(node.textContent).toContain("Stripe Connect");
+    expect(node.textContent).toContain("New payment links open once");
+    expect(node.textContent).toContain("its own Stripe account");
   },
 );
 it("shows paid status and historical attribution without inventing the old actor", async () => {
@@ -89,7 +89,7 @@ it("shows paid status and historical attribution without inventing the old actor
     vi.fn<typeof fetch>().mockResolvedValue(Response.json(snapshot())),
   );
   expect(node.textContent).toContain(
-    "Created before agency ownership was recorded · Actor not recorded",
+    "Made before Strelva recorded who made links",
   );
   expect(node.textContent).not.toContain("old@example.test");
   expect(node.textContent).toContain("Paid $500");
@@ -107,7 +107,8 @@ it("recovers a denied initial read with GET only", async () => {
   const node = await render(request);
   expect(node.textContent).toContain("Access denied");
   expect(node.querySelector("form")).toBeNull();
-  await act(async () => button(node, "Refresh payment links").click());
+  expect(button(node, "Refresh payment links")).toBeUndefined();
+  await act(async () => button(node, "Try again").click());
   expect(node.textContent).toContain("No payment links recorded yet");
   expect(request.mock.calls.every(([, init]) => !init?.method)).toBe(true);
 });
@@ -143,7 +144,7 @@ it("holds exact expiration terms after a lost response and retries the same key"
   });
   const node = await render(request);
   await expire(node);
-  await act(async () => button(node, "Refresh payment links").click());
+  await act(async () => button(node, "Try again").click());
   expect(bodies).toHaveLength(1);
   await act(async () => button(node, "Retry the same request").click());
   expect(bodies[1]).toEqual(bodies[0]);
@@ -460,4 +461,29 @@ it("keeps earlier links under their own heading once connected links exist", asy
       ),
   );
   expect(node.textContent).toContain("Earlier payment links");
+});
+it("reads the links again when the agency comes back to the tab, without a refresh control", async () => {
+  const request = vi
+    .fn<typeof fetch>()
+    .mockImplementation(async () => Response.json(snapshot()));
+  const node = await render(request);
+  expect(button(node, "Refresh payment links")).toBeUndefined();
+  const now = Date.now();
+  const clock = vi.spyOn(Date, "now").mockReturnValue(now + 10_000);
+  await act(async () => window.dispatchEvent(new Event("focus")));
+  clock.mockRestore();
+  expect(request).toHaveBeenCalledTimes(2);
+  expect(request.mock.calls.every(([, init]) => !init?.method)).toBe(true);
+});
+it("shows no made-up amount in the live preview before one is typed", async () => {
+  const node = await render(
+    vi.fn<typeof fetch>().mockResolvedValue(
+      Response.json(
+        snapshot({ creation: { enabled: true, reason: "ready" } }),
+      ),
+    ),
+  );
+  expect(node.textContent).toContain("Amount appears here");
+  expect(node.textContent).not.toContain("$0");
+  expect(node.textContent).not.toContain("Pay $");
 });

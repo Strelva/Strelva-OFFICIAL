@@ -38,6 +38,7 @@ export const XS = {
   source: "a7000000-0000-4000-8000-000000000031",
   listing: "a7000000-0000-4000-8000-000000000032",
   version: "a7000000-0000-4000-8000-000000000033",
+  priya: "a7000000-0000-4000-8000-000000000022",
 } as const;
 
 export const NORTH_BRAND: OwnerBrand = {
@@ -167,6 +168,7 @@ const transition = (over: Partial<PayerTransition>): PayerTransition => ({
   successorWorkspaceId: XS.north,
   successorWorkspaceName: "North Studio",
   proposerEmail: "dr.lin@harbordental.com",
+  proposerName: "Dr. Amy Lin",
   status: "pending",
   proposedAt: "2026-10-14T15:12:00Z",
   resolvedAt: null,
@@ -207,6 +209,7 @@ export const agencyInbox: PayerTransitionSnapshot = {
       workspaceId: XS.lakeview,
       workspaceName: "Lakeview Mediation",
       proposerEmail: "ruth@lakeviewmediation.com",
+      proposerName: "Ruth Alvarez",
       canRespond: true,
     },
   ],
@@ -356,19 +359,25 @@ export const businessMoney = {
       id: "a7000000-0000-4000-8000-000000000701",
       amount_cents: 12000,
       currency: "usd",
-      purpose: "booking_deposit",
+      purpose: "deposit",
+      reference_id: "a7000000-0000-4000-8000-000000000901",
+      created_at: "2026-11-20T15:00:00Z",
     },
     {
       id: "a7000000-0000-4000-8000-000000000702",
       amount_cents: 45000,
       currency: "usd",
-      purpose: "quoted_work",
+      purpose: "quote",
+      reference_id: "a7000000-0000-4000-8000-000000000903",
+      created_at: "2026-11-12T15:00:00Z",
     },
     {
       id: "a7000000-0000-4000-8000-000000000703",
       amount_cents: 12000,
       currency: "usd",
-      purpose: "booking_deposit",
+      purpose: "deposit",
+      reference_id: "a7000000-0000-4000-8000-000000000904",
+      created_at: "2026-11-24T15:00:00Z",
     },
   ],
   events: [
@@ -376,16 +385,19 @@ export const businessMoney = {
       payment_id: "a7000000-0000-4000-8000-000000000701",
       kind: "paid",
       amount_cents: 12000,
+      created_at: "2026-11-21T14:10:00Z",
     },
     {
       payment_id: "a7000000-0000-4000-8000-000000000702",
       kind: "paid",
       amount_cents: 45000,
+      created_at: "2026-11-13T18:40:00Z",
     },
     {
       payment_id: "a7000000-0000-4000-8000-000000000702",
       kind: "refund",
       amount_cents: 5000,
+      created_at: "2026-11-15T10:00:00Z",
     },
   ],
 };
@@ -413,6 +425,9 @@ export const paymentRequests = [
     currency: "usd",
     status: "paid",
     refundRequired: false,
+    lines: [{ name: "Ana R. · Nov 23 cleaning deposit" }],
+    issued_at: "2026-11-20T15:00:00Z",
+    expires_at: "2026-11-22T15:00:00Z",
   },
   {
     id: "a7000000-0000-4000-8000-000000000902",
@@ -421,6 +436,31 @@ export const paymentRequests = [
     currency: "usd",
     status: "unpaid",
     refundRequired: false,
+    lines: [{ name: "Marcus T. · crown and fitting" }],
+    issued_at: "2026-11-25T15:00:00Z",
+    expires_at: "2026-12-02T15:00:00Z",
+  },
+  {
+    id: "a7000000-0000-4000-8000-000000000903",
+    kind: "quote",
+    amount_cents: 45000,
+    currency: "usd",
+    status: "paid",
+    refundRequired: false,
+    lines: [{ name: "Joel P. · whitening" }],
+    issued_at: "2026-11-12T15:00:00Z",
+    expires_at: "2026-11-19T15:00:00Z",
+  },
+  {
+    id: "a7000000-0000-4000-8000-000000000904",
+    kind: "deposit",
+    amount_cents: 12000,
+    currency: "usd",
+    status: "unpaid",
+    refundRequired: false,
+    lines: [{ name: "Priscilla N. · Dec 1 cleaning deposit" }],
+    issued_at: "2026-11-24T15:00:00Z",
+    expires_at: "2026-11-30T15:00:00Z",
   },
 ];
 
@@ -536,7 +576,7 @@ export const creatorMaintenance = (
     : [
         {
           id: XS.listing,
-          definitionId: "Dental intake",
+          definitionId: `system-source:${XS.system}`,
           sourceRevisionId: XS.source,
           agreementVersion: "North Studio creator terms 2026",
           rateReference: "Written rate A",
@@ -573,6 +613,8 @@ export const reconciliationIssues = [
     resolution: {
       id: "a7000000-0000-4000-8000-000000000990",
       kind: "no_effect_after_review",
+      reviewed_by: "a7000000-0000-4000-8000-000000000022",
+      created_at: "2026-10-12T16:20:00Z",
       note: "Refund matched the Oct 12 receipt for Fieldwork Studio. Nothing else moved.",
     },
   },

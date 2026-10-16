@@ -30,7 +30,20 @@ export interface IssuedRequest {
   currency: string;
   status: string;
   refundRequired: boolean;
+  /** What the owner named it ("Ana R. cleaning deposit"); the read returns the whole row. */
+  lines?: { name?: string }[];
+  issued_at?: string;
+  expires_at?: string;
 }
+const shortDay = (iso: string | null | undefined) => {
+  const value = iso ? new Date(iso) : null;
+  return value && Number.isFinite(value.getTime())
+    ? new Intl.DateTimeFormat("en-US", {
+        month: "short",
+        day: "numeric",
+      }).format(value)
+    : "";
+};
 
 const KIND_WORDS: Record<string, string> = {
   quote: "Quoted work",
@@ -130,6 +143,8 @@ export default function PaymentManager({
     }
   }
   const locked = busy || !!url;
+  // Paid requests already appear as customer payments; list what still waits.
+  const open = requests.filter((q) => q.status !== "paid" || q.refundRequired);
   return (
     <>
       <section className={styles.section} aria-labelledby="ask-to-pay-heading">
@@ -250,9 +265,9 @@ export default function PaymentManager({
         <XaLabel as="h2" id="requests-heading">
           Payment requests
         </XaLabel>
-        {requests.length ? (
+        {open.length ? (
           <XaRows label="Payment requests">
-            {requests.map((q) => {
+            {open.map((q) => {
               const status = STATUS[q.status] ?? {
                 kind: "draft" as const,
                 word: q.status.replaceAll("_", " "),
@@ -260,17 +275,29 @@ export default function PaymentManager({
               return (
                 <XaRow
                   key={q.id}
-                  title={KIND_WORDS[q.kind] ?? q.kind.replaceAll("_", " ")}
+                  title={
+                    q.lines?.[0]?.name?.trim() ||
+                    KIND_WORDS[q.kind] ||
+                    q.kind.replaceAll("_", " ")
+                  }
                   detail={
-                    q.refundRequired ? (
-                      <XaStatus kind="waits" size="sm">
-                        Refund needs your review
-                      </XaStatus>
-                    ) : status.kind === "live" ? undefined : (
-                      <XaStatus kind={status.kind} size="sm">
-                        {status.word}
-                      </XaStatus>
-                    )
+                    <>
+                      {q.refundRequired ? (
+                        <XaStatus kind="waits" size="sm">
+                          Refund needs your review
+                        </XaStatus>
+                      ) : status.kind === "live" ? null : (
+                        <XaStatus kind={status.kind} size="sm">
+                          {status.word}
+                        </XaStatus>
+                      )}
+                      {q.issued_at && shortDay(q.issued_at)
+                        ? ` · sent ${shortDay(q.issued_at)}`
+                        : ""}
+                      {q.status === "unpaid" && shortDay(q.expires_at)
+                        ? `, pay by ${shortDay(q.expires_at)}`
+                        : ""}
+                    </>
                   }
                   meta={
                     <span className={styles.figure}>
@@ -282,7 +309,11 @@ export default function PaymentManager({
             })}
           </XaRows>
         ) : (
-          <p className={styles.body}>No payment requests yet.</p>
+          <p className={styles.body}>
+            {requests.length
+              ? "Every payment request is paid. Paid ones are listed under Customer payments."
+              : "No payment requests yet."}
+          </p>
         )}
       </section>
     </>

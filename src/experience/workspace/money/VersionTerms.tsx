@@ -3,6 +3,7 @@ import { XaButton, XaField, XaSelect } from "@/components/ui/strelva/Xa";
 import xa from "@/experience/workspace/money/money.module.css";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { formatMoney } from "@/platform/connect/money-format";
+import { periodWords, shortLocalDay } from "./period";
 import {
   neutralVersionMoneyGraphSchema,
   neutralVersionCollectionCommandSchema,
@@ -13,20 +14,6 @@ import {
   type NeutralVersionCollectionCommand,
   type NeutralReviewedVersion,
 } from "@/platform/connect/neutral-creator-contract";
-const recordedDay = (iso: string | null | undefined) => {
-  const value = iso ? new Date(iso) : null;
-  return value && Number.isFinite(value.getTime())
-    ? new Intl.DateTimeFormat("en-US", {
-        month: "short",
-        day: "numeric",
-        year: "numeric",
-        hour: "numeric",
-        minute: "2-digit",
-        timeZone: "UTC",
-        timeZoneName: "short",
-      }).format(value)
-    : "not recorded";
-};
 type Pending = {
   command: NeutralVersionCollectionCommand;
   reviewed: NeutralReviewedVersion;
@@ -72,6 +59,19 @@ function ScopedVersionTerms({
       inflight.current?.abort();
     };
   }, []);
+  // Read again whenever the owner comes back to this tab, instead of a Reload control.
+  const reloadRef = useRef<() => void>(() => undefined);
+  useEffect(() => {
+    const back = () => {
+      if (document.visibilityState !== "hidden") reloadRef.current();
+    };
+    window.addEventListener("focus", back);
+    document.addEventListener("visibilitychange", back);
+    return () => {
+      window.removeEventListener("focus", back);
+      document.removeEventListener("visibilitychange", back);
+    };
+  }, []);
   const installed = graph.installations.find(
       (item) => item.versionId === versionId,
     ),
@@ -95,7 +95,7 @@ function ScopedVersionTerms({
           status.current?.focus();
       });
   }
-  async function reload() {
+  async function reload(silent = false) {
     if (inflight.current) return;
     const controller = new AbortController(),
       origin = document.activeElement;
@@ -112,7 +112,7 @@ function ScopedVersionTerms({
         },
       );
       if (!response.ok)
-        throw Error("Current paid Version terms could not be loaded.");
+        throw Error("Prices for installed Systems could not be loaded.");
       const next = neutralVersionMoneyGraphSchema.parse(await response.json());
       const receipt = reconcileNeutralVersionMoney(
         next,
@@ -125,14 +125,14 @@ function ScopedVersionTerms({
       if (receipt) {
         pending.current = null;
         setFeedback(
-          "Your exact paid Version period is recorded. Payment collection remains unconfigured.",
+          "Your exact paid Version period is recorded. Charging a card stays a separate step.",
         );
       } else if (pending.current)
         setFeedback(
-          "The original acceptance is unconfirmed. Reload again before creating another request.",
+          "Your last answer is still not confirmed. Check again before agreeing to anything else.",
         );
       setPhase(pending.current ? "uncertain" : "ready");
-      focus(origin);
+      if (!silent) focus(origin);
     } catch (error) {
       if (!controller.signal.aborted && alive.current) {
         setPhase("blocked");
@@ -141,12 +141,13 @@ function ScopedVersionTerms({
             ? error.message
             : "The recorded terms could not be confirmed.",
         );
-        focus(origin);
+        if (!silent) focus(origin);
       }
     } finally {
       if (!controller.signal.aborted && alive.current) inflight.current = null;
     }
   }
+  reloadRef.current = () => void reload(true);
   async function accept(event: FormEvent) {
     event.preventDefault();
     if (
@@ -197,7 +198,7 @@ function ScopedVersionTerms({
       );
       if (!response.ok)
         throw Error(
-          "Acceptance could not be confirmed. Reload to check the original request.",
+          "Your answer could not be confirmed. Check what was recorded.",
         );
       const receipt = neutralPaidVersionReceiptSchema.parse(
         await response.json(),
@@ -211,7 +212,7 @@ function ScopedVersionTerms({
         )
       )
         throw Error(
-          "The acceptance receipt changed the reviewed Version or terms. Reload before continuing.",
+          "The acceptance receipt changed the reviewed Version or terms. Check what was recorded before continuing.",
         );
       if (controller.signal.aborted || !alive.current) return;
       pending.current = null;
@@ -224,7 +225,7 @@ function ScopedVersionTerms({
       }));
       setPhase("blocked");
       setFeedback(
-        "Your exact paid Version period is recorded. No payment was collected. Reload current permission before accepting another period.",
+        "Your exact paid Version period is recorded. No payment was collected.",
       );
       focus(origin);
     } catch (error) {
@@ -244,28 +245,26 @@ function ScopedVersionTerms({
   return (
     <section aria-labelledby="version-money-heading" className={xa.section}>
       <h2 id="version-money-heading" className={xa.heading}>
-        Installed Version terms
+        Prices for Systems you installed
       </h2>
-      <p>
-        Recorded payer:{" "}
-        {graph.payerKind === "agency" ? "The paying agency" : "This business"}.
-        Current payer approval and its payment mandate remain separate.
-      </p>
-      <p>
-        Choose a released Version and its written price. This records a paid
-        period and the original creator lineage. A payment mandate and
-        collection remain separate.
+      <p className={xa.body}>
+        {graph.payerKind === "agency"
+          ? "Your agency pays"
+          : "This business pays"}
+        . Pick a System you installed from another creator and its written
+        price. Agreeing records the dates it covers and keeps the creator
+        credited. Charging a card stays a separate step.
       </p>
       {!admitted ? (
-        <p>
-          History remains available. A current business owner and configured
-          payment details are required to accept another period.
+        <p className={xa.body}>
+          What you agreed to stays here. A current business owner with payment
+          details set up can agree to another period.
         </p>
       ) : (
         <div className={xa.block}>
           <form onSubmit={(event) => void accept(event)} className={xa.form}>
             <XaSelect
-              label="Released Version"
+              label="System"
               value={versionId}
               disabled={locked}
               required
@@ -274,33 +273,38 @@ function ScopedVersionTerms({
                 setPriceVersion("");
               }}
               options={[
-                { value: "", label: "Choose an installed Version" },
+                { value: "", label: "Choose an installed System" },
                 ...graph.installations
                   .filter((item) => item.qualified && item.released)
-                  .map((item) => ({ value: item.versionId, label: item.name })),
+                  .map((item) => ({
+                    value: item.versionId,
+                    label: item.releaseNumber
+                      ? `${item.name}, Release ${item.releaseNumber}`
+                      : item.name,
+                  })),
               ]}
             />
             <XaSelect
-              label="Written Version price"
+              label="Written price"
               value={priceVersion}
               disabled={locked}
               required
               onChange={(event) => setPriceVersion(event.target.value)}
               options={[
-                { value: "", label: "Choose a recorded price" },
+                { value: "", label: "Choose a written price" },
                 ...prices.map((item) => ({
                   value: item.version,
-                  label: `${item.version} · ${formatMoney(item.amountCents, item.currency)}`,
+                  label: `${item.version}, ${formatMoney(item.amountCents, item.currency)}`,
                 })),
               ]}
             />
             {installed ? (
               <p className={xa.note}>
-                Installed from{" "}
+                {installed.name}
                 {installed.releaseNumber
-                  ? `release ${installed.releaseNumber}`
-                  : "a release"}{" "}
-                of its creator&apos;s source. The creator stays credited.
+                  ? `, Release ${installed.releaseNumber}`
+                  : ""}
+                . Its creator stays credited.
               </p>
             ) : null}
             <XaField
@@ -320,7 +324,7 @@ function ScopedVersionTerms({
               onChange={(event) => setEnd(event.target.value)}
             />
             {price ? (
-              <p>
+              <p className={xa.body}>
                 {formatMoney(price.amountCents, price.currency)} for the chosen
                 period.
               </p>
@@ -329,43 +333,62 @@ function ScopedVersionTerms({
               type="submit"
               disabled={locked || !installed || !price || !start || !end}
             >
-              Accept this Version period
+              Accept this period
             </XaButton>
           </form>
         </div>
       )}
-      <p role="status" aria-live="polite" tabIndex={-1} ref={status}>
+      <p
+        role="status"
+        aria-live="polite"
+        tabIndex={-1}
+        ref={status}
+        className={xa.body}
+      >
         {feedback}
       </p>
-      <XaButton
-        variant="quiet"
-        disabled={phase === "pending"}
-        onClick={() => void reload()}
-      >
-        Reload Version terms and history
-      </XaButton>
+      {phase !== "ready" || pending.current ? (
+        <XaButton
+          variant="quiet"
+          disabled={phase === "pending"}
+          onClick={() => void reload()}
+        >
+          Check what was recorded
+        </XaButton>
+      ) : null}
       {pending.current ? (
         <p className={xa.body}>
           Your last acceptance is not confirmed yet. It is held exactly as sent
           while you check the history.
         </p>
       ) : null}
-      <h3>Accepted Version periods</h3>
+      <h3 className={xa.heading}>Periods you agreed to</h3>
       {graph.history.length ? (
         <ul className={xa.section}>
           {graph.history.map((item) => (
             <li key={item.line_id} className={xa.body}>
-              {item.price_version} ·{" "}
-              {formatMoney(item.amountCents, item.currency)} ·{" "}
-              {recordedDay(item.period_start)} to {recordedDay(item.period_end)}
-              . Terms recorded by{" "}
-              {item.accepted_by === actorId ? "you" : "a business owner"};
-              collection is not set up.
+              {item.price_version},{" "}
+              {formatMoney(item.amountCents, item.currency).replace(
+                /\.00$/,
+                "",
+              )}{" "}
+              {periodWords(item.period_start, item.period_end)
+                ? `for ${periodWords(item.period_start, item.period_end)}`
+                : ""}
+              .{" "}
+              <span className={xa.note}>
+                {item.accepted_by === actorId ? "You" : "A business owner"}{" "}
+                agreed
+                {shortLocalDay(item.accepted_at)
+                  ? ` on ${shortLocalDay(item.accepted_at)}`
+                  : ""}
+                .
+              </span>
             </li>
           ))}
         </ul>
       ) : (
-        <p>No paid Version period has been recorded.</p>
+        <p className={xa.note}>No paid Version period has been recorded.</p>
       )}
     </section>
   );

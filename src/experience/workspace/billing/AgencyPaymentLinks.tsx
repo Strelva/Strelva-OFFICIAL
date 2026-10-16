@@ -21,6 +21,7 @@ import {
   type AgencyPayLink,
 } from "@/platform/agency-pay-links/types";
 import { AgencyMerchantSetup } from "./AgencyMerchantSetup";
+import { clientColor } from "@/platform/presentation/client-color";
 import type { PayLinkConfig } from "@/platform/infra/pay-links";
 import type { readAgencyPaymentLinks } from "./payment-links-server";
 import styles from "@/experience/workspace/money/money.module.css";
@@ -105,17 +106,27 @@ const blankForm: LinkForm = {
 };
 type ProspectPrefill = { token?: string; name: string; description: string };
 
-/** What the client will see, drawn from the form as it is typed (Stripe and Square show the page beside the form). */
-function previewAmount(form: LinkForm) {
+/**
+ * What the client will see, drawn from the form as it is typed (Stripe and
+ * Square show the page beside the form). Null until there is a real amount:
+ * the preview never shows a made-up figure.
+ */
+function previewAmount(form: LinkForm): string | null {
   if (form.kind === "fixed")
-    return /^\d+(\.\d{1,2})?$/.test(form.dollars.trim())
+    return /^\d+(\.\d{1,2})?$/.test(form.dollars.trim()) &&
+      Number(form.dollars) > 0
       ? exact(Math.round(Number(form.dollars) * 100))
-      : "$0";
+      : null;
   const low = Number(form.minDollars),
     high = Number(form.maxDollars);
-  return Number.isFinite(low) && Number.isFinite(high) && low > 0 && high >= low
+  return form.minDollars.trim() &&
+    form.maxDollars.trim() &&
+    Number.isFinite(low) &&
+    Number.isFinite(high) &&
+    low > 0 &&
+    high >= low
     ? `${money(low * 100)} to ${money(high * 100)}`
-    : "$0 to $0";
+    : null;
 }
 
 export function AgencyPaymentLinks({
@@ -213,6 +224,26 @@ function ScopedPaymentLinks({
     const controller = new AbortController();
     void load(controller.signal);
     return () => controller.abort();
+  }, [load]);
+  // Read the links again whenever the agency comes back to this tab (from
+  // Stripe, or after sending a link), instead of a Refresh control.
+  const quiet = useRef({ busy: false, loading: false });
+  quiet.current = { busy, loading };
+  useEffect(() => {
+    let last = Date.now();
+    const back = () => {
+      if (document.visibilityState === "hidden") return;
+      if (quiet.current.busy || quiet.current.loading || flight.current) return;
+      if (Date.now() - last < 5000) return;
+      last = Date.now();
+      void load();
+    };
+    window.addEventListener("focus", back);
+    document.addEventListener("visibilitychange", back);
+    return () => {
+      window.removeEventListener("focus", back);
+      document.removeEventListener("visibilitychange", back);
+    };
   }, [load]);
 
   async function command(body: Record<string, unknown>) {
@@ -385,8 +416,15 @@ function ScopedPaymentLinks({
         <p className={styles.critical} role="alert">
           {error}
           {stale && snapshot
-            ? " These links may be out of date. Refresh before changing anything."
-            : ""}
+            ? " These links may be out of date, so changes are held."
+            : ""}{" "}
+          <XaTextLink
+            onClick={() => {
+              if (!busy && !loading) void load();
+            }}
+          >
+            Try again
+          </XaTextLink>
         </p>
       ) : null}
       {message ? <XaSays>{message}</XaSays> : null}
@@ -402,41 +440,22 @@ function ScopedPaymentLinks({
           </XaTextLink>
         </p>
       ) : null}
-      <div className={styles.links}>
-        <XaTextLink
-          onClick={() => {
-            if (!busy && !loading) void load();
-          }}
-        >
-          Refresh payment links
-        </XaTextLink>
-        <span aria-hidden="true">·</span>
-        <XaTextLink
-          href={`/workspace?workspaceId=${encodeURIComponent(agencyWorkspaceId)}&agencyView=clients`}
-        >
-          Your clients
-        </XaTextLink>
-      </div>
+
       {loading && !snapshot ? (
         <p className={styles.note} role="status">
           Reading payment links…
         </p>
       ) : !snapshot ? (
         <p className={styles.body}>
-          Payment links are unavailable. Confirm your agency owner or admin
-          access, then refresh.
+          Payment links are unavailable. Only an agency owner or admin can make
+          them.
         </p>
       ) : (
         <>
           {snapshot.creation.reason === "off" ? (
-            <p className={`${styles.body} ${styles.statusLine}`}>
-              <XaStatus kind="draft" size="sm">
-                Coming soon
-              </XaStatus>
-              <span>
-                New payment links need your agency&apos;s own Stripe Connect
-                account. Checkout for new links is not available yet.
-              </span>
+            <p className={styles.body}>
+              New payment links open once your agency can connect its own Stripe
+              account. Links you already made keep working.
             </p>
           ) : null}
           {snapshot.creation.reason === "setup_required" ? (
@@ -447,8 +466,9 @@ function ScopedPaymentLinks({
           ) : null}
           {snapshot.creation.reason === "unavailable" ? (
             <p className={styles.body}>
-              Payment readiness could not be confirmed. Refresh to check again.
-              No payment link can be made right now.
+              Payment readiness could not be confirmed, so no payment link can
+              be made right now. Strelva checks again when you come back to this
+              page.
             </p>
           ) : null}
           {snapshot.creation.reason === "ready" ? (
@@ -561,13 +581,21 @@ function ScopedPaymentLinks({
                       {form.description.trim() ||
                         "What it is for appears here."}
                     </p>
-                    <p className={styles.amount}>{previewAmount(form)}</p>
-                    <span className={styles.previewPill} aria-hidden="true">
-                      Pay{" "}
-                      {form.kind === "fixed"
-                        ? previewAmount(form)
-                        : "the amount they choose"}
-                    </span>
+                    {previewAmount(form) ? (
+                      <>
+                        <p className={styles.amount}>{previewAmount(form)}</p>
+                        <span className={styles.previewPill} aria-hidden="true">
+                          Pay{" "}
+                          {form.kind === "fixed"
+                            ? previewAmount(form)
+                            : "the amount they choose"}
+                        </span>
+                      </>
+                    ) : (
+                      <p className={styles.previewPlaceholder}>
+                        Amount appears here
+                      </p>
+                    )}
                   </div>
                 </XaPage>
               </div>
@@ -582,7 +610,13 @@ function ScopedPaymentLinks({
                 {snapshot.connectedLinks.map((link) => (
                   <XaRow
                     key={link.id}
-                    lead={<XaInitial name={link.clientName} size={32} />}
+                    lead={
+                      <XaInitial
+                        name={link.clientName}
+                        color={clientColor(link.clientName)}
+                        size={32}
+                      />
+                    }
                     title={link.clientName}
                     meta={
                       <span className={styles.figure}>
@@ -690,7 +724,8 @@ function ScopedPaymentLinks({
               </p>
               {!snapshot.paymentStatusAvailable ? (
                 <p className={styles.body}>
-                  Payment status could not be read. Refresh to check again.
+                  Payment status could not be read. Strelva checks again when
+                  you come back to this page.
                 </p>
               ) : null}
               {!snapshot.payLinks.length ? (
@@ -702,7 +737,13 @@ function ScopedPaymentLinks({
                     return (
                       <XaRow
                         key={link.slug}
-                        lead={<XaInitial name={link.clientName} size={32} />}
+                        lead={
+                          <XaInitial
+                            name={link.clientName}
+                            color={clientColor(link.clientName)}
+                            size={32}
+                          />
+                        }
                         title={link.clientName}
                         meta={
                           <span className={styles.figure}>{price(link)}</span>
@@ -714,7 +755,7 @@ function ScopedPaymentLinks({
                               {link.customCopy ? `${link.customCopy} · ` : ""}
                               {link.agencyWorkspaceId
                                 ? `${link.agencyDisplayName || "Agency identity not recorded"} · Runs on Strelva`
-                                : "Created before agency ownership was recorded · Actor not recorded"}{" "}
+                                : "Made before Strelva recorded who made links"}{" "}
                               · {day(link.createdAt)}
                             </span>
                             <br />

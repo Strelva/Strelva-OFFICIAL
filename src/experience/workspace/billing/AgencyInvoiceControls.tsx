@@ -1,7 +1,6 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
-  XaAnswers,
   XaButton,
   XaDecision,
   XaField,
@@ -136,156 +135,169 @@ function ScopedAgencyInvoiceControls({
     }
   }
   return (
-    <details className={styles.history}>
-      <summary className={styles.detailsToggle}>
-        {invoice
-          ? `Retail price · ${price(invoice)}${invoice.kind === "rebill" ? " a month" : " once"} · ${STATUS_WORDS[invoice.status]}`
-          : "Set a retail price for this client"}
-      </summary>
-      <div className={styles.inlinePanel}>
-        <p className={styles.note}>
-          The business owner sees these exact terms and says yes before any
-          checkout or subscription is made. Your wholesale bill stays separate.
+    <>
+      {invoice ? (
+        <p className={styles.clientFigure}>
+          {price(invoice).replace(/\.00$/, "")}
+          <span className={styles.figureQuiet}>
+            {invoice.kind === "rebill" ? " / month" : " once"}
+          </span>
         </p>
-        <AgencyCheckoutStatus
-          availability={checkoutAvailability}
-          paymentsHref={`/workspace/payments?workspaceId=${encodeURIComponent(agencyWorkspaceId)}`}
-        />
-        <form
-          className={styles.form}
-          onSubmit={(event) => {
-            event.preventDefault();
-            const form = new FormData(event.currentTarget);
-            const dollars = String(form.get("amount") ?? "").trim();
-            if (!/^\d+(\.\d{1,2})?$/.test(dollars) || Number(dollars) <= 0) {
-              setError("Enter an amount above $0, with at most two decimals.");
-              return;
-            }
-            void command({
-              action: "propose",
-              agencyWorkspaceId,
-              businessWorkspaceId,
-              kind,
-              amountCents: Math.round(Number(dollars) * 100),
-              currency: "usd",
-              description: form.get("description"),
-              idempotencyKey:
-                idempotencyKey ||
-                (() => {
-                  const key = crypto.randomUUID();
-                  setIdempotencyKey(key);
-                  return key;
-                })(),
-            });
-          }}
-        >
-          <XaSegmented
-            label="How the client pays"
-            value={kind}
-            onChange={(value) => {
-              if (!busy) setKind(value);
-            }}
-            options={[
-              { value: "rebill", label: "Every month" },
-              { value: "pay_link", label: "Once" },
-            ]}
+      ) : null}
+      <details className={styles.history}>
+        <summary className={styles.detailsToggle}>
+          {invoice
+            ? `Retail price${invoice.status === "proposed" ? " waits on the owner" : `, ${STATUS_WORDS[invoice.status].toLowerCase()}`}`
+            : "Set a retail price for this client"}
+        </summary>
+        <div className={styles.inlinePanel}>
+          <p className={styles.note}>
+            The business owner sees these exact terms and says yes before any
+            checkout or subscription is made. Your wholesale bill stays
+            separate.
+          </p>
+          <AgencyCheckoutStatus
+            availability={checkoutAvailability}
+            paymentsHref={`/workspace/payments?workspaceId=${encodeURIComponent(agencyWorkspaceId)}`}
           />
-          <XaField
-            label={
-              kind === "rebill"
-                ? "Amount each month, in dollars"
-                : "Amount, in dollars"
-            }
-            name="amount"
-            inputMode="decimal"
-            required
-            disabled={busy}
-          />
-          <XaTextArea
-            label="What this covers"
-            name="description"
-            maxLength={300}
-            required
-            disabled={busy}
-          />
-          <div className={styles.actions}>
-            <XaButton type="submit" disabled={busy}>
-              Send to the owner for a yes
-            </XaButton>
-          </div>
-        </form>
-        {initialInvoices.length > 1 ? (
-          <XaSelect
-            label="Earlier agreements with this client"
-            disabled={busy}
-            value={invoice?.id ?? ""}
-            onChange={(event) => {
-              if (!inflight.current) {
-                setInvoice(
-                  initialInvoices.find(
-                    (item) => item.id === event.target.value,
-                  ) ?? null,
+          <form
+            className={styles.form}
+            onSubmit={(event) => {
+              event.preventDefault();
+              const form = new FormData(event.currentTarget);
+              const dollars = String(form.get("amount") ?? "").trim();
+              if (!/^\d+(\.\d{1,2})?$/.test(dollars) || Number(dollars) <= 0) {
+                setError(
+                  "Enter an amount above $0, with at most two decimals.",
                 );
-                setError("");
+                return;
               }
+              void command({
+                action: "propose",
+                agencyWorkspaceId,
+                businessWorkspaceId,
+                kind,
+                amountCents: Math.round(Number(dollars) * 100),
+                currency: "usd",
+                description: form.get("description"),
+                idempotencyKey:
+                  idempotencyKey ||
+                  (() => {
+                    const key = crypto.randomUUID();
+                    setIdempotencyKey(key);
+                    return key;
+                  })(),
+              });
             }}
-            options={initialInvoices.map((item) => ({
-              value: item.id,
-              label: `${item.description} · ${STATUS_WORDS[item.status]}`,
-            }))}
-          />
-        ) : null}
-        {invoice ? (
-          <div className={styles.section}>
-            <p className={styles.body} role="status">
-              {invoice.description}: {price(invoice)}
-              {invoice.kind === "rebill" ? " a month" : " once"}.{" "}
-              {STATUS_WORDS[invoice.status]}.
-            </p>
-            <ReceiptState invoice={invoice} />
-            <div className={styles.links}>
-              <XaTextLink
-                href={`/workspace/billing?workspaceId=${businessWorkspaceId}&invoiceId=${invoice.id}`}
-              >
-                See what the owner sees
-              </XaTextLink>
-              {checkoutAvailability.status === "ready" &&
-              invoice.checkout_url &&
-              (!invoice.payment_receipt_state ||
-                invoice.payment_receipt_state === "unconfirmed") ? (
-                <>
-                  <span aria-hidden="true">·</span>
-                  <a
-                    className={styles.detailsToggle}
-                    href={invoice.checkout_url}
+          >
+            <XaSegmented
+              label="How the client pays"
+              value={kind}
+              onChange={(value) => {
+                if (!busy) setKind(value);
+              }}
+              options={[
+                { value: "rebill", label: "Every month" },
+                { value: "pay_link", label: "Once" },
+              ]}
+            />
+            <XaField
+              label={
+                kind === "rebill"
+                  ? "Amount each month, in dollars"
+                  : "Amount, in dollars"
+              }
+              name="amount"
+              inputMode="decimal"
+              required
+              disabled={busy}
+            />
+            <XaTextArea
+              label="What this covers"
+              name="description"
+              maxLength={300}
+              required
+              disabled={busy}
+            />
+            <div className={styles.actions}>
+              <XaButton type="submit" disabled={busy}>
+                Send to the owner for a yes
+              </XaButton>
+            </div>
+          </form>
+          {initialInvoices.length > 1 ? (
+            <XaSelect
+              label="Earlier agreements with this client"
+              disabled={busy}
+              value={invoice?.id ?? ""}
+              onChange={(event) => {
+                if (!inflight.current) {
+                  setInvoice(
+                    initialInvoices.find(
+                      (item) => item.id === event.target.value,
+                    ) ?? null,
+                  );
+                  setError("");
+                }
+              }}
+              options={initialInvoices.map((item) => ({
+                value: item.id,
+                label: `${item.description} · ${STATUS_WORDS[item.status]}`,
+              }))}
+            />
+          ) : null}
+          {invoice ? (
+            <div className={styles.section}>
+              <p className={styles.body} role="status">
+                {invoice.description}: {price(invoice)}
+                {invoice.kind === "rebill" ? " a month" : " once"}.{" "}
+                {STATUS_WORDS[invoice.status]}.
+              </p>
+              <ReceiptState invoice={invoice} />
+              <div className={styles.links}>
+                <XaTextLink
+                  href={`/workspace/billing?workspaceId=${businessWorkspaceId}&invoiceId=${invoice.id}`}
+                >
+                  See what the owner sees
+                </XaTextLink>
+                {checkoutAvailability.status === "ready" &&
+                invoice.checkout_url &&
+                (!invoice.payment_receipt_state ||
+                  invoice.payment_receipt_state === "unconfirmed") ? (
+                  <>
+                    <span aria-hidden="true">·</span>
+                    <a
+                      className={styles.detailsToggle}
+                      href={invoice.checkout_url}
+                    >
+                      Open payment page
+                    </a>
+                  </>
+                ) : null}
+              </div>
+              {invoice.status === "accepted" ? (
+                <div className={styles.actions}>
+                  <XaButton
+                    size="sm"
+                    disabled={busy || checkoutAvailability.status !== "ready"}
+                    onClick={() =>
+                      void command({ action: "fulfill", intentId: invoice.id })
+                    }
                   >
-                    Open payment page
-                  </a>
-                </>
+                    Create accepted checkout
+                  </XaButton>
+                </div>
               ) : null}
             </div>
-            {invoice.status === "accepted" ? (
-              <div className={styles.actions}>
-                <XaButton
-                  size="sm"
-                  disabled={busy || checkoutAvailability.status !== "ready"}
-                  onClick={() =>
-                    void command({ action: "fulfill", intentId: invoice.id })
-                  }
-                >
-                  Create accepted checkout
-                </XaButton>
-              </div>
-            ) : null}
-          </div>
-        ) : null}
-        {error ? (
-          <p role="alert" className={styles.critical}>
-            {error}
-          </p>
-        ) : null}
-      </div>
-    </details>
+          ) : null}
+          {error ? (
+            <p role="alert" className={styles.critical}>
+              {error}
+            </p>
+          ) : null}
+        </div>
+      </details>
+    </>
   );
 }
 
@@ -293,6 +305,10 @@ type AcceptanceProps = {
   invoiceId: string;
   checkoutAvailability?: CheckoutAvailability;
   request?: typeof fetch;
+  /** Agencies serving this business, by workspace id, so the agency is named. */
+  agencyNames?: Readonly<Record<string, string>>;
+  /** What the business pays Strelva each month, so the owner can tell the two apart. */
+  planCents?: number | null;
 };
 /** The owner agrees to a price their agency prepared (XA · O3): the terms, then the one yes. */
 export function AgencyInvoiceAcceptance(props: AcceptanceProps) {
@@ -302,6 +318,8 @@ function ScopedAgencyInvoiceAcceptance({
   invoiceId,
   checkoutAvailability = UNRELEASED_CHECKOUT,
   request = fetch,
+  agencyNames = {},
+  planCents = null,
 }: AcceptanceProps) {
   const [invoice, setInvoice] = useState<AgencyInvoice | null>(null);
   const [error, setError] = useState("");
@@ -387,6 +405,17 @@ function ScopedAgencyInvoiceAcceptance({
       </section>
     );
   const proposed = invoice.status === "proposed" && invoice.can_accept;
+  const agency = agencyNames[invoice.agency_workspace_id] ?? "your agency";
+  const Agency = agency.charAt(0).toUpperCase() + agency.slice(1);
+  const plan =
+    planCents && planCents > 0
+      ? new Intl.NumberFormat("en-US", {
+          style: "currency",
+          currency: "USD",
+        })
+          .format(planCents / 100)
+          .replace(/\.00$/, "")
+      : null;
   const yesState: XaYesState =
     busy === "accept" ? "going" : error && proposed ? "failed" : "waiting";
   const status =
@@ -403,7 +432,7 @@ function ScopedAgencyInvoiceAcceptance({
     <XaDecision
       label="Agency retail agreement"
       status={status}
-      meta="Prepared by your agency"
+      meta={`Prepared by ${agency}`}
       yes={
         proposed ? (
           <XaYes
@@ -433,20 +462,17 @@ function ScopedAgencyInvoiceAcceptance({
           <small>{invoice.kind === "rebill" ? "a month" : "once"}</small>
         </p>
         <p className={styles.body}>{invoice.description}</p>
+        <p className={styles.note}>
+          {plan
+            ? `This is what ${agency} charges you, on its own Stripe account, separate from Strelva's ${plan} a month.`
+            : `This is what ${agency} charges you, on its own Stripe account, separate from what you pay Strelva.`}
+        </p>
+        <AgencyCheckoutStatus
+          availability={checkoutAvailability}
+          agencyName={Agency}
+        />
       </div>
-      <XaAnswers
-        labelWidth={120}
-        rows={[
-          ["Who charges", "Your agency, on its own Stripe account"],
-          [
-            "Separate from",
-            "Its wholesale bill and any job limits you already set",
-          ],
-          ["Status", STATUS_WORDS[invoice.status]],
-        ]}
-      />
       <ReceiptState invoice={invoice} />
-      <AgencyCheckoutStatus availability={checkoutAvailability} />
       {invoice.status === "accepted" && invoice.can_manage ? (
         <div className={styles.actions}>
           <XaButton

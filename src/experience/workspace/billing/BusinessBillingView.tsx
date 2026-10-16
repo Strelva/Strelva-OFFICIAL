@@ -1,9 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { BusinessBilling } from "@/platform/business-billing";
 import {
-  XaAnswers,
   XaButton,
   XaEmpty,
   XaHeadline,
@@ -42,12 +41,57 @@ type Props = {
 };
 
 function planLine(billing: BusinessBilling) {
-  if (billing.state === "grandfathered") return "Your existing terms are kept";
+  if (billing.state === "grandfathered") return "Your existing terms";
   if (billing.state === "comped") return "Comped";
   if (billing.state === "none") return "No plan price published yet";
   if (billing.state === "custom") return "Custom agreement";
+  return "Strelva plan";
+}
+/** Who said the plan's terms (XA · R1 "Said by"). */
+function planSaidBy(billing: BusinessBilling) {
+  if (billing.state === "grandfathered" || billing.state === "custom")
+    return "Your agreement";
+  if (billing.state === "none") return "";
   return "Strelva";
 }
+const shortDay = (iso: string | null | undefined) => {
+  const value = iso ? new Date(iso) : null;
+  return value && Number.isFinite(value.getTime())
+    ? new Intl.DateTimeFormat("en-US", {
+        month: "short",
+        day: "numeric",
+      }).format(value)
+    : "";
+};
+
+/** R1: each answer on its own line, the person or system that said it on the right. */
+function SaidList({
+  rows,
+}: {
+  rows: readonly { label: string; value: ReactNode; by: ReactNode }[];
+}) {
+  return (
+    <dl className={styles.said}>
+      <div className={styles.saidHead} aria-hidden="true">
+        <span>Detail</span>
+        <span>Said by</span>
+      </div>
+      {rows.map((row) => (
+        <div key={row.label} className={styles.saidRow}>
+          <dt>{row.label}</dt>
+          <dd>{row.value}</dd>
+          <dd className={styles.saidBy}>
+            <span className={styles.saidWord}>Said by </span>
+            {row.by}
+          </dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
+/** A payer change the owner asks for from Pebble's line; the payer section reloads and shows it waiting. */
+export const PAYER_CHANGED_EVENT = "strelva:payer-transition";
 
 export function BusinessBillingView({
   billing,
@@ -60,10 +104,52 @@ export function BusinessBillingView({
 }: Props) {
   const name = businessName ?? "This business";
   const agencyPays = billing?.payerParty?.kind === "agency";
-  const payer = agencyPays
+  const agencyName = agencyPays
     ? (billing?.payerParty?.name ?? "Your agency")
+    : null;
+  const payer = agencyPays
+    ? agencyName!
     : (billing?.payer?.name ?? billing?.payer?.email ?? "This business");
   const pastDue = billing?.paymentStatus === "past_due";
+  const [direct, setDirect] = useState<"idle" | "busy" | "asked" | string>(
+    "idle",
+  );
+
+  async function payDirectly() {
+    if (!workspaceId || direct === "busy") return;
+    setDirect("busy");
+    try {
+      const response = await (transport ?? fetch)(
+        "/api/work-economics/payer-transition",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "propose",
+            workspaceId,
+            successorKind: "business",
+          }),
+        },
+      );
+      const body = (await response.json().catch(() => ({}))) as {
+        error?: string;
+      };
+      if (!response.ok)
+        throw new Error(
+          body.error ?? "The change could not be confirmed. Nothing changed.",
+        );
+      setDirect("asked");
+      window.dispatchEvent(
+        new CustomEvent(PAYER_CHANGED_EVENT, { detail: { workspaceId } }),
+      );
+    } catch (cause) {
+      setDirect(
+        cause instanceof Error
+          ? cause.message
+          : "The change could not be confirmed. Nothing changed.",
+      );
+    }
+  }
 
   if (!billing)
     return (
@@ -98,6 +184,7 @@ export function BusinessBillingView({
     );
 
   const priced = billing.state !== "none";
+  const updated = shortDay(billing.paymentUpdatedAt);
   return (
     <section className={styles.section} aria-labelledby="plan-heading">
       <div className={styles.brief}>
@@ -122,7 +209,13 @@ export function BusinessBillingView({
         <XaSays
           links={
             agencyPays
-              ? undefined
+              ? canManage && workspaceId && direct === "idle"
+                ? [
+                    <XaTextLink key="direct" onClick={() => void payDirectly()}>
+                      Pay directly instead
+                    </XaTextLink>,
+                  ]
+                : undefined
               : [
                   <XaTextLink key="manage" href="#manage-plan">
                     Update the card
@@ -131,47 +224,53 @@ export function BusinessBillingView({
           }
         >
           {agencyPays
-            ? "Your agency’s payment needs attention. A business owner can choose direct payment for future work below."
-            : "Your last payment did not go through. Open payment management below to update your payment method."}{" "}
+            ? `${agencyName}’s payment needs attention.`
+            : "Your last payment did not go through."}{" "}
           Your sites and inquiry capture keep working.
+          {agencyPays && direct === "busy" ? " Asking…" : ""}
+          {agencyPays && direct === "asked"
+            ? " You asked to pay directly for future jobs; accept it under Who pays."
+            : ""}
+          {agencyPays && !["idle", "busy", "asked"].includes(direct)
+            ? ` ${direct}`
+            : ""}
         </XaSays>
       ) : null}
-      <XaAnswers
-        labelWidth={140}
+      <SaidList
         rows={[
-          [
-            "Plan",
-            priced ? (
+          {
+            label: "Plan",
+            value: priced ? (
               <>
                 {planLine(billing)} ·{" "}
                 <span className={styles.figure}>
-                  {money(billing.monthlyCents)} / month
+                  {money(billing.monthlyCents).replace(/\.00$/, "")} / month
                 </span>
               </>
             ) : (
-              <>No monthly price or plan is recorded.</>
+              "No monthly price or plan is recorded."
             ),
-          ],
-          [
-            "Covers",
-            <>
-              {name}
-              {billing.sites.length ? (
+            by: planSaidBy(billing),
+          },
+          {
+            label: "Covers",
+            value: (
+              <>
+                {name}
                 <span className={styles.figureQuiet}>
                   {" "}
-                  · {billing.sites.map((site) => site.siteName).join(", ")}
+                  ·{" "}
+                  {billing.sites.length
+                    ? billing.sites.map((site) => site.siteName).join(", ")
+                    : "No covered sites are recorded."}
                 </span>
-              ) : (
-                <span className={styles.figureQuiet}>
-                  {" "}
-                  · No covered sites are recorded.
-                </span>
-              )}
-            </>,
-          ],
-          [
-            "Payment",
-            pastDue ? (
+              </>
+            ),
+            by: "Strelva",
+          },
+          {
+            label: "Payment",
+            value: pastDue ? (
               <XaStatus kind="waits" size="sm">
                 Needs attention
               </XaStatus>
@@ -180,35 +279,24 @@ export function BusinessBillingView({
             ) : billing.paymentStatus === "active" ? (
               "The next charge date is not available in this record."
             ) : (
-              <XaStatus kind="draft" size="sm">
-                {billing.paymentStatus.replaceAll("_", " ")}
-              </XaStatus>
+              billing.paymentStatus.replaceAll("_", " ")
             ),
-          ],
-          [
-            "Receipts",
-            agencyPays
-              ? "Your agency keeps the receipts for this plan."
-              : "Open payment management below to review receipts from Stripe.",
-          ],
+            by: updated ? `Stripe · ${updated}` : "Stripe",
+          },
+          {
+            label: "Paid by",
+            value: payer,
+            by: agencyPays ? agencyName : "Stripe",
+          },
         ]}
       />
       {billing.grandfatheredTerms ? (
         <p className={styles.body}>{billing.grandfatheredTerms}</p>
       ) : null}
-      {priced ? (
-        <p className={styles.note}>
-          Moving into the business workspace does not change your amount, plan,
-          card or payment cycle.
-          {agencyPays
-            ? " This amount records the existing business agreement. Agency wholesale pricing and any separate retail invoice are in the agency’s billing records."
-            : ""}
-        </p>
-      ) : null}
       {agencyPays ? (
         <p className={styles.note}>
-          Your agency manages its payment method and receipts. The business
-          owner can choose a different payer below.
+          {agencyName} manages its payment method and keeps the receipts for
+          this plan.
         </p>
       ) : canManage && workspaceId ? (
         <WorkspaceBillingControls
@@ -299,7 +387,7 @@ function WorkspaceBillingControls({
 
   return (
     <div id="manage-plan" className={styles.section}>
-      <p className={styles.body}>
+      <p className={styles.note}>
         Stripe holds your payment method and receipts. Any change needs your
         confirmation there.
       </p>

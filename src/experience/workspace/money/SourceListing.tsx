@@ -47,6 +47,19 @@ function ScopedSourceListing({
       inflight.current?.abort();
     };
   }, []);
+  // Read the listings again whenever the creator comes back to this tab.
+  const reloadRef = useRef<() => void>(() => undefined);
+  useEffect(() => {
+    const back = () => {
+      if (document.visibilityState !== "hidden") reloadRef.current();
+    };
+    window.addEventListener("focus", back);
+    document.addEventListener("visibilitychange", back);
+    return () => {
+      window.removeEventListener("focus", back);
+      document.removeEventListener("visibilitychange", back);
+    };
+  }, []);
   function focus(origin: Element | null) {
     if (
       document.activeElement === origin ||
@@ -61,7 +74,7 @@ function ScopedSourceListing({
           status.current?.focus();
       });
   }
-  async function reload() {
+  async function reload(silent = false) {
     if (inflight.current) return;
     const controller = new AbortController(),
       origin = document.activeElement;
@@ -77,7 +90,7 @@ function ScopedSourceListing({
         },
       );
       if (!response.ok)
-        throw Error("Current creator access could not be confirmed.");
+        throw Error("Your creator access could not be confirmed just now.");
       const next = neutralCreatorSourcesSchema.parse(await response.json());
       if (
         next.workspaceId !== initial.workspaceId ||
@@ -87,7 +100,7 @@ function ScopedSourceListing({
             item.definitionId !== `system-source:${item.sourceSystemId}`,
         )
       )
-        throw Error("The listing sources belong to another creator.");
+        throw Error("These Systems belong to another creator.");
       const attempt = pending.current,
         source = attempt
           ? next.sources.find(
@@ -103,22 +116,18 @@ function ScopedSourceListing({
           source.listingRateReference !== attempt?.command.rateReference)
       )
         throw Error(
-          "The existing listing does not match the exact request. Preserve the original source and written terms.",
+          "The recorded listing does not match what you asked for. Nothing else will be listed until this is reviewed.",
         );
       if (controller.signal.aborted || !alive.current) return;
       setGraph(next);
       if (source?.listingId) {
         pending.current = null;
+        setFeedback(`${source.name} is listed with its creator agreement.`);
+      } else if (attempt)
         setFeedback(
-          "The exact source listing and written agreement are recorded.",
+          "Your last listing is still not confirmed. Check again before listing anything else.",
         );
-      } else
-        setFeedback(
-          attempt
-            ? "The original listing remains unconfirmed. Reload again before preparing another."
-            : "Current source listings loaded.",
-        );
-      focus(origin);
+      if (!silent) focus(origin);
     } catch (error) {
       if (!controller.signal.aborted && alive.current) {
         setFeedback(
@@ -126,7 +135,7 @@ function ScopedSourceListing({
             ? error.message
             : "Listing could not be confirmed.",
         );
-        focus(origin);
+        if (!silent) focus(origin);
       }
     } finally {
       if (!controller.signal.aborted && alive.current) {
@@ -135,6 +144,7 @@ function ScopedSourceListing({
       }
     }
   }
+  reloadRef.current = () => void reload(true);
   async function register(event: FormEvent) {
     event.preventDefault();
     if (inflight.current || pending.current || !graph.canRegister) return;
@@ -169,7 +179,7 @@ function ScopedSourceListing({
       });
       if (!response.ok)
         throw Error(
-          "The listing could not be confirmed. Reload its exact source and agreement.",
+          "The listing could not be confirmed. Check what was recorded.",
         );
       const receipt = z
         .object({
@@ -198,9 +208,7 @@ function ScopedSourceListing({
         ),
       }));
       pending.current = null;
-      setFeedback(
-        "The qualified source listing is recorded. Reload current authority before preparing another.",
-      );
+      setFeedback(`${source.name} is listed with its creator agreement.`);
       focus(origin);
     } catch (error) {
       if (!controller.signal.aborted && alive.current) {
@@ -219,46 +227,55 @@ function ScopedSourceListing({
     }
   }
   const locked = busy || !!pending.current;
+  const percent = (bps: number) => `${bps / 100}% of each payment`;
+  const rateFor = (version: string | null | undefined) =>
+    graph.agreements.find((item) => item.version === version);
+  const waiting = pending.current
+    ? graph.sources.find(
+        (item) =>
+          item.sourceRevisionId === pending.current!.command.sourceRevisionId,
+      )
+    : null;
   return (
     <section className={xa.section} aria-labelledby="source-listing-heading">
       <h2 id="source-listing-heading" className={xa.heading}>
-        Qualified source listings
+        Systems you list for other businesses
       </h2>
-      <p>
-        List an actual published source with its written creator agreement.
-        Customers install their own Version. Listing grants no access to
-        customer records or accounts.
+      <p className={xa.body}>
+        List a System you published, with its written creator agreement. Each
+        business that installs it gets its own Version. Listing gives you no
+        access to their records or accounts.
       </p>
       {graph.canRegister ? (
         <div className={xa.block}>
           <form className={xa.form} onSubmit={(event) => void register(event)}>
             <XaSelect
-              label="Qualified source revision"
+              label="System"
               value={revision}
               disabled={locked}
               required
               onChange={(event) => setRevision(event.target.value)}
               options={[
-                { value: "", label: "Choose a qualified published source" },
+                { value: "", label: "Choose a published System" },
                 ...graph.sources
                   .filter((item) => item.qualified && !item.listingId)
                   .map((item) => ({
                     value: item.sourceRevisionId,
-                    label: `${item.name} · Release ${item.revision}`,
+                    label: `${item.name}, Release ${item.revision}`,
                   })),
               ]}
             />
             <XaSelect
-              label="Written creator agreement"
+              label="Creator agreement"
               value={agreementVersion}
               disabled={locked}
               required
               onChange={(event) => setAgreementVersion(event.target.value)}
               options={[
-                { value: "", label: "Choose a recorded agreement" },
+                { value: "", label: "Choose a written agreement" },
                 ...graph.agreements.map((item) => ({
                   value: item.version,
-                  label: `${item.version} · ${item.rateReference} · ${item.rateBps} basis points`,
+                  label: `${item.version}, ${percent(item.rateBps)}`,
                 })),
               ]}
             />
@@ -266,29 +283,41 @@ function ScopedSourceListing({
               type="submit"
               disabled={locked || !revision || !agreementVersion}
             >
-              Record this source listing
+              List this System
             </XaButton>
           </form>
         </div>
       ) : (
-        <p>
-          Future source listings are unavailable. Recorded listings remain
-          visible.
+        <p className={xa.body}>
+          New listings are not available for this workspace. Systems already
+          listed stay listed.
         </p>
       )}
-      <p role="status" tabIndex={-1} ref={status} aria-live="polite">
+      <p
+        role="status"
+        tabIndex={-1}
+        ref={status}
+        aria-live="polite"
+        className={xa.body}
+      >
         {feedback}
       </p>
-      <XaButton variant="quiet" disabled={busy} onClick={() => void reload()}>
-        Reload source listings
-      </XaButton>
       {pending.current ? (
-        <p className={xa.body}>
-          Unconfirmed source: {pending.current.command.sourceRevisionId}. New
-          listing requests stay locked.
-        </p>
+        <>
+          <p className={xa.body}>
+            Your listing of {waiting?.name ?? "this System"} is not confirmed
+            yet. New listings wait until it is.
+          </p>
+          <XaButton
+            variant="quiet"
+            disabled={busy}
+            onClick={() => void reload()}
+          >
+            Check what was recorded
+          </XaButton>
+        </>
       ) : null}
-      <ul>
+      <ul className={xa.section}>
         {graph.sources
           .filter((item) => item.listingId)
           .map((item) => (
@@ -297,10 +326,14 @@ function ScopedSourceListing({
                 className={xa.detailsToggle}
                 href={`/workspace/source-attribution?${new URLSearchParams({ workspaceId: graph.workspaceId, systemId: item.sourceSystemId })}`}
               >
-                {item.name}
+                {item.name}, Release {item.revision}
               </a>{" "}
-              · Release {item.revision} · agreement{" "}
-              {item.listingAgreementVersion} · {item.listingRateReference}
+              <span className={xa.note}>
+                · {item.listingAgreementVersion}
+                {rateFor(item.listingAgreementVersion)
+                  ? `, ${percent(rateFor(item.listingAgreementVersion)!.rateBps)}`
+                  : ""}
+              </span>
             </li>
           ))}
       </ul>

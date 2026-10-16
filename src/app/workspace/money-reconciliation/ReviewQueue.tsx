@@ -13,13 +13,46 @@ export interface ReconciliationIssue {
   reason: string;
   event_type: string;
   object_id: string | null;
-  resolution: { id: string; kind: string; note: string } | null;
+  resolution: {
+    id: string;
+    kind: string;
+    note: string;
+    /** Who recorded it and when; the read returns the whole resolution row. */
+    reviewed_by?: string;
+    created_at?: string;
+  } | null;
 }
+const KIND_WORDS: Record<string, string> = {
+  no_effect_after_review: "recorded no effect",
+  effect_confirmed: "confirmed the ledger effect",
+};
+const day = (iso: string | undefined) => {
+  const value = iso ? new Date(iso) : null;
+  return value && Number.isFinite(value.getTime())
+    ? new Intl.DateTimeFormat("en-US", {
+        month: "short",
+        day: "numeric",
+      }).format(value)
+    : "";
+};
+/** Library (Strelva staff): Stripe records that did not match the ledger. Ids are shown; staff need them to find the record. */
 export default function ReviewQueue({
   issues,
+  actorId,
+  names = {},
 }: {
   issues: ReconciliationIssue[];
+  /** The signed-in staff member, so their own reviews read "You". */
+  actorId?: string;
+  /** Staff display names by user id, when known. */
+  names?: Readonly<Record<string, string>>;
 }) {
+  const who = (id: string | undefined) =>
+    id && names[id]
+      ? names[id]!
+      : id && id === actorId
+        ? "You"
+        : "Another Strelva staff member";
   const [rows, setRows] = useState(issues);
   return (
     <div className={xa.section}>
@@ -28,6 +61,7 @@ export default function ReviewQueue({
           <Review
             key={`${i.account_id}:${i.event_id}:${i.reason}`}
             issue={i}
+            who={who}
             onResolved={(r) =>
               setRows((old) =>
                 old.map((v) => (v === i ? { ...v, resolution: r } : v)),
@@ -46,8 +80,10 @@ export default function ReviewQueue({
 function Review({
   issue,
   onResolved,
+  who,
 }: {
   issue: ReconciliationIssue;
+  who: (id: string | undefined) => string;
   onResolved: (receipt: NonNullable<ReconciliationIssue["resolution"]>) => void;
 }) {
   const [kind, setKind] = useState("no_effect_after_review");
@@ -110,20 +146,24 @@ function Review({
       <p className={xa.note}>
         {issue.account_id} · {issue.event_type} · {issue.event_id}
       </p>
-      <p className={xa.body}>
-        Provider object: {issue.object_id ?? "Unavailable"}
-      </p>
+      <p className={xa.body}>Stripe record: {issue.object_id ?? "not given"}</p>
       {issue.resolution ? (
         <div className={xa.body}>
           <p role="status">
-            Review recorded: {issue.resolution.kind.replaceAll("_", " ")}
+            {who(issue.resolution.reviewed_by)}{" "}
+            {KIND_WORDS[issue.resolution.kind] ??
+              `recorded ${issue.resolution.kind.replaceAll("_", " ")}`}
+            {day(issue.resolution.created_at)
+              ? ` on ${day(issue.resolution.created_at)}`
+              : ""}
+            .
           </p>
-          <p className={xa.body}>{issue.resolution.note}</p>
+          <p className={xa.note}>{issue.resolution.note}</p>
         </div>
       ) : (
         <form onSubmit={resolve} className={xa.form}>
           <XaSelect
-            label="Result of provider and ledger review"
+            label="What you found in Stripe and the ledger"
             options={[
               {
                 value: "no_effect_after_review",
@@ -139,7 +179,7 @@ function Review({
             disabled={busy}
           />
           <XaTextArea
-            label="Evidence and conclusion"
+            label="What you checked and why"
             required
             minLength={20}
             maxLength={5000}
@@ -150,7 +190,7 @@ function Review({
           {kind === "effect_confirmed" ? (
             <>
               <XaSelect
-                label="Immutable ledger receipt"
+                label="Which ledger record proves it"
                 options={[
                   { value: "invoice_split", label: "Invoice source receipt" },
                   {
@@ -167,7 +207,7 @@ function Review({
                 disabled={busy}
               />
               <XaField
-                label="Receipt ID"
+                label="That record's id"
                 required
                 value={evidenceId}
                 onChange={(e) => setEvidenceId(e.target.value)}
@@ -176,9 +216,8 @@ function Review({
             </>
           ) : null}
           <p className={xa.note}>
-            Record the review after checking the provider and ledger. This
-            action creates a receipt; it does not charge, refund, transfer or
-            retry a payment.
+            Recording keeps your finding with your name. It does not charge,
+            refund, transfer or retry a payment.
           </p>
           <XaButton type="submit" disabled={busy}>
             {busy ? "Recording…" : "Record review"}

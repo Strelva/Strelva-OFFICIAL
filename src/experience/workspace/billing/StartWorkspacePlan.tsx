@@ -1,13 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import {
-  XaAnswers,
-  XaButton,
-  XaLabel,
-  XaSays,
-  XaTextLink,
-} from "@/components/ui/strelva/Xa";
+import { XaButton, XaSays, XaTextLink } from "@/components/ui/strelva/Xa";
 import styles from "@/experience/workspace/money/money.module.css";
 
 import type {
@@ -20,13 +14,14 @@ const dollars = (amount: number) =>
     amount,
   );
 
+/** A reset or change day. The period boundary is a calendar day, so it reads the same everywhere. */
 const monthDay = (iso: string) =>
   new Intl.DateTimeFormat("en-US", {
     month: "long",
     day: "numeric",
-    year: "numeric",
     timeZone: "UTC",
-  }).format(new Date(iso)) + " (UTC)";
+  }).format(new Date(iso));
+const whole = (amount: number) => dollars(amount).replace(/\.00$/, "");
 
 /** What the agency or Strelva set for this business, named. Nothing renders without a controls row. */
 function AgencyUsageControlLines({
@@ -47,7 +42,7 @@ function AgencyUsageControlLines({
     );
   if (controls.monthlyCapCents !== null)
     lines.push(
-      `Usage limit ${dollars(controls.monthlyCapCents / 100)} set by ${agency ?? "Strelva"}.${resetsAt && Number.isFinite(Date.parse(resetsAt)) ? ` Resets ${monthDay(resetsAt)}.` : ""}`,
+      `Usage limit ${whole(controls.monthlyCapCents / 100)} set by ${agency ?? "Strelva"}.${resetsAt && Number.isFinite(Date.parse(resetsAt)) ? ` Resets ${monthDay(resetsAt)}.` : ""}`,
     );
   return lines.length ? (
     <div className={styles.section}>
@@ -63,7 +58,11 @@ function AgencyUsageControlLines({
   ) : null;
 }
 
-/** Server-authorized budget projection; never infer a cap or a reset from the browser. */
+/**
+ * Usage this month, in one sentence (XA · R1): what was used, what running
+ * jobs hold, the limit and the reset. Server-authorized; never infer a limit
+ * or a reset from the browser.
+ */
 export function BusinessAiBudgetSummary({
   budget,
   capUsd,
@@ -82,54 +81,34 @@ export function BusinessAiBudgetSummary({
     Number.isFinite(Date.parse(budget.resetsAt));
   const spent = known ? Number(budget.spentUsd) : null;
   const reserved = known ? Number(budget.reservedUsd) : null;
+  const incomplete = Boolean(known && budget.unknownCostCalls > 0);
+  const limited = capUsd !== null && Number.isFinite(capUsd);
   const remaining =
-    spent !== null &&
-    reserved !== null &&
-    capUsd !== null &&
-    Number.isFinite(capUsd)
+    spent !== null && reserved !== null && limited && !incomplete
       ? Math.max(0, capUsd - spent - reserved)
       : null;
-  const reading = !known
+  const sentence = !known ? (
+    "Usage this month could not be confirmed."
+  ) : (
+    <>
+      Usage this month: <strong>{dollars(spent!)}</strong> used
+      {reserved ? `, ${dollars(reserved)} held for running jobs` : ""}
+      {limited ? `, of your ${whole(capUsd)} limit` : ""}.
+      {remaining !== null ? ` ${dollars(remaining)} left.` : ""}
+      {!limited ? " No usage limit is set." : ""} Resets{" "}
+      {monthDay(budget.resetsAt)}.
+    </>
+  );
+  const problem = !known
     ? "Usage could not be confirmed. Budgeted building stays paused until the budget can be checked."
-    : budget.unknownCostCalls > 0
+    : incomplete
       ? capUsd === null
-        ? "Some past calls have no confirmed cost. Recorded spend is incomplete. No spending limit is recorded for this business."
+        ? "Recorded spend is incomplete: some past jobs have no confirmed cost yet. No spending limit is recorded for this business."
         : "Usage could not be confirmed. Budgeted building stays paused until the budget can be checked."
-      : "Budgeted calls reserve their maximum cost before running. Reserved amounts stay committed until the reset date, including calls whose outcome is not confirmed.";
+      : null;
   return (
-    <section className={styles.section} aria-label="Monthly usage">
-      <XaLabel as="h2">Monthly usage</XaLabel>
-      <XaAnswers
-        labelWidth={160}
-        rows={[
-          ["Recorded spend", spent === null ? "Unavailable" : dollars(spent)],
-          [
-            "Reserved for work",
-            reserved === null ? "Unavailable" : dollars(reserved),
-          ],
-          [
-            "Remaining budget",
-            !known || budget.unknownCostCalls > 0
-              ? "Unavailable"
-              : capUsd === null
-                ? "No spending limit recorded"
-                : remaining === null
-                  ? "Unavailable"
-                  : dollars(remaining),
-          ],
-          [
-            "Resets",
-            known
-              ? new Intl.DateTimeFormat("en-US", {
-                  month: "long",
-                  day: "numeric",
-                  year: "numeric",
-                  timeZone: "UTC",
-                }).format(new Date(budget.resetsAt)) + " (UTC)"
-              : "Unavailable",
-          ],
-        ]}
-      />
+    <section className={styles.section} aria-label="Usage this month">
+      <p className={styles.body}>{sentence}</p>
       {controls ? (
         <AgencyUsageControlLines
           controls={controls}
@@ -137,10 +116,12 @@ export function BusinessAiBudgetSummary({
         />
       ) : null}
       {enforced ? (
-        !known || budget.unknownCostCalls > 0 ? (
-          <XaSays>{reading}</XaSays>
+        problem ? (
+          <XaSays>{problem}</XaSays>
         ) : (
-          <p className={styles.note}>{reading}</p>
+          <p className={styles.note}>
+            Each job holds the most it could cost until it finishes.
+          </p>
         )
       ) : (
         <p className={styles.note}>
@@ -159,6 +140,7 @@ type Transport = (input: string, init?: RequestInit) => Promise<Response>;
 
 /** The owner starts the business's own plan (ADR 0015). Checkout happens on Stripe; nothing is charged here. */
 export function StartWorkspacePlan({
+  primary = true,
   workspaceId,
   budget = null,
   capUsd = null,
@@ -167,6 +149,8 @@ export function StartWorkspacePlan({
   transport = fetch,
   navigate = (url: string) => window.location.assign(url),
 }: {
+  /** False when another decision on the screen already holds the one ink pill. */
+  primary?: boolean;
   workspaceId: string;
   budget?: BusinessAiBudget | null;
   capUsd?: number | null;
@@ -216,7 +200,7 @@ export function StartWorkspacePlan({
         </p>
         <div className={styles.actions}>
           <XaButton
-            variant="primary"
+            variant={primary ? "primary" : "secondary"}
             busy={busy}
             disabled={busy}
             onClick={() => void start()}
