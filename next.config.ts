@@ -29,8 +29,9 @@ const nextConfig: NextConfig = {
   },
   // The dev-tools badge defaults to bottom-left, where it sits on top of the
   // dashboard sidebar's account footer during local walks. Move it out of the
-  // way. Dev-only — has no effect on a production build.
-  devIndicators: { position: "bottom-right" },
+  // way. Dev-only — has no effect on a production build. Screenshot runs set
+  // STRELVA_UI_SHOOT=1 so the evidence matches production (no badge at all).
+  devIndicators: process.env.STRELVA_UI_SHOOT === "1" ? false : { position: "bottom-right" },
   allowedDevOrigins: [
     "127.0.0.1",
     "gldf.localhost",

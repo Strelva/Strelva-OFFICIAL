@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
 import { StSkeleton } from "@/components/ui/strelva/Kit";
-import { XaAnswers, XaButton, XaButtonLink, XaEntry, XaEntryCaption, XaEntryStack, XaHeadline, XaInitial, XaPebbleScene, XaTextLink } from "@/components/ui/strelva/Xa";
+import { XaAnswers, XaButton, XaButtonLink, XaComposer, XaEntry, XaEntryCaption, XaEntryStack, XaHeadline, XaInitial, XaLabel, XaPebbleAvatar, XaPebbleScene, XaTextLink } from "@/components/ui/strelva/Xa";
 import styles from "./agency-door.module.css";
 import type { ClaimReview, ClaimReviewAccepted, OwnerClaimAccepted, OwnerClaimPreview } from "@/products/agency-clients/contracts";
 import { ClaimNextSteps, ClaimReviewForm, claimReviewInput, initialClaimReviewChoices, type ClaimReviewChoices } from "./OwnerClaimReview";
@@ -67,7 +67,7 @@ export function OwnerClaimPresentation({ preview, accepted, loading, submitting,
   const errorLine = error ? <p role="alert" className={styles.error}>{error}</p> : null;
   if (loading) return <ClaimEntry mode={mode}><div aria-busy="true"><StSkeleton label="Checking your link" /><StSkeleton width="70%" /></div></ClaimEntry>;
   if (accepted) return <ClaimOwned mode={mode} workspaceId={accepted.workspaceId} workspaceName={accepted.workspaceName} agencyName={preview?.agencyName ?? null}
-    lead={accepted.alreadyAccepted ? "You already claimed it with this link." : `Check the details ${preview?.agencyName ?? "your agency"} added, and confirm what’s right.`} />;
+    lead={accepted.alreadyAccepted ? "You already claimed it with this link." : `${preview?.agencyName ?? "Your agency"} added them from your site. Confirm what’s right in ${accepted.workspaceName}.`} />;
   if (!preview) return <ClaimBroken mode={mode}>{errorLine}</ClaimBroken>;
   if (preview.status !== "pending") return <ClaimClosed preview={preview} status={preview.status} mode={mode}>{errorLine}</ClaimClosed>;
   return <ClaimEntry mode={mode} agencyName={preview.agencyName} businessName={preview.workspaceName}
@@ -76,7 +76,6 @@ export function OwnerClaimPresentation({ preview, accepted, loading, submitting,
       <ClaimSetUpBy agencyName={preview.agencyName} />
       <XaHeadline quiet="Claim it to own the workspace and its data.">{preview.workspaceName} is ready for its owner.</XaHeadline>
       <XaAnswers labelWidth={124} rows={[
-        ["Your site", "Keeps running whether or not you sign in."],
         [preview.agencyName, "Works through access you can end at any time."],
         ["This link", <>For {preview.recipientEmail}, until {expires}.</>],
       ]} />
@@ -94,39 +93,77 @@ function claimDate(value: string): string {
 }
 
 /** The claim's entry frame (XA · C1, C2): the business keeps running on the right while the owner decides. */
-function ClaimEntry({ children, agencyName, businessName, footnote, mode, aside, corner }: { children: ReactNode; agencyName?: string; businessName?: string; footnote?: ReactNode; mode?: "light" | "dark"; aside?: ReactNode; corner?: ReactNode }) {
-  return <XaEntry mode={mode} corner={corner} footnote={footnote ?? (agencyName ? `Runs on Strelva. Same account as strelva.com.` : undefined)}
+function ClaimEntry({ children, agencyName, businessName, footnote, mode, aside, corner, asideOnPhone }: { children: ReactNode; agencyName?: string; businessName?: string; footnote?: ReactNode; mode?: "light" | "dark"; aside?: ReactNode; corner?: ReactNode; asideOnPhone?: "below" | "hidden" }) {
+  // C1: the panel is where "keeps running" is said, once, with Pebble tending the site.
+  // On a phone it drops; a small Pebble sits beside "set this up for you" instead.
+  return <XaEntry mode={mode} corner={corner} asideOnPhone={asideOnPhone ?? (aside ? "below" : "hidden")} footnote={footnote ?? (agencyName ? `Runs on Strelva. Same account as strelva.com.` : undefined)}
     aside={aside ?? (businessName ? <>
-      <XaPebbleScene pose="resting" size={360} bare label={`Pebble keeping ${businessName} running`} />
-      <XaEntryCaption title={`${businessName} keeps running.`}>Pebble keeps it going while you decide. Nothing changes until you say so.</XaEntryCaption>
+      <XaPebbleScene pose="adds" size={360} bare label={`Pebble tending ${businessName}’s site`} />
+      <XaEntryCaption title={`${businessName} keeps running.`}>Nothing on it changes until you say so.</XaEntryCaption>
     </> : undefined)}>
     {children}
   </XaEntry>;
 }
 
 function ClaimSetUpBy({ agencyName }: { agencyName: string }) {
-  return <p className={styles.setUpBy}><XaInitial name={agencyName} size={26} /><span>{agencyName} set this up for you</span></p>;
+  return <p className={styles.setUpBy}><XaInitial name={agencyName} size={26} /><span>{agencyName} set this up for you</span><span className={styles.phonePebble}><XaPebbleAvatar size={36} label="Pebble, keeping your site running" /></span></p>;
 }
 
-/** XA · C2: the owner owns it. One way in; Pebble waves. */
-export function ClaimOwned({ workspaceId, workspaceName, agencyName, lead, mode, children }: { workspaceId: string; workspaceName: string; agencyName: string | null; lead: string; mode?: "light" | "dark"; children?: ReactNode }) {
+/**
+ * XA · C2: the owner owns it. One way in. Pebble hands over the clipboard: the
+ * panel shows the first thing waiting in their business, as their composer
+ * will show it, when the claim response says how many details wait.
+ */
+export function ClaimOwned({ workspaceId, workspaceName, agencyName, lead, agencyLine, waiting, mode, children }: { workspaceId: string; workspaceName: string; agencyName: string | null; lead: string | null; agencyLine?: string; waiting?: number | null; mode?: "light" | "dark"; children?: ReactNode }) {
   const agency = agencyName ?? "Your agency";
+  const details = waiting === 1 ? "1 detail" : `${waiting} details`;
   return <ClaimEntry mode={mode} footnote="Runs on Strelva. Same account as strelva.com." aside={<>
-    <XaPebbleScene pose="waving" size={360} bare label="Pebble waving hello" />
-    <XaEntryCaption title={`Welcome to ${workspaceName}.`}>Your site keeps running. Nothing changes until you say so.</XaEntryCaption>
+    <XaPebbleScene pose="waving" size={320} bare label={waiting ? `Pebble handing over ${details} to confirm` : "Pebble handing over the clipboard"} />
+    {waiting ? <div className={styles.seen}>
+      <XaLabel>The first thing you’ll see</XaLabel>
+      <div className={styles.seenComposer} inert aria-hidden="true">
+        <XaComposer value="" onChange={() => undefined} onSubmit={() => undefined} onAdd={() => undefined} onVoice={() => undefined} placeholder="Ask Strelva for anything" scope={{ label: workspaceName, state: "live" }}
+          waiting={{ kicker: <>Waits for you · from {agency}</>, title: `Confirm ${details} read from your site`, from: { name: agency, color: "#2f5236" }, action: <span className={styles.fakeAction}>Confirm</span> }} />
+      </div>
+    </div> : <XaEntryCaption title={`${agency}’s changes come to you first.`} />}
   </>}>
     <XaEntryStack>
       <p className="sr-only" role="status">{workspaceName} is yours. You’re the owner.</p>
       <XaHeadline quiet={`${agency}’s changes come to you first.`}>You own {workspaceName}.</XaHeadline>
       <XaAnswers labelWidth={124} rows={[
         ["You decide", <>What goes live, and who works on {workspaceName}.</>],
-        [agency, "Prepares changes. You can end their access at any time."],
-        ["Your details", lead],
+        [agency, agencyLine ?? "Prepares changes and asks you first. You can end their access at any time."],
+        ...(lead ? [["Your details", lead] as const] : []),
       ]} />
       {children}
-      <XaButtonLink variant="primary" size="lg" block href={`/workspace?workspaceId=${encodeURIComponent(workspaceId)}`}>Open your business</XaButtonLink>
+      <XaButtonLink variant="primary" size="lg" block href={`/workspace?workspaceId=${encodeURIComponent(workspaceId)}`}>Open {workspaceName}</XaButtonLink>
     </XaEntryStack>
   </ClaimEntry>;
+}
+
+/** What the agency may now do, from the areas the owner chose. */
+function agencyLineFor(accepted: ClaimReviewAccepted | null): string | undefined {
+  const areas = accepted?.areas;
+  if (!areas) return undefined;
+  const full = Object.entries(areas).filter(([, choice]) => choice === "full_control").map(([area]) => AREA_WORDS[area] ?? area);
+  const prepare = Object.values(areas).some(choice => choice === "prepare");
+  if (full.length && prepare) return `Runs ${joinWords(full)} once they accept. Prepares everything else and asks you first.`;
+  if (full.length) return `Runs ${joinWords(full)} once they accept. You can end their access at any time.`;
+  if (prepare) return "Prepares changes and asks you first. You can end their access at any time.";
+  return "Has no access yet. You can give it any time.";
+}
+const AREA_WORDS: Record<string, string> = { website: "your website", inquiries: "inquiries", bookings: "bookings", google: "your Google listing", internal_tools: "internal tools" };
+function joinWords(words: readonly string[]): string {
+  return words.length <= 1 ? words.join("") : `${words.slice(0, -1).join(", ")} and ${words.at(-1)}`;
+}
+
+/** What waits in "Your details" after a claim, from the counts the claim returned. */
+function detailsLead(accepted: ClaimReviewAccepted): string | null {
+  if (accepted.alreadyAccepted) return "You already claimed it with this link.";
+  const waiting = accepted.facts?.waiting;
+  if (waiting === undefined) return null;
+  if (waiting === 0) return "Everything found on your site is confirmed.";
+  return `${waiting} ${waiting === 1 ? "waits" : "wait"} for you to confirm.`;
 }
 
 function ClaimClosed({ preview, status, mode, children }: { preview: OwnerClaimPreview; status: OwnerClaimPreview["status"]; mode?: "light" | "dark"; children?: ReactNode }) {
@@ -215,8 +252,9 @@ export function OwnerClaimReviewPresentation({ preview, load, choices, accepted,
   const agencyName = preview?.agencyName ?? (load.kind === "ready" ? load.review.agencyName : null);
   if (accepted || (load.kind === "ready" && load.review.status === "accepted")) {
     const owned = accepted ?? (load.kind === "ready" ? { workspaceId: load.review.workspaceId, workspaceName: load.review.workspaceName, alreadyAccepted: true } : null)!;
+    const result = accepted ?? null;
     return <ClaimOwned mode={mode} workspaceId={owned.workspaceId} workspaceName={owned.workspaceName} agencyName={agencyName}
-      lead={owned.alreadyAccepted ? "You already claimed it with this link." : "Your choices are saved."}>
+      lead={result ? detailsLead(result) : "You already claimed it with this link."} agencyLine={agencyLineFor(result)} waiting={result && !result.alreadyAccepted ? result.facts?.waiting ?? null : null}>
       <ClaimNextSteps workspaceId={owned.workspaceId} workspaceName={owned.workspaceName} returnTo={target} alreadyAccepted={owned.alreadyAccepted} navigate={navigate} />
       {alerts}
     </ClaimOwned>;
@@ -233,14 +271,12 @@ export function OwnerClaimReviewPresentation({ preview, load, choices, accepted,
         <ClaimSetUpBy agencyName={preview.agencyName} />
         <XaHeadline quiet="Claim it to own the workspace and its data.">{preview.workspaceName} is ready for its owner.</XaHeadline>
         <XaAnswers labelWidth={124} rows={[
-          ["Your site", "Keeps running whether or not you sign in."],
           ["Your details", `What ${preview.agencyName} found waits for you to confirm.`],
           [preview.agencyName, "Works with the access you choose."],
         ]} />
         <div className={styles.claimActions}>
           <XaButtonLink variant="primary" size="lg" block href={`/sign-up?next=${encodeURIComponent(target)}`}>Create an account</XaButtonLink>
-          <XaButtonLink size="lg" block href={`/sign-in?next=${encodeURIComponent(target)}`}>Sign in</XaButtonLink>
-          <p className={styles.sentence}>Sign in with {preview.recipientEmail} to see what they found on your website and what they prepared, and to choose what they may do.</p>
+          <p className={styles.sentence}>Sign in with {preview.recipientEmail} to see what {preview.agencyName} found and prepared, and to choose what {preview.agencyName} may do. <XaTextLink href={`/sign-in?next=${encodeURIComponent(target)}`}>Sign in</XaTextLink></p>
         </div>
         {alerts}
       </XaEntryStack>

@@ -277,15 +277,15 @@ function addedHtml(currentClient?: AgencyClientListItem, rebuildOpenToAgency = t
 describe("new agency client handoff", () => {
   it("leads with one draft action and does not claim an unread owner has not signed in", () => {
     const html = addedHtml();
-    expect(html).toContain("Ready for a website draft");
-    expect(html).toContain("Start website draft");
-    expect(html).toContain("Owner claim not yet checked");
+    expect(html).toContain("connect the site they have");
+    expect(html).toContain("start a website draft");
+    expect(html).not.toContain("Owner has not claimed");
     expect(html).not.toContain("Owner not signed in yet");
     expect(html).not.toContain('data-state="done"');
   });
   it("reads accepted owner status from the current client and removes the old private claim link", () => {
     const html = addedHtml({ ...addedResult.client, ownerClaimed: true, seatActive: true, pendingClaim: null });
-    expect(html).toContain("Owner claimed the business");
+    expect(html).toContain("Its owner claimed it.");
     expect(html).toContain("The owner has accepted their claim");
     expect(html).not.toContain("private-token");
     expect(html).not.toContain("No message was sent");
@@ -293,16 +293,16 @@ describe("new agency client handoff", () => {
   });
   it("offers owner claim when agency rebuilding is gated and keeps draft pending", () => {
     const html = addedHtml({ ...addedResult.client, ownerClaimed: false, seatActive: true, pendingClaim: null }, false);
-    expect(html).toContain("Prepare owner claim link");
-    expect(html).toContain("Agency rebuilding is not available here yet");
-    expect(html).not.toContain("Start website draft");
+    expect(html).toContain("Make owner link");
+    expect(html).toContain("A website draft opens to your agency once owner@example.com claims Northside Bakery.");
+    expect(html).not.toContain("start a website draft");
     expect(html).not.toContain('data-state="done"');
   });
   it("does not present an expired or replaced owner token as the next action", () => {
     const html = addedHtml({ ...addedResult.client, ownerClaimed: false, seatActive: true, pendingClaim: { claimId: "replacement", recipientEmail: "owner@example.com", expiresAt: expiresAt(), delivery: addedResult.ownerClaim!.delivery } }, false);
     expect(html).not.toContain("private-token");
-    expect(html).toContain("previously shown owner link is no longer current");
-    expect(html).toContain("Prepare owner claim link");
+    expect(html).toContain("The link shown earlier is no longer current");
+    expect(html).toContain("Make a new link");
   });
 
 });

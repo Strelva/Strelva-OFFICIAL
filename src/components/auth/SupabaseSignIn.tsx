@@ -21,6 +21,7 @@ export function SupabaseSignIn({
   emailReady = false,
   appearance = "st",
   emailLabel = "Email",
+  initialSent = false,
 }: {
   next?: string;
   prefillEmail?: string;
@@ -29,9 +30,11 @@ export function SupabaseSignIn({
   /** "xa" draws the XA entry (A1, B1): ink Continue, white Continue with Google. Behaviour is identical. */
   appearance?: "st" | "xa";
   emailLabel?: string;
+  /** Fictional preview only: open on the "check your email" state without sending anything. */
+  initialSent?: boolean;
 }) {
   const [email, setEmail] = useState(prefillEmail);
-  const [status, setStatus] = useState<"idle" | "google" | "sending" | "sent" | "error">("idle");
+  const [status, setStatus] = useState<"idle" | "google" | "sending" | "sent" | "error">(initialSent ? "sent" : "idle");
   const [error, setError] = useState<string | null>(null);
 
   function redirectTo() {

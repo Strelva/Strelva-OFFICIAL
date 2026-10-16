@@ -3,7 +3,7 @@
  * mandate. The exact agency/seat/email verification is checked in SQL instead. */
 import { createHash } from "node:crypto";
 import { sendEmailWithReceipt, type SendEmailInput, type SendEmailResult } from "@/platform/infra/email/send";
-import { CONTROL_PLANE_URL } from "@/platform/infra/brand";
+import { publicAppOrigin } from "@/platform/infra/brand";
 import type { WorkspaceActor } from "@/platform/workspaces/types";
 import type { OwnerClaim, OwnerClaimDelivery } from "./contracts";
 
@@ -30,7 +30,7 @@ export async function emailOwnerClaim(actor: WorkspaceActor, agencyWorkspaceId: 
   if (reserved.error || reserved.data !== true) return held;
   let delivery: OwnerClaimDelivery;
   try {
-    const origin = new URL(process.env.NEXT_PUBLIC_APP_URL || CONTROL_PLANE_URL);
+    const origin = new URL(publicAppOrigin());
     if (origin.protocol !== "https:") throw new Error("Secure app origin required");
     const result = await deps.send({ audience: "client", authorship: "platform", workspaceId: claim.customerWorkspaceId,
       fromAddress: "hello@updates.strelva.com", to: claim.recipientEmail,

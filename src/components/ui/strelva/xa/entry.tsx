@@ -6,14 +6,16 @@
  *
  * The panel is never decoration: it holds Pebble doing the job this step
  * starts, or a true preview of what someone else will see. On phones the
- * panel drops below the task and shrinks, so the task stays first.
+ * panel drops below the task and shrinks, so the task stays first; a page
+ * whose panel only restates the task passes asideOnPhone="hidden" and shows a
+ * small Pebble in the task instead.
  */
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { XaMark } from "./state";
 import styles from "./entry.module.css";
 
-export function XaEntry({ children, aside, corner, footnote, mode, label = "Strelva", width = "form" }: {
+export function XaEntry({ children, aside, corner, footnote, mode, label = "Strelva", width = "form", asideOnPhone = "below" }: {
   children: ReactNode;
   /** The felt panel's content. Omit for a single-column entry (errors, loading). */
   aside?: ReactNode;
@@ -24,6 +26,8 @@ export function XaEntry({ children, aside, corner, footnote, mode, label = "Stre
   label?: string;
   /** "wide" (640) for a review the owner reads line by line; "form" (460) otherwise. */
   width?: "form" | "wide";
+  /** "below" (default) stacks the panel under the task on phones; "hidden" drops it there. */
+  asideOnPhone?: "below" | "hidden";
 }) {
   return <main className={styles.entry} data-workspace-theme="linen" data-workspace-mode={mode} data-has-aside={aside ? true : undefined}>
     <div className={styles.task}>
@@ -34,7 +38,7 @@ export function XaEntry({ children, aside, corner, footnote, mode, label = "Stre
       <div className={styles.body} data-width={width}>{children}</div>
       {footnote ? <p className={styles.footnote}>{footnote}</p> : null}
     </div>
-    {aside ? <aside className={styles.aside}>{aside}</aside> : null}
+    {aside ? <aside className={styles.aside} data-phone={asideOnPhone}>{aside}</aside> : null}
   </main>;
 }
 

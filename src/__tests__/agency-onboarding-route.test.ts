@@ -48,6 +48,12 @@ describe("GET /api/agency-onboarding", () => {
     expect(mocks.read).toHaveBeenCalledWith({ userId: "5a000000-0000-4000-8000-000000000001", verifiedEmail: "owner@northside.example" }, AGENCY, undefined, { addClient: false });
   });
 
+  it("greets the viewer by the first word of their own auth display name, and by nothing when there is none", async () => {
+    mocks.user.mockResolvedValueOnce({ id: "5a000000-0000-4000-8000-000000000001", email: "owner@northside.example", email_confirmed_at: "2026-10-07", user_metadata: { full_name: "  Maya Okafor " } });
+    expect(await (await get(`?workspaceId=${AGENCY}`)).json()).toMatchObject({ onboarding: { viewer: { firstName: "Maya" } } });
+    expect(await (await get(`?workspaceId=${AGENCY}`)).json()).toMatchObject({ onboarding: { viewer: { firstName: null } } });
+  });
+
   it("offers adding a first client once the add-client release is on", async () => {
     vi.stubEnv("STRELVA_AGENCY_ADD_CLIENT_RELEASE", "1");
     await get(`?workspaceId=${AGENCY}`);

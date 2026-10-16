@@ -113,7 +113,7 @@ export function AgencyOnboardingView({ state, addClient, workspaceId, onOpen, on
   onOpen: (id: string) => void; onRetry: () => void; onCreateAnother: () => void; onClearAgency: () => void;
   create: (name: string) => Promise<string>; onSignedOut: () => void;
   /** Fictional preview only: where the frame's links go, and the light or dark mode. */
-  preview?: { appBase: string; hrefs?: Partial<Record<"home" | "clients" | "queue" | "library" | "team" | "verification" | "minutes", string>>; addClientHref?: string; mode?: "light" | "dark"; notice?: ReactNode };
+  preview?: { appBase: string; hrefs?: Partial<Record<"home" | "clients" | "queue" | "library" | "team" | "verification" | "minutes", string>>; addClientHref?: string; mode?: "light" | "dark"; notice?: ReactNode; accountName?: string };
 }) {
   const workspaceHref = workspaceId ? `/workspace?workspaceId=${encodeURIComponent(workspaceId)}` : "/workspace";
   const corner = <a href={preview ? "#" : workspaceHref}>Your workspace</a>;
@@ -169,7 +169,7 @@ function CreateAgency({ onCreated, onSignedOut, create, corner, mode }: { onCrea
   return <XaEntry corner={corner} mode={mode} aside={<div className={styles.seen}>
     <XaLabel>How a client sees you, for example Dr. Lin at Harbor Dental</XaLabel>
     <div className={styles.seenComposer} inert aria-hidden="true">
-      <XaComposer value="" onChange={() => undefined} onSubmit={() => undefined} placeholder="Ask Strelva for anything" scope={{ label: "Harbor Dental", state: "live" }}
+      <XaComposer value="" onChange={() => undefined} onSubmit={() => undefined} onAdd={() => undefined} onVoice={() => undefined} placeholder="Ask Strelva for anything" scope={{ label: "Harbor Dental", state: "live" }}
         waiting={{ kicker: <>Waits for you · from {shown}</>, title: "New wording for your Fees page", from: { name: shown, color: "#2f5236" }, action: <span className={styles.fakeAction}>Review</span> }} />
     </div>
     <p className={styles.seenNote}>Prepared by {shown} · Runs on Strelva</p>
@@ -201,13 +201,13 @@ export function AgencyVerification({ onboarding, fictionalQualification, heading
 }
 
 /** XA · A3 inside the agency's frame. Verification opens in place under the sentences, never in a modal. */
-function Checklist({ onboarding, workspaceHref, addClient, preview }: { onboarding: Onboarding; workspaceHref: string; addClient: boolean; preview?: { appBase: string; hrefs?: Partial<Record<"home" | "clients" | "queue" | "library" | "team" | "verification" | "minutes", string>>; addClientHref?: string; mode?: "light" | "dark"; notice?: ReactNode } }) {
+function Checklist({ onboarding, workspaceHref, addClient, preview }: { onboarding: Onboarding; workspaceHref: string; addClient: boolean; preview?: { appBase: string; hrefs?: Partial<Record<"home" | "clients" | "queue" | "library" | "team" | "verification" | "minutes", string>>; addClientHref?: string; mode?: "light" | "dark"; notice?: ReactNode; accountName?: string } }) {
   const { agency } = onboarding;
   const [verifying, setVerifying] = useState(false);
   const canAdd = addClient && agency.role !== "member";
   const addHref = preview?.addClientHref ?? `/workspace/agency/clients/new?workspaceId=${encodeURIComponent(agency.id)}`;
-  return <AgencyFrame agencyWorkspaceId={preview ? undefined : agency.id} agencyName={agency.name} title="Today" appBase={preview?.appBase} hrefs={preview?.hrefs} mode={preview?.mode} notice={preview?.notice} signOut={preview ? null : undefined} active={verifying ? "verification" : "home"}>
-    <AgencyDayOne agencyName={agency.name} clients={onboarding.clients} openAgencyHref={preview?.hrefs?.home ?? workspaceHref}
+  return <AgencyFrame agencyWorkspaceId={preview ? undefined : agency.id} agencyName={agency.name} title="Today" accountName={preview?.accountName} appBase={preview?.appBase} hrefs={preview?.hrefs} mode={preview?.mode} notice={preview?.notice} signOut={preview ? null : undefined} active={verifying ? "verification" : "home"}>
+    <AgencyDayOne agencyName={agency.name} viewerFirstName={onboarding.viewer?.firstName} clients={onboarding.clients} openAgencyHref={preview?.hrefs?.home ?? workspaceHref}
       addClientHref={canAdd ? addHref : null} addClientBlocked={addClient ? `An owner or admin of ${agency.name} adds clients.` : "Adding clients opens here next."}
       verification={{ verified: onboarding.verifiedEffects, total: onboarding.effects.length || AGENCY_EFFECT_TOTAL, onOpen: () => setVerifying(value => !value), open: verifying }}
       team={{ members: onboarding.members, pending: onboarding.pendingInvitations, inviteHref: agency.role === "owner" ? preview ? "#" : `/workspace/invitations?workspaceId=${encodeURIComponent(agency.id)}` : null, ownerOnly: `Only an owner of ${agency.name} invites people.` }}

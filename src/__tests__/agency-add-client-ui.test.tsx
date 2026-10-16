@@ -12,8 +12,8 @@ const ready: Extract<ClientAiCheck, { status: "ready" }> = { status: "ready", wo
 describe("agency client AI check", () => {
   it("links to the existing private work and distinguishes readiness from an unrun live probe", () => {
     const html = renderToStaticMarkup(<AgencyClientAiCheck check={ready} />);
-    expect(html).toContain("C · 70/100");
-    expect(html).toContain("Probe not completed");
+    expect(html).toContain("grade C (70 of 100)");
+    expect(html).toContain("Strelva has not asked a live assistant yet.");
     expect(html).toContain("Add business schema");
     expect(html).toContain('href="/workspace?workspaceId=agency&amp;work=assessment"');
     expect(html).not.toContain("AI doesn't recommend");
@@ -22,31 +22,30 @@ describe("agency client AI check", () => {
   it("does not show a grade when neither readiness nor a live answer was measured", () => {
     const html = renderToStaticMarkup(<AgencyClientAiCheck check={{ ...ready, result: { ...ready.result,
       measurementStatus: "unavailable", readinessMeasured: false, score: 0, grade: "F" } }} />);
-    expect(html).not.toContain("0/100");
-    expect(html).not.toContain("F ·");
-    expect(html).toContain("Open saved AI check");
+    expect(html).not.toContain("0 of 100");
+    expect(html).not.toContain("grade F");
+    expect(html).toContain("Open the AI check in your agency");
   });
 
   it("does not grade readiness from a citation-only partial result", () => {
     const html = renderToStaticMarkup(<AgencyClientAiCheck check={{ ...ready, result: { ...ready.result,
       readinessMeasured: false, citation: { ...ready.result.citation, probed: true, note: "One live Gemini answer measured." } } }} />);
-    expect(html).not.toContain("70/100");
+    expect(html).not.toContain("70 of 100");
     expect(html).toContain("One live Gemini answer measured");
-    expect(html).toContain("Probe completed");
+    expect(html).toContain("Strelva asked a live assistant.");
   });
 
   it.each(["unavailable", "pending"] as const)("keeps recovery available for a %s check", (status) => {
     const html = renderToStaticMarkup(<AgencyClientAiCheck check={{ status, message: "Client retained. Check unavailable.", href: "/workspace?workspaceId=agency&view=work" }} />);
     expect(html).toContain('role="status"');
-    expect(html).toContain("Client retained");
-    expect(html).toContain("Open agency saved work");
-    expect(html).not.toContain("/100");
+    expect(html).toContain(status === "pending" ? "Strelva is also checking how search assistants describe their site." : "Client retained");
+    expect(html).toContain("Open the AI check in your agency");
+    expect(html).not.toContain("of 100");
   });
 
-  it("states that no check was requested without a website", () => {
+  it("draws nothing when no check was requested (the page already says no website was read)", () => {
     const html = renderToStaticMarkup(<AgencyClientAiCheck check={{ status: "not_requested" }} />);
-    expect(html).toContain("No website given");
-    expect(html).not.toContain("href=");
+    expect(html).toBe("");
   });
 });
 

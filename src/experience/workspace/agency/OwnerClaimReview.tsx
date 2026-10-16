@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import { XaButton, XaField, XaHeadline, XaLabel, XaSegmented, XaStatus, XaTextLink } from "@/components/ui/strelva/Xa";
 import styles from "./agency-door.module.css";
 import { AGENCY_LEVEL_HELP, AGENCY_SCOPE_LABELS } from "@/platform/agency-directory/contract";
@@ -163,23 +162,18 @@ export function ClaimReviewForm({ review, choices, onChange, submitting, onAccep
   </>;
 }
 
-/** After the claim: optional, skippable connections. The way into the business is the owner page's one primary. */
+/**
+ * After the claim: two optional connections as one line of text links, so the
+ * way into the business stays the owner page's one action. Not choosing one is
+ * skipping it; nothing is recorded either way.
+ */
 export function ClaimNextSteps({ workspaceId, returnTo, navigate = (url: string) => window.location.assign(url) }: {
   workspaceId: string; workspaceName: string; returnTo: string; alreadyAccepted?: boolean; navigate?: (url: string) => void;
 }) {
-  const [skipped, setSkipped] = useState<{ google: boolean; calendar: boolean }>({ google: false, calendar: false });
   const id = encodeURIComponent(workspaceId);
   const google = `/workspace/google?workspaceId=${id}&returnTo=${encodeURIComponent(returnTo)}`;
   const calendar = `/api/workspace/calendar-connections/oauth/google?workspaceId=${id}`;
-  const step = (key: "google" | "calendar", title: string, detail: string, action: string, href: string) => <li className={styles.reviewLine}>
-    <span><span className={styles.reviewValue}>{title}</span><small className={styles.reviewSource}>{detail}</small></span>
-    {skipped[key] ? <span className={styles.objectMeta}>Skipped</span> : <span className={styles.links}><XaButton size="sm" onClick={() => navigate(href)}>{action}</XaButton><XaTextLink onClick={() => setSkipped((s) => ({ ...s, [key]: true }))}>Skip</XaTextLink></span>}
-  </li>;
-  return <section className={styles.reviewSection} aria-labelledby="claim-next">
-    <XaLabel as="h2" id="claim-next">Two optional steps, a minute each</XaLabel>
-    <ul className={styles.reviewRows} aria-label="Optional next steps">
-      {step("google", "Connect Google", "Lets your agency work on your Google listing the way you chose. Connecting posts nothing.", "Connect Google", google)}
-      {step("calendar", "Connect your calendar", "Shows when you’re busy so bookings don’t clash. No booking is sent.", "Connect calendar", calendar)}
-    </ul>
-  </section>;
+  return <p className={styles.sentence} aria-label="Optional next steps">
+    Later, if you like: <XaTextLink onClick={() => navigate(google)}>connect Google</XaTextLink> · <XaTextLink onClick={() => navigate(calendar)}>connect your calendar</XaTextLink>. Connecting posts nothing and sends no booking.
+  </p>;
 }

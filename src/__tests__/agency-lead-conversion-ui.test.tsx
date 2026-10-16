@@ -55,7 +55,7 @@ describe("lead conversion recovery in the ordinary add-client flow", () => {
     expect(container.querySelector("fieldset")?.disabled).toBe(true);
     await click("Confirm client addition");
     expect(bodies).toHaveLength(2); expect(bodies[0]).toBe(bodies[1]);
-    expect(container.textContent).toContain("this client was already added");
+    expect(container.textContent).toContain("This client was already added. Nothing was added twice.");
     expect(container.textContent).toContain("Lead converted");
   });
 

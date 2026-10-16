@@ -38,9 +38,11 @@ const DOOR_COPY: Record<AccountDoorKind, { quiet: string; emailLabel: string; ca
  * `choice` is false when only one door is open; the segmented control then
  * disappears instead of offering a door that leads nowhere.
  */
-export function AccountDoor({ kind, choice, next, requestedNext, emailReady, signInHref, title = "Make your Strelva account.", footnote, mode }: {
+export function AccountDoor({ kind, choice, next, requestedNext, emailReady, signInHref, title = "Make your Strelva account.", footnote, mode, previewSentTo }: {
   kind: AccountDoorKind; choice: boolean; next: string; requestedNext: string | null; emailReady: boolean; signInHref: string;
   title?: ReactNode; footnote?: ReactNode; mode?: "light" | "dark";
+  /** Fictional preview only: show the sent state for this address. Nothing is sent. */
+  previewSentTo?: string;
 }) {
   const copy = DOOR_COPY[kind];
   return <XaEntry mode={mode} corner={<a href={signInHref}>Sign in</a>} footnote={footnote}
@@ -48,7 +50,7 @@ export function AccountDoor({ kind, choice, next, requestedNext, emailReady, sig
       <XaPebbleScene pose={kind === "agency" ? "lineup" : "website"} size={360} bare label={kind === "agency" ? "Pebble beside a row of client Systems" : "The website clay, ready to be brought in"} />
       <XaEntryCaption title={copy.caption}>{copy.detail}</XaEntryCaption>
     </>}>
-    <SupabaseSignIn appearance="xa" key={next} next={next} emailReady={emailReady} emailLabel={copy.emailLabel}
+    <SupabaseSignIn appearance="xa" key={next} next={next} prefillEmail={previewSentTo} initialSent={Boolean(previewSentTo)} emailReady={emailReady} emailLabel={copy.emailLabel}
       heading={<>
         <XaHeadline quiet={copy.quiet}>{title}</XaHeadline>
         {choice ? <nav className={styles.doors} aria-label="Who is this for?">

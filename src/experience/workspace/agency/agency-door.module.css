@@ -15,10 +15,24 @@
 .dayActions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 20px; }
 .sentence { margin: 0; color: var(--st-text-2); font-size: 15px; line-height: 1.45; }
 .after { display: flex; flex-direction: column; gap: 10px; margin: 0; padding: 0; color: var(--st-text-body); font-size: 15px; line-height: 1.5; list-style: none; }
-.daySide { display: flex; justify-content: center; }
+.daySide { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+/* Pebble holds the empty client tile it fills when the first site is read: no felt, no dot. */
+.holding { --hold: 300px; position: relative; display: block; flex-shrink: 0; width: var(--hold); height: var(--hold); }
+.holding > span:first-child { --xa-size: var(--hold) !important; }
+.emptyTile { position: absolute; z-index: 2; left: 58%; top: 44%; width: calc(var(--hold) * 0.2); height: calc(var(--hold) * 0.2); box-sizing: border-box; border: 1.5px dashed color-mix(in srgb, var(--st-need) 60%, transparent); border-radius: calc(var(--hold) * 0.05); background: color-mix(in srgb, #efe6d6 85%, var(--st-surface)); box-shadow: inset 0 -3px 0 #00000010, 0 2px 4px #00000014; }
+.caption { max-width: 280px; margin: -64px 0 0; color: var(--st-text-2); font-size: 15px; line-height: 1.45; text-align: center; }
 .inPlace { padding-top: 8px; border-top: 1px solid var(--st-line); }
-@media (max-width: 1100px) { .dayOne { grid-template-columns: minmax(0, 1fr); gap: 40px; justify-content: stretch; min-height: 0; } .daySide { justify-content: flex-start; } }
-@media (max-width: 767px) { .dayOne { padding: 24px 16px 96px; gap: 32px; } .dayLead { gap: 22px; } }
+@media (max-width: 1100px) { .dayOne { grid-template-columns: minmax(0, 1fr); gap: 24px; justify-content: stretch; min-height: 0; } .daySide { align-items: flex-start; } .caption { text-align: left; } }
+/* Phone: Pebble and its tile sit small beside the caption, under the one action. */
+@media (max-width: 767px) {
+  .dayOne { padding: 24px 16px 96px; gap: 16px; } .dayLead { gap: 22px; }
+  .daySide { order: 0; flex-direction: row; align-items: center; gap: 8px; }
+  .daySide .holding { --hold: 120px !important; }
+  .caption { margin: 0; font-size: 14px; }
+}
+/* The preview notice sits inside the content gutter, never on the shell edge. */
+.previewNotice { margin: 0; padding: 12px 40px 0; color: var(--st-text-3); font-size: 12px; line-height: 16px; }
+@media (max-width: 767px) { .previewNotice { padding: 8px 16px 0; } }
 
 /* A2: how a client sees the agency, live as the name is typed. */
 .seen { display: flex; width: 100%; max-width: 400px; flex-direction: column; align-items: center; gap: 16px; text-align: center; }
@@ -36,15 +50,22 @@
 .check input { width: 18px; height: 18px; accent-color: var(--st-accent); }
 .error { margin: 0; color: var(--st-critical); font-size: 14px; line-height: 1.45; }
 .sentenceStrong { margin: 0; color: var(--st-text); font-size: 15px; line-height: 1.45; }
+.sentenceBody { max-width: 520px; margin: 0; color: var(--st-text-body); font-size: 15px; line-height: 1.55; }
 .sentenceBlock { display: flex; flex-direction: column; gap: 8px; }
 .links { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; margin: 0; font-size: 14px; }
 .addActions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 20px; padding-top: 8px; }
 .block { display: flex; flex-direction: column; gap: 8px; }
 .grade { margin: 0; color: var(--st-text); font-size: 17px; font-weight: 500; font-variant-numeric: tabular-nums; }
 
-/* The one object on the page: a white sheet with the large shadow (A4 reading card, A5 claim link). */
+/* A4: Pebble reading their site, in place on the paper. No card, no lift. */
+.reading { display: flex; min-width: 0; flex-direction: column; align-items: flex-start; gap: 12px; padding-top: 8px; }
+.reading > span:first-child { margin: -40px 0 -48px -24px; }
+.readingTitle { margin: 0; color: var(--st-text); font-size: 20px; font-weight: 500; letter-spacing: -0.3px; line-height: 1.3; }
+.readingNote { max-width: 440px; margin: 0; color: var(--st-text-2); font-size: 15px; line-height: 1.5; }
+
+/* A5: the claim link is the one object on the page: white, a hairline and a small lift. */
 .objectColumn { display: flex; min-width: 0; flex-direction: column; }
-.object { box-sizing: border-box; display: flex; min-width: 0; flex-direction: column; gap: 16px; padding: 28px; border-radius: var(--st-r-xl); background: var(--st-surface); box-shadow: var(--st-shadow-lg); }
+.object { box-sizing: border-box; display: flex; min-width: 0; flex-direction: column; gap: 16px; padding: 28px; border-radius: var(--st-r-lg, 16px); background: var(--st-surface); box-shadow: 0 0 0 1px var(--st-line), 0 1px 2px #0000000a; }
 .object[data-flat="true"] { padding: 20px 0 4px; border-radius: 0; background: none; box-shadow: none; }
 .objectHead { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; margin: 0; }
 .objectTitle { min-width: 0; font-size: 15px; }
@@ -90,6 +111,12 @@
 @media (max-width: 1100px) { .addSplit { grid-template-columns: minmax(0, 1fr); gap: 40px; } .addPage { padding: 56px 32px 120px; } }
 @media (max-width: 767px) {
   .addPage { padding: 24px 16px 120px; }
+  /* A5 on a phone: the claim link, the page's one object and its one primary, comes first. */
+  .addedSplit { display: flex; flex-direction: column; gap: 24px; }
+  .addedSplit > .addLead { display: contents; }
+  .addedSplit .addedHead { order: -2; }
+  .addedSplit .objectColumn { order: -1; }
+  .reading > span:first-child { --xa-size: 180px !important; margin: -28px 0 -36px -16px; }
   .object { padding: 20px; border-radius: 20px; }
   .linkRow { flex-direction: column; }
   .addedState { width: 100%; padding-left: 46px; text-align: left; }
@@ -99,6 +126,8 @@
 
 /* C1 / C2: the claim. */
 .setUpBy { display: flex; align-items: center; gap: 10px; margin: 0; color: var(--st-text-body); font-size: 15px; }
+.phonePebble { display: none; }
+@media (max-width: 860px) { .phonePebble { display: inline-flex; margin-left: auto; } }
 .claimActions { display: flex; flex-direction: column; gap: 12px; }
 .reviewColumn { display: flex; width: 100%; max-width: 640px; flex-direction: column; gap: 28px; }
 .entryWide { max-width: 640px; }

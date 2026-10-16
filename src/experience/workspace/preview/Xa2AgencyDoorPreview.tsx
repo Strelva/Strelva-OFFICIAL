@@ -7,6 +7,9 @@
  * that answers only its own two routes and only inside this preview.
  */
 import { useState } from "react";
+import { XaComposer, XaComposerDock } from "@/components/ui/strelva/Xa";
+import { CONTROL_PLANE_URL } from "@/platform/infra/brand";
+import doorStyles from "@/experience/workspace/agency/agency-door.module.css";
 import { AccountDoor } from "@/experience/workspace/agency/AccountDoor";
 import { AgencyOnboardingView, type AgencyOnboardingState } from "@/experience/workspace/agency/AgencyOnboarding";
 import { AddedClient, AgencyAddClient } from "@/experience/workspace/agency/AgencyAddClient";
@@ -23,7 +26,7 @@ import type { Xa2Screen } from "./xa2-screens";
 const BASE = "/preview/strelva/xa/xa2-agency-door";
 const AGENCY = "00000000-0000-4000-8000-0000000000a2";
 const HARBOR = "00000000-0000-4000-8000-0000000000b1";
-const notice = <p style={{ margin: 0, color: "var(--st-text-3)", fontSize: 12 }}>Fictional preview. Nothing here reaches a real business.</p>;
+const notice = <p className={doorStyles.previewNotice}>Fictional preview. Nothing here reaches a real business.</p>;
 const in14 = () => new Date(Date.now() + 14 * 86_400_000).toISOString();
 const ago = (hours: number) => new Date(Date.now() - hours * 3_600_000).toISOString();
 
@@ -35,7 +38,7 @@ function hrefs(mode: "light" | "dark") {
 const onboarding = (clients: number, role: "owner" | "admin" | "member" = "owner"): AgencyOnboarding => ({
   agency: { id: AGENCY, name: "North Studio", role }, members: 1, pendingInvitations: 0, clients,
   effects: [{ effect: "publish", verified: false }, { effect: "google", verified: false }, { effect: "email", verified: false }, { effect: "payments", verified: false }],
-  steps: [], next: "first_client", verifiedEffects: 0,
+  steps: [], next: "first_client", verifiedEffects: 0, viewer: { firstName: "Maya" },
 } as unknown as AgencyOnboarding);
 
 const sidebarClients = (mode: "light" | "dark") => [
@@ -123,10 +126,11 @@ export function Xa2AgencyDoorPreview({ screen, state, mode }: { screen: Xa2Scree
   const [plainAccepted, setPlainAccepted] = useState(false);
   const [now] = useState(() => Date.now());
   void installed;
-  const frame = { appBase: "/preview/strelva", hrefs: hrefs(mode), mode, notice };
+  const [ask, setAsk] = useState("");
+  const frame = { appBase: "/preview/strelva", hrefs: hrefs(mode), mode, notice, accountName: "Maya Okafor" };
 
   if (screen === "a1-sign-up") return <AccountDoor kind={state === "business" ? "business" : "agency"} choice={state !== "single-door"} next={state === "business" ? "/workspace/business/new" : "/workspace/agency/start"} requestedNext={null}
-    emailReady signInHref="#sign-in" mode={mode} />;
+    emailReady signInHref="#sign-in" mode={mode} previewSentTo={state === "sent" ? "maya@northstudio.co" : undefined} />;
 
   if (screen === "a2-name-it" || screen === "a3-day-one") {
     const s: AgencyOnboardingState = screen === "a3-day-one" ? { kind: "ready", onboarding: onboarding(state === "later" ? 4 : 0, state === "member" ? "member" : "owner") }
@@ -148,7 +152,7 @@ export function Xa2AgencyDoorPreview({ screen, state, mode }: { screen: Xa2Scree
     const current = state === "claimed" ? listItem({ ownerClaimed: true, pendingClaim: null }) : state === "no-link" ? listItem({ pendingClaim: null }) : listItem();
     return <AgencyFrame agencyName="North Studio" title="Harbor Dental" {...frame} clients={[{ ...sidebarClients(mode)[0]!, current: true }]} signOut={null} active="clients">
       <section style={{ boxSizing: "border-box", maxWidth: 1160, margin: "0 auto", padding: "clamp(24px, 6vw, 96px) clamp(16px, 3vw, 40px) 120px" }}>
-        <AddedClient result={result} agencyWorkspaceId={AGENCY} agencyHref={`${BASE}/a6-every-client?state=ready`} currentClient={current} onAnother={() => undefined} onClaim={() => undefined} />
+        <AddedClient result={result} agencyWorkspaceId={AGENCY} agencyName="North Studio" agencyHref={`${BASE}/a6-every-client?state=ready`} currentClient={current} onAnother={() => undefined} onClaim={() => undefined} linkOrigin={CONTROL_PLANE_URL} />
       </section>
     </AgencyFrame>;
   }
@@ -160,7 +164,9 @@ export function Xa2AgencyDoorPreview({ screen, state, mode }: { screen: Xa2Scree
         onOpen={() => undefined} onRetryPage={() => undefined} onMore={() => undefined} addClientHref={`${BASE}/a4-add-client?state=ready`}
         lastGoodReads={state === "stale" ? new Map([[rows[3]!.workspaceId, { client: everyClientRows("ready")[3]!, readAt: ago(0.5) }]]) : undefined} />;
     return <AgencyFrame agencyName="North Studio" title="Clients" {...frame} clients={state === "empty" ? [] : sidebarClients(mode)} signOut={null} active="clients">
-      <div style={{ boxSizing: "border-box", maxWidth: 1080, margin: "0 auto", padding: "clamp(24px, 6vw, 72px) clamp(16px, 3vw, 40px) 120px" }}>{body}</div>
+      <div style={{ boxSizing: "border-box", maxWidth: 1080, margin: "0 auto", padding: "clamp(24px, 6vw, 72px) clamp(16px, 3vw, 40px) 160px" }}>{body}</div>
+      {/* The agency's composer, as AgencyHome docks it under the client table. */}
+      {state !== "empty" ? <XaComposerDock><XaComposer value={ask} onChange={setAsk} onSubmit={() => setAsk("")} onAdd={() => undefined} placeholder="Ask Strelva about any client" /></XaComposerDock> : null}
     </AgencyFrame>;
   }
 
@@ -168,7 +174,9 @@ export function Xa2AgencyDoorPreview({ screen, state, mode }: { screen: Xa2Scree
   if (screen === "c2-owner") {
     if (state === "plain") return <OwnerClaimPresentation preview={claimPreview} accepted={{ workspaceId: HARBOR, workspaceName: "Harbor Dental", status: "accepted", alreadyAccepted: false }} loading={false} submitting={false} error="" target={target} onAccept={() => undefined} mode={mode} />;
     return <OwnerClaimReviewPresentation preview={claimPreview} load={{ kind: "ready", review }} choices={choices} onChange={setChoices} submitting={false} error="" target={target} onAccept={() => undefined} navigate={() => undefined} mode={mode}
-      accepted={{ workspaceId: HARBOR, workspaceName: "Harbor Dental", status: "accepted", alreadyAccepted: state === "already" }} />;
+      accepted={{ workspaceId: HARBOR, workspaceName: "Harbor Dental", status: "accepted", alreadyAccepted: state === "already",
+        areas: { website: "prepare", inquiries: "prepare", bookings: "prepare", google: "prepare", internal_tools: "prepare" },
+        facts: state === "all-confirmed" ? { confirmed: 4, changed: 0, removed: 0, later: 0, waiting: 0 } : { confirmed: 1, changed: 0, removed: 0, later: 3, waiting: 3 } }} />;
   }
 
   // c1-claim

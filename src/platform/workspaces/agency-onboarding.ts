@@ -63,6 +63,8 @@ export interface AgencyOnboarding extends AgencyOnboardingFacts {
   /** The first step not yet done that this actor can do something about, or null. */
   next: AgencyOnboardingStepId | null;
   verifiedEffects: number;
+  /** Added by the route from the signed-in session: the viewer's first name for the greeting, or null. */
+  viewer?: { firstName: string | null };
 }
 
 export interface AgencySummary { id: string; name: string; role: WorkspaceRole }
