@@ -124,14 +124,14 @@ export function QueuePage({ initialPending, initialResolved, pendingCount: initi
   const list = <div className="flex flex-col gap-4">
     {decisionError ? <DashNote tone="down" role="alert">{decisionError}</DashNote> : null}
     {settled && tab === "pending" ? <XaSays links={settled.action === "approved" ? [<XaTextLink key="history" href={dashboardHref("/dashboard/history")}>See it in History</XaTextLink>] : undefined}>
-      {settled.action === "approved" ? `Made live: ${settled.title}.` : `Skipped: ${settled.title}. Nothing changed on your site.`}
+      {settled.action === "approved" ? `Made live: ${settled.title}.` : `Not yet: ${settled.title}. Nothing changed on your site.`}
     </XaSays> : null}
     {tab === "resolved" && aiHandledThisMonth > 0 ? (
       <p className="m-0 text-[14px] text-[var(--st-text-2)]">Strelva finished {aiHandledThisMonth} update{aiHandledThisMonth === 1 ? "" : "s"} this month.</p>
     ) : null}
     {currentEvents.length === 0 ? (
       tab === "pending" ? <EmptyQueue staleSectionCount={staleSectionCount} recent={resolved.slice(0, 3)} compact={compact} />
-        : <p className="m-0 text-[15px] text-[var(--st-text-2)]">Nothing finished yet. Changes you make live or skip land here.</p>
+        : <p className="m-0 text-[15px] text-[var(--st-text-2)]">Nothing finished yet. Changes you make live, or say not yet to, land here.</p>
     ) : (
       <ul className={queueStyles.list} aria-label={tab === "pending" ? "Needs you" : "Done"}>
         {currentEvents.map((event) => (
@@ -165,7 +165,8 @@ export function QueuePage({ initialPending, initialResolved, pendingCount: initi
   return (
     <DashPage
       title="Needs you."
-      quiet={waitingWords}
+      // Empty, the page's own empty state says it; the headline never says it twice.
+      quiet={pendingCount > 0 || tab !== "pending" ? waitingWords : undefined}
       actions={<XaSegmented label="Which changes" value={tab} onChange={setTab} options={[
         { value: "pending", label: pendingCount > 0 ? `Open ${pendingCount}` : "Open" },
         { value: "resolved", label: resolved.length > 0 ? `Done ${resolved.length}` : "Done" },

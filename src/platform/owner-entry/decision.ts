@@ -49,6 +49,15 @@ export type DashboardRouting =
  * What a `/dashboard` request does for this person. `pathWithSearch` is the
  * trusted path the proxy saw (`/dashboard/reports?view=monthly`). Operators
  * keep `?legacy=1` to stay on the old page; clients never get that.
+ *
+ * October 16, 2026: the legacy dashboard is retired as a second owner app.
+ * Once owner entry sends this person to the workspace, every `/dashboard`
+ * page redirects: to its exact workspace home when that home is on for the
+ * workspace, otherwise to workspace Home (the page's equivalent is not on
+ * yet, and Home is where the business starts). Nothing renders the old page
+ * for a moved person except an operator's `?legacy=1`. A person with no
+ * workspace membership is never moved (decideOwnerEntry), so no redirect
+ * sends anyone somewhere they cannot open.
  */
 export function routeDashboardRequest(input: {
   decision: OwnerEntryDecision;
@@ -68,13 +77,11 @@ export function routeDashboardRequest(input: {
   const gateOn = (flag: DispositionGate) => flag === "ask"
     ? input.askReleased ?? (input.flagOn ? input.flagOn(flag) === true : askReleaseEnabled())
     : input.flagOn?.(flag) === true;
+  if (legacy) return { kind: "render-with-back", homeHref, route, state: entry.state };
   const flagsReady = (entry.requires ?? []).every(gateOn);
-  if (entry.state === "ready" && flagsReady && !legacy) {
-    // A target that wouldn't survive sign-in is never a redirect.
-    const location = workspaceReturnTarget(entry.target(context));
-    if (location) return { kind: "redirect", location, route };
-  }
-  return { kind: "render-with-back", homeHref, route, state: entry.state };
+  // A target that wouldn't survive sign-in is never a redirect; Home always does.
+  const exact = flagsReady ? workspaceReturnTarget(entry.target(context)) : null;
+  return { kind: "redirect", location: exact ?? homeHref, route };
 }
 
 /** Where sign-in, sign-up and the admin root send someone after auth. */

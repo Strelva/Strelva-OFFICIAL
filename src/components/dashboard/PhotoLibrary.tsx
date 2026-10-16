@@ -44,7 +44,8 @@ export function PhotoLibrary() {
   // Fetch assets on mount
   useEffect(() => {
     fetch(apiHref("/api/media"), { credentials: "same-origin" })
-      .then((res) => { if (!res.ok) throw new Error("Photos could not be read."); return res.json(); })
+      // Read the refusal's body too, so the request ends instead of hanging open.
+      .then(async (res) => { if (!res.ok) { await res.text().catch(() => ""); throw new Error("Photos could not be read."); } return res.json(); })
       .then((data) => setAssets(data.assets || []))
       .catch(() => { setAssets([]); setLoadError(true); })
       .finally(() => setLoading(false));

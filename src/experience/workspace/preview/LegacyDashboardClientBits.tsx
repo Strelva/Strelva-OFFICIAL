@@ -2,8 +2,8 @@
 /** Client-only pieces of the legacy dashboard preview (functions cannot cross from the server page). */
 import { useState } from "react";
 import { DashboardErrorView } from "@/components/dashboard/DashboardErrorView";
-import { ConfirmDialog } from "@/components/dashboard/ConfirmDialog";
-import { XaButton } from "@/components/ui/strelva/Xa";
+import { PhotoDetail } from "@/components/dashboard/PhotoDetail";
+import type { MediaAsset } from "@/lib/media";
 import { DashPage } from "@/components/dashboard/xa/DashboardXa";
 import type { ReactNode } from "react";
 import { ChatPageClient } from "@/app/dashboard/chat/ChatPageClient";
@@ -22,16 +22,16 @@ export function LegacyErrorPreview() {
   return <DashboardErrorView onRetry={() => window.location.reload()} />;
 }
 
-/** The dashboard's confirm sheet, opened over the photo library the way a delete opens it. */
+/** Deleting a photo: the real PhotoDetail with its in-place question already asked (no sheet over the page). */
 export function LegacyConfirmPreview() {
-  const [open, setOpen] = useState(true);
-  const [busy, setBusy] = useState(false);
-  return <DashPage title="Photos." quiet="2 photos Strelva can use on your site." actions={<XaButton onClick={() => setOpen(true)}>Delete a photo</XaButton>}>
-    <ConfirmDialog open={open} busy={busy} destructive title="Delete this photo?" confirmLabel="Delete the photo" cancelLabel="Keep it"
-      thumbnail={{ src: "/xa/photo-dentist.webp", alt: "Dr. Lin at work" }}
-      message="It comes off your site and out of your photo library. Pages that used it show the next photo instead."
-      onCancel={() => setOpen(false)} onConfirm={() => { setBusy(true); window.setTimeout(() => { setBusy(false); setOpen(false); }, 900); }} />
-  </DashPage>;
+  const [gone, setGone] = useState(false);
+  return <div className="flex h-full min-h-0 w-full">
+    <DashPage title="Photos." quiet={gone ? "1 photo Strelva can use on your site." : "2 photos Strelva can use on your site."}>
+      <p className="m-0 text-[15px] text-[var(--st-text-2)]">{gone ? "Deleted. Nothing on your site was using it." : "Dr. Lin at work is open beside the library."}</p>
+    </DashPage>
+    {gone ? null : <PhotoDetail askDeleteFirst asset={{ id: "m1", url: "/xa/photo-dentist.webp", filename: "Dr. Lin at work.webp", width: 1200, height: 1680, size: 182_000, createdAt: "2026-11-21T15:00:00.000Z" } as MediaAsset}
+      onClose={() => undefined} onDelete={() => new Promise<void>((resolve) => window.setTimeout(() => { setGone(true); resolve(); }, 700))} />}
+  </div>;
 }
 
 /* ---------- Real client components, fixture props ---------- */

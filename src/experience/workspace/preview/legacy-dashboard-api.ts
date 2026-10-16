@@ -35,7 +35,7 @@ export async function legacyApiFixture(method: string, path: string, query: URLS
     ]);
     case path.startsWith("threads/"): return ok({ id: path.slice(8), messages: [
       { id: "m1", role: "user", content: "Close online booking Thursday and Friday for Thanksgiving.", timestamp: ago(3) },
-      { id: "m2", role: "assistant", content: "Done as a draft: your homepage says you're closed Thursday and Friday, Nov 26 and 27. It waits in Needs you for your yes.", timestamp: ago(2.9) },
+      { id: "m2", role: "assistant", content: "Done as a draft: your homepage says you're closed Thursday and Friday, Nov 26 and 27. It waits on Home for your yes.", timestamp: ago(2.9) },
     ] });
     case path === "media": return state === "error" ? { status: 503, body: { error: "Photos could not be read." } } : ok({ assets: state === "empty" ? [] : [
       { id: "m1", url: "/xa/photo-dentist.webp", filename: "Dr. Lin at work.webp", width: 1200, height: 1680, size: 182_000, createdAt: ago(30) },

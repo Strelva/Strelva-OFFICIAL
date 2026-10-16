@@ -1,9 +1,11 @@
 import { XaLabel, XaLines, XaTextLink } from "@/components/ui/strelva/Xa";
+import { PLACE_LABELS } from "@/platform/presentation/place-labels";
 import type { ActivityEntry } from "@/lib/storage/activity-store";
 import { buildActivityFeed } from "@/lib/activity-feed";
 
 /**
- * "What Strelva did for you" — the owner-facing proof timeline on Today.
+ * What changed (GLOSSARY): the owner-facing proof timeline on Home. Every
+ * line is Strelva's own logged work for this business, so Strelva is the actor.
  *
  * The anti-churn surface: it makes the managed service VISIBLE so the owner
  * sees the work instead of feeling like nothing is happening. Every line comes
@@ -58,14 +60,14 @@ export function ActivityFeed({
 
   return (
     <section className="flex flex-col gap-3" aria-labelledby="activity-feed-label">
-      <XaLabel id="activity-feed-label">What Strelva did</XaLabel>
+      <XaLabel id="activity-feed-label">{PLACE_LABELS.whatChanged}</XaLabel>
       {items.length === 0 ? (
         <p className="m-0 text-[15px] leading-[1.45] text-[var(--st-text-2)]">
           Nothing yet. The first change Strelva makes to your site shows up here, with the time it landed.
         </p>
       ) : (
         <XaLines
-          label="What Strelva did"
+          label={PLACE_LABELS.whatChanged}
           lines={items.map((item) => ({
             time: feedTime(item.time),
             dateTime: item.time,
@@ -74,7 +76,7 @@ export function ActivityFeed({
         />
       )}
       {items.length > 0 && historyHref ? (
-        <p className="m-0 text-[14px]"><XaTextLink href={historyHref}>See everything in History</XaTextLink></p>
+        <p className="m-0 text-[14px]"><XaTextLink href={historyHref}>See everything that changed</XaTextLink></p>
       ) : null}
     </section>
   );

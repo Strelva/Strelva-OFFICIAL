@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
-import { Building2, Eye, EyeOff, Inbox, Plus, Shield, Sun, X } from "lucide-react";
+import { Building2, Eye, EyeOff, Plus, ScrollText, Shield, SquarePen, Sun, X } from "lucide-react";
+import { PLACE_LABELS, XA_PLACE_LABELS } from "@/platform/presentation/place-labels";
 import { XaGlideList, XaSystemTile } from "@/components/ui/strelva/Xa";
 import type { DashboardSurface, SurfaceId } from "@/lib/dashboard-surfaces";
 import { useDashboard } from "./DashboardContext";
@@ -26,8 +27,15 @@ const NAV_LABELS: Partial<Record<SurfaceId, string>> = {
   "google-business": "Google listing",
   schedule: "Bookings",
   roster: "Bookings",
-  analytics: "Visitors",
 };
+/**
+ * October 16: the same places, in the same words, as the workspace sidebar
+ * (XaSidebar): New request, Home (carrying what waits), What changed. The
+ * dashboard has no Requests or Running yet, so they are not drawn. Ask
+ * Strelva is reached through New request; visits and recaps are linked from
+ * Home, as the workspace's Results and Recaps are. Their routes still work.
+ */
+const NOT_A_PLACE: ReadonlySet<SurfaceId> = new Set(["today", "ask-ai", "analytics", "reports"]);
 /** Surfaces that are Systems show their clay; the rest are places with a line icon. */
 const SURFACE_CLAY: Partial<Record<SurfaceId, string>> = {
   website: "website", "google-business": "listing", reviews: "reviews", schedule: "bookings", roster: "bookings", members: "form",
@@ -41,9 +49,11 @@ export function ManagedNavigation({ businessName, pendingCount, isSuperAdmin, vi
   const effectivePath = dashboardBasePath && pathname?.startsWith(dashboardBasePath)
     ? pathname.slice(dashboardBasePath.length) || "/dashboard"
     : pathname || "";
-  const isActive = (item: DashboardSurface) => item.id === "today" ? effectivePath === "/dashboard"
+  const onPlace = (path: string) => effectivePath === path || effectivePath.startsWith(`${path}/`);
+  const isActive = (item: DashboardSurface) => item.id === "today" ? effectivePath === "/dashboard" || onPlace("/dashboard/review")
+    : item.id === "website" ? SURFACE_MATCH.website.some((match) => match !== "/dashboard/history" && effectivePath.startsWith(match))
     : SURFACE_MATCH[item.id].some((match) => effectivePath.startsWith(match)) || (item.id === "schedule" && effectivePath.startsWith("/dashboard/roster"));
-  const places = surfaces.filter((surface) => !SURFACE_CLAY[surface.id]);
+  const places = surfaces.filter((surface) => !SURFACE_CLAY[surface.id] && !NOT_A_PLACE.has(surface.id));
   // Bookings is one System: when the full Bookings page exists, today's roster
   // lives inside it (its Today view), so the rail never shows two bookings rows.
   const hasSchedule = surfaces.some((surface) => surface.id === "schedule");
@@ -55,13 +65,18 @@ export function ManagedNavigation({ businessName, pendingCount, isSuperAdmin, vi
     <div className={styles.navigation}>
       <XaGlideList as="nav" label={`${businessName} website`} className={styles.list}>
         <div className={styles.group} role="group" aria-label="Places">
-          {places.filter((item) => item.id === "today").map((item) => <Link key={item.id} className={styles.item} href={dashboardHref(item.href)} prefetch={false} aria-current={isActive(item) ? "page" : undefined}>
-            <Sun size={17} strokeWidth={1.7} aria-hidden="true" /><span className={styles.label}>{NAV_LABELS[item.id] ?? item.label}</span>
-          </Link>)}
-          {pendingCount > 0 && <Link className={styles.item} href={dashboardHref("/dashboard/review")} prefetch={false} aria-current={effectivePath === "/dashboard/review" || effectivePath.startsWith("/dashboard/review/") ? "page" : undefined} aria-label={`Needs you, ${pendingCount} waiting`}>
-            <Inbox size={17} strokeWidth={1.7} aria-hidden="true" /><span className={styles.label}>Needs you</span><span className={styles.count} aria-hidden="true"><span className={styles.dot} />{pendingCount > 99 ? "99+" : pendingCount}</span>
-          </Link>}
-          {places.filter((item) => item.id !== "today").map((item) => {
+          <Link className={styles.item} href={dashboardHref("/dashboard/chat")} prefetch={false} aria-current={onPlace("/dashboard/chat") ? "page" : undefined}>
+            <SquarePen size={17} strokeWidth={1.7} aria-hidden="true" /><span className={styles.label}>{XA_PLACE_LABELS.newRequest}</span>
+          </Link>
+          <Link className={styles.item} href={dashboardHref("/dashboard")} prefetch={false} aria-current={effectivePath === "/dashboard" || onPlace("/dashboard/review") ? "page" : undefined}
+            aria-label={pendingCount > 0 ? `${PLACE_LABELS.home}, ${pendingCount} ${pendingCount === 1 ? "thing waits" : "things wait"} for you` : undefined}>
+            <Sun size={17} strokeWidth={1.7} aria-hidden="true" /><span className={styles.label}>{PLACE_LABELS.home}</span>
+            {pendingCount > 0 ? <span className={styles.count} aria-hidden="true"><span className={styles.dot} />{pendingCount > 99 ? "99+" : pendingCount}</span> : null}
+          </Link>
+          <Link className={styles.item} href={dashboardHref("/dashboard/history")} prefetch={false} aria-current={onPlace("/dashboard/history") ? "page" : undefined}>
+            <ScrollText size={17} strokeWidth={1.7} aria-hidden="true" /><span className={styles.label}>{PLACE_LABELS.whatChanged}</span>
+          </Link>
+          {places.map((item) => {
             const Icon = SURFACE_ICONS[item.id];
             return <Link key={item.id} className={styles.item} href={dashboardHref(item.href)} prefetch={false} aria-current={isActive(item) ? "page" : undefined} title={item.preview ? "Not on for this business: operator preview" : undefined}>
               <Icon size={17} strokeWidth={1.7} aria-hidden="true" /><span className={styles.label}>{NAV_LABELS[item.id] ?? item.label}</span>{aside(item)}
@@ -76,7 +91,7 @@ export function ManagedNavigation({ businessName, pendingCount, isSuperAdmin, vi
         </div> : null}
         <div className={styles.group} role="group" aria-label="Business details">
           <Link className={styles.item} href={dashboardHref("/dashboard/settings")} prefetch={false} aria-current={effectivePath.startsWith("/dashboard/settings") ? "page" : undefined}>
-            <Building2 size={17} strokeWidth={1.7} aria-hidden="true" /><span className={styles.label}>Business details</span>
+            <Building2 size={17} strokeWidth={1.7} aria-hidden="true" /><span className={styles.label}>{PLACE_LABELS.businessDetails}</span>
           </Link>
         </div>
       </XaGlideList>

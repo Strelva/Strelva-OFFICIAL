@@ -42,7 +42,7 @@ describe("QueuePage approval-with-diff", () => {
       ]),
     );
 
-    expect(html).toContain("What changed");
+    expect(html).toContain("The change");
     // changed → both sides shown
     expect(html).toContain("Old headline");
     expect(html).toContain("New headline");
@@ -58,7 +58,7 @@ describe("QueuePage approval-with-diff", () => {
 
   it("does not render a diff block when the event carries no diffs", () => {
     const html = render(contentEvent([]));
-    expect(html).not.toContain("What changed");
+    expect(html).not.toContain("The change");
   });
 
   it("caps the visible rows and reports the overflow count", () => {
@@ -69,7 +69,7 @@ describe("QueuePage approval-with-diff", () => {
       type: "changed" as const,
     }));
     const html = render(contentEvent(many));
-    expect(html).toContain("What changed");
+    expect(html).toContain("The change");
     // 9 changes, 6 shown → "+3 more fields changed"
     expect(html).toContain("more field");
   });

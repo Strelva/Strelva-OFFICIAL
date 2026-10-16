@@ -89,7 +89,7 @@ export function GoogleBusinessPanel({ connected, state }: { connected: boolean; 
           ) : (
             <p className={styles.quiet}>No posts yet. Ask Strelva to write one from a recent update; it posts after your yes.</p>
           )}
-          <XaSays>Every change to your listing waits in Needs you. Nothing reaches Google without your yes.</XaSays>
+          <XaSays>Every change to your listing waits on Home. Nothing reaches Google without your yes.</XaSays>
         </section>
       </div>
     </DashPage>

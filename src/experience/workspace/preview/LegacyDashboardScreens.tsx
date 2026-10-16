@@ -54,7 +54,7 @@ function today(state: LegacyState) {
     suggestion={state === "ready" ? { title: "Add a page for same-week emergency visits", prompt: "Add a page for same-week emergency visits" } : null}
     leads={legacyLeads(state)}
     retentionSignals={legacyRetention()}
-    hrefs={{ reports: href("/dashboard/reports"), history: href("/dashboard/history"), leads: href("/dashboard/leads"), site: href("/dashboard/site"), live: null }}
+    hrefs={{ reports: href("/dashboard/reports"), analytics: href("/dashboard/analytics"), history: href("/dashboard/history"), leads: href("/dashboard/leads"), site: href("/dashboard/site"), live: null }}
   />;
 }
 

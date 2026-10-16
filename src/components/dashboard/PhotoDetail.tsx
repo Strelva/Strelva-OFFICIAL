@@ -2,8 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { X } from "lucide-react";
-import { XaButton, XaIconButton, XaTextLink } from "@/components/ui/strelva/Xa";
-import { ConfirmDialog } from "@/components/dashboard/ConfirmDialog";
+import { XaButton, XaIconButton, XaTextLink, XaYes } from "@/components/ui/strelva/Xa";
 import type { MediaAsset } from "@/lib/media";
 import { photoCaption } from "@/lib/media";
 
@@ -11,11 +10,18 @@ interface PhotoDetailProps {
   asset: MediaAsset | null;
   onClose: () => void;
   onDelete?: (asset: MediaAsset) => Promise<void> | void;
+  /** Previews only: open with the delete question already asked. */
+  askDeleteFirst?: boolean;
 }
 
-export function PhotoDetail({ asset, onClose, onDelete }: PhotoDetailProps) {
+/**
+ * One photo, beside the library. Deleting asks its one question in place
+ * (XaYes `question`), never in a sheet over the page: the photo stays in view
+ * while the owner decides, and "Keep it" backs out.
+ */
+export function PhotoDetail({ asset, onClose, onDelete, askDeleteFirst = false }: PhotoDetailProps) {
   const [copied, setCopied] = useState(false);
-  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(askDeleteFirst);
   const [deleting, setDeleting] = useState(false);
   const [prevAssetId, setPrevAssetId] = useState(asset?.id);
 
@@ -27,16 +33,17 @@ export function PhotoDetail({ asset, onClose, onDelete }: PhotoDetailProps) {
     setDeleting(false);
   }
 
-  // Close on Escape, unless the delete sheet is open: then Escape belongs to
-  // the sheet, which closes and hands focus back to "Delete photo".
+  // Escape backs out of the delete question first, then closes the photo.
   useEffect(() => {
-    if (!asset || confirmingDelete) return;
+    if (!asset) return;
     const handler = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && !document.querySelector("dialog[open]")) onClose();
+      if (e.key !== "Escape" || deleting) return;
+      if (confirmingDelete) setConfirmingDelete(false);
+      else onClose();
     };
     document.addEventListener("keydown", handler);
     return () => document.removeEventListener("keydown", handler);
-  }, [asset, onClose, confirmingDelete]);
+  }, [asset, onClose, confirmingDelete, deleting]);
 
   const handleCopy = async () => {
     if (!asset) return;
@@ -69,27 +76,28 @@ export function PhotoDetail({ asset, onClose, onDelete }: PhotoDetailProps) {
       </div>
       <img src={asset.url} alt={caption} className="max-h-[300px] w-full rounded-[var(--st-r-md)] object-contain" />
       <p className="m-0 text-[14px] text-[var(--st-text-2)]">Ask Strelva to put it on any part of your site, or copy its address.</p>
-      <div className="flex flex-wrap items-center gap-4">
-        <XaButton onClick={handleCopy}>{copied ? "Copied" : "Copy address"}</XaButton>
-        {onDelete ? <XaTextLink onClick={() => setConfirmingDelete(true)}>Delete photo</XaTextLink> : null}
-      </div>
+      {confirmingDelete && onDelete ? (
+        <XaYes
+          state="waiting"
+          question="Delete this photo? It comes out of your photo library, and any part of your site still using it loses the image."
+          yesLabel="Delete the photo"
+          notYetLabel="Keep it"
+          onYes={() => void handleConfirmDelete()}
+          onNotYet={() => setConfirmingDelete(false)}
+          disabled={deleting}
+          block={false}
+        />
+      ) : (
+        <div className="flex flex-wrap items-center gap-4">
+          <XaButton onClick={handleCopy}>{copied ? "Copied" : "Copy address"}</XaButton>
+          {onDelete ? <XaTextLink onClick={() => setConfirmingDelete(true)}>Delete photo</XaTextLink> : null}
+        </div>
+      )}
     </div>
   );
 
   return (
     <>
-      <ConfirmDialog
-        open={confirmingDelete}
-        title="Delete this photo?"
-        message="It comes out of your photo library. Any part of your site still using it loses the image."
-        thumbnail={{ src: asset.url, alt: caption }}
-        confirmLabel="Delete the photo"
-        destructive
-        busy={deleting}
-        onConfirm={handleConfirmDelete}
-        onCancel={() => setConfirmingDelete(false)}
-      />
-
       {/* Desktop: the photo opens beside the library */}
       <div className="hidden w-[340px] shrink-0 flex-col overflow-y-auto border-l border-[var(--st-line)] bg-[var(--st-surface)] md:flex">
         {detail}

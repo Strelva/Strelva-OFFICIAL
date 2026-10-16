@@ -95,12 +95,12 @@ export function ConnectionsPage() {
 
   useEffect(() => {
     Promise.allSettled([
-      fetch(apiHref("/api/tenant-settings"), { credentials: "same-origin" }).then((r) => {
-        if (!r.ok) throw new Error("Failed to load tenant settings");
+      fetch(apiHref("/api/tenant-settings"), { credentials: "same-origin" }).then(async (r) => {
+        if (!r.ok) { await r.text().catch(() => ""); throw new Error("Failed to load tenant settings"); }
         return r.json();
       }),
-      fetch(apiHref("/api/connections"), { credentials: "same-origin" }).then((r) => {
-        if (!r.ok) throw new Error("Failed to load connections");
+      fetch(apiHref("/api/connections"), { credentials: "same-origin" }).then(async (r) => {
+        if (!r.ok) { await r.text().catch(() => ""); throw new Error("Failed to load connections"); }
         return r.json();
       }),
     ])
@@ -201,7 +201,8 @@ export function ConnectionsPage() {
   return (
     <DashPage
       title="Connections."
-      quiet={`${connectedCount} of ${totalCount} connected.`}
+      // A sentence, not a score: "1 of 5" read as a progress meter.
+      quiet={connectedCount === 0 ? "Nothing is connected yet." : connectedCount === totalCount ? "Everything is connected." : connectedCount === 1 ? "One is connected so far." : `${connectedCount} are connected so far.`}
       lede="Each one lets Strelva see or do a little more for you."
       actions={<label className="flex min-h-[40px] w-full items-center gap-2 rounded-full border border-[var(--st-line)] bg-[var(--st-surface)] px-4 sm:w-[240px]">
         <Search className="h-4 w-4 shrink-0 text-[var(--st-text-3)]" strokeWidth={1.7} aria-hidden="true" />

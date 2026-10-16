@@ -17,6 +17,12 @@ import { workspaceSiteHref, type SiteTab } from "@/platform/workspaces/site-plac
  *
  * Every `src/app/dashboard/**\/page.tsx` has an entry; a test fails otherwise.
  * Every target passes `workspaceReturnTarget`, so it survives sign-in.
+ *
+ * October 16, 2026 (legacy dashboard retired): every page is `ready`. For a
+ * moved person a page whose gates are off, or a `stay`/`frozen` page should
+ * one come back, redirects to workspace Home instead of rendering
+ * (routeDashboardRequest). Only tenants with no workspace, and people with no
+ * membership in the linked workspace, still see `/dashboard`.
  */
 
 export type DispositionState = "ready" | "stay" | "retire" | "frozen";
@@ -195,8 +201,8 @@ export const DASHBOARD_DISPOSITIONS: readonly DashboardDisposition[] = [
       "Reads the tenant review store, not the Publishing listing receipts (src/products/google-listing), which stay behind STRELVA_PUBLISHING_RELEASE.",
     ],
     target: (c) => workspacePlace("reviews", c.workspaceId) },
-  { route: "/settings", home: "Business menu: Business details (/workspace/business-details), People & access, account, plan", state: "stay", use: "always", retainedAtLaunch: true,
-    note: "Settings intentionally stays on /dashboard at launch, preserving branding, site basics and domain editing. It has a Back to business link and does not block owner entry.",
+  { route: "/settings", home: "Business menu: Business details (/workspace/business-details), People & access, account, plan", state: "ready", use: "always",
+    note: "October 16: retired with the rest of /dashboard. Until October 16 Settings stayed on /dashboard to keep branding, site basics and domain editing; those now say Strelva handles them on request.",
     parityGaps: [
       "Edits only business name, phone, public email, description and who gets Strelva's emails, in the business record; the tenant's site profile fields (tagline, main button, footer) don't change from here.",
       "No branding, site basics, navigation, connected services or domains editing; those sections say Strelva handles them on request.",

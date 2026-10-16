@@ -1,18 +1,13 @@
 "use client";
 
-import { usePathname } from "next/navigation";
-import { useEffect, useRef, useState, type ReactNode } from "react";
-import { MessageCircle } from "lucide-react";
-import { XaButton } from "@/components/ui/strelva/Xa";
+import { useState, type ReactNode } from "react";
 import { DashNote, DashShellNotes } from "./xa/DashboardXa";
-import { useHydrationReady } from "@/experience/app-frame";
 import { StrelvaShell } from "@/experience/app-frame/StrelvaShell";
 import { MANAGED_WEBSITES_LABEL } from "@/products/managed-presence";
 import { RELATIONSHIP_STATUS_LABELS } from "@/platform/relationships";
 import { ManagedNavigation } from "./ManagedNavigation";
 import { PropertySwitcher } from "./PropertySwitcher";
 import { SectionSubNav } from "./SectionSubNav";
-import { ChatPanel } from "./ChatPanel";
 import { useDashboard } from "./DashboardContext";
 
 interface ConversationShellProps {
@@ -37,6 +32,12 @@ interface ConversationShellProps {
   notes?: ReactNode;
 }
 
+/**
+ * The shell for a tenant with no business workspace (every linked tenant is
+ * redirected into the workspace; see routeDashboardRequest). October 16: one
+ * way to ask, as in the workspace: New request in the sidebar opens the full
+ * conversation, and Home has its composer. No header button or side chat.
+ */
 export function ConversationShell({
   children, businessName, accountName, accountEmail, isSuperAdmin = false,
   pendingCount = 0, hasStore = false, inspect = false, inspectTenantName,
@@ -44,20 +45,7 @@ export function ConversationShell({
 }: ConversationShellProps) {
   // Cosmetic client preview does not change the actor or server authorization.
   const [viewAsClient, setViewAsClient] = useState(false);
-  const [discussionOpen, setDiscussionOpen] = useState(false);
-  const hydrationReady = useHydrationReady();
-  const pathname = usePathname();
-  const discussionTriggerRef = useRef<HTMLButtonElement>(null);
-  const { tenantId, dashboardBasePath, dashboardHref, impersonation, relationship } = useDashboard();
-  const effectivePathname = dashboardBasePath && pathname?.startsWith(dashboardBasePath)
-    ? pathname.slice(dashboardBasePath.length) || "/dashboard" : pathname || "";
-  const isChatRoute = effectivePathname === "/dashboard/chat" || effectivePathname.startsWith("/dashboard/chat/");
-
-  useEffect(() => {
-    if (!isChatRoute) return;
-    const frame = window.requestAnimationFrame(() => setDiscussionOpen(false));
-    return () => window.cancelAnimationFrame(frame);
-  }, [isChatRoute]);
+  const { tenantId, dashboardHref, impersonation, relationship } = useDashboard();
 
   const relationshipLabel = relationship && relationship.status !== "user" ? RELATIONSHIP_STATUS_LABELS[relationship.status] : null;
 
@@ -87,22 +75,9 @@ export function ConversationShell({
       navigation={<ManagedNavigation businessName={businessName} pendingCount={pendingCount} isSuperAdmin={isSuperAdmin} viewAsClient={viewAsClient} onToggleViewAsClient={() => setViewAsClient((value) => !value)} appBase={appBase} />}
       contentId="main-content"
       notice={shellNotes}
-      actions={!isChatRoute ? <XaButton
-        ref={discussionTriggerRef} size="sm" onClick={() => setDiscussionOpen((open) => !open)} disabled={!hydrationReady}
-        aria-expanded={discussionOpen} aria-controls="managed-discussion"
-      ><MessageCircle size={15} aria-hidden="true" />Ask Strelva</XaButton> : undefined}
-      rightRail={!isChatRoute ? <OptionalManagedDiscussion open={discussionOpen} ownerName={accountName} /> : undefined}
-      rightRailOpen={!isChatRoute && discussionOpen}
-      onCloseRightRail={() => setDiscussionOpen(false)}
-      rightRailTriggerRef={discussionTriggerRef}
     >
       <SectionSubNav hasStore={hasStore} />
       <div className="flex min-h-0 flex-1">{children}</div>
     </StrelvaShell>
   );
-}
-
-/** Keep the tenant conversation dormant until requested; never mount two chats. */
-function OptionalManagedDiscussion({ open, ownerName }: { open: boolean; ownerName: string }) {
-  return open ? <ChatPanel ownerName={ownerName} variant="compact" /> : null;
 }

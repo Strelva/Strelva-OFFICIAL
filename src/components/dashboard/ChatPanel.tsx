@@ -735,7 +735,7 @@ export function ChatPanel({ threadId, ownerName, onThreadCreated, variant = "ful
             {drafted && !isLoading ? (
               <div className={compact ? "" : "pl-10"}>
                 <XaRows label="What this made">
-                  <XaRow lead={queueLead(drafted, 32)} title={drafted.title} detail="Waits for your yes in Needs you" tone="waits"
+                  <XaRow lead={queueLead(drafted, 32)} title={drafted.title} detail="Waits for your yes on Home" tone="waits"
                     action={<XaTextLink href={needsYouHref} aria-label={`See it: ${drafted.title}`}>See it</XaTextLink>} />
                 </XaRows>
               </div>

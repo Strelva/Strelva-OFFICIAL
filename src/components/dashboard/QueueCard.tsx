@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import type { UnifiedEvent } from "@/lib/types";
-import type { ReactNode } from "react";
 import { XaButton, XaLabel, XaPage, XaPageChange, XaPebbleAvatar, XaStatus, XaSystemTile, XaTextLink, XaYes } from "@/components/ui/strelva/Xa";
 import type { PreviewDiff } from "@/lib/agent-risk";
 import { UseAsTestimonialModal } from "./UseAsTestimonialModal";
@@ -12,9 +11,9 @@ import styles from "./queue.module.css";
 /**
  * One thing that waits, as an open row (XA · O5). Opened, it becomes the
  * decision in place: the page as visitors will see it with the new words
- * tinted, then the one yes (XA · O3). Beside the yes sit two text links with
- * what each one does: "Not now" closes it and keeps it waiting, "Skip" turns
- * it down and nothing changes.
+ * tinted, then the one yes (XA · O3) with the workspace's one way out, "Not
+ * yet": it turns the change down and nothing on the site changes, as Not yet
+ * does on workspace Home. Closing the row keeps it waiting.
  */
 
 // Owner-facing label for an event's source, never the raw internal slug.
@@ -53,7 +52,7 @@ export function formatEventStatus(event: UnifiedEvent): string {
       : "Made live";
   }
   if (event.status === "auto_approved") return "Handled";
-  if (event.status === "dismissed") return "Skipped";
+  if (event.status === "dismissed") return "Not yet";
   return "Waits for you";
 }
 
@@ -163,7 +162,7 @@ export function QueueChange({ event, domain }: { event: UnifiedEvent; domain: st
   const shown = diffs.slice(0, MAX_DIFF_ROWS);
   const extra = diffs.length - shown.length;
   return <div className={styles.change}>
-    <XaLabel>What changed</XaLabel>
+    <XaLabel>The change</XaLabel>
     <XaPage address={pageAddress(event, domain)} flat>
       {shown.map((d, i) => <div key={`${d.field}-${i}`} className={styles.diff}>
         <span className={styles.diffField}>{d.field}</span>
@@ -250,13 +249,11 @@ export function QueueCard({ event, onApprove, onDismiss, onWorkflowAction, disab
             state={disabled ? "going" : "waiting"}
             yesLabel={isSuggestion ? "Use this idea" : "Make it live"}
             onYes={() => onApprove(event.id)}
+            onNotYet={() => onDismiss(event.id)}
+            notYetAriaLabel={`Not yet: ${event.title}. Nothing on your site changes.`}
             block={false}
           />
-          <DecisionLinks
-            onNotNow={onOpenChange ? () => onOpenChange(false) : undefined}
-            onSkip={() => onDismiss(event.id)}
-            extra={isReview && reviewData ? <XaTextLink onClick={() => setTestimonialModalOpen(true)}>Put this review on your site</XaTextLink> : null}
-          />
+          {isReview && reviewData ? <p className={styles.links}><XaTextLink onClick={() => setTestimonialModalOpen(true)}>Put this review on your site</XaTextLink></p> : null}
         </div>
       ) : null}
 
@@ -291,14 +288,4 @@ export function QueueCard({ event, onApprove, onDismiss, onWorkflowAction, disab
       )}
     </div>
   );
-}
-
-/** The two ways out of a decision, each saying what it does. */
-function DecisionLinks({ onNotNow, onSkip, extra }: { onNotNow?: () => void; onSkip: () => void; extra?: ReactNode }) {
-  return <p className={styles.links}>
-    {onNotNow ? <><XaTextLink onClick={onNotNow}>Not now</XaTextLink> · </> : null}
-    <XaTextLink onClick={onSkip}>Skip</XaTextLink>
-    <span className={styles.linksWhy}>{onNotNow ? "Not now keeps it here for later. " : ""}Skip turns it down and nothing on your site changes.</span>
-    {extra ? <span className={styles.linksExtra}>{extra}</span> : null}
-  </p>;
 }
