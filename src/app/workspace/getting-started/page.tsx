@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { redirect } from "next/navigation";
-import { StrelvaShell } from "@/experience/app-frame/StrelvaShell";
+import { XaButtonLink, XaEntry, XaHeadline, XaSays } from "@/components/ui/strelva/Xa";
+import { entryAccountName } from "@/experience/getting-started/entry-account";
 import { GettingStarted } from "@/experience/getting-started/GettingStarted";
 import { businessSignupReleaseEnabled, gettingStartedHref } from "@/platform/business-signup-release";
 import { getSessionUser } from "@/platform/infra/db/server-client";
@@ -37,22 +37,21 @@ export default async function GettingStartedPage({ searchParams }: { searchParam
     return { business, google, connect, check: check?.workspaceId === workspaceId && ["website_audit", "ai_visibility"].includes(check.productId) ? check.id : null };
   });
   const home = `/workspace?${new URLSearchParams({ workspaceId })}`;
-  // Content goes straight into the shell (as Help does); an extra scroll wrapper squeezes the sidebar.
-  return <StrelvaShell title="Getting started" workspaceId={workspaceId} accountName={user.email}>
-      {state.kind === "ready" ? <GettingStarted business={state.data.business} links={{
-        home,
-        details: `/workspace/business-details?${new URLSearchParams({ workspaceId })}`,
-        agency: `/workspace?${new URLSearchParams({ workspaceId, view: "help" })}`,
-        // L4 owns the fresh Connect Google start there and brings the owner back here.
-        google: state.data.google ? `/workspace/google?${new URLSearchParams({ workspaceId, returnTo: gettingStartedHref(workspaceId) })}` : null,
-        connect: state.data.connect ? `/workspace/site?${new URLSearchParams({ workspaceId, entry: "connect" })}` : null,
-        check: state.data.check ? `/workspace?${new URLSearchParams({ workspaceId, view: "work", work: state.data.check })}` : null,
-        request: requestId ? `/workspace/delivery/${requestId}` : null,
-      }} />
-        : <div className="mx-auto w-full max-w-2xl px-4 py-12 md:px-8">
-          <h1 className="font-display text-[24px] font-medium">{state.kind === "permission" ? "This business isn't available to your account." : "Getting started couldn't open just now."}</h1>
-          <p className="mt-3 text-[15px] leading-6 text-gray-muted">{state.kind === "permission" ? "Sign in with the account that owns it, or ask its owner to invite you." : "Nothing changed. Try again in a moment."}</p>
-          <Link className="mt-4 inline-block underline underline-offset-4" href="/workspace">Go to your workspace</Link>
-        </div>}
-  </StrelvaShell>;
+  const account = entryAccountName(user);
+  // XA · B3–B5 live in the entry frame: the business is new and its workspace comes after this.
+  if (state.kind !== "ready") return <XaEntry account={account} stage={{ pose: "fixing", label: "Pebble looking into it", title: "Nothing changed.", body: "Your business and its details are as you left them." }}>
+    <XaHeadline>{state.kind === "permission" ? "This business isn't available to your account." : "Getting started couldn't open just now."}</XaHeadline>
+    <div role="alert"><XaSays>{state.kind === "permission" ? "Sign in with the account that owns it, or ask its owner to invite you." : "Nothing changed. Try again in a moment."}</XaSays></div>
+    <XaButtonLink href={state.kind === "permission" ? "/workspace" : gettingStartedHref(workspaceId, requestId, checkWorkId)} variant="primary" size="lg" block>{state.kind === "permission" ? "Go to your workspace" : "Try again"}</XaButtonLink>
+  </XaEntry>;
+  return <GettingStarted account={account} business={state.data.business} links={{
+    home,
+    details: `/workspace/business-details?${new URLSearchParams({ workspaceId })}`,
+    agency: `/workspace?${new URLSearchParams({ workspaceId, view: "help" })}`,
+    // L4 owns the fresh Connect Google start there and brings the owner back here.
+    google: state.data.google ? `/workspace/google?${new URLSearchParams({ workspaceId, returnTo: gettingStartedHref(workspaceId) })}` : null,
+    connect: state.data.connect ? `/workspace/site?${new URLSearchParams({ workspaceId, entry: "connect" })}` : null,
+    check: state.data.check ? `/workspace?${new URLSearchParams({ workspaceId, view: "work", work: state.data.check })}` : null,
+    request: requestId ? `/workspace/delivery/${requestId}` : null,
+  }} />;
 }

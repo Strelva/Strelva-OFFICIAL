@@ -1,32 +1,44 @@
 "use client";
 
 /**
- * Supabase sign-in (migration Phase 4) — replaces Clerk's <SignIn> when the
- * Supabase auth path is active. Google OAuth (the primary method) + email
- * magic-link fallback. Both redirect through /auth/callback, which exchanges the
- * code for a session; the handle_new_user trigger provisions the user on first
- * sign-in.
+ * Supabase sign-in: Google OAuth and, once email delivery is qualified, an
+ * email sign-in link. Both return through /auth/callback, which exchanges the
+ * code for a session; the handle_new_user trigger provisions the user on
+ * first sign-in.
+ *
+ * XA (Pen XA · B1): one ink pill (the email link when email is ready,
+ * otherwise Google), the other method as a white pill, and bad news said by
+ * Pebble in one sentence. The sent state stays in place (no modal) and names
+ * the address, with Send again and Use a different email as text links.
  */
 
-import { StField, StHead, StMono, StPill, StPillLink, StTextButton, StNotice } from "@/components/ui/strelva/Kit";
 import { useState, type ReactNode } from "react";
+import { XaButton, XaButtonLink, XaField, XaHeadline, XaLede, XaSays, XaTextLink } from "@/components/ui/strelva/Xa";
 import { signInErrorCopy } from "./sign-in-errors";
 import { createBrowserSupabase } from "@/platform/infra/db/browser-client";
+
+/** Preview harnesses only: open already sent, or already failed. */
+export type SupabaseSignInInitial = { status: "sent" } | { error: string };
 
 export function SupabaseSignIn({
   next = "/account",
   prefillEmail = "",
   heading,
   emailReady = false,
+  emailLabel = "Email",
+  initial,
 }: {
   next?: string;
   prefillEmail?: string;
   heading?: ReactNode;
   emailReady?: boolean;
+  /** "Work email" on the business door. */
+  emailLabel?: string;
+  initial?: SupabaseSignInInitial;
 }) {
   const [email, setEmail] = useState(prefillEmail);
-  const [status, setStatus] = useState<"idle" | "google" | "sending" | "sent" | "error">("idle");
-  const [error, setError] = useState<string | null>(null);
+  const [status, setStatus] = useState<"idle" | "google" | "sending" | "sent" | "error">(initial ? "status" in initial ? "sent" : "error" : "idle");
+  const [error, setError] = useState<string | null>(initial && "error" in initial ? initial.error : null);
 
   function redirectTo() {
     if (typeof window === "undefined") return undefined;
@@ -62,21 +74,26 @@ export function SupabaseSignIn({
     setStatus("error");
   }
 
-  if (status === "sent") return <div className="flex flex-col gap-5">
-    <StHead title="Check your email" meta="We sent a sign-in link to" />
-    <StMono tone="text">{email}</StMono>
-    <p className="text-sm text-gray-muted">Open it on this device to continue.</p>
-    <div className="flex flex-wrap gap-3"><StPillLink href="https://mail.google.com" variant="soft">Open Gmail</StPillLink><StPillLink href="https://outlook.live.com/mail" variant="soft">Open Outlook</StPillLink></div>
-    <div className="flex flex-wrap gap-5"><StTextButton tone="accent" onClick={() => void sendMagicLink()}>Send again</StTextButton><StTextButton tone="accent" onClick={() => { setEmail(""); setStatus("idle"); }}>Use a different email</StTextButton></div>
+  if (status === "sent") return <div className="flex flex-col gap-[22px]" data-xa-sign-in="sent">
+    <XaHeadline>Check your email</XaHeadline>
+    <XaLede>We sent a sign-in link to <strong className="font-medium text-[var(--st-text)]">{email}</strong>. Open it on this device to continue.</XaLede>
+    <div className="flex flex-wrap gap-2">
+      <XaButtonLink href="https://mail.google.com" target="_blank" rel="noopener noreferrer">Open Gmail</XaButtonLink>
+      <XaButtonLink href="https://outlook.live.com/mail" target="_blank" rel="noopener noreferrer">Open Outlook</XaButtonLink>
+    </div>
+    <p className="m-0 flex flex-wrap gap-x-2 text-[14px] leading-5 text-[var(--st-text-2)]">
+      No email after a minute? <XaTextLink onClick={() => void sendMagicLink()}>Send again</XaTextLink><span aria-hidden="true">·</span><XaTextLink onClick={() => { setEmail(""); setStatus("idle"); }}>Use a different email</XaTextLink>
+    </p>
   </div>;
 
-  return <div className="flex flex-col gap-5">
+  const busy = status === "sending" || status === "google";
+  return <div className="flex flex-col gap-[22px]" data-xa-sign-in="form">
     {heading}
-    {emailReady ? <form onSubmit={sendMagicLink} className="flex flex-col gap-5">
-      <StField label="Email"><input type="email" required autoComplete="email" value={email} onChange={event => setEmail(event.target.value)} placeholder="you@business.com" disabled={status === "sending" || status === "google"} /></StField>
-      <StPill type="submit" block busy={status === "sending"} disabled={status === "google"}>Email me a sign-in link</StPill>
+    {emailReady ? <form onSubmit={sendMagicLink} className="flex flex-col gap-[22px]">
+      <XaField label={emailLabel} type="email" required autoComplete="email" inputMode="email" spellCheck={false} autoCapitalize="none" value={email} onChange={event => setEmail(event.target.value)} placeholder="you@yourbusiness.com" disabled={busy} />
+      <XaButton type="submit" variant="primary" size="lg" block busy={status === "sending"} disabled={status === "google"}>Email me a sign-in link</XaButton>
     </form> : null}
-    <StPill variant="soft" block onClick={() => void signInWithGoogle()} busy={status === "google"} disabled={status === "sending"}>Continue with Google</StPill>
-    {error ? <StNotice tone="critical">{error}</StNotice> : null}
+    <XaButton variant={emailReady ? "secondary" : "primary"} size="lg" block onClick={() => void signInWithGoogle()} busy={status === "google"} disabled={status === "sending"}>Continue with Google</XaButton>
+    {error ? <div role="alert"><XaSays>{error}</XaSays></div> : null}
   </div>;
 }

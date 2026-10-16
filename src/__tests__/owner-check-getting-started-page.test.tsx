@@ -41,7 +41,8 @@ describe("owner check first-run page", () => {
     const html = renderToStaticMarkup(await page());
     expect(html).toContain(`href="/workspace?workspaceId=${workspaceId}&amp;view=work&amp;work=${check}"`);
     expect(html).toContain("Open saved check");
-    expect(html).toContain("https://juniper.example/");
+    // The owner sees the address they would type, never a scheme.
+    expect(html).toContain('value="juniper.example"');
     expect(mocks.work).toHaveBeenCalledWith({ userId, verifiedEmail: "owner@example.test" }, check);
   });
   it.each(["other_business", "not_a_check", "access_refused", "missing"])("withholds the saved-check link for %s", async condition => {

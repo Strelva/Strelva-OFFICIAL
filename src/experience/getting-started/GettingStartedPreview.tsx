@@ -1,7 +1,6 @@
 "use client";
 
 import { useMemo } from "react";
-import { StrelvaShell } from "@/experience/app-frame/StrelvaShell";
 import { WorkspaceRequestContext } from "@/experience/workspace/WorkspaceRequest";
 import type { FoundFact } from "@/products/getting-started/contracts";
 import { GettingStarted } from "./GettingStarted";
@@ -38,9 +37,7 @@ export function GettingStartedPreview({ state, mode = "light" }: { state: string
   const links = { home: "#home", details: "#details", agency: "#agency", google: state === "closed" ? null : "#google", connect: state === "closed" ? null : "#connect", request: state === "request" ? "#request" : null };
   return <div data-workspace-theme="linen" data-workspace-mode={mode}>
     <WorkspaceRequestContext.Provider value={transport}>
-      <StrelvaShell title="Getting started" context={<span>Northside Bakery</span>} accountName="Maya Ortiz" accountDetail="Owner">
-          <GettingStarted key={state} business={{ workspaceId: BUSINESS, name: "Northside Bakery", website: state === "no-website" ? null : "https://northside-bakery.example/", canConfirm: state !== "member", revision: 2, waiting: [] }} links={links} />
-      </StrelvaShell>
+      <GettingStarted key={state} account="Maya Ortiz" mode={mode === "dark" ? "dark" : "light"} business={{ workspaceId: BUSINESS, name: "Northside Bakery", website: state === "no-website" ? null : "https://northside-bakery.example/", canConfirm: state !== "member", revision: 2, waiting: [] }} links={links} />
       {check ? <StartBusinessFromCheck resultId="scan_preview" workspaceName="Maya's workspace" savingHere={false} saveHereError="" onSaveHere={() => undefined} onClose={() => undefined} /> : null}
     </WorkspaceRequestContext.Provider>
     <p className="px-6 pb-6 text-xs text-gray-muted">Fictional preview · nothing is read, created or saved.</p>
