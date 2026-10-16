@@ -53,7 +53,7 @@ describe("agency Library ready Version selection", () => {
     const request = vi.fn<typeof fetch>(async () => Response.json(current));
     const node = await render(request);
     expect(node.textContent).toContain("Owner reviews are paused");
-    const prepare = button(node, "Prepare offers for 1 client") || [...node.querySelectorAll("button")].find(item => item.textContent?.startsWith("Prepare offers"));
+    const prepare = [...node.querySelectorAll("button")].find(item => item.textContent?.startsWith("Offer to"));
     expect(prepare?.disabled).toBe(true);
     expect(node.querySelector('a[href*="version-review"]')).toBeNull();
     expect(request.mock.calls.every(([, init]) => init?.method !== "POST")).toBe(true);
@@ -61,22 +61,24 @@ describe("agency Library ready Version selection", () => {
   it("sends only selected ready Versions and keeps conflicts and missing accounts skipped", async () => {
     const request = vi.fn(transport());
     const node = await render(request);
-    await act(async () => button(node, "Review selection").click());
+    await act(async () => button(node, "Choose clients").click());
     const checkboxes = [...node.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')];
     expect(checkboxes).toHaveLength(7);
     expect(checkboxes.filter(item => item.disabled)).toHaveLength(2);
     expect(checkboxes.filter(item => item.checked)).toHaveLength(5);
     await act(async () => checkboxes.find(item => item.checked)!.click());
-    await act(async () => button(node, "Prepare 4 offers").click());
+    await act(async () => button(node, "Send 4 offers").click());
     const writes = request.mock.calls.filter(([, init]) => init?.method === "POST");
     expect(writes).toHaveLength(1);
     const body = JSON.parse(String(writes[0]![1]!.body));
     expect(body.versionIds).toHaveLength(4);
     expect(body.revision).toBe(2);
-    expect(node.textContent).toContain("1 ready");
-    expect(node.textContent).toContain("4 up to date");
+    expect(node.textContent).toContain("Live at 4 · 3 more could use it");
     expect(node.textContent).not.toMatch(/\br[123]\b/);
-    expect(node.textContent).toContain("Release 1 + 1 local change");
+    const rows = node.querySelector('[aria-label="Versions of Intake"]')!.textContent!;
+    expect(rows).not.toContain("Release");
+    expect(rows).not.toContain("Up to date");
+    expect(rows).toContain("Their intake already has its own title. Choose which one stays.");
     expect(body.versionIds).not.toContain("v-intake-1");
     expect(body.versionIds).not.toContain("v-intake-4");
     expect(body.versionIds).not.toContain("v-intake-5");
@@ -88,7 +90,7 @@ describe("agency Library ready Version selection", () => {
     let resolve!: (response: Response) => void;
     const request = vi.fn<typeof fetch>(async (input, init) => init?.method === "POST" ? new Promise<Response>(done => { resolve = done; }) : delegate(input, init));
     const node = await render(request);
-    const review = [...node.querySelectorAll("button")].find(item => item.textContent?.startsWith("Prepare offers for"))!;
+    const review = [...node.querySelectorAll("button")].find(item => item.textContent?.startsWith("Offer to"))!;
     await act(async () => { review.click(); review.click(); });
     expect(request.mock.calls.filter(([, init]) => init?.method === "POST")).toHaveLength(1);
     const sources = [...node.querySelectorAll<HTMLButtonElement>('[aria-label="Sources"] button')];
@@ -104,14 +106,14 @@ describe("agency Library ready Version selection", () => {
       return delegate(input, init);
     });
     const node = await render(request);
-    await act(async () => button(node, "Prepare offers for 1 client").click());
-    expect(node.textContent).toContain("5 prepared for Release 2");
+    await act(async () => button(node, "Offer to 1 client").click());
+    expect(node.textContent).toContain("5 offers sent");
     expect(node.textContent).toContain("Counts may be out of date");
-    expect(button(node, "Prepare offers for 1 client").disabled).toBe(true);
+    expect(button(node, "Offer to 1 client").disabled).toBe(true);
     await act(async () => button(node, "Refresh Library").click());
     expect(node.textContent).not.toContain("Counts may be out of date");
-    expect(node.textContent).toContain("5 up to date");
-    expect(node.textContent).toContain("5 prepared for Release 2");
+    expect(node.textContent).toContain("Live at 5 · 2 more could use it");
+    expect(node.textContent).toContain("5 offers sent");
     expect(request.mock.calls.filter(([, init]) => init?.method === "POST")).toHaveLength(1);
   });
   it("refreshes changed readiness without posting or losing the chosen source", async () => {
@@ -121,8 +123,7 @@ describe("agency Library ready Version selection", () => {
     current.sources[0]!.versions[0]!.state = "up_to_date";
     current.sources[0]!.versions[0]!.improvementRevision = null;
     await act(async () => button(node, "Refresh Library").click());
-    expect(node.textContent).toContain("4 ready");
-    expect(node.textContent).toContain("1 up to date");
+    expect(node.textContent).toContain("Live at 1 · 6 more could use it");
     expect(request.mock.calls.some(([, init]) => init?.method === "POST")).toBe(false);
   });
   it("never prepares a ready row without its recorded exact offer", async () => {
@@ -130,8 +131,10 @@ describe("agency Library ready Version selection", () => {
     for (const version of current.sources[0]!.versions) delete version.improvementRevision;
     const request = vi.fn<typeof fetch>(async input => String(input).startsWith("/api/workspace/agency-library") ? Response.json(current) : Response.json({}, { status: 404 }));
     const node = await render(request);
-    expect(button(node, "Prepare offers for 0 clients").disabled).toBe(true);
-    expect(node.textContent).toContain("No Version has a qualified release ready");
+    // Nothing ready: a sentence, never a disabled gray pill.
+    expect([...node.querySelectorAll("button")].some(item => item.textContent?.startsWith("Offer"))).toBe(false);
+    expect(node.querySelector("[data-xa-primary]")).toBeNull();
+    expect(node.textContent).toContain("Nothing else is ready to offer.");
     expect(request.mock.calls.some(([, init]) => init?.method === "POST")).toBe(false);
   });
   it("rereads adoption after a lost response before permitting another offer", async () => {
@@ -142,10 +145,10 @@ describe("agency Library ready Version selection", () => {
       return result;
     });
     const node = await render(request);
-    await act(async () => button(node, "Prepare offers for 1 client").click());
+    await act(async () => button(node, "Offer to 1 client").click());
     expect(node.textContent).toContain("Outcome not confirmed");
-    expect(node.textContent).toContain("5 up to date");
-    expect(button(node, "Prepare offers for 0 clients").disabled).toBe(true);
+    expect(node.textContent).toContain("Live at 5");
+    expect([...node.querySelectorAll("button")].some(item => item.textContent?.startsWith("Offer to"))).toBe(false);
     expect(request.mock.calls.filter(([, init]) => init?.method === "POST")).toHaveLength(1);
   });
 
@@ -163,14 +166,14 @@ describe("agency Library ready Version selection", () => {
       }) });
     });
     const node = await render(request);
-    await act(async () => button(node, "Prepare offers for 1 client").click());
+    await act(async () => button(node, "Offer to 1 client").click());
     const writes = request.mock.calls.filter(([, init]) => init?.method === "POST").map(([, init]) => JSON.parse(String(init!.body)));
     expect(writes).toHaveLength(2);
     expect(writes[0]).toMatchObject({ revision: 2, versionIds: ["v-intake-1", "v-intake-3", "v-intake-6", "v-intake-7"] });
     expect(writes[1]).toMatchObject({ revision: 3, versionIds: ["v-intake-2"] });
-    expect(node.textContent).toContain("4 prepared for Release 2");
+    expect(node.textContent).toContain("4 offers sent");
     expect(node.textContent).toContain("Outcome not confirmed");
-    expect(node.textContent).toContain("1 ready");
+    expect(node.textContent).toContain("Live at 4 · 3 more could use it");
   });
 
 });
@@ -188,7 +191,8 @@ it("filters Library by the latest release's declared connections and keeps unkno
   await act(async () => { select.value = "highlevel"; select.dispatchEvent(new Event("change", { bubbles: true })); });
   expect(node.textContent).toContain("No sources work with this connection yet");
   expect(node.querySelector('[aria-label="Sources"]')).toBeNull();
-  await act(async () => { select.value = ""; select.dispatchEvent(new Event("change", { bubbles: true })); });
+  const reset = node.querySelector<HTMLSelectElement>('[aria-label="Works with"]')!;
+  await act(async () => { reset.value = ""; reset.dispatchEvent(new Event("change", { bubbles: true })); });
   expect(node.querySelector('[aria-label="Sources"]')!.textContent).toContain("Twin Trees website");
 });
 
@@ -197,4 +201,46 @@ it("shows a permission state without source contents when Library read is forbid
   const node = await render(request);
   expect(node.textContent).toContain("You do not have permission to open this Library");
   expect(node.querySelector('[aria-label="Sources"]')).toBeNull();
+});
+
+it("resolves a conflict inline through the client's Version choice, then rereads the Library", async () => {
+  const current = library();
+  const conflict = current.sources[0]!.versions[3]!;
+  conflict.versionId = "55555555-5555-4555-8555-555555555555";
+  const calls: { url: string; body?: unknown }[] = [];
+  const request = vi.fn<typeof fetch>(async (input, init) => {
+    const url = String(input);
+    calls.push({ url, body: init?.body ? JSON.parse(String(init.body)) : undefined });
+    if (url.startsWith("/api/workspace/agency-library")) return Response.json(current);
+    if (url.startsWith("/api/workspace/versions?")) return Response.json({ workspaceId: clientId, systemId: sourceId, versionId: conflict.versionId, rowRevision: 7, canManage: true, possibilities: [{ sourceRevision: 2, conflicts: [{ path: "title", local: "Local title", upstream: "Updated title" }], missingAccounts: [] }] });
+    if (url === "/api/workspace/versions" && init?.method === "POST") { conflict.state = "up_to_date"; conflict.conflicts = []; return Response.json({ outcome: "prepared", rowRevision: 8, receipt: null }); }
+    return Response.json({}, { status: 404 });
+  });
+  const node = await render(request);
+  await act(async () => button(node, "Resolve").click());
+  const save = button(node, "Offer with this choice");
+  expect(save.disabled).toBe(true);
+  const keep = [...node.querySelectorAll<HTMLInputElement>('input[type="radio"]')].find(item => item.value === "keep_local")!;
+  await act(async () => keep.click());
+  await act(async () => button(node, "Offer with this choice").click());
+  const post = calls.find(call => call.url === "/api/workspace/versions")!;
+  expect(post.body).toEqual({ workspaceId: clientId, systemId: sourceId, versionId: conflict.versionId, rowRevision: 7, action: "adopt", revision: 2, resolutions: [{ path: "title", choice: "keep_local" }] });
+  expect(node.textContent).toContain("Offered to Business 4 with your choice. Nothing changes until they say yes.");
+  expect(calls.filter(call => call.url.startsWith("/api/workspace/agency-library")).length).toBeGreaterThanOrEqual(2);
+});
+
+it("keeps the conflict open and says why when the client's System changed", async () => {
+  const current = library();
+  const request = vi.fn<typeof fetch>(async (input) => {
+    const url = String(input);
+    if (url.startsWith("/api/workspace/agency-library")) return Response.json(current);
+    if (url.startsWith("/api/workspace/versions?")) return Response.json({ workspaceId: clientId, systemId: sourceId, versionId: "v-intake-4", rowRevision: 7, canManage: true, possibilities: [{ sourceRevision: 2, conflicts: [{ path: "title" }, { path: "body" }], missingAccounts: [] }] });
+    return Response.json({}, { status: 404 });
+  });
+  const node = await render(request);
+  await act(async () => button(node, "Resolve").click());
+  await act(async () => [...node.querySelectorAll<HTMLInputElement>('input[type="radio"]')].find(item => item.value === "take_upstream")!.click());
+  await act(async () => button(node, "Offer with this choice").click());
+  expect(node.querySelector('[role="alert"]')?.textContent).toContain("This System changed since the Library was read");
+  expect(request.mock.calls.some(([, init]) => init?.method === "POST")).toBe(false);
 });

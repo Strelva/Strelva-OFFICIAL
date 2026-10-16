@@ -1,23 +1,28 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { WorksWithFilter, worksWith } from "@/experience/systems/RequiredConnections";
 import type { ConnectionProvider } from "@/platform/connections/contracts";
 import { SystemCreator } from "@/experience/systems/SystemCreator";
 import { systemHref } from "@/experience/systems/model";
 import { SourcePackageControls } from "./SourcePackageControls";
-import { StEmpty, StLabel, StMono, StNotice, StPill, StRow, StRows, StSection, StSkeleton, StState, StSurface, StTextButton } from "@/components/ui/strelva/Kit";
+import { StLabel, StNotice, StRow, StRows, StSection, StSkeleton, StTextButton } from "@/components/ui/strelva/Kit";
+import { XaButton, XaChoices, XaEmpty, XaHeadline, XaInitial, XaLabel, XaRow, XaRows, XaSays, XaTextLink, XaWorking } from "@/components/ui/strelva/Xa";
+import { clientColor } from "./xa/client-color";
+import { AgencyFold } from "./xa/AgencyFold";
+import { LibraryResolveError, resolveLibraryConflict, type ConflictChoice } from "./library-resolve";
+import xa from "./xa/agency-xa.module.css";
 import { AgencyWorkspaceReadError, loadAgencyLibrary, reviewAllImprovements, type AgencyBulkReviewResult, type AgencyLibrary, type AgencyLibrarySource, type AgencyLibraryVersion } from "../agency-clients";
 import {
-  conflictPathLabel,
   conflictValue,
   latestRevision,
-  libraryStatusLine,
+  libraryConflictSentence,
+  libraryReachLine,
+  libraryVersionLine,
   reviewAllLines,
   reviewLineLabel,
   reviewableVersionIds,
   reviewableVersionGroups,
-  versionStatusLabel,
 } from "../agency-home";
 
 type LibraryState =
@@ -30,12 +35,13 @@ type ReviewState =
   | { status: "done"; results: AgencyBulkReviewResult[]; message?: string }
   | { status: "error"; message: string };
 
-const meta = "text-xs leading-5 text-gray-muted";
 
 /**
  * Library: the agency's sources and where each client Version stands against
- * the exact qualified offer. Conflicts are read here; the choice happens on the
- * client's own System. Review all sends only ready Versions.
+ * the exact qualified offer. Status shows only on the exceptions. Each ready
+ * client has its own Offer; a conflict is resolved inline through the same
+ * Version choice the client's System uses. Offering several sends only ready
+ * Versions, and nothing goes live until each owner says yes.
  */
 export function AgencyLibraryView({
   request,
@@ -102,10 +108,10 @@ export function AgencyLibraryView({
         results.push(result);
         if (scope.current === agencyWorkspaceId) setReviews(current => ({ ...current, [source.systemId]: { status: "done", results: [...results] } }));
       }
-      if (!groups.length && scope.current === agencyWorkspaceId) setReviews(current => ({ ...current, [source.systemId]: { status: "error", message: "No Version has a qualified release ready. Nothing was sent." } }));
+      if (!groups.length && scope.current === agencyWorkspaceId) setReviews(current => ({ ...current, [source.systemId]: { status: "error", message: "Nothing is ready to offer. Nothing was sent." } }));
     } catch (cause) {
       if (scope.current === agencyWorkspaceId) {
-        const message = `${cause instanceof Error ? cause.message : "The preparation response could not be read."} Outcome not confirmed. Reading the Library before another offer.`;
+        const message = `${cause instanceof Error ? cause.message : "The offer response could not be read."} Outcome not confirmed. Reading the Library before another offer.`;
         setReviews(current => ({ ...current, [source.systemId]: results.length ? { status: "done", results: [...results], message } : { status: "error", message } }));
       }
     } finally {
@@ -114,22 +120,35 @@ export function AgencyLibraryView({
     }
   }, [request, agencyWorkspaceId, refresh, refreshing, refreshError, state]);
 
-  if (state.status === "loading") return <div className="space-y-4" role="status" aria-label="Loading the library"><StSkeleton width="48%" label="Loading the library" /><StSkeleton width="72%" /></div>;
-  if (state.status === "error" && state.permission) return <StNotice>You do not have permission to open this Library. Ask an agency owner to check your access.</StNotice>;
-  if (state.status === "error") return <StNotice tone="critical"><p>The library could not be loaded. Nothing was changed.</p><StTextButton onClick={() => setAttempt(value => value + 1)}>Retry</StTextButton></StNotice>;
-  if (!state.library.sources.length && !state.library.inquiryVersions?.length && !state.library.inquiryVersionsUnavailable) return <div className="space-y-4"><StTextButton disabled={refreshing} onClick={() => void refresh()}>Refresh Library</StTextButton><StEmpty>No sources yet. When a System is packaged as a source and adapted for a client, it appears here with each client’s Version.</StEmpty>{refreshError ? <StNotice tone="critical">{refreshError}</StNotice> : null}</div>;
+  if (state.status === "loading") return <div className={xa.library}><div className={xa.libraryLead} role="status" aria-label="Loading the library"><XaHeadline quiet="Reading your sources and every client's Version…">Fix it once.</XaHeadline><StSkeleton width="48%" label="Loading the library" /><StSkeleton width="72%" /></div></div>;
+  if (state.status === "error" && state.permission) return <div className={xa.state}><XaSays>You do not have permission to open this Library. Ask an agency owner to check your access.</XaSays></div>;
+  if (state.status === "error") return <div className={xa.state}><XaEmpty pose="fixing" job="Pebble kept every source and Version as it was. Nothing was changed." title="The library could not be loaded." action={<XaButton variant="primary" onClick={() => setAttempt(value => value + 1)}>Retry</XaButton>} /></div>;
+  if (!state.library.sources.length && !state.library.inquiryVersions?.length && !state.library.inquiryVersionsUnavailable) return <div className={xa.state}><XaEmpty pose="lineup" job="When a System is packaged as a source and adapted for a client, Pebble lists it here with each client's Version." title="No sources yet." secondary={<XaTextLink onClick={refreshing ? undefined : () => void refresh()}>Refresh Library</XaTextLink>}>Build something once for a client, package it, and every other client who could use it can get their own Version.</XaEmpty>{refreshError ? <p role="alert" className={xa.inlineAlert}>{refreshError}</p> : null}</div>;
   const visibleSources = state.library.sources.filter(source => worksWith(latestRevision(source)?.requiredConnections ?? [], provider));
   const selectedSource = visibleSources.find(source => source.systemId === selectedSourceId) ?? visibleSources[0];
-  return <div className="space-y-9"><div><StTextButton disabled={refreshing || Object.values(reviews).some(review => review.status === "running")} onClick={() => void refresh()}>Refresh Library</StTextButton>{refreshing ? <p role="status" className="text-sm text-gray-muted">Refreshing the Library…</p> : null}{refreshError ? <StNotice tone="critical">{refreshError}</StNotice> : null}</div><p className="text-sm text-gray-muted">Library holds your sources. Qualified releases shared with clients appear in their Apps. Each client gets its own Version, records, Connections and approval.</p>
-    {state.library.reviewEnabled !== true ? <StNotice>Owner reviews are paused. Your saved sources and client Versions remain available. Strelva will turn reviews on for you.</StNotice> : null}
+  const busyReviewing = Object.values(reviews).some(review => review.status === "running");
+  // Filter and refresh are tools for the person packaging sources; they live in the fold, not the main view.
+  const tools = <>
     <WorksWithFilter value={provider} onChange={setProvider} />
-    {provider && state.library.sources.some(source => latestRevision(source)?.requiredConnections === undefined) ? <StNotice>Some source Connections could not be checked. Those sources are excluded from this filter.</StNotice> : null}
-    {!visibleSources.length ? <StEmpty>No sources work with this connection yet. Choose another connection.</StEmpty> : null}
-    {selectedSource ? <div className="grid items-start gap-7 lg:grid-cols-[minmax(0,0.65fr)_minmax(0,1fr)]">
-      <StRows label="Sources">{visibleSources.map(source => <StRow key={source.systemId} title={source.name} detail={latestRevision(source)?.summary || "No release published yet"} selected={source.systemId === selectedSource.systemId} onClick={() => setSelectedSourceId(source.systemId)} end={<StMono>{latestRevision(source) ? `Release ${latestRevision(source)!.number}` : "Draft"} · {source.versions.length} {source.versions.length === 1 ? "use" : "uses"}</StMono>} />)}</StRows>
-      <LibrarySource key={selectedSource.systemId} request={request} source={selectedSource} review={reviews[selectedSource.systemId]} reviewEnabled={state.library.reviewEnabled === true} held={refreshing || Boolean(refreshError) || state.library.reviewEnabled !== true} onChanged={() => void refresh()} onReview={ids => void review(selectedSource, ids)} />
-    </div> : null}
-    {!provider ? <InquiryLibraryVersions library={state.library} /> : null}
+    {provider && state.library.sources.some(source => latestRevision(source)?.requiredConnections === undefined) ? <p className={xa.note}>Some source Connections could not be checked. Those sources are excluded from this filter.</p> : null}
+    <p className={xa.note}><XaTextLink onClick={refreshing || busyReviewing ? undefined : () => void refresh()}>Refresh Library</XaTextLink>{refreshing ? <span role="status"> · Refreshing…</span> : null}</p>
+    <p className={xa.note}>Clients see an offer in their Apps. Each keeps its own Version, records, Connections and say.</p>
+  </>;
+  return <div className={xa.library}>
+    <div className={xa.libraryLead}>
+      <XaHeadline quiet="Every client who could use it gets it to review.">Fix it once.</XaHeadline>
+      {state.library.reviewEnabled !== true ? <XaSays>Owner reviews are paused. Your saved sources and client Versions remain available. Strelva will turn reviews on for you.</XaSays> : null}
+      {visibleSources.length ? <ul className={xa.sources} aria-label="Sources">{visibleSources.map(source => <li key={source.systemId}><button type="button" className={xa.source} aria-pressed={source.systemId === selectedSource?.systemId} onClick={() => setSelectedSourceId(source.systemId)}>
+        <span className={xa.sourceText}><b>{source.name}</b><small>{libraryReachLine(source)}</small></span>
+      </button></li>)}</ul> : null}
+      {!visibleSources.length ? <p className={xa.note}>No sources work with this connection yet. <XaTextLink onClick={() => setProvider("")}>Show every source</XaTextLink></p> : null}
+      {refreshError ? <p role="alert" className={xa.inlineAlert}>{refreshError}</p> : null}
+    </div>
+    <div>
+      {selectedSource ? <LibrarySource key={selectedSource.systemId} request={request} source={selectedSource} review={reviews[selectedSource.systemId]} reviewEnabled={state.library.reviewEnabled === true} held={refreshing || Boolean(refreshError) || state.library.reviewEnabled !== true} tools={tools} onChanged={() => void refresh()} onReview={ids => void review(selectedSource, ids)} />
+        : <AgencyFold label="Releases and packaging" open>{tools}</AgencyFold>}
+      {!provider ? <InquiryLibraryVersions library={state.library} /> : null}
+    </div>
   </div>;
 }
 
@@ -138,50 +157,125 @@ export function InquiryLibraryVersions({ library }: { library: AgencyLibrary }) 
     {library.inquiryVersions?.length ? <StSection title="Inquiry Versions"><StRows label="Inquiry Versions">{library.inquiryVersions.map(version => <StRow key={version.id} title={`${version.businessName} · ${version.name}`} detail={<><span>Source Release {version.sourceRevision} · this Version’s Release {version.currentRelease}</span><br />{version.improvement === "blocked" ? "A source update needs a choice about local changes." : version.improvement === "auto_applicable" ? "A source update is available for review." : "Based on the accepted source revision. Local changes keep their own release."}</>} end={<StTextButton href={`/business/${encodeURIComponent(version.tenantId)}?view=patterns`}>Open {version.businessName}’s inquiry form</StTextButton>} />)}</StRows><StLabel>Updates use the existing inquiry review and testing steps. Each business owner approves going live.</StLabel></StSection> : null}</>;
 }
 
-function LibrarySource({ request, source, review, onReview, held, onChanged, reviewEnabled }: {
-  reviewEnabled: boolean; request: typeof fetch; source: AgencyLibrarySource; review: ReviewState | undefined; onReview: (versionIds?: string[]) => void; held: boolean; onChanged: () => void;
+type ResolveState = { versionId: string; choices: Record<string, ConflictChoice>; status: "choosing" | "saving" | "error"; message?: string };
+
+function LibrarySource({ request, source, review, onReview, held, onChanged, reviewEnabled, tools }: {
+  reviewEnabled: boolean; request: typeof fetch; source: AgencyLibrarySource; review: ReviewState | undefined; onReview: (versionIds?: string[]) => void; held: boolean; onChanged: () => void; tools: ReactNode;
 }) {
   const latest = latestRevision(source);
   const readyIds = useMemo(() => reviewableVersionIds(source), [source]);
   const [bulk, setBulk] = useState(false);
   const [selection, setSelectedIds] = useState(readyIds);
+  const [resolving, setResolving] = useState<ResolveState | null>(null);
+  const [resolved, setResolved] = useState<Record<string, string>>({});
   const selectedIds = selection.filter(id => readyIds.includes(id));
-  const offeredReleases = reviewableVersionGroups(source).map(group => `Release ${group.revision}`).join(", ");
   const headingId = `library-source-${source.systemId}`;
   const readyClients = new Set(source.versions.filter(version => readyIds.includes(version.versionId)).map(version => version.workspaceId)).size;
-  return <div className="space-y-7">
-    <StSection title={source.name} id={headingId} action={latest ? <StPill variant="soft" disabled={held || !readyIds.length} busy={review?.status === "running"} onClick={() => onReview()} aria-describedby={`${headingId}-review-note`}>Prepare offers for {readyClients} {readyClients === 1 ? "client" : "clients"}</StPill> : null}>
-      <SystemCreator requestOverride={request} workspaceId={source.workspaceId} systemId={source.systemId} /><StLabel>{libraryStatusLine(source)}</StLabel>
-      {source.hidden ? <StLabel>The shared source System these Versions grew from. It stays hidden from the business’s everyday Systems.</StLabel> : null}
-      {latest ? <p id={`${headingId}-review-note`} className="text-sm text-gray-muted">{readyIds.length ? `Updates ${readyIds.length} ready drafts to ${offeredReleases} and prepares a separate review for each owner. Conflicts and missing Connections are skipped. Nothing goes live until its owner approves.` : "No Version has a qualified release ready."}</p> : null}
-    </StSection>
-    <StSection title="Releases"><StRows label={`Releases of ${source.name}`}>{[...source.revisions].sort((a, b) => b.number - a.number).map(revision => <StRow key={revision.number} lead={<StMono tone="text">Release {revision.number}</StMono>} title={revision.summary || revision.label || `Release ${revision.number}`} detail={<>Published <StMono as="time" dateTime={revision.publishedAt}>{new Date(revision.publishedAt).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" })}</StMono></>} end={<StState kind={source.versions.some(version => version.baselineRevision === revision.number) ? "live" : "draft"}>{source.versions.some(version => version.baselineRevision === revision.number) ? "In use" : "Published"}</StState>} />)}</StRows>{!source.revisions.length ? <StEmpty>No release published yet.</StEmpty> : null}</StSection>
-    <StSection title="Client Versions" action={latest && readyIds.length ? <StTextButton onClick={() => setBulk(value => !value)}>{bulk ? "Close selection" : "Review selection"}</StTextButton> : null}>
-      {source.versions.length ? <StRows label={`Versions of ${source.name}`}>{source.versions.map(version => <VersionRow key={version.versionId} version={version} selection={bulk ? { checked: selectedIds.includes(version.versionId), disabled: held || !readyIds.includes(version.versionId) || review?.status === "running", onChange: () => setSelectedIds(current => current.includes(version.versionId) ? current.filter(id => id !== version.versionId) : [...current, version.versionId]) } : undefined} />)}</StRows> : <StEmpty>No client has a Version of this yet.</StEmpty>}
-    </StSection>
-    {bulk ? <StSurface label="Prepare selected improvements"><div className="flex flex-wrap items-center justify-between gap-4"><div className="max-w-sm space-y-2"><StLabel>What each owner will read</StLabel><p className="text-sm">{reviewableVersionGroups(source, selectedIds).map(group => source.revisions.find(revision => revision.number === group.revision)?.summary || `Release ${group.revision}`).join(" · ") || "Select a qualified improvement."}</p><StLabel>Each selected Version gets its own Needs you item. Ready drafts are updated now. Conflicts and missing Connections are skipped; no live client changes until its owner approves.</StLabel></div><StPill disabled={held || !selectedIds.length || review?.status === "running"} busy={review?.status === "running"} onClick={() => onReview(selectedIds)}>Prepare {selectedIds.length} {selectedIds.length === 1 ? "offer" : "offers"}</StPill></div></StSurface> : null}
+  const running = review?.status === "running";
+  const allSettled = source.versions.length > 0 && source.versions.every(version => version.state === "up_to_date");
+  // One ink pill: the bulk offer when several are ready, otherwise the single ready client's Offer.
+  const singleReady = readyIds.length === 1;
+
+  async function resolve(version: AgencyLibraryVersion, choices: Record<string, ConflictChoice>) {
+    setResolving({ versionId: version.versionId, choices, status: "saving" });
+    try {
+      const outcome = await resolveLibraryConflict(request, { workspaceId: version.workspaceId, systemId: version.systemId, versionId: version.versionId, choices });
+      setResolving(null);
+      setResolved(current => ({ ...current, [version.versionId]: outcome === "prepared" ? `Offered to ${version.clientName} with your choice. Nothing changes until they say yes.` : `${version.clientName}'s System has another choice to make. Open it to finish.` }));
+      onChanged();
+    } catch (cause) {
+      setResolving({ versionId: version.versionId, choices, status: "error", message: cause instanceof LibraryResolveError ? cause.message : "The choice could not be confirmed. Nothing went live." });
+    }
+  }
+
+  return <section className={xa.sourcePanel} aria-labelledby={headingId}>
+    <div className={xa.panelHead}><h2 id={headingId}>{source.name}</h2><small>{latest ? `Updated ${new Date(latest.publishedAt).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" })}` : "Not shared yet"}</small></div>
+    {latest?.summary ? <p className={xa.panelBody}>{latest.summary}</p> : null}
+    {source.hidden ? <p className={xa.note}>The shared source these Versions grew from stays out of the business&apos;s everyday Systems.</p> : null}
+    {source.versions.length ? <XaRows label={`Versions of ${source.name}`}>{source.versions.map(version => <VersionRow key={version.versionId} version={version}
+      selection={bulk ? { checked: selectedIds.includes(version.versionId), disabled: held || !readyIds.includes(version.versionId) || running, onChange: () => setSelectedIds(current => current.includes(version.versionId) ? current.filter(id => id !== version.versionId) : [...current, version.versionId]) } : undefined}
+      done={resolved[version.versionId]}
+      offer={!bulk && readyIds.includes(version.versionId) ? { primary: singleReady, disabled: held || running, busy: running, onOffer: () => onReview([version.versionId]) } : undefined}
+      resolve={!bulk && version.state === "conflicts" && version.conflicts.length ? {
+        state: resolving?.versionId === version.versionId ? resolving : null,
+        disabled: held || running || (resolving !== null && resolving.versionId !== version.versionId),
+        onOpen: () => setResolving(current => current?.versionId === version.versionId ? null : { versionId: version.versionId, choices: {}, status: "choosing" }),
+        onChoose: (path, choice) => setResolving(current => current?.versionId === version.versionId ? { ...current, status: "choosing", message: undefined, choices: { ...current.choices, [path]: choice } } : current),
+        onSave: choices => void resolve(version, choices),
+      } : undefined} />)}</XaRows> : <p className={xa.note}>No client has a Version of this yet.</p>}
+    {latest ? <div className={xa.panelFoot}>
+      {readyIds.length >= 2 ? <>
+        <p id={`${headingId}-review-note`} className={xa.note}>Each owner gets their own review. Nothing changes until they say yes. Clients with a choice to make or a Connection missing are skipped.</p>
+        {bulk ? <p className={xa.panelBody}>{reviewableVersionGroups(source, selectedIds).map(group => source.revisions.find(revision => revision.number === group.revision)?.summary || "The latest update").join(" · ") || "Choose at least one client."}</p> : null}
+        <div className={xa.toolbar}>
+          {bulk ? <XaButton variant="primary" disabled={held || !selectedIds.length || running} busy={running} onClick={() => onReview(selectedIds)}>Send {selectedIds.length} {selectedIds.length === 1 ? "offer" : "offers"}</XaButton>
+            : <XaButton variant="primary" disabled={held} busy={running} onClick={() => onReview()} aria-describedby={`${headingId}-review-note`}>Offer to {readyClients} {readyClients === 1 ? "client" : "clients"}</XaButton>}
+          <XaTextLink onClick={() => setBulk(value => !value)}>{bulk ? "Close selection" : "Choose clients"}</XaTextLink>
+        </div>
+      </> : readyIds.length === 0 && source.versions.length ? <p className={xa.note}>{allSettled ? "Every client is up to date." : "Nothing else is ready to offer."}</p> : null}
+    </div> : null}
     {review ? <ReviewResult reviewEnabled={reviewEnabled} source={source} review={review} /> : null}
-    <SourcePackageControls request={request} workspaceId={source.workspaceId} systemId={source.systemId} onChanged={onChanged} />
-  </div>;
+    <XaSays>Pebble checks each client&apos;s setup before anything is offered.</XaSays>
+    <AgencyFold label="Releases and packaging" count={source.revisions.length || null}>
+      {tools}
+      <SystemCreator requestOverride={request} workspaceId={source.workspaceId} systemId={source.systemId} />
+      {source.revisions.length ? <XaRows label={`Releases of ${source.name}`}>{[...source.revisions].sort((a, b) => b.number - a.number).map(revision => <XaRow key={revision.number} title={revision.summary || revision.label || "No summary"} detail={`Shared ${new Date(revision.publishedAt).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" })}`} meta={source.versions.some(version => version.baselineRevision === revision.number) ? "In use" : undefined} />)}</XaRows> : <p className={xa.note}>Nothing shared yet.</p>}
+      <SourcePackageControls request={request} workspaceId={source.workspaceId} systemId={source.systemId} onChanged={onChanged} />
+    </AgencyFold>
+  </section>;
 }
 
-function VersionRow({ version, selection }: { version: AgencyLibraryVersion; selection?: { checked: boolean; disabled: boolean; onChange: () => void } }) {
-  const localChanges = version.localChanges ?? 0;
+interface ResolveProps {
+  state: ResolveState | null;
+  disabled: boolean;
+  onOpen: () => void;
+  onChoose: (path: string, choice: ConflictChoice) => void;
+  onSave: (choices: Record<string, ConflictChoice>) => void;
+}
+
+function VersionRow({ version, selection, offer, resolve, done }: {
+  version: AgencyLibraryVersion;
+  /** The sentence after an inline Resolve, kept after the Library rereads. */
+  done?: string;
+  selection?: { checked: boolean; disabled: boolean; onChange: () => void };
+  offer?: { primary: boolean; disabled: boolean; busy: boolean; onOffer: () => void };
+  resolve?: ResolveProps;
+}) {
   const href = systemHref("", version.workspaceId, version.systemId);
-  const stateKind = version.state === "up_to_date" ? "live" : version.state === "unavailable" ? "down" : version.state === "declined" ? "draft" : "need";
-  return <StRow align="start" lead={selection ? <input type="checkbox" className="mt-1 h-5 w-5 accent-[var(--st-accent)]" aria-label={`Offer improvement to ${version.clientName} · ${version.context.label}`} checked={selection.checked} disabled={selection.disabled} onChange={selection.onChange} /> : null} title={version.clientName} detail={<><StTextButton href={href}>{version.systemName}{version.context.label !== version.clientName ? ` · ${version.context.label}` : ""}</StTextButton><br /><StMono>Release {version.baselineRevision}{localChanges ? ` + ${localChanges} local ${localChanges === 1 ? "change" : "changes"}` : ""}</StMono>{version.improvementRevision ? <><br /><span>Offered Release {version.improvementRevision}</span></> : null}</>} end={<StState kind={stateKind}>{selection && version.state !== "ready" ? "Skipped · " : ""}{versionStatusLabel(version)}</StState>}>
-    {version.state === "conflicts" && version.conflicts.length ? <div className="mt-3 space-y-3">{version.conflicts.map(conflict => <div key={conflict.path} className="space-y-2"><StLabel>{conflictPathLabel(conflict.path)}</StLabel><div className="grid gap-4 sm:grid-cols-2"><span><StLabel>{version.clientName} has</StLabel><span className="text-sm">{conflictValue(conflict.local)}</span></span><span><StLabel>New default</StLabel><span className="text-sm">{conflictValue(conflict.upstream)}</span></span></div></div>)}<p className={meta}>The choice is made on {version.clientName}’s System. <StTextButton href={href}>Open {version.clientName}’s System</StTextButton></p></div> : null}
-  </StRow>;
+  const exception = version.state === "missing_accounts" || version.state === "declined" || version.state === "unavailable" || version.state === "conflicts";
+  const resolveId = `resolve-${version.versionId}`;
+  const open = Boolean(resolve?.state);
+  const action = offer ? <XaButton size="sm" variant={offer.primary ? "primary" : "secondary"} disabled={offer.disabled} busy={offer.busy && offer.primary} onClick={offer.onOffer} aria-label={`Offer to ${version.clientName}`}>Offer</XaButton>
+    : resolve && !done ? <XaButton size="sm" aria-expanded={open} aria-controls={resolveId} disabled={resolve.disabled} onClick={resolve.onOpen} aria-label={`${open ? "Close" : "Resolve"}: ${version.clientName}`}>{open ? "Close" : "Resolve"}</XaButton>
+      : null;
+  return <>
+    <XaRow lead={<>{selection ? <input type="checkbox" className="h-5 w-5 accent-[var(--st-accent)]" aria-label={`Offer to ${version.clientName} · ${version.context.label}`} checked={selection.checked} disabled={selection.disabled} onChange={selection.onChange} /> : null}<XaInitial name={version.clientName} color={clientColor(version.workspaceId)} size={36} /></>}
+      title={version.clientName}
+      detail={done ?? (version.state === "conflicts" ? libraryConflictSentence(version) : <>{version.state === "up_to_date" || version.state === "ready" ? <><XaTextLink href={href}>{version.systemName}</XaTextLink>{libraryVersionLine(version, selection !== undefined) ? ` · ${libraryVersionLine(version, selection !== undefined)}` : ""}</> : libraryVersionLine(version, selection !== undefined)}</>)}
+      tone={exception && !done ? "waits" : undefined}
+      action={action} wrapOnPhone />
+    {resolve?.state ? <li id={resolveId} className={xa.resolve}>
+      {version.conflicts.map(conflict => <XaChoices key={conflict.path} name={`${resolveId}-${conflict.path}`} label={`Which one stays for ${version.clientName}?`} value={resolve.state!.choices[conflict.path] ?? null}
+        onChange={choice => resolve.onChoose(conflict.path, choice)}
+        options={[{ value: "keep_local" as const, label: "Keep theirs", detail: conflictValue(conflict.local) }, { value: "take_upstream" as const, label: "Use the new default", detail: conflictValue(conflict.upstream) }]} />)}
+      {resolve.state.status === "error" ? <p role="alert" className={xa.inlineAlert}>{resolve.state.message}</p> : null}
+      <div className={xa.toolbar}>
+        <XaButton size="sm" busy={resolve.state.status === "saving"} disabled={version.conflicts.some(conflict => !resolve.state!.choices[conflict.path])} onClick={() => resolve.onSave(resolve.state!.choices)}>Offer with this choice</XaButton>
+        <span className={xa.note}>{version.clientName} still says yes before anything changes. <XaTextLink href={href}>Open their System</XaTextLink></span>
+      </div>
+    </li> : null}
+  </>;
 }
 
 function ReviewResult({ source, review, reviewEnabled }: { reviewEnabled: boolean; source: AgencyLibrarySource; review: ReviewState }) {
-  if (review.status === "running") return <div role="status"><StLabel>Preparing an improvement for each ready Version…</StLabel><StSkeleton /></div>;
-  if (review.status === "error") return <StNotice tone="critical">{review.message}</StNotice>;
-  return <>{review.message ? <StNotice tone="critical">{review.message}</StNotice> : null}{review.results.map(result => <ReviewReleaseResult reviewEnabled={reviewEnabled} key={result.revision} source={source} result={result} />)}</>;
+  if (review.status === "running") return <XaWorking title="Preparing an offer for each ready client…" steps={[]} />;
+  if (review.status === "error") return <p role="alert" className={xa.inlineAlert}>{review.message}</p>;
+  return <>{review.message ? <p role="alert" className={xa.inlineAlert}>{review.message}</p> : null}{review.results.map(result => <ReviewReleaseResult reviewEnabled={reviewEnabled} key={result.revision} source={source} result={result} />)}</>;
 }
 
 function ReviewReleaseResult({ source, result, reviewEnabled }: { reviewEnabled: boolean; source: AgencyLibrarySource; result: AgencyBulkReviewResult }) {
   const lines = reviewAllLines(source, result);
   const prepared = lines.filter(line => line.outcome === "prepared").length;
-  return <StSection title={`${prepared} prepared for Release ${result.revision}`}><p role="status" className="text-sm text-gray-muted">Each owner approves their own.</p><StRows label="Review all results">{lines.map(line => <StRow key={line.versionId} title={line.clientName} detail={<>{line.outcome === "prepared" ? line.decisionId ? `Prepared. Waiting on ${line.clientName}.` : line.detail || "Draft prepared. No owner decision was returned." : reviewLineLabel(line)}<br />{source.versions.find(version => version.versionId === line.versionId)?.systemName}</>} end={reviewEnabled && line.decisionId && source.versions.some(version => version.versionId === line.versionId) ? <StTextButton href={`/workspace/version-review?${new URLSearchParams({ workspaceId: line.workspaceId, systemId: source.versions.find(version => version.versionId === line.versionId)!.systemId, decisionId: line.decisionId })}`}>Open prepared review</StTextButton> : null} lead={<StState kind={line.outcome === "prepared" ? "live" : line.outcome === "failed" ? "down" : "need"}>{line.outcome === "prepared" ? "Prepared" : line.outcome === "failed" ? "Could not prepare" : "Skipped"}</StState>} />)}</StRows></StSection>;
+  const title = `${prepared} ${prepared === 1 ? "offer" : "offers"} sent`;
+  return <section className={xa.group} aria-label={title}><XaLabel as="h3">{title}</XaLabel><p role="status" className={xa.note}>Each owner approves their own.</p><XaRows label="Review all results">{lines.map(line => <XaRow key={line.versionId} title={line.clientName} detail={<>{line.outcome === "prepared" ? line.decisionId ? `Sent. Waiting on ${line.clientName}.` : line.detail || "Sent. No owner decision came back yet." : reviewLineLabel(line)} {source.versions.find(version => version.versionId === line.versionId)?.systemName}</>} tone={line.outcome === "prepared" ? undefined : "waits"} action={reviewEnabled && line.decisionId && source.versions.some(version => version.versionId === line.versionId) ? <XaTextLink href={`/workspace/version-review?${new URLSearchParams({ workspaceId: line.workspaceId, systemId: source.versions.find(version => version.versionId === line.versionId)!.systemId, decisionId: line.decisionId })}`}>See it</XaTextLink> : null} />)}</XaRows></section>;
 }

@@ -17,7 +17,7 @@ export { placeForSection, workspaceSectionHref, type StrelvaAgencyLink, type Str
 
 type NavigableSection = Exclude<StrelvaSection, "account">;
 
-type AgencyNavigationView = "clients" | "queue" | "library" | "team";
+type AgencyNavigationView = "clients" | "queue" | "library" | "team" | "minutes";
 type AgencyPlace = AgencyNavigationView | "home" | "verification";
 export interface AgencyNavigation {
   paymentLinksCurrent?: boolean;

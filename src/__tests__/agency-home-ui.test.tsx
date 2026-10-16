@@ -201,7 +201,7 @@ describe("agency home on the batched read", () => {
     expect(node.querySelector('[aria-label="Clients"]')).toBeNull();
   });
 
-  it("Library shows conflicts side by side and Review all sends only ready Versions", async () => {
+  it("Library shows status only on exceptions, resolves a conflict inline, and Offer sends only that ready Version", async () => {
     const bodies: unknown[] = [];
     const request = router({
       clients: () => Response.json(page([row(1)])),
@@ -211,19 +211,33 @@ describe("agency home on the batched read", () => {
     const { node } = await render(request);
     await act(async () => { button(node, "Library").click(); });
     await settle();
-    expect(node.textContent).toContain("1 ready · 1 has conflicts · 1 missing accounts");
+    expect(node.textContent).toContain("3 clients could use it");
+    expect(node.textContent).not.toContain("1 ready · 1 has conflicts");
+    expect(node.textContent).not.toContain("Up to date");
+    expect(node.textContent).toContain("Their inquiry intake already has its own follow up message. Choose which one stays.");
+    expect(node.textContent).not.toContain("›");
+    expect(node.textContent).toContain("Needs Google Calendar connected first");
+    // The values appear only when the agency opens Resolve, under the row at full width.
+    expect(node.textContent).not.toContain("“We'll call you within one business day”");
+    const resolve = [...node.querySelectorAll("button")].find(item => item.textContent === "Resolve")!;
+    await act(async () => { resolve.click(); });
+    expect(resolve.getAttribute("aria-expanded")).toBe("true");
     expect(node.textContent).toContain("“We'll call you within one business day”");
     expect(node.textContent).toContain("“Someone will reply by the end of the next business day.”");
-    expect(node.textContent).toContain("Needs Google Calendar connected first");
-    const conflictLink = [...node.querySelectorAll("a")].find(link => link.textContent === "Open The Mooney Firm’s System")!;
+    const conflictLink = [...node.querySelectorAll("a")].find(link => link.textContent === "Open their System")!;
     expect(conflictLink.getAttribute("href")).toBe(`/workspace?view=system&system=${uuid("52000000", 2)}&workspaceId=${uuid("c0000000", 2)}`);
-    await act(async () => { button(node, "Prepare offers for 1 client").click(); });
+    await act(async () => { resolve.click(); });
+    // One ready client: its own Offer carries the screen's one ink pill.
+    const offer = node.querySelector<HTMLButtonElement>('[aria-label="Offer to Lake Bakery"]')!;
+    expect(offer.hasAttribute("data-xa-primary")).toBe(true);
+    expect(node.querySelectorAll("[data-xa-primary]")).toHaveLength(1);
+    await act(async () => { offer.click(); });
     await settle();
     expect(bodies).toEqual([{ action: "review_all", workspaceId: AGENCY, sourceSystemId: library.sources[0]!.systemId, revision: 4, versionIds: ["ready-1"] }]);
-    const preparedReview = [...node.querySelectorAll("a")].find(link => link.textContent === "Open prepared review")!;
+    const preparedReview = [...node.querySelectorAll("a")].find(link => link.textContent === "See it")!;
     expect(preparedReview.getAttribute("href")).toBe(`/workspace/version-review?workspaceId=${uuid("c0000000", 1)}&systemId=${uuid("52000000", 1)}&decisionId=${uuid("54000000", 1)}`);
     const results = node.querySelector('[aria-label="Review all results"]')!.textContent!;
-    expect(results).toContain("Prepared. Waiting on Lake Bakery.");
+    expect(results).toContain("Sent. Waiting on Lake Bakery.");
     expect(results).toContain("The Mooney FirmSkipped. Needs a choice on 1 change.");
     expect(results).toContain("Elmwood PTSkipped. Needs Google Calendar connected first.");
   });
@@ -303,15 +317,16 @@ it("lets the real sidebar own navigation and keeps Build accessible beside the p
   expect(request.mock.calls.some(([url]) => String(url).includes("agency-proposals"))).toBe(false);
 });
 
-it("opens a distinct agency Home with the same scoped portfolio and a Clients action", async () => {
+it("opens the XA agency Today with the same scoped portfolio, one row per client", async () => {
   const request = router({ clients: () => Response.json(page([row(1), row(2)])) });
   const { node } = await render(request, true, vi.fn(), "home");
-  expect(node.querySelector("h1")?.textContent).toBe("Strelva");
+  // XA · AG1: a greeting (a role address like ops@ gets no name), one sentence, then one row per client.
+  expect(node.querySelector("h1")?.textContent).toMatch(/^Good (morning|afternoon|evening)\.$/);
   expect(node.querySelector('section[aria-label="Home"]')).not.toBeNull();
   expect(node.querySelector('[role="tablist"]')).toBeNull();
-  expect(node.textContent).toContain("2 clients");
-  expect(node.querySelectorAll('table[aria-label="Clients"] tbody > tr')).toHaveLength(2);
-  expect(button(node, "View clients")).toBeDefined();
+  expect(node.textContent).toContain("Every client is quiet.");
+  expect([...node.querySelectorAll('ul[aria-label="Clients"] > li')].map(item => item.textContent)).toEqual([expect.stringContaining("Client 1"), expect.stringContaining("Client 2")]);
+  expect(node.querySelectorAll("[data-xa-primary]")).toHaveLength(0);
   expect(clientCalls(request)).toHaveLength(1);
 });
 

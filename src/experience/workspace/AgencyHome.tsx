@@ -4,7 +4,7 @@ import { AgencyClientSites } from "@/experience/connected-sites/AgencyClientSite
 import { AgencyProposals } from "./agency/AgencyProposals";
 
 import { ArrowRight, BriefcaseBusiness, Coins, FileText, Globe2, RefreshCw, Users } from "lucide-react";
-import { useEffect, useId, useState, type ReactNode } from "react";
+import { useEffect, useId, useMemo, useState, type ReactNode } from "react";
 import type { WorkAllowanceInspection } from "@/platform/work-economics/allowances";
 import type { AgencyApplicationDraftWork, AgencyManagedWebsiteDraftWork } from "@/platform/offerings";
 import { Tabs, TabsPanel } from "@/components/ui/Tabs";
@@ -32,13 +32,22 @@ import { AgencyVersionCreate } from "./agency/AgencyVersionCreate";
 import { StComposerBar, StComposerDock, StHead, StMono, StNotice, StPage, StPill, StPillLink, StSection, StTextButton } from "@/components/ui/strelva/Kit";
 import type { AgencyLastGoodRead } from "./agency/AgencyViews";
 import { AgencyCareReports } from "@/experience/care-reports/AgencyCareReports";
+import { XaComposer, XaComposerDock } from "@/components/ui/strelva/Xa";
+import { AgencyToday } from "./agency/xa/AgencyToday";
+import { AgencyQueueXa } from "./agency/xa/AgencyQueueXa";
+import { AgencyMinutes } from "./agency/xa/AgencyMinutes";
+import { useAgencyMinutes } from "./agency/xa/useAgencyMinutes";
+import { firstNameFromEmail, splitQueue } from "./agency/xa/agency-xa-model";
+import { AgencyFold } from "./agency/xa/AgencyFold";
+import type { AgencyQueueItem } from "./agency-clients";
+import xaStyles from "./agency/xa/agency-xa.module.css";
 
 type ClientsState =
   | { status: "loading" }
   | { status: "error" }
   | { status: "ready"; pages: AgencyLoadedPage[]; loadingMore: boolean; moreError: boolean; retrying: ReadonlySet<number> };
 
-export type AgencyView = "home" | "clients" | "queue" | "library" | "team" | "build" | "package";
+export type AgencyView = "home" | "clients" | "queue" | "library" | "team" | "build" | "package" | "minutes";
 
 /** Last successful rows are held in component state and never cross agency scope. */
 function rememberReads(previous: ReadonlyMap<string, AgencyLastGoodRead>, pages: readonly AgencyLoadedPage[]): Map<string, AgencyLastGoodRead> {
@@ -81,6 +90,7 @@ export function AgencyHome({
   onStart,
   view: controlledView,
   onViewChange,
+  onQueueSummary,
 }: {
   snapshot: WorkspaceSnapshot;
   busy: boolean;
@@ -90,6 +100,8 @@ export function AgencyHome({
   onStart: (request?: string) => void;
   view?: AgencyView;
   onViewChange?: (view: AgencyView) => void;
+  /** The sidebar's Queue count and the clients that wait on the agency, from this same batched read. */
+  onQueueSummary?: (summary: { count: number; waiting: ReadonlySet<string> } | null) => void;
 }) {
   const request = useWorkspaceRequest();
   const id = useId().replace(/:/g, "");
@@ -104,7 +116,7 @@ export function AgencyHome({
   const [localView, setView] = useState<AgencyView>(() => {
     if (typeof window === "undefined") return "home";
     const selected = new URLSearchParams(window.location.search).get("agencyView");
-    return ["home", "clients", "queue", "library", "team", "build", "package"].includes(selected || "") ? selected as AgencyView : "home";
+    return ["home", "clients", "queue", "library", "team", "build", "package", "minutes"].includes(selected || "") ? selected as AgencyView : "home";
   });
   const view = released ? controlledView ?? localView : "clients";
   const [ask, setAsk] = useState("");
@@ -145,7 +157,22 @@ export function AgencyHome({
     return () => controller.abort();
   }, [request, snapshot.workspaceId, canUseTools, clientsKey]);
 
-  const combined = clients.status === "ready" ? combineAgencyPages(clients.pages) : null;
+  const readyPages = clients.status === "ready" ? clients.pages : null;
+  const combined = useMemo(() => readyPages ? combineAgencyPages(readyPages) : null, [readyPages]);
+  // XA (AG1, AG2, AG5, AG6) is the screen the real sidebar opens; standalone embeds keep the tabs below.
+  const xaView = released && canUseTools && (controlledView ? view === "home" || view === "queue" || view === "library" || view === "minutes" : view === "minutes");
+  const minutes = useAgencyMinutes(request, snapshot.workspaceId, combined?.clients ?? null, xaView && (view === "home" || view === "minutes"));
+  const minutesByClient = minutes.state.status === "ready" ? new Map(minutes.state.rows.map(row => [row.workspaceId, row.minutes])) : null;
+  const [providerCount, setProviderCount] = useState<number | null>(null);
+  const [requestCount, setRequestCount] = useState<number | null>(null);
+  // The sidebar shows what the Queue shows: the agency's own items, and a clay dot on each client that has one.
+  const queueSummary = useMemo(() => {
+    if (!combined) return null;
+    const { you } = splitQueue(combined.queue);
+    // A Library offer counts in the Queue but never marks a client as waiting on the agency.
+    return { count: you.length, waiting: new Set(you.filter(item => item.kind !== "improvement").map(item => item.workspaceId)) as ReadonlySet<string> };
+  }, [combined]);
+  useEffect(() => { onQueueSummary?.(queueSummary); }, [onQueueSummary, queueSummary]);
 
   const loadMore = () => {
     if (clients.status !== "ready" || clients.loadingMore) return;
@@ -268,7 +295,7 @@ export function AgencyHome({
   const serviceRequests = <section aria-labelledby={`${id}-service-requests`}>
     <h2 id={`${id}-service-requests`} className={sectionTitle}>Service requests</h2>
     <p className={sectionNote}>Review requests addressed to {agencyName}. A response records review and does not start work.</p>
-    <div className="mt-5"><ServiceRequestInbox providerWorkspaceId={snapshot.workspaceId} surface="workspace" /></div>
+    <div className="mt-5"><ServiceRequestInbox providerWorkspaceId={snapshot.workspaceId} surface="workspace" onCount={setRequestCount} /></div>
   </section>;
 
   const applicationDraftSection = <section aria-labelledby={`${id}-application-drafts`}>
@@ -314,6 +341,13 @@ export function AgencyHome({
 
   if (!canUseTools) return <StPage><StHead title="Clients" meta={agencyName} /><StNotice>{agencyName} shared some work with you to read. Clients, the queue and agency tools are for members of {agencyName}.</StNotice>{privateWork}</StPage>;
 
+  const openItem = (item: AgencyQueueItem) => {
+    if (item.href) { window.location.assign(item.href); return; }
+    if (item.workId) onOpenClientWork(item.workspaceId, item.workId); else onWorkspace(item.workspaceId);
+  };
+  const go = (next: AgencyView) => { setView(next); onViewChange?.(next); };
+  const clientsStatus = clients.status === "loading" ? "loading" as const : clients.status === "error" ? "error" as const : "ready" as const;
+
   // XA · A3: an agency with no clients yet sees day one on its Today, not an empty table.
   // Only inside the shell (controlledView), where the sidebar carries Queue, Library and Team.
   if (released && controlledView === "home" && clients.status === "ready" && combined && combined.total === 0 && !combined.nextCursor) {
@@ -327,6 +361,36 @@ export function AgencyHome({
       onAsk={text => onStart(text)} /></div>;
   }
 
+  if (xaView && view === "home") return <div aria-busy={busy || clients.status === "loading" || undefined}><section aria-label="Home">
+    <AgencyToday agencyName={agencyName} personName={firstNameFromEmail(snapshot.actor.email)} status={clientsStatus} clients={combined?.clients ?? []} queue={combined?.queue ?? []}
+      minutes={minutesByClient} totalClients={combined?.total} addClientHref={addClientHref} hour={new Date(now).getHours()} onAsk={onStart} onOpenClient={onWorkspace} onOpenItem={openItem} onAllClients={() => go("clients")} onRetry={retry} />
+  </section>{creditSection}</div>;
+
+  const moreCount = providerCount === null || requestCount === null || applicationDrafts === null || websiteDrafts === null ? null
+    : providerCount + requestCount + readyApplicationDrafts.length + readyWebsiteDrafts.length;
+  const queueChecks = combined ? combined.clients.reduce((sum, client) => {
+    const checked = client.systems.filter(system => system.health?.lastVerifiedAt);
+    const latest = checked.map(system => system.health!.lastVerifiedAt!).sort().at(-1) ?? null;
+    return { systems: sum.systems + checked.length, at: latest && (!sum.at || latest > sum.at) ? latest : sum.at };
+  }, { systems: 0, at: null as string | null }) : undefined;
+
+  if (xaView && view === "queue") return <div aria-busy={busy || clients.status === "loading" || undefined}><section aria-label="Queue">
+    <AgencyQueueXa now={now} status={clientsStatus} items={combined?.queue ?? []} complete={combined?.queueComplete ?? true} gaps={combined?.queueGaps} loaded={combined ? { clients: combined.clients.length, total: combined.total } : undefined}
+      onOpen={openItem} onLoadMore={combined?.nextCursor ? loadMore : undefined} loadingMore={clients.status === "ready" && clients.loadingMore} onRetry={retry}
+      proposals={<AgencyProposals key={snapshot.workspaceId} quietWhenEmpty onAccepted={retry} agencyWorkspaceId={snapshot.workspaceId} agencyName={agencyName} canManage={current?.role === "owner" || current?.role === "admin"} transport={request} showListing={false} />}
+      checks={queueChecks}
+      more={{ count: moreCount, content: <><ProviderClientQueue workspaceId={snapshot.workspaceId} onWorkspace={onWorkspace} onCount={setProviderCount} />{serviceRequests}{applicationDraftSection}{websiteDraftSection}</> }} />
+  </section><XaComposerDock><div className={xaStyles.columnDock}><XaComposer value={ask} onChange={setAsk} onSubmit={() => { onStart(ask); setAsk(""); }} placeholder="Ask Strelva about any client" inputLabel={`Ask Strelva about ${agencyName}'s clients`} /></div></XaComposerDock></div>;
+
+  if (xaView && view === "library") return <div aria-busy={busy || undefined}><section aria-label="Library">
+    <AgencyLibraryView request={request} agencyWorkspaceId={snapshot.workspaceId} onWorkspace={onWorkspace} />
+    {current?.role === "owner" || current?.role === "admin" ? <div className={xaStyles.column} style={{ paddingTop: 0 }}><AgencyFold label="Adapt a source for another client"><AgencyVersionCreate request={request} agencyWorkspaceId={snapshot.workspaceId} clients={combined?.clients ?? []} /></AgencyFold></div> : null}
+  </section></div>;
+
+  if (xaView && view === "minutes") return <div aria-busy={busy || minutes.state.status === "loading" || undefined}><section aria-label="Minutes">
+    <AgencyMinutes agencyName={agencyName} state={clients.status === "error" ? { status: "clients-error" } : clients.status === "loading" ? { status: "loading" } : minutes.state} onOpenClient={onWorkspace} onRetry={clients.status === "error" ? retry : minutes.retry} />
+  </section></div>;
+
   const tab = (value: AgencyView) => ({ id: `${id}-${value}-tab`, panelId: `${id}-${value}-panel` });
   const choose = (value: string) => {
     const next = value as AgencyView;
@@ -336,7 +400,7 @@ export function AgencyHome({
   };
 
   return <div aria-busy={busy || clients.status === "loading" || undefined}><StPage width={view === "home" || view === "clients" ? "wide" : "column"}>
-    <StHead title={view === "home" ? agencyName : view === "clients" ? "Clients" : view === "queue" ? "Queue" : view === "library" ? "Library" : view === "team" ? "Team" : view === "build" ? "Build for a client" : "Prepare a release"} meta={<>{agencyName}{combined ? <> · {combined.total} {combined.total === 1 ? "client" : "clients"} · {combined.queue.length} client {combined.queue.length === 1 ? "item" : "items"} loaded{!combined.queueComplete ? " · Queue incomplete" : ""}</> : null}</>} actions={<>
+    <StHead title={view === "home" ? agencyName : view === "clients" ? "Clients" : view === "queue" ? "Queue" : view === "library" ? "Library" : view === "team" ? "Team" : view === "build" ? "Build for a client" : view === "minutes" ? "Minutes" : "Prepare a release"} meta={<>{agencyName}{combined ? <> · {combined.total} {combined.total === 1 ? "client" : "clients"} · {combined.queue.length} client {combined.queue.length === 1 ? "item" : "items"} loaded{!combined.queueComplete ? " · Queue incomplete" : ""}</> : null}</>} actions={<>
       {snapshot.releases?.agencyAddClient ? <StPillLink variant={view === "clients" ? "primary" : "soft"} href={`/workspace/agency/clients/new?workspaceId=${encodeURIComponent(snapshot.workspaceId)}`}>Add a client</StPillLink> : null}
       {snapshot.releases?.agencyImportClients ? <StPillLink variant="soft" href={`/workspace/agency/clients/import?workspaceId=${encodeURIComponent(snapshot.workspaceId)}`}>Import clients</StPillLink> : null}
       {snapshot.releases?.agencySetup ? <StTextButton href={`/workspace/agency/start?workspaceId=${encodeURIComponent(snapshot.workspaceId)}`}>Verification</StTextButton> : null}

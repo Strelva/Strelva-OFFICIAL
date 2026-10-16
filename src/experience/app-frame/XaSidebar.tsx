@@ -36,7 +36,7 @@ export interface XaAgencyNavigation {
   leadsAvailable?: boolean;
   leadsCurrent?: boolean;
   active?: AgencyPlace;
-  onNavigate?: (view: "clients" | "queue" | "library" | "team") => void;
+  onNavigate?: (view: "clients" | "queue" | "library" | "team" | "minutes") => void;
   hrefs?: Partial<Record<AgencyPlace, string>>;
   /** XA: the agency's clients, read through ordinary agency scope. */
   clients?: readonly StrelvaClientLink[];
@@ -110,9 +110,8 @@ export function XaSidebar(props: XaSidebarProps) {
   const agencyHref = (view: AgencyPlace) => agencyNavigation?.hrefs?.[view]
     || (view === "home" ? workspaceSectionHref("home", appBase, agencyId)
       : view === "verification" ? scoped("/workspace/agency/start", agencyId)
-        : view === "minutes" ? workspaceSectionHref("ongoing", appBase, agencyId)
           : `${workspaceSectionHref("home", appBase, agencyId)}${agencyId ? "&" : "?"}agencyView=${view}`);
-  const agencyGo = (view: AgencyPlace) => view !== "home" && view !== "verification" && view !== "minutes" && agencyNavigation?.onNavigate ? () => agencyNavigation.onNavigate?.(view) : undefined;
+  const agencyGo = (view: AgencyPlace) => view !== "home" && view !== "verification" && agencyNavigation?.onNavigate ? () => agencyNavigation.onNavigate?.(view) : undefined;
   const brandCredit = ownerBrand?.agencyId ? <p className={styles.credit}>{name === ownerBrand.name || name.startsWith(`${ownerBrand.name} / `) ? "Runs on Strelva" : `${ownerBrand.name} · Runs on Strelva`}</p> : ownerBrand?.name === "Agency identity unavailable" ? <p className={styles.credit}>Agency identity unavailable</p> : null;
   const showSwitcher = Boolean(businessContext && !contextName);
   const close = () => onCloseMobile?.();

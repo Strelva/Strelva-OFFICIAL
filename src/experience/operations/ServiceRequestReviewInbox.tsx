@@ -16,10 +16,12 @@ function agencyResponseKey(item: ServiceRequest, decision: "accepted" | "decline
   return `service-request-response:${item.id}:${item.revision}:${decision}`;
 }
 
-export function ServiceRequestInbox({ providerWorkspaceId, surface = "admin" }: {
+export function ServiceRequestInbox({ providerWorkspaceId, surface = "admin", onCount }: {
   /** The server-resolved agency workspace. Omit this for the Strelva inbox. */
   providerWorkspaceId?: string;
   surface?: "admin" | "workspace";
+  /** Reports how many requests the inbox holds once read; null while unknown or unreadable. */
+  onCount?: (count: number | null) => void;
 }) {
   const dark = surface === "admin";
   const transport = useWorkspaceRequest();
@@ -62,6 +64,7 @@ export function ServiceRequestInbox({ providerWorkspaceId, surface = "admin" }: 
     void load(controller.signal);
     return () => controller.abort();
   }, [load, retry]);
+  useEffect(() => { onCount?.(loading || error ? null : requests.length); }, [onCount, loading, error, requests.length]);
 
   async function respond(item: ServiceRequest, decision: "accepted" | "declined") {
     const requestContext = inboxQuery;

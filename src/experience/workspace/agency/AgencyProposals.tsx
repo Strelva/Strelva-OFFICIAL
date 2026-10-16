@@ -12,7 +12,7 @@ type Transport = (input: string, init?: RequestInit) => Promise<Response>;
  * listed where businesses choose one. Nothing changes for a business until
  * an owner or admin of the agency accepts. Listing is opt-in and unranked.
  */
-export function AgencyProposals({ agencyWorkspaceId, agencyName, canManage, transport = fetch, showListing = true, listingOnly = false, onAccepted }: { agencyWorkspaceId: string; agencyName: string; canManage: boolean; transport?: Transport; showListing?: boolean; listingOnly?: boolean; onAccepted?: () => void }) {
+export function AgencyProposals({ agencyWorkspaceId, agencyName, canManage, transport = fetch, showListing = true, listingOnly = false, onAccepted, quietWhenEmpty = false }: { agencyWorkspaceId: string; agencyName: string; canManage: boolean; transport?: Transport; showListing?: boolean; listingOnly?: boolean; onAccepted?: () => void; /** XA Queue: say nothing while no business is asking. */ quietWhenEmpty?: boolean }) {
   const [state, setState] = useState<{ loading: boolean; error: string; proposals: Proposal[] }>({ loading: canManage, error: "", proposals: [] });
   const [busy, setBusy] = useState<string | null>(null);
   const [message, setMessage] = useState("");
@@ -63,6 +63,7 @@ export function AgencyProposals({ agencyWorkspaceId, agencyName, canManage, tran
   }
 
   if (!canManage) return null;
+  if (quietWhenEmpty && !showListing && !state.loading && !state.error && !state.proposals.length && !message) return null;
   return <>
     {!listingOnly ? <StSection title="Businesses asking you in" meta="A business chose what you can do. Nothing changes for them until you accept." action={<StTextButton disabled={Boolean(busy)} onClick={() => void load()}>Refresh requests</StTextButton>}>
       {state.loading ? <><p role="status">Loading requests from businesses…</p><StSkeleton label="Loading requests from businesses" /></>

@@ -24,14 +24,15 @@ describe("agency v2 document drafts", () => {
     const save = vi.fn(async (_binding,record) => ({website:record}));
     await mount({read:async()=>initial,save});
     const options = [...container.querySelectorAll("option")].map(option=>option.textContent);
-    expect(options.join()).toContain("ServiceGrid");
+    expect(options.join()).toContain("Practice areas");
+    expect(options.join()).not.toContain("Service grid");
     expect(options.join()).not.toContain("Header");
     expect(options.join()).not.toContain("Hero");
     expect(container.textContent).not.toContain("Approve this preview");
     expect(container.textContent).not.toContain("Connect domain");
     await change(container.querySelector("textarea")!,"[Agency's proposed services]");
-    await act(async()=>container.querySelector<HTMLButtonElement>('[aria-label="Move service-one down"]')!.click());
-    await act(async()=>button("Save draft for client review").click());
+    await act(async()=>container.querySelector<HTMLButtonElement>('[aria-label="Move [First service from source] down"]')!.click());
+    await act(async()=>button("Send to the client").click());
     expect(save).toHaveBeenCalledWith(bindingId,initial.website,"services",[
       {op:"replace",path:"/nodes/services/props",value:{...initial.website!.rebuild.candidate!.document.nodes.services!.props,title:"[Agency's proposed services]"}},
       {op:"replace",path:"/nodes/services/children",value:["service-two","service-one"]},
@@ -42,14 +43,14 @@ describe("agency v2 document drafts", () => {
     const initial=agencyDocumentFixture(scenario); const save=vi.fn();
     await mount({read:async()=>initial,save});
     expect(container.querySelectorAll("textarea")).toHaveLength(0);
-    expect(button("Save draft for client review")).toBeUndefined();
+    expect(button("Send to the client")).toBeUndefined();
     expect(save).not.toHaveBeenCalled();
   });
   it("preserves edits after stale revision failure and reloads revoked permission",async()=>{
     const initial=agencyDocumentFixture();let reads=0;
     await mount({read:async()=>++reads===1?initial:agencyDocumentFixture("agency-revoked"),save:async()=>{throw new Error("This website changed. Reload before preparing a draft.");}});
     await change(container.querySelector("textarea")!,"[Keep this unsaved proposal]");
-    await act(async()=>button("Save draft for client review").click());
+    await act(async()=>button("Send to the client").click());
     expect(container.querySelector("textarea")!.value).toBe("[Keep this unsaved proposal]");
     expect(container.querySelector('[role="alert"]')!.textContent).toContain("Your unsaved edits are preserved");
     await act(async()=>button("Reload saved document and permission").click());
@@ -73,7 +74,7 @@ describe("agency v2 document drafts", () => {
     await act(async()=>container.querySelector("iframe")!.dispatchEvent(new Event("load")));
     expect(container.textContent).toContain("The private preview is unavailable");
     await act(async()=>button("Reload preview and permission").click());
-    expect(container.textContent).toContain("Grant expired");expect(button("Save draft for client review")).toBeUndefined();
+    expect(container.textContent).toContain("Grant expired");expect(button("Send to the client")).toBeUndefined();
   });
   it.each(["read","save"] as const)("handles a followed sign-in redirect during %s as lost permission",async method=>{
     const response=new Response("<!doctype html><h1>Sign in</h1>",{status:200,headers:{"Content-Type":"text/html"}});
@@ -102,8 +103,8 @@ describe("agency v2 document drafts", () => {
     }));
     await mount({read:async()=>initial,save:agencyDocumentTransport.save});
     await change(container.querySelector("textarea")!,"[Preserve my proposed edit]");
-    await act(async()=>button("Save draft for client review").click());
-    expect(button("Save draft for client review")).toBeUndefined();
+    await act(async()=>button("Send to the client").click());
+    expect(button("Send to the client")).toBeUndefined();
     expect(container.textContent).toContain("Your unsaved edits are preserved");
     expect(container.textContent).toContain("Reloading replaces them with the saved document");
     expect(initial.website!.rebuild.candidate!.document.nodes.services!.props).toMatchObject({title:"Practice areas"});
@@ -138,7 +139,7 @@ describe("agency v2 document drafts", () => {
     await mount({read:async()=>initial,save:vi.fn()});
     expect(container.textContent).toContain("Navigation and footer changes need the client or Strelva");
     expect(container.querySelector("textarea")).toBeNull();
-    expect(button("Save draft for client review")).toBeUndefined();
+    expect(button("Send to the client")).toBeUndefined();
   });
   it("keeps the legacy section editor when the binding has no v2 document",async()=>{
     const initial=agencyDocumentFixture();

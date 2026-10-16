@@ -201,6 +201,39 @@ export function libraryStatusLine(source: AgencyLibrarySource): string {
   return parts.length ? parts.join(" · ") : "No client Versions yet";
 }
 
+/** "Live at 1 · 3 more could use it": how far one source has reached, in the words of the render. */
+export function libraryReachLine(source: AgencyLibrarySource): string {
+  const counts = libraryCounts(source);
+  const live = counts.up_to_date;
+  const more = source.versions.length - live - counts.declined - counts.unavailable;
+  if (!source.versions.length) return "Not offered to a client yet";
+  if (!live) return `${more} ${more === 1 ? "client" : "clients"} could use it`;
+  if (!more) return `Live at ${live} ${live === 1 ? "client" : "clients"}`;
+  return `Live at ${live} · ${more} more could use it`;
+}
+
+/** One Version's row line. Settled rows say where they live; only exceptions read as a state. */
+export function libraryVersionLine(version: AgencyLibraryVersion, choosing = false): string {
+  const own = version.localChanges ? ` · keeps ${plural(version.localChanges, "change")} of their own` : "";
+  switch (version.state) {
+    case "up_to_date": return own.replace(/^ · /, "");
+    case "ready": return `${choosing ? "Can be offered" : "Works as is"}${own}`;
+    case "conflicts": return libraryConflictSentence(version);
+    case "missing_accounts": return `${choosing ? "Skipped · " : ""}${missingAccountsLabel(version.missingBindings)}`;
+    case "declined": return version.declinedReason ? `Declined: ${version.declinedReason}` : "Declined";
+    case "unavailable": return "Could not be read just now";
+  }
+}
+
+/** "Their contact form already has its own reply message. Choose which one stays." */
+export function libraryConflictSentence(version: Pick<AgencyLibraryVersion, "systemName" | "conflicts">): string {
+  const first = version.conflicts[0];
+  const part = first ? conflictPathLabel(first.path).replaceAll(" › ", " ") : "version of this";
+  const others = version.conflicts.length - 1;
+  const name = /^[A-Z][a-z]+(\s|$)/.test(version.systemName) ? version.systemName.charAt(0).toLowerCase() + version.systemName.slice(1) : version.systemName;
+  return `Their ${name} already has its own ${part}${others > 0 ? ` and ${plural(others, "other part")}` : ""}. Choose which one stays.`;
+}
+
 /** A conflict value as the person would read it: text in quotes, the rest as data. */
 export function conflictValue(value: unknown): string {
   if (value === undefined || value === null) return "Not set";

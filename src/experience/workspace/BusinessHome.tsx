@@ -44,6 +44,8 @@ import { workspaceWorkLabel } from "./work-label";
 import { LoopRibbon } from "./outcomes/LoopRibbon";
 import { useHomeOutcomes } from "./outcomes/HomeOutcomes";
 import styles from "./business-home.module.css";
+import { useWorkspaceRequest } from "./WorkspaceRequest";
+import { AgencyClientXa, useAgencyGrants } from "./agency/xa/AgencyClientXa";
 
 interface Props {
   needs?: ReturnType<typeof useNeedsYou>;
@@ -169,6 +171,8 @@ export function BusinessHome({ needs: providedNeeds, agencyHome: providedAgencyH
   const selectedDecisionId = readLocation.decision ?? (decisionHint && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(decisionHint) ? decisionHint : undefined);
   const decisionId = selectedDecisionId ?? (reviewed?.workspaceId === snapshot.workspaceId ? reviewed.id : undefined);
   const agencyWorkspace = clientAgencyWorkspace(snapshot);
+  const workspaceRequest = useWorkspaceRequest();
+  const agencyGrants = useAgencyGrants(workspaceRequest, snapshot.workspaceId, agencySeat && systemsReleased ? agencyWorkspace?.id : undefined);
   const navigationBrand = !agencyWorkspace || snapshot.ownerBrand?.agencyId === agencyWorkspace.id ? snapshot.ownerBrand : undefined;
   const deliveryScope = eligibility.deliveries && !agencySeat ? snapshot.workspaceId : undefined;
   const deliveries = useBusinessDeliveries(deliveryScope);
@@ -450,10 +454,15 @@ export function BusinessHome({ needs: providedNeeds, agencyHome: providedAgencyH
     onDecide={needsYou.decide} onUndo={needsYou.undo} onRetry={needsYou.refresh} onToday={() => { setReviewed(null); onNavigate("home"); }}
     onWhatChanged={() => { setReviewed(null); setHandledWorkspaceId(snapshot.workspaceId); onNavigate("home"); }} onOpenDecision={reviewDecision}
     onAsk={readOnly ? undefined : request} />;
+  // XA · AG3: inside one client, the agency sees what the owner let it do.
+  const agencyClient = agencySeat && business && agencyWorkspace && !showHandled && !readLocation.deliveryCheck
+    ? <AgencyClientXa clientName={name} workspaceId={snapshot.workspaceId} agencyName={navigationBrand?.agencyId ? navigationBrand.name : agencyWorkspace.name} agencyHref={`${appBase}/workspace?workspaceId=${encodeURIComponent(agencyWorkspace.id)}&agencyView=clients`}
+        systems={systems} systemsLoading={busy || systemsLoading} grants={agencyGrants} shared={sharedHome.state} systemHref={openSystemHref} onOpenSystem={onOpenSystem} onRetryShared={sharedHome.refresh} onAsk={readOnly || busy ? undefined : () => onStart()} />
+    : null;
   const page = view === "needs-you" && needsYouReleased ? xaOwner ? xaDecision : needsYouPage
-    : business ? xaOwner && !showHandled ? xaToday : paperHome : homePage;
+    : business ? xaOwner && !showHandled ? xaToday : agencyClient ?? paperHome : homePage;
 
-  return <StrelvaShell connectionsAvailable={current?.kind === "customer" || current?.kind === "agency"} workspaceName={agencyWorkspace ? `${navigationBrand?.agencyId ? navigationBrand.name : agencyWorkspace.name} / ${name}` : name} ownerBrand={navigationBrand} brandWorkspaceId={agencyWorkspace?.id} allClients={agencyWorkspace ? { href: `${appBase}/workspace?workspaceId=${agencyWorkspace.id}&agencyView=clients` } : undefined} agencyNavigation={agencyWorkspace && systemsReleased ? { leadsAvailable: false, agencyWorkspaceId: agencyWorkspace.id, clients: agencyClientLinks(snapshot, appBase, onWorkspace) } : undefined} active={view === "needs-you" ? "needs-you" : "home"} title={view === "needs-you" ? agencySeat ? `Waiting on ${name}` : "Needs you" : xaOwner && !showHandled ? "Today" : name} appBase={appBase} workspaceId={snapshot.workspaceId} accountName={snapshot.actor.displayName?.trim() || snapshot.actor.email.split("@")[0] || "Your account"} accountDetail={snapshot.actor.email} signOut={signOut} onNavigate={place => { setHandledWorkspaceId(null); onNavigate(place); }} onStart={onStart} startDisabled={readOnly || busy} searchItems={searchItems} searchScopeName={name} recentWork={recentWork} pinned={systemsReleased ? pinnedSystems(systems, openSystemHref, onOpenSystem) : [...pinnedWebsites(sites), ...pinnedApps(snapshot.work, workHref, onOpen)]} systemsReleased={systemsReleased} notice={notice} contentId="business-home-main"
+  return <StrelvaShell connectionsAvailable={current?.kind === "customer" || current?.kind === "agency"} workspaceName={agencyWorkspace ? systemsReleased ? navigationBrand?.agencyId ? navigationBrand.name : agencyWorkspace.name : `${navigationBrand?.agencyId ? navigationBrand.name : agencyWorkspace.name} / ${name}` : name} ownerBrand={navigationBrand} brandWorkspaceId={agencyWorkspace?.id} allClients={agencyWorkspace ? { href: `${appBase}/workspace?workspaceId=${agencyWorkspace.id}&agencyView=clients` } : undefined} agencyNavigation={agencyWorkspace && systemsReleased ? { leadsAvailable: false, agencyWorkspaceId: agencyWorkspace.id, clients: agencyClientLinks(snapshot, appBase, onWorkspace) } : undefined} active={view === "needs-you" ? "needs-you" : "home"} title={view === "needs-you" ? agencySeat ? `Waiting on ${name}` : "Needs you" : xaOwner && !showHandled ? "Today" : name} appBase={appBase} workspaceId={snapshot.workspaceId} accountName={snapshot.actor.displayName?.trim() || snapshot.actor.email.split("@")[0] || "Your account"} accountDetail={snapshot.actor.email} signOut={signOut} onNavigate={place => { setHandledWorkspaceId(null); onNavigate(place); }} onStart={onStart} startDisabled={readOnly || busy} searchItems={searchItems} searchScopeName={name} recentWork={recentWork} pinned={systemsReleased ? pinnedSystems(systems, openSystemHref, onOpenSystem) : [...pinnedWebsites(sites), ...pinnedApps(snapshot.work, workHref, onOpen)]} systemsReleased={systemsReleased} notice={notice} contentId="business-home-main"
     navigation={gettingStartedHref ? <StTextButton href={gettingStartedHref}>Getting started</StTextButton> : undefined}
     needsYou={needsYouReleased ? { count: decisionsWaiting, label: agencySeat ? `Waiting on ${name}` : undefined } : undefined}
     businessContext={business ? <WorkspaceBusinessSwitcher snapshot={snapshot} systems={systems} onSystem={onOpenSystem} busy={busy} onWorkspace={onWorkspace} onNavigate={onNavigate} /> : <label><span className={styles.srOnly}>Current workspace</span><select aria-label="Current workspace" value={snapshot.workspaceId} disabled={busy} onChange={event => onWorkspace(event.target.value)}>{snapshot.workspaces.map(workspace => <option key={workspace.id} value={workspace.id}>{workspace.name}{workspace.access === "delegated_read" ? " · Read-only" : ""}</option>)}</select></label>}>

@@ -7,6 +7,47 @@ The [visual direction map](../../DESIGN.md#visual-direction-and-extension-map) o
 how identity, imagery, composition and component treatment fit together. This
 file owns component contracts, extension and adoption, including gaps in source.
 
+## October 16 XA-6 agency screens (local, branch xa/lane-xa6-agency)
+
+The agency's own screens move to XA in `src/experience/workspace/agency/xa/`,
+on the foundation kit with no forks:
+
+- `AgencyToday` (AG1): greeting, one sentence about every client, the composer
+  carrying the one item that needs the agency, one row per client with time
+  this month, and Pebble with the latest checks. AgencyHome view `home`.
+- `AgencyQueueXa` (AG2): "Waiting on you" (broken first, the oldest gets the
+  ink pill) and "Waiting on owners" (text link only). AgencyHome view `queue`.
+- `AgencyClientXa` (AG3): inside one client, the owner's level per area when
+  readable, "Only <owner> can", shared decisions and changes. BusinessHome
+  renders it for a provider seat with Systems released.
+- `AgencySendPanel` (AG4): now/after rows and "Send to <client>", used by
+  `AgencyWebsiteDocumentDraftExperience`.
+- `AgencyLibraryView` (AG5) keeps its offer logic; sources ("Live at 1 · 3
+  more could use it") sit beside the chosen source as the page's one
+  large-shadow object.
+- `AgencyMinutes` + `useAgencyMinutes` (AG6): time per client from the
+  care-report time read. AgencyHome view `minutes`; the sidebar's Minutes now
+  opens it instead of the business `ongoing` view.
+
+Critic pass (same day): status shows only on exceptions; `AgencyFold`
+(`agency/xa/AgencyFold.tsx`) is the one fold for agency screens (label, count,
+chevron; stays mounted while closed so its parts can report counts); the
+Library gives each ready client its own Offer and resolves a conflict inline
+through `/api/workspace/versions` (`agency/library-resolve.ts`), with filter and
+refresh inside "Releases and packaging"; AG4 diffs long text line by line
+(`lineChanges`), opens on the section that holds the changes, and moves the
+send panel under the brief below 1180px with a sticky Send on phone; AG6 has
+one Pebble line under the rows and names who logged each client's minutes.
+`AgencyHome.onQueueSummary` feeds the real sidebar's Queue count and clay
+client dots from the same batched read. `ServiceRequestInbox` and
+`ProviderClientQueue` take an optional `onCount`. Kit: `XaWaiting` wraps its
+action under the title on narrow screens.
+
+Shared touches: `XaSidebar`/`StrelvaSidebar` accept `minutes` as an agency view,
+`agencyClientLinks` gives each client a stable colour (`clientColor`), and
+`AgencyProposals` takes `quietWhenEmpty`. Preview:
+`/preview/strelva/xa/xa6-agency/<today|queue|client|prepare|library|minutes>?state=…`.
+
 ## October 15 XA foundation (local, branch xa/build-20261015)
 
 XA is the default workspace look: paper, a quiet side rail, one ink primary per

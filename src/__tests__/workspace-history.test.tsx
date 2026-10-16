@@ -204,12 +204,13 @@ it("agency client work opens a new history entry and Back restores the agency", 
     return Response.json({ ...data, releases: { ...data.releases, systems: true } });
   }) as typeof fetch;
   const node = await render(request);
-  const tab = [...node.querySelectorAll<HTMLAnchorElement>("aside a")].find(item => item.textContent?.trim() === "Queue")!;
+  const tab = [...node.querySelectorAll<HTMLAnchorElement>("aside a")].find(item => item.textContent?.trim().startsWith("Queue"))!;
   expect(tab).toBeDefined();
   await act(async () => tab.click()); await settle();
-  const open = [...node.querySelectorAll<HTMLButtonElement>("button")].find(item => item.textContent?.startsWith("Open saved assessment"))!;
+  // XA · AG2: the row names the client and kind; its one action opens the client's own work.
+  const open = [...node.querySelectorAll<HTMLButtonElement>("button")].find(item => item.getAttribute("aria-label")?.startsWith("Open request: Open saved assessment"))!;
   expect(open).toBeDefined();
-  expect(open.textContent).toContain("Harbor Dental · Request");
+  expect(open.closest("li")?.textContent).toContain("Harbor Dental · request");
   await act(async () => open.click()); await settle();
   expect(new URLSearchParams(window.location.search).get("workspaceId")).toBe(BUSINESS);
   expect(new URLSearchParams(window.location.search).get("work")).toBe("44444444-4444-4444-8444-444444444444");
