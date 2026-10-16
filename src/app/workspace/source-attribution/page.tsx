@@ -9,13 +9,42 @@ import { MoneyLoadFailure } from "@/experience/workspace/money/MoneyLoadFailure"
 import styles from "@/experience/workspace/money/money.module.css";
 export const dynamic = "force-dynamic";
 
-export default async function SourceAttributionPage({ searchParams }: { searchParams: Promise<{ workspaceId?: string; systemId?: string }> }) {
+export default async function SourceAttributionPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ workspaceId?: string; systemId?: string }>;
+}) {
   if (!workspaceReleaseEnabled()) notFound();
-  const actor = await workspaceHttpActor(); if (!actor) redirect("/sign-in");
-  const parsed = z.object({ workspaceId: z.string().uuid(), systemId: z.string().uuid() }).safeParse(await searchParams); if (!parsed.success) notFound();
+  const actor = await workspaceHttpActor();
+  if (!actor) redirect("/sign-in");
+  const parsed = z
+    .object({ workspaceId: z.string().uuid(), systemId: z.string().uuid() })
+    .safeParse(await searchParams);
+  if (!parsed.success) notFound();
   const { workspaceId, systemId } = parsed.data;
   let creator;
-  try { creator = await readPackageCreator(actor, workspaceId, systemId); }
-  catch { return <StrelvaShell title="" workspaceId={workspaceId} active="system"><div className={styles.screen}><MoneyLoadFailure title="Who made this could not be checked." quiet="The System keeps running. Its creator credit is read again next time you open this." retryHref={`/workspace/source-attribution?${new URLSearchParams({ workspaceId, systemId })}`} /></div></StrelvaShell>; }
-  return <StrelvaShell title="" workspaceId={workspaceId} active="system"><SourceAttributionView workspaceId={workspaceId} systemId={systemId} creator={creator} /></StrelvaShell>;
+  try {
+    creator = await readPackageCreator(actor, workspaceId, systemId);
+  } catch {
+    return (
+      <StrelvaShell title="" workspaceId={workspaceId} active="system">
+        <div className={styles.screen}>
+          <MoneyLoadFailure
+            title="Who made this could not be checked."
+            quiet="The System keeps running. Its creator credit is read again next time you open this."
+            retryHref={`/workspace/source-attribution?${new URLSearchParams({ workspaceId, systemId })}`}
+          />
+        </div>
+      </StrelvaShell>
+    );
+  }
+  return (
+    <StrelvaShell title="" workspaceId={workspaceId} active="system">
+      <SourceAttributionView
+        workspaceId={workspaceId}
+        systemId={systemId}
+        creator={creator}
+      />
+    </StrelvaShell>
+  );
 }

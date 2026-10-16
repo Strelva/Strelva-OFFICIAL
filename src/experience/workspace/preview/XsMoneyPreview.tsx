@@ -10,7 +10,10 @@ import { StrelvaShell } from "@/experience/app-frame/StrelvaShell";
 import type { StrelvaClientLink } from "@/experience/app-frame/workspace-places";
 import { XaHeadline, XaTextLink } from "@/components/ui/strelva/Xa";
 import { BusinessBillingView } from "@/experience/workspace/billing/BusinessBillingView";
-import { BusinessAiBudgetSummary, StartWorkspacePlan } from "@/experience/workspace/billing/StartWorkspacePlan";
+import {
+  BusinessAiBudgetSummary,
+  StartWorkspacePlan,
+} from "@/experience/workspace/billing/StartWorkspacePlan";
 import { WorkspacePayerTransition } from "@/experience/workspace/WorkspacePayerTransition";
 import { AgencyInvoiceAcceptance } from "@/experience/workspace/billing/AgencyInvoiceControls";
 import { UNRELEASED_CHECKOUT } from "@/experience/workspace/billing/AgencyCheckoutStatus";
@@ -34,141 +37,719 @@ import CreatorMaintenance from "@/app/workspace/creator-maintenance/CreatorMaint
 import ReviewQueue from "@/app/workspace/money-reconciliation/ReviewQueue";
 import { businessDepositFixture } from "./deposit-fixture";
 import {
-  CLIENT_COLORS, NORTH_BRAND, XS, agencyBilling, agencyInbox, businessMoney, connectedLinks, creatorMaintenance, creatorSources, governedGraph, harborBilling, harborBillingAgencyPays,
-  harborBudget, harborRetail, invoiceDoc, payerSnapshot, paymentLinksSnapshot, paymentRequests, paymentSources, receiptDoc, reconciliationIssues, versionGraph,
+  CLIENT_COLORS,
+  NORTH_BRAND,
+  XS,
+  agencyBilling,
+  agencyInbox,
+  businessMoney,
+  connectedLinks,
+  creatorMaintenance,
+  creatorSources,
+  governedGraph,
+  harborBilling,
+  harborBillingAgencyPays,
+  harborBudget,
+  harborRetail,
+  invoiceDoc,
+  payerSnapshot,
+  paymentLinksSnapshot,
+  paymentRequests,
+  paymentSources,
+  receiptDoc,
+  reconciliationIssues,
+  versionGraph,
 } from "./xs-money-fixture";
 import { XS_MONEY_SCREENS, type XsMoneyScreen } from "./xs-money-screens";
 export { XS_MONEY_SCREENS, type XsMoneyScreen };
 
 const BASE = "/preview/strelva/xa/xs-money";
-const json = (value: unknown, status = 200) => new Response(JSON.stringify(value), { status, headers: { "Content-Type": "application/json" } });
+const json = (value: unknown, status = 200) =>
+  new Response(JSON.stringify(value), {
+    status,
+    headers: { "Content-Type": "application/json" },
+  });
 const never = () => new Promise<Response>(() => undefined);
 
 /** A fetch that answers from fixtures. `hang` keeps the loading state on screen; `fail` answers 503. */
-function fixtureFetch(answer: (url: string, init?: RequestInit) => unknown, mode: "ok" | "hang" | "fail" = "ok"): typeof fetch {
+function fixtureFetch(
+  answer: (url: string, init?: RequestInit) => unknown,
+  mode: "ok" | "hang" | "fail" = "ok",
+): typeof fetch {
   return (async (input: RequestInfo | URL, init?: RequestInit) => {
     if (mode === "hang") return never();
-    if (mode === "fail") return json({ error: "Strelva could not read this just now. Nothing changed." }, 503);
-    await new Promise(resolve => setTimeout(resolve, init?.method === "POST" ? 700 : 120));
+    if (mode === "fail")
+      return json(
+        { error: "Strelva could not read this just now. Nothing changed." },
+        503,
+      );
+    await new Promise((resolve) =>
+      setTimeout(resolve, init?.method === "POST" ? 700 : 120),
+    );
     return json(answer(String(input), init));
   }) as typeof fetch;
 }
 
-export function XsMoneyPreview({ screen, state, mode }: { screen: XsMoneyScreen; state: string; mode: "light" | "dark" }) {
+export function XsMoneyPreview({
+  screen,
+  state,
+  mode,
+}: {
+  screen: XsMoneyScreen;
+  state: string;
+  mode: "light" | "dark";
+}) {
   const states = XS_MONEY_SCREENS[screen] as readonly string[];
-  const shell = { appBase: "/preview/strelva", signOut: null, systemsReleased: true, mode, notice: <p className={styles.note} style={{ padding: "8px 20px" }}>Fictional preview. Nothing here reaches Stripe, a client or an inbox.</p> } as const;
+  const shell = {
+    appBase: "/preview/strelva",
+    signOut: null,
+    systemsReleased: true,
+    mode,
+    notice: (
+      <p className={styles.note} style={{ padding: "8px 20px" }}>
+        Fictional preview. Nothing here reaches Stripe, a client or an inbox.
+      </p>
+    ),
+  } as const;
   const clients: StrelvaClientLink[] = [
-    { id: "harbor", name: "Harbor Dental", href: `${BASE}/billing`, detail: "Dr. Lin", color: CLIENT_COLORS.harbor, waits: screen === "billing-agency" },
-    { id: "coast", name: "North Coast Realty", href: `${BASE}/billing-agency`, detail: "Dana", color: CLIENT_COLORS.coast },
-    { id: "lakeview", name: "Lakeview Mediation", href: `${BASE}/billing-agency`, detail: "Ruth", color: CLIENT_COLORS.lakeview },
-    { id: "fieldwork", name: "Fieldwork Studio", href: `${BASE}/billing-agency`, detail: "Ana", color: CLIENT_COLORS.fieldwork },
+    {
+      id: "harbor",
+      name: "Harbor Dental",
+      href: `${BASE}/billing`,
+      detail: "Dr. Lin",
+      color: CLIENT_COLORS.harbor,
+      waits: screen === "billing-agency",
+    },
+    {
+      id: "coast",
+      name: "North Coast Realty",
+      href: `${BASE}/billing-agency`,
+      detail: "Dana",
+      color: CLIENT_COLORS.coast,
+    },
+    {
+      id: "lakeview",
+      name: "Lakeview Mediation",
+      href: `${BASE}/billing-agency`,
+      detail: "Ruth",
+      color: CLIENT_COLORS.lakeview,
+    },
+    {
+      id: "fieldwork",
+      name: "Fieldwork Studio",
+      href: `${BASE}/billing-agency`,
+      detail: "Ana",
+      color: CLIENT_COLORS.fieldwork,
+    },
   ];
-  const owner = (children: ReactNode, detailsPlace: "plan" | undefined = "plan") => <StrelvaShell {...shell} workspaceId={XS.harbor} workspaceName="Harbor Dental" accountName="Dr. Amy Lin" active="settings" detailsPlace={detailsPlace} agency={{ name: "North Studio", person: "Maya", color: CLIENT_COLORS.harbor }}>{children}</StrelvaShell>;
-  const agency = (children: ReactNode, paymentLinks = false) => <StrelvaShell {...shell} workspaceId={XS.north} workspaceName="North Studio" accountName="Maya Okafor" ownerBrand={NORTH_BRAND} detailsPlace={paymentLinks ? undefined : "plan"} agencyNavigation={{ paymentLinksCurrent: paymentLinks, leadsAvailable: false, clients, queueCount: 3 }}>{children}</StrelvaShell>;
+  const owner = (
+    children: ReactNode,
+    detailsPlace: "plan" | undefined = "plan",
+  ) => (
+    <StrelvaShell
+      {...shell}
+      workspaceId={XS.harbor}
+      workspaceName="Harbor Dental"
+      accountName="Dr. Amy Lin"
+      active="settings"
+      detailsPlace={detailsPlace}
+      agency={{
+        name: "North Studio",
+        person: "Maya",
+        color: CLIENT_COLORS.harbor,
+      }}
+    >
+      {children}
+    </StrelvaShell>
+  );
+  const agency = (children: ReactNode, paymentLinks = false) => (
+    <StrelvaShell
+      {...shell}
+      workspaceId={XS.north}
+      workspaceName="North Studio"
+      accountName="Maya Okafor"
+      ownerBrand={NORTH_BRAND}
+      detailsPlace={paymentLinks ? undefined : "plan"}
+      agencyNavigation={{
+        paymentLinksCurrent: paymentLinks,
+        leadsAvailable: false,
+        clients,
+        queueCount: 3,
+      }}
+    >
+      {children}
+    </StrelvaShell>
+  );
   const loading = (label: string) => <MoneyLoading label={label} />;
-  const failure = (title: string, quiet: string) => <div className={styles.screen}><MoneyLoadFailure title={title} quiet={quiet} retryHref={`${BASE}/${screen}`} /></div>;
+  const failure = (title: string, quiet: string) => (
+    <div className={styles.screen}>
+      <MoneyLoadFailure
+        title={title}
+        quiet={quiet}
+        retryHref={`${BASE}/${screen}`}
+      />
+    </div>
+  );
 
-  const requests = useMemo(() => ({
-    payer: fixtureFetch((url, init) => init?.method === "POST" ? payerSnapshot("pending") : payerSnapshot(state === "done" ? "accepted" : state === "empty" ? "none" : "pending"), state === "error" ? "fail" : "ok"),
-    agencyInbox: fixtureFetch(() => ({ transitions: agencyInbox.transitions }), "ok"),
-    accountInbox: fixtureFetch(() => state === "empty" ? { transitions: [], jobs: [], current: null, pending: null, currentActorId: XS.maya } : state === "done" ? { ...agencyInbox, transitions: [{ ...agencyInbox.transitions[0]!, status: "accepted" }], jobs: [] } : agencyInbox, state === "error" ? "fail" : "ok"),
-    invoice: fixtureFetch((url, init) => init?.method === "POST" ? { ...harborRetail, status: JSON.parse(String(init.body)).action === "accept" ? "accepted" : "declined", can_accept: false } : harborRetail),
-    links: fixtureFetch((url, init) => {
-      if (init?.method === "POST") { const body = JSON.parse(String(init.body)); return { payLink: { slug: body.slug ?? "new-client-z4k2p", clientName: body.clientName, createdAt: new Date().toISOString(), revokedAt: body.action === "revoke" ? new Date().toISOString() : undefined, revokedBy: XS.maya, agencyWorkspaceId: XS.north } }; }
-      return state === "setup" ? paymentLinksSnapshot("setup_required", []) : state === "off" ? paymentLinksSnapshot("off", []) : paymentLinksSnapshot("ready", state === "empty" ? [] : connectedLinks);
-    }, state === "loading" ? "hang" : state === "error" ? "fail" : "ok"),
-    portal: (async () => json({ error: "Payment management opens on Stripe in the real workspace. Nothing changed here." }, 409)) as (input: string, init?: RequestInit) => Promise<Response>,
-    money: fixtureFetch(() => ({ error: "Fictional preview" }), "fail"),
-  }), [state]);
+  const requests = useMemo(
+    () => ({
+      payer: fixtureFetch(
+        (url, init) =>
+          init?.method === "POST"
+            ? payerSnapshot("pending")
+            : payerSnapshot(
+                state === "done"
+                  ? "accepted"
+                  : state === "empty"
+                    ? "none"
+                    : "pending",
+              ),
+        state === "error" ? "fail" : "ok",
+      ),
+      agencyInbox: fixtureFetch(
+        () => ({ transitions: agencyInbox.transitions }),
+        "ok",
+      ),
+      accountInbox: fixtureFetch(
+        () =>
+          state === "empty"
+            ? {
+                transitions: [],
+                jobs: [],
+                current: null,
+                pending: null,
+                currentActorId: XS.maya,
+              }
+            : state === "done"
+              ? {
+                  ...agencyInbox,
+                  transitions: [
+                    { ...agencyInbox.transitions[0]!, status: "accepted" },
+                  ],
+                  jobs: [],
+                }
+              : agencyInbox,
+        state === "error" ? "fail" : "ok",
+      ),
+      invoice: fixtureFetch((url, init) =>
+        init?.method === "POST"
+          ? {
+              ...harborRetail,
+              status:
+                JSON.parse(String(init.body)).action === "accept"
+                  ? "accepted"
+                  : "declined",
+              can_accept: false,
+            }
+          : harborRetail,
+      ),
+      links: fixtureFetch(
+        (url, init) => {
+          if (init?.method === "POST") {
+            const body = JSON.parse(String(init.body));
+            return {
+              payLink: {
+                slug: body.slug ?? "new-client-z4k2p",
+                clientName: body.clientName,
+                createdAt: new Date().toISOString(),
+                revokedAt:
+                  body.action === "revoke"
+                    ? new Date().toISOString()
+                    : undefined,
+                revokedBy: XS.maya,
+                agencyWorkspaceId: XS.north,
+              },
+            };
+          }
+          return state === "setup"
+            ? paymentLinksSnapshot("setup_required", [])
+            : state === "off"
+              ? paymentLinksSnapshot("off", [])
+              : paymentLinksSnapshot(
+                  "ready",
+                  state === "empty" ? [] : connectedLinks,
+                );
+        },
+        state === "loading" ? "hang" : state === "error" ? "fail" : "ok",
+      ),
+      portal: (async () =>
+        json(
+          {
+            error:
+              "Payment management opens on Stripe in the real workspace. Nothing changed here.",
+          },
+          409,
+        )) as (input: string, init?: RequestInit) => Promise<Response>,
+      money: fixtureFetch(() => ({ error: "Fictional preview" }), "fail"),
+    }),
+    [state],
+  );
 
   if (!states.includes(state)) return null;
 
   switch (screen) {
     case "billing": {
-      if (state === "loading") return owner(loading("Reading the plan and who pays"));
-      if (state === "error") return owner(failure("Billing could not be loaded.", "Your sites and inquiries keep running. Confirm your access and try again."));
-      const billing = state === "empty" ? null : state === "past-due" ? { ...harborBillingAgencyPays, paymentStatus: "past_due" } : harborBilling;
-      return owner(<div className={styles.screen}><div className={state === "waiting" ? styles.split : styles.column}>
-        <div className={styles.column}>
-          <BusinessBillingView workspaceId={XS.harbor} canManage billing={billing} businessName="Harbor Dental" backHref={`${BASE}/billing`} transport={requests.portal} navigate={() => undefined} />
-          {state === "empty" ? <StartWorkspacePlan workspaceId={XS.harbor} budget={harborBudget} capUsd={25} budgetEnforced transport={requests.portal} navigate={() => undefined} /> : <BusinessAiBudgetSummary budget={harborBudget} capUsd={25} enforced />}
-          <WorkspacePayerTransition workspaceId={XS.harbor} canPropose agencyChoices={[{ id: XS.north, name: "North Studio" }]} request={requests.payer} />
-          <nav aria-label="Payment and agency settings" className={styles.links}><XaTextLink href={`${BASE}/payments`}>Deposits and payments</XaTextLink><span aria-hidden="true">·</span><XaTextLink href={`${BASE}/money-terms`}>Recorded money terms</XaTextLink></nav>
-        </div>
-        {state === "waiting" ? <aside className={styles.side} aria-label="A price from your agency"><AgencyInvoiceAcceptance invoiceId={harborRetail.id} checkoutAvailability={UNRELEASED_CHECKOUT} request={requests.invoice} /></aside> : null}
-      </div></div>);
+      if (state === "loading")
+        return owner(loading("Reading the plan and who pays"));
+      if (state === "error")
+        return owner(
+          failure(
+            "Billing could not be loaded.",
+            "Your sites and inquiries keep running. Confirm your access and try again.",
+          ),
+        );
+      const billing =
+        state === "empty"
+          ? null
+          : state === "past-due"
+            ? { ...harborBillingAgencyPays, paymentStatus: "past_due" }
+            : harborBilling;
+      return owner(
+        <div className={styles.screen}>
+          <div className={state === "waiting" ? styles.split : styles.column}>
+            <div className={styles.column}>
+              <BusinessBillingView
+                workspaceId={XS.harbor}
+                canManage
+                billing={billing}
+                businessName="Harbor Dental"
+                backHref={`${BASE}/billing`}
+                transport={requests.portal}
+                navigate={() => undefined}
+              />
+              {state === "empty" ? (
+                <StartWorkspacePlan
+                  workspaceId={XS.harbor}
+                  budget={harborBudget}
+                  capUsd={25}
+                  budgetEnforced
+                  transport={requests.portal}
+                  navigate={() => undefined}
+                />
+              ) : (
+                <BusinessAiBudgetSummary
+                  budget={harborBudget}
+                  capUsd={25}
+                  enforced
+                />
+              )}
+              <WorkspacePayerTransition
+                workspaceId={XS.harbor}
+                canPropose
+                agencyChoices={[{ id: XS.north, name: "North Studio" }]}
+                request={requests.payer}
+              />
+              <nav
+                aria-label="Payment and agency settings"
+                className={styles.links}
+              >
+                <XaTextLink href={`${BASE}/payments`}>
+                  Deposits and payments
+                </XaTextLink>
+                <span aria-hidden="true">·</span>
+                <XaTextLink href={`${BASE}/money-terms`}>
+                  Recorded money terms
+                </XaTextLink>
+              </nav>
+            </div>
+            {state === "waiting" ? (
+              <aside
+                className={styles.side}
+                aria-label="A price from your agency"
+              >
+                <AgencyInvoiceAcceptance
+                  invoiceId={harborRetail.id}
+                  checkoutAvailability={UNRELEASED_CHECKOUT}
+                  request={requests.invoice}
+                />
+              </aside>
+            ) : null}
+          </div>
+        </div>,
+      );
     }
     case "billing-agency": {
-      if (state === "loading") return agency(loading("Reading what your agency pays"));
-      if (state === "error") return agency(failure("Agency billing did not load.", "Only an agency owner or admin can read its billing."));
-      return agency(<div className={styles.screen}><div className={styles.split}>
-        <div className={styles.column}>
-          {state === "empty" ? <section className={styles.section}><XaHeadline quiet="No client has your agency as payer yet.">Agency billing</XaHeadline></section>
-            : <AgencyBillingView billing={agencyBilling(state === "priced")} checkoutAvailability={UNRELEASED_CHECKOUT} />}
-          <nav aria-label="More about agency money" className={styles.links}><XaTextLink href={`${BASE}/payment-links`}>Payment links</XaTextLink><span aria-hidden="true">·</span><XaTextLink href={`${BASE}/creator-maintenance`}>Creator maintenance</XaTextLink></nav>
-        </div>
-        <aside className={styles.side} aria-label="Owners asking your agency to pay"><AgencyPayerRequests agencyWorkspaceId={XS.north} request={state === "empty" ? fixtureFetch(() => ({ transitions: [] })) : requests.agencyInbox} /></aside>
-      </div></div>);
+      if (state === "loading")
+        return agency(loading("Reading what your agency pays"));
+      if (state === "error")
+        return agency(
+          failure(
+            "Agency billing did not load.",
+            "Only an agency owner or admin can read its billing.",
+          ),
+        );
+      return agency(
+        <div className={styles.screen}>
+          <div className={styles.split}>
+            <div className={styles.column}>
+              {state === "empty" ? (
+                <section className={styles.section}>
+                  <XaHeadline quiet="No client has your agency as payer yet.">
+                    Agency billing
+                  </XaHeadline>
+                </section>
+              ) : (
+                <AgencyBillingView
+                  billing={agencyBilling(state === "priced")}
+                  checkoutAvailability={UNRELEASED_CHECKOUT}
+                />
+              )}
+              <nav
+                aria-label="More about agency money"
+                className={styles.links}
+              >
+                <XaTextLink href={`${BASE}/payment-links`}>
+                  Payment links
+                </XaTextLink>
+                <span aria-hidden="true">·</span>
+                <XaTextLink href={`${BASE}/creator-maintenance`}>
+                  Creator maintenance
+                </XaTextLink>
+              </nav>
+            </div>
+            <aside
+              className={styles.side}
+              aria-label="Owners asking your agency to pay"
+            >
+              <AgencyPayerRequests
+                agencyWorkspaceId={XS.north}
+                request={
+                  state === "empty"
+                    ? fixtureFetch(() => ({ transitions: [] }))
+                    : requests.agencyInbox
+                }
+              />
+            </aside>
+          </div>
+        </div>,
+      );
     }
     case "payment-links":
-      return agency(<div className={styles.screen}><AgencyPaymentLinks key={state} agencyWorkspaceId={XS.north} request={requests.links} /></div>, true);
+      return agency(
+        <div className={styles.screen}>
+          <AgencyPaymentLinks
+            key={state}
+            agencyWorkspaceId={XS.north}
+            request={requests.links}
+          />
+        </div>,
+        true,
+      );
     case "invoice":
-      return agency(state === "loading" ? loading("Reading the invoice") : <div className={styles.screen}><MoneyDocument doc={invoiceDoc} back={{ label: "Payment links", href: `${BASE}/payment-links` }} payUrl="https://strelva.com/pay/harbor-dental-k3x9q" /></div>, true);
+      return agency(
+        state === "loading" ? (
+          loading("Reading the invoice")
+        ) : (
+          <div className={styles.screen}>
+            <MoneyDocument
+              doc={invoiceDoc}
+              back={{ label: "Payment links", href: `${BASE}/payment-links` }}
+              payUrl="https://strelva.com/pay/harbor-dental-k3x9q"
+            />
+          </div>
+        ),
+        true,
+      );
     case "receipt":
-      return agency(<div className={styles.screen}>{state === "waiting" ? <div className={styles.docFrame}>
-        <p className={styles.note}><XaTextLink href={`${BASE}/payment-links`}>Payment links</XaTextLink></p>
-        <XaHeadline quiet="Stripe confirms payments; this page fills in when it does.">No payment is recorded for this link yet.</XaHeadline>
-        <p className={styles.body}>Harbor Dental has not paid this link. The invoice stays open until they do or you expire it. <XaTextLink href={`${BASE}/invoice`}>See the invoice</XaTextLink></p>
-      </div> : <MoneyDocument doc={receiptDoc} back={{ label: "Payment links", href: `${BASE}/payment-links` }} />}</div>, true);
+      return agency(
+        <div className={styles.screen}>
+          {state === "waiting" ? (
+            <div className={styles.docFrame}>
+              <p className={styles.note}>
+                <XaTextLink href={`${BASE}/payment-links`}>
+                  Payment links
+                </XaTextLink>
+              </p>
+              <XaHeadline quiet="Stripe confirms payments; this page fills in when it does.">
+                No payment is recorded for this link yet.
+              </XaHeadline>
+              <p className={styles.body}>
+                Harbor Dental has not paid this link. The invoice stays open
+                until they do or you expire it.{" "}
+                <XaTextLink href={`${BASE}/invoice`}>
+                  See the invoice
+                </XaTextLink>
+              </p>
+            </div>
+          ) : (
+            <MoneyDocument
+              doc={receiptDoc}
+              back={{ label: "Payment links", href: `${BASE}/payment-links` }}
+            />
+          )}
+        </div>,
+        true,
+      );
     case "payments":
-      if (state === "loading") return owner(loading("Reading deposits and payments"));
-      if (state === "error") return owner(failure("Payments did not load.", "Payments already made are safe in Stripe. Confirm your access and try again."));
-      return owner(<PaymentsScreen workspaceId={XS.harbor} money={state === "empty" ? { account: { state: "ready" }, payments: [], events: [] } : state === "setup" ? { account: { state: "restricted" }, payments: [], events: [] } : businessMoney} sources={state === "empty" ? [] : paymentSources} requests={state === "empty" || state === "setup" ? [] : paymentRequests} />);
+      if (state === "loading")
+        return owner(loading("Reading deposits and payments"));
+      if (state === "error")
+        return owner(
+          failure(
+            "Payments did not load.",
+            "Payments already made are safe in Stripe. Confirm your access and try again.",
+          ),
+        );
+      return owner(
+        <PaymentsScreen
+          workspaceId={XS.harbor}
+          money={
+            state === "empty"
+              ? { account: { state: "ready" }, payments: [], events: [] }
+              : state === "setup"
+                ? { account: { state: "restricted" }, payments: [], events: [] }
+                : businessMoney
+          }
+          sources={state === "empty" ? [] : paymentSources}
+          requests={
+            state === "empty" || state === "setup" ? [] : paymentRequests
+          }
+        />,
+      );
     case "pay": {
-      const base = { slug: "harbor-dental-k3x9q", clientName: "Harbor Dental", description: "Website care for November: booking page, hours and two inquiry follow-ups", amountCents: 125050 as number | null, minCents: null as number | null, maxCents: null as number | null, currency: "usd", status: "open" as "open" | "paid" | "expired", receiptNumber: null as number | null };
-      const view = state === "range" ? { ...base, description: "Spanish intake form. Choose what fits this month.", amountCents: null, minCents: 20000, maxCents: 40000 } : state === "paid" ? { ...base, status: "paid" as const, receiptNumber: 3 } : state === "expired" ? { ...base, status: "expired" as const } : base;
-      return <ConnectedPayLink link={view} brand={NORTH_BRAND} payment={state === "returned" ? "success" : state === "cancelled" ? "cancelled" : undefined} />;
+      const base = {
+        slug: "harbor-dental-k3x9q",
+        clientName: "Harbor Dental",
+        description:
+          "Website care for November: booking page, hours and two inquiry follow-ups",
+        amountCents: 125050 as number | null,
+        minCents: null as number | null,
+        maxCents: null as number | null,
+        currency: "usd",
+        status: "open" as "open" | "paid" | "expired",
+        receiptNumber: null as number | null,
+      };
+      const view =
+        state === "range"
+          ? {
+              ...base,
+              description: "Spanish intake form. Choose what fits this month.",
+              amountCents: null,
+              minCents: 20000,
+              maxCents: 40000,
+            }
+          : state === "paid"
+            ? { ...base, status: "paid" as const, receiptNumber: 3 }
+            : state === "expired"
+              ? { ...base, status: "expired" as const }
+              : base;
+      return (
+        <ConnectedPayLink
+          link={view}
+          brand={NORTH_BRAND}
+          payment={
+            state === "returned"
+              ? "success"
+              : state === "cancelled"
+                ? "cancelled"
+                : undefined
+          }
+        />
+      );
     }
     case "pay-receipt":
-      return state === "waiting" ? <PublicMoneyPage brand={NORTH_BRAND} lead={<>
-        <p className={styles.publicKicker}>Payment receipt</p>
-        <h1 className={styles.publicTitle}>No payment is recorded for this link yet.</h1>
-        <p className={styles.publicCopy}>Stripe tells North Studio when a payment goes through. If you just paid, refresh in a minute; the receipt appears here once Stripe confirms it.</p>
-        <p className={styles.note}><XaTextLink href={`${BASE}/pay`}>Back to the payment link</XaTextLink></p>
-      </>} /> : <PublicMoneyPage brand={NORTH_BRAND} single lead={<MoneyDocument doc={{ ...receiptDoc, number: 4, snapshot: { ...receiptDoc.snapshot, billTo: "Harbor Dental", description: invoiceDoc.snapshot.description, amountPaidCents: 125050 } }} back={{ label: "Back to the payment link", href: `${BASE}/pay` }} />} />;
+      return state === "waiting" ? (
+        <PublicMoneyPage
+          brand={NORTH_BRAND}
+          lead={
+            <>
+              <p className={styles.publicKicker}>Payment receipt</p>
+              <h1 className={styles.publicTitle}>
+                No payment is recorded for this link yet.
+              </h1>
+              <p className={styles.publicCopy}>
+                Stripe tells North Studio when a payment goes through. If you
+                just paid, refresh in a minute; the receipt appears here once
+                Stripe confirms it.
+              </p>
+              <p className={styles.note}>
+                <XaTextLink href={`${BASE}/pay`}>
+                  Back to the payment link
+                </XaTextLink>
+              </p>
+            </>
+          }
+        />
+      ) : (
+        <PublicMoneyPage
+          brand={NORTH_BRAND}
+          single
+          lead={
+            <MoneyDocument
+              doc={{
+                ...receiptDoc,
+                number: 4,
+                snapshot: {
+                  ...receiptDoc.snapshot,
+                  billTo: "Harbor Dental",
+                  description: invoiceDoc.snapshot.description,
+                  amountPaidCents: 125050,
+                },
+              }}
+              back={{ label: "Back to the payment link", href: `${BASE}/pay` }}
+            />
+          }
+        />
+      );
     case "pay-business":
-      return state === "error" ? <BusinessPayment key="error" token={"0".repeat(64)} preview={false} /> : <BusinessPayment key={state} token={"0".repeat(64)} preview initialRequest={state === "paid" ? { ...businessDepositFixture, businessName: "Harbor Dental", paid: true, status: "paid" } : { ...businessDepositFixture, businessName: "Harbor Dental", acceptedTerms: "Deposit for Ana R.'s cleaning on Mon Nov 23 at 10:30, at 1180 Elmwood Ave." }} />;
+      return state === "error" ? (
+        <BusinessPayment key="error" token={"0".repeat(64)} preview={false} />
+      ) : (
+        <BusinessPayment
+          key={state}
+          token={"0".repeat(64)}
+          preview
+          initialRequest={
+            state === "paid"
+              ? {
+                  ...businessDepositFixture,
+                  businessName: "Harbor Dental",
+                  paid: true,
+                  status: "paid",
+                }
+              : {
+                  ...businessDepositFixture,
+                  businessName: "Harbor Dental",
+                  acceptedTerms:
+                    "Deposit for Ana R.'s cleaning on Mon Nov 23 at 10:30, at 1180 Elmwood Ave.",
+                }
+          }
+        />
+      );
     case "money-terms":
-      return owner(state === "error" ? failure("Terms could not be loaded.", "Confirm your current business access and reload.") : <div className={styles.screen}>
-        <p className={styles.note}><XaTextLink href={`${BASE}/billing`}>Plan and billing</XaTextLink></p>
-        <XaHeadline quiet="Written prices you accepted, and the exact period each covers. Nothing here charges a card.">Recorded money terms</XaHeadline>
-        <CollectionTerms graph={governedGraph(state === "empty")} actorId={XS.amy} request={requests.money} />
-        <VersionTerms graph={versionGraph(state === "empty")} actorId={XS.amy} request={requests.money} />
-      </div>);
+      return owner(
+        state === "error" ? (
+          failure(
+            "Terms could not be loaded.",
+            "Confirm your current business access and reload.",
+          )
+        ) : (
+          <div className={styles.screen}>
+            <p className={styles.note}>
+              <XaTextLink href={`${BASE}/billing`}>Plan and billing</XaTextLink>
+            </p>
+            <XaHeadline quiet="Written prices you accepted, and the exact period each covers. Nothing here charges a card.">
+              Recorded money terms
+            </XaHeadline>
+            <CollectionTerms
+              graph={governedGraph(state === "empty")}
+              actorId={XS.amy}
+              request={requests.money}
+            />
+            <VersionTerms
+              graph={versionGraph(state === "empty")}
+              actorId={XS.amy}
+              request={requests.money}
+            />
+          </div>
+        ),
+      );
     case "reconciliation":
-      return <main data-workspace-theme="linen" data-workspace-mode={mode}>{state === "error" ? failure("Payment exceptions could not be loaded.", "Confirm operator access and try again.") : <div className={styles.screen}>
-        <XaHeadline quiet="Check each against Stripe and the ledger, then record what you found. Recording never moves money.">{state === "done" ? "Payment exceptions" : "1 payment exception waits for review."}</XaHeadline>
-        <ReviewQueue issues={state === "done" ? [] : reconciliationIssues} />
-      </div>}</main>;
+      return (
+        <main data-workspace-theme="linen" data-workspace-mode={mode}>
+          {state === "error" ? (
+            failure(
+              "Payment exceptions could not be loaded.",
+              "Confirm operator access and try again.",
+            )
+          ) : (
+            <div className={styles.screen}>
+              <XaHeadline quiet="Check each against Stripe and the ledger, then record what you found. Recording never moves money.">
+                {state === "done"
+                  ? "Payment exceptions"
+                  : "1 payment exception waits for review."}
+              </XaHeadline>
+              <ReviewQueue
+                issues={state === "done" ? [] : reconciliationIssues}
+              />
+            </div>
+          )}
+        </main>
+      );
     case "creator-maintenance":
-      return agency(state === "error" ? failure("Maintenance records could not be loaded.", "Confirm owner or admin access and try again.") : <div className={styles.screen}>
-        <nav aria-label="Back" className={styles.links}><XaTextLink href={`${BASE}/billing-agency`}>Billing</XaTextLink></nav>
-        <XaHeadline quiet="These records grant no access to client data and set no payment on their own.">Creator maintenance</XaHeadline>
-        <SourceListing graph={creatorSources(state === "empty")} actorId={XS.maya} request={requests.money} />
-        <CreatorMaintenance graph={creatorMaintenance(state === "empty")} />
-      </div>);
+      return agency(
+        state === "error" ? (
+          failure(
+            "Maintenance records could not be loaded.",
+            "Confirm owner or admin access and try again.",
+          )
+        ) : (
+          <div className={styles.screen}>
+            <nav aria-label="Back" className={styles.links}>
+              <XaTextLink href={`${BASE}/billing-agency`}>Billing</XaTextLink>
+            </nav>
+            <XaHeadline quiet="These records grant no access to client data and set no payment on their own.">
+              Creator maintenance
+            </XaHeadline>
+            <SourceListing
+              graph={creatorSources(state === "empty")}
+              actorId={XS.maya}
+              request={requests.money}
+            />
+            <CreatorMaintenance graph={creatorMaintenance(state === "empty")} />
+          </div>
+        ),
+      );
     case "source-attribution":
-      return state === "creator" ? agency(<SourceAttributionView workspaceId={XS.north} systemId={XS.system} creator={{ creatorName: "North Studio", creatorWorkspaceId: XS.north }} />)
-        : owner(state === "error" ? failure("Who made this could not be checked.", "The System keeps running. Its creator credit is read again next time you open this.") : <SourceAttributionView workspaceId={XS.harbor} systemId={XS.system} creator={{ creatorName: "North Studio", creatorWorkspaceId: XS.north }} />, undefined);
+      return state === "creator"
+        ? agency(
+            <SourceAttributionView
+              workspaceId={XS.north}
+              systemId={XS.system}
+              creator={{
+                creatorName: "North Studio",
+                creatorWorkspaceId: XS.north,
+              }}
+            />,
+          )
+        : owner(
+            state === "error" ? (
+              failure(
+                "Who made this could not be checked.",
+                "The System keeps running. Its creator credit is read again next time you open this.",
+              )
+            ) : (
+              <SourceAttributionView
+                workspaceId={XS.harbor}
+                systemId={XS.system}
+                creator={{
+                  creatorName: "North Studio",
+                  creatorWorkspaceId: XS.north,
+                }}
+              />
+            ),
+            undefined,
+          );
     case "payer":
-      return agency(<div className={styles.screen}>
-        <XaHeadline quiet="Requests to pay, and job limits waiting for your yes.">Payer requests for Maya Okafor</XaHeadline>
-        <AccountPayerInbox request={requests.accountInbox} />
-      </div>);
+      return agency(
+        <div className={styles.screen}>
+          <XaHeadline quiet="Requests to pay, and job limits waiting for your yes.">
+            Payer requests for Maya Okafor
+          </XaHeadline>
+          <AccountPayerInbox request={requests.accountInbox} />
+        </div>,
+      );
     case "email-declined":
-      return <main data-workspace-theme="linen" data-workspace-mode={mode}><div className={styles.screen}>
-        <XaHeadline quiet="A template only. Client emails stay off during the rollout.">Card declined email</XaHeadline>
-        <iframe title="Card declined email" src="/preview/strelva/email/html?template=declined" style={{ width: "100%", maxWidth: 760, height: 760, border: "1px solid var(--st-line)", borderRadius: 16, background: "#fff" }} />
-      </div></main>;
+      return (
+        <main data-workspace-theme="linen" data-workspace-mode={mode}>
+          <div className={styles.screen}>
+            <XaHeadline quiet="A template only. Client emails stay off during the rollout.">
+              Card declined email
+            </XaHeadline>
+            <iframe
+              title="Card declined email"
+              src="/preview/strelva/email/html?template=declined"
+              style={{
+                width: "100%",
+                maxWidth: 760,
+                height: 760,
+                border: "1px solid var(--st-line)",
+                borderRadius: 16,
+                background: "#fff",
+              }}
+            />
+          </div>
+        </main>
+      );
   }
 }

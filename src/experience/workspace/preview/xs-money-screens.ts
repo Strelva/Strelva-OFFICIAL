@@ -17,4 +17,3 @@ export const XS_MONEY_SCREENS = {
   "email-declined": ["ready"],
 } as const;
 export type XsMoneyScreen = keyof typeof XS_MONEY_SCREENS;
-
