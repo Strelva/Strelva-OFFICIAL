@@ -1,0 +1,67 @@
+/* XA entry frame. Pen: XA · A1, A2, C1, C2. Paper task column (96 px gutter at
+   1440), felt panel at 560 x 852 with 24 px inset and 24 radius. */
+.entry {
+  box-sizing: border-box;
+  display: grid;
+  min-height: 100dvh;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 24px;
+  padding: 0 24px 24px;
+  background: var(--st-canvas);
+  color: var(--st-text);
+  font-family: var(--font-workspace, system-ui), system-ui, sans-serif;
+}
+.entry[data-has-aside="true"] { grid-template-columns: minmax(0, 1fr) minmax(0, 560px); padding: 24px 24px 24px 0; }
+
+.task { display: flex; min-width: 0; flex-direction: column; padding: 0 72px 0 96px; }
+.entry[data-has-aside="true"] .task { padding-right: 72px; }
+/* Without the felt panel the task sits centered on the paper. */
+.entry:not([data-has-aside="true"]) .task { box-sizing: border-box; width: 100%; max-width: 736px; margin: 0 auto; padding: 0 24px; }
+.header { display: flex; min-height: 48px; align-items: center; justify-content: space-between; gap: 16px; padding-top: 0; }
+.entry:not([data-has-aside="true"]) .header { padding-top: 24px; }
+.brand { display: inline-flex; align-items: center; gap: 4px; color: var(--st-text); font-size: 24px; font-weight: 500; letter-spacing: -0.6px; text-decoration: none; }
+.brand:focus-visible { outline: 2px solid var(--st-accent); outline-offset: 4px; border-radius: 8px; }
+.corner { color: var(--st-text-2); font-size: 14px; }
+.corner a { color: inherit; text-decoration: none; }
+.corner a:hover { color: var(--st-text); text-decoration: underline; text-underline-offset: 3px; }
+.body { display: flex; width: 100%; max-width: 460px; flex: 1; flex-direction: column; justify-content: center; padding: 48px 0; }
+.body[data-width="wide"] { max-width: 640px; }
+.footnote { margin: 0; padding-bottom: 24px; color: var(--st-faint); font-size: 13px; line-height: 18px; }
+.entry[data-has-aside="true"] .footnote { padding-bottom: 0; }
+
+.aside {
+  position: sticky;
+  top: 24px;
+  display: flex;
+  min-height: calc(100dvh - 48px);
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 24px;
+  padding: 48px 40px;
+  border-radius: var(--st-r-xl, 24px);
+  background: var(--st-felt-from);
+  box-sizing: border-box;
+}
+
+.caption { display: flex; max-width: 380px; flex-direction: column; gap: 6px; text-align: center; }
+.captionTitle { margin: 0; color: var(--st-text); font-size: 17px; font-weight: 500; line-height: 24px; }
+.captionBody { margin: 0; color: var(--st-text-2); font-size: 15px; line-height: 22px; }
+
+.stack { display: flex; flex-direction: column; gap: 24px; }
+.stack[data-gap="sm"] { gap: 16px; }
+
+@media (max-width: 1100px) {
+  .task, .entry[data-has-aside="true"] .task { padding: 0 40px; }
+}
+
+/* Phone (XA · E6 rules): the task first, the felt panel below it, smaller. */
+@media (max-width: 860px) {
+  .entry, .entry[data-has-aside="true"] { grid-template-columns: minmax(0, 1fr); padding: 0 0 16px; gap: 8px; }
+  .task, .entry[data-has-aside="true"] .task, .entry:not([data-has-aside="true"]) .task { padding: 0 16px; }
+  .header, .entry:not([data-has-aside="true"]) .header { padding-top: 12px; }
+  .brand { font-size: 20px; }
+  .body { max-width: none; justify-content: flex-start; padding: 32px 0 24px; }
+  .footnote, .entry[data-has-aside="true"] .footnote { padding-bottom: 8px; }
+  .aside { position: static; min-height: 0; margin: 0 16px; padding: 28px 20px; border-radius: 20px; gap: 16px; }
+}

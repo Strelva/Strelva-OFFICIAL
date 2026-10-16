@@ -2,7 +2,7 @@
 import { act, createElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { OwnerClaimAcceptance } from "@/experience/workspace/agency/OwnerClaimAcceptance";
+import { ClaimOwned, OwnerClaimAcceptance } from "@/experience/workspace/agency/OwnerClaimAcceptance";
 import { ClaimNextSteps, claimReviewInput, initialClaimReviewChoices } from "@/experience/workspace/agency/OwnerClaimReview";
 import type { ClaimReview } from "@/products/agency-clients/contracts";
 
@@ -96,6 +96,14 @@ describe("owner claim review", () => {
     const skips = Array.from(container.querySelectorAll("button")).filter(b => b.textContent === "Skip");
     for (const skip of skips) await act(async () => skip.click());
     expect(container.textContent?.match(/Skipped/g)).toHaveLength(2);
+    // The way into the business is the owner page's one primary (ClaimOwned), not a second pill here.
+    expect(container.querySelector(`a[href="/workspace?workspaceId=${WS}"]`)).toBeNull();
+  });
+
+  it("the owned page has one way in, and names the agency's changes as coming to the owner first", async () => {
+    await act(async () => root.render(createElement(ClaimOwned, { workspaceId: WS, workspaceName: "Fictional Bakery", agencyName: "Fictional Studio", lead: "Your choices are saved." })));
     expect(container.querySelector(`a[href="/workspace?workspaceId=${WS}"]`)?.textContent).toBe("Open your business");
+    expect(container.querySelectorAll("[data-xa-primary]")).toHaveLength(1);
+    expect(container.textContent).toContain("Fictional Studio’s changes come to you first.");
   });
 });

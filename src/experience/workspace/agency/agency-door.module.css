@@ -1,0 +1,117 @@
+/* XA-2 · the agency door and the claim. Lane styles; parts come from the XA kit. */
+
+/* A1: the two doors as a segmented track of links (L0 · Segmented, qIVLf). */
+.doors { display: flex; padding: 3px; border-radius: 999px; background: var(--st-inset); }
+.door { display: flex; min-height: 38px; flex: 1; align-items: center; justify-content: center; padding: 6px 12px; border-radius: 999px; color: var(--st-text-2); font-size: 14px; line-height: 20px; text-align: center; text-decoration: none; transition: background-color var(--motion-fast) var(--ease-settle), color var(--motion-fast) var(--ease-settle); }
+.door:hover { color: var(--st-text); }
+.door[aria-current="page"] { background: var(--st-surface); box-shadow: 0 1px 3px #1617151a; color: var(--st-text); font-weight: 500; }
+.door:focus-visible { outline: 2px solid var(--st-accent); outline-offset: -2px; }
+@media (pointer: coarse) { .door { min-height: 44px; } }
+
+/* A3: day one. Lead column 560 at x352 on the board; Pebble at the right. */
+.dayOne { display: grid; grid-template-columns: minmax(0, 560px) minmax(0, 340px); justify-content: center; gap: 96px; align-items: center; min-height: calc(100dvh - 96px); padding: 48px 32px; box-sizing: border-box; }
+.dayLead { display: flex; min-width: 0; flex-direction: column; gap: 28px; }
+.greeting { display: flex; flex-direction: column; gap: 12px; }
+.dayActions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 20px; }
+.sentence { margin: 0; color: var(--st-text-2); font-size: 15px; line-height: 1.45; }
+.after { display: flex; flex-direction: column; gap: 10px; margin: 0; padding: 0; color: var(--st-text-body); font-size: 15px; line-height: 1.5; list-style: none; }
+.daySide { display: flex; justify-content: center; }
+.inPlace { padding-top: 8px; border-top: 1px solid var(--st-line); }
+@media (max-width: 1100px) { .dayOne { grid-template-columns: minmax(0, 1fr); gap: 40px; justify-content: stretch; min-height: 0; } .daySide { justify-content: flex-start; } }
+@media (max-width: 767px) { .dayOne { padding: 24px 16px 96px; gap: 32px; } .dayLead { gap: 22px; } }
+
+/* A2: how a client sees the agency, live as the name is typed. */
+.seen { display: flex; width: 100%; max-width: 400px; flex-direction: column; align-items: center; gap: 16px; text-align: center; }
+.seenComposer { width: 100%; text-align: left; pointer-events: none; }
+.seenNote { margin: 0; color: var(--st-text-2); font-size: 13px; line-height: 18px; }
+.fakeAction { display: inline-flex; height: 34px; align-items: center; padding: 0 14px; border-radius: 999px; background: var(--st-surface); box-shadow: 0 1px 2px #00000014, 0 0 0 1px #0000000a; color: var(--st-text); font-size: 14px; font-weight: 500; }
+
+/* A4 / A5: add a client. Form column 484 at x328; the object card 540 at the right. */
+.addPage { box-sizing: border-box; width: 100%; max-width: 1160px; margin: 0 auto; padding: 96px 40px 120px; }
+.addSplit { display: grid; grid-template-columns: minmax(0, 484px) minmax(0, 540px); justify-content: space-between; gap: 64px; align-items: start; }
+.addLead { display: flex; min-width: 0; flex-direction: column; gap: 24px; }
+.addForm { display: flex; flex-direction: column; gap: 20px; }
+.fields { display: flex; min-width: 0; flex-direction: column; gap: 14px; margin: 0; padding: 0; border: 0; }
+.check { display: flex; min-height: 44px; align-items: center; gap: 10px; color: var(--st-text-body); font-size: 14px; }
+.check input { width: 18px; height: 18px; accent-color: var(--st-accent); }
+.error { margin: 0; color: var(--st-critical); font-size: 14px; line-height: 1.45; }
+.sentenceStrong { margin: 0; color: var(--st-text); font-size: 15px; line-height: 1.45; }
+.sentenceBlock { display: flex; flex-direction: column; gap: 8px; }
+.links { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; margin: 0; font-size: 14px; }
+.addActions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 20px; padding-top: 8px; }
+.block { display: flex; flex-direction: column; gap: 8px; }
+.grade { margin: 0; color: var(--st-text); font-size: 17px; font-weight: 500; font-variant-numeric: tabular-nums; }
+
+/* The one object on the page: a white sheet with the large shadow (A4 reading card, A5 claim link). */
+.objectColumn { display: flex; min-width: 0; flex-direction: column; }
+.object { box-sizing: border-box; display: flex; min-width: 0; flex-direction: column; gap: 16px; padding: 28px; border-radius: var(--st-r-xl); background: var(--st-surface); box-shadow: var(--st-shadow-lg); }
+.object[data-flat="true"] { padding: 20px 0 4px; border-radius: 0; background: none; box-shadow: none; }
+.objectHead { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; margin: 0; }
+.objectTitle { min-width: 0; font-size: 15px; }
+.objectMeta { color: var(--st-text-3); font-size: 13px; }
+.objectNote { margin: 0; color: var(--st-text-2); font-size: 13px; line-height: 1.5; }
+.rule { width: 100%; height: 1px; margin: 4px 0; border: 0; background: var(--st-line); }
+.linkRow { display: flex; gap: 8px; }
+.linkField { box-sizing: border-box; min-width: 0; min-height: 44px; flex: 1; padding: 10px 16px; border: 0; border-radius: var(--st-r-md); background: var(--st-inset); color: var(--st-text-body); font: inherit; font-size: 14px; text-overflow: ellipsis; }
+.linkField:focus-visible { outline: 2px solid var(--st-accent); outline-offset: 2px; }
+.found { display: flex; flex-direction: column; gap: 10px; }
+.facts { display: flex; flex-direction: column; gap: 10px; margin: 0; }
+.facts > div { display: flex; justify-content: space-between; gap: 16px; font-size: 15px; }
+.facts dt { color: var(--st-text-body); }
+.facts dd { margin: 0; color: var(--st-text-3); font-size: 13px; }
+
+/* Prospect picker: open rows, the chosen one ringed. */
+.prospects { margin: 0; padding: 0; border: 0; min-width: 0; }
+.prospects ul { max-height: 288px; margin: 8px 0 0; padding: 0; overflow-y: auto; list-style: none; border-top: 1px solid var(--st-line); }
+.prospects li { border-bottom: 1px solid var(--st-line); }
+.fieldLegend { padding: 0; color: var(--st-text-body); font-size: 13px; font-weight: 500; }
+.prospect { display: flex; min-height: 56px; align-items: center; gap: 12px; padding: 10px 4px; cursor: pointer; }
+.prospect[data-added="true"] { cursor: default; opacity: 0.6; }
+.prospect input { width: 16px; height: 16px; accent-color: var(--st-accent); }
+.prospectText { display: flex; min-width: 0; flex: 1; flex-direction: column; gap: 2px; }
+.prospectText strong { overflow: hidden; color: var(--st-text); font-size: 15px; font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
+.prospectText small { overflow: hidden; color: var(--st-text-2); font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
+.prospectMeta { flex-shrink: 0; color: var(--st-text-3); font-size: 13px; font-variant-numeric: tabular-nums; }
+
+/* Clients this agency added: a quiet list under the task. */
+.addedList { display: flex; flex-direction: column; gap: 12px; margin-top: 80px; }
+.listHead { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.addedRows { margin: 0; padding: 0; list-style: none; border-top: 1px solid var(--st-line); }
+.addedRows > li { border-bottom: 1px solid var(--st-line); }
+.addedRow { display: flex; min-height: 64px; flex-wrap: wrap; align-items: center; gap: 8px 14px; padding: 10px 0; }
+.addedText { display: flex; min-width: 0; flex: 1; flex-direction: column; gap: 2px; }
+.addedText strong { color: var(--st-text); font-size: 15px; font-weight: 500; }
+.addedText small { overflow: hidden; color: var(--st-text-2); font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
+.addedState { max-width: 340px; color: var(--st-text-2); font-size: 13px; line-height: 1.4; text-align: right; }
+.addedState[data-tone="live"] { color: var(--st-live); }
+.addedState[data-tone="waits"] { color: var(--st-need); }
+.inline { padding: 0 0 16px 46px; }
+
+@media (max-width: 1100px) { .addSplit { grid-template-columns: minmax(0, 1fr); gap: 40px; } .addPage { padding: 56px 32px 120px; } }
+@media (max-width: 767px) {
+  .addPage { padding: 24px 16px 120px; }
+  .object { padding: 20px; border-radius: 20px; }
+  .linkRow { flex-direction: column; }
+  .addedState { width: 100%; padding-left: 46px; text-align: left; }
+  .inline { padding-left: 0; }
+  .addedList { margin-top: 56px; }
+}
+
+/* C1 / C2: the claim. */
+.setUpBy { display: flex; align-items: center; gap: 10px; margin: 0; color: var(--st-text-body); font-size: 15px; }
+.claimActions { display: flex; flex-direction: column; gap: 12px; }
+.reviewColumn { display: flex; width: 100%; max-width: 640px; flex-direction: column; gap: 28px; }
+.entryWide { max-width: 640px; }
+.reviewSection { display: flex; flex-direction: column; gap: 10px; }
+.reviewRows { margin: 0; padding: 0; list-style: none; border-top: 1px solid var(--st-line); }
+.reviewRows > li { border-bottom: 1px solid var(--st-line); }
+.reviewRow { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px; padding: 14px 0; }
+.reviewFact { display: flex; min-width: 0; flex: 1 1 260px; flex-direction: column; gap: 2px; }
+.reviewKind { color: var(--st-text-2); font-size: 13px; }
+.reviewValue { color: var(--st-text); font-size: 15px; font-weight: 500; overflow-wrap: anywhere; }
+.reviewSource { display: block; color: var(--st-text-2); font-size: 13px; line-height: 1.45; overflow-wrap: anywhere; }
+.reviewChange { width: 100%; }
+.reviewLine { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px; min-height: 52px; padding: 10px 0; color: var(--st-text); font-size: 15px; }
+.sourceLink { color: var(--st-accent); font-weight: 500; text-decoration: none; }
+.sourceLink:hover { text-decoration: underline; text-underline-offset: 3px; }
+.strong { color: var(--st-text); font-weight: 500; }

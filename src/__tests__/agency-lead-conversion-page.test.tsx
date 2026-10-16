@@ -5,7 +5,14 @@ vi.mock("@/platform/workspaces/http", () => ({ workspaceHttpActor: mocks.actor }
 vi.mock("@/experience/workspace/leads/leads-server", () => ({ readAgencyLead: mocks.read }));
 vi.mock("@/platform/agency-prospecting/server", () => ({ agencyProspectingEnabled: () => true }));
 vi.mock("@/products/agency-clients", () => ({ agencyAddClientReleaseEnabled: mocks.release }));
-import Page from "@/app/workspace/agency/clients/new/page";
+vi.mock("@/platform/workspaces/agency-onboarding", () => ({ listMemberAgencies: async () => [{ id: "00000000-0000-4000-8000-000000000001", name: "North Studio", role: "owner" }] }));
+import RoutePage from "@/app/workspace/agency/clients/new/page";
+// The route wraps the add-client task in the agency's frame; the task's props are what these tests check.
+const Page = async (input: Parameters<typeof RoutePage>[0]) => {
+  const frame = await RoutePage(input) as { props: { agencyName?: string; children: { props: Record<string, unknown> } } };
+  expect(frame.props.agencyName).toBe("North Studio");
+  return frame.props.children;
+};
 
 const workspaceId = "00000000-0000-4000-8000-000000000001";
 const actorId = "00000000-0000-4000-8000-000000000002";

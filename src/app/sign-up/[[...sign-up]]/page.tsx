@@ -5,6 +5,7 @@ import { StEntry, StHead, StPillLink, StTextButton } from "@/components/ui/strel
 import type { Metadata } from "next";
 import { SupabaseSignIn } from "@/components/auth/SupabaseSignIn";
 import { StChoiceLink } from "@/components/ui/strelva/ChoiceCards";
+import { AccountDoor } from "@/experience/workspace/agency/AccountDoor";
 import { headers } from "next/headers";
 import { getClientFallbackRoot, isClientFallbackRoot } from "@/lib/client-fallback";
 import { getInvite } from "@/lib/invites";
@@ -105,6 +106,9 @@ export default async function SignUpPage({
     // ADR 0015: "I run a business" goes straight to creating that business,
     // not to a personal workspace with the business one click away in Help.
     const next = asAgency ? AGENCY_START_PATH : invitationTarget || workspaceTarget || accountTarget || BUSINESS_SIGNUP_PATH;
+    // XA · A1 / B1: the open doors, with no invitation behind them.
+    if (!invitationTarget) return <AccountDoor kind={asAgency ? "agency" : "business"} choice={agencyDoor && businessDoor} next={next} requestedNext={requestedNext}
+      emailReady={authEmailReady()} signInHref={`/sign-in?next=${encodeURIComponent(next)}`} />;
     const identity = await invitationEntryIdentity(invitationTarget);
     return <StEntry brand={identity?.brand ?? (invitationTarget ? AGENCY_IDENTITY_UNAVAILABLE : undefined)} helpHref="/workspace?view=help">
       <SupabaseSignIn emailReady={authEmailReady()} key={next} next={next} heading={<><StHead title={identity ? `Create access for ${identity.businessName}` : "Create your account"} />{agencyDoor && businessDoor ? <AccountKindChoice selected={asAgency ? "agency" : "business"} next={requestedNext} /> : null}</>} />

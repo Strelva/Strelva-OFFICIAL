@@ -13,7 +13,7 @@ XA is the default workspace look: paper, a quiet side rail, one ink primary per
 screen, moss for live, clay for what waits, DM Sans only (no monospace). The LX
 kit is `@/components/ui/strelva/Xa` (`XaButton`, `XaComposer`, `XaYes`,
 `XaStatus`, `XaWorking`, `XaPage`, `XaUndo`, Pebble and System clays, inputs,
-`XaSheet`, `XaEmpty`, `XaRows`, motion primitives). `StrelvaSidebar` renders
+`XaSheet`, `XaEmpty`, `XaRows`, motion primitives, and `XaEntry` for sign-up, naming an agency and the owner claim). `StrelvaSidebar` renders
 `XaSidebar` (owner, agency, details shapes); `StrelvaShell theme="paper"` keeps
 the October 9 look. The St* kit is restyled to the same look and stays
 exported. API, Pen node per part, motion and the anti-slop checklist:

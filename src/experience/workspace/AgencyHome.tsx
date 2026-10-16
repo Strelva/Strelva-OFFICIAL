@@ -19,7 +19,9 @@ import {
   type AgencyCreditPeriod,
   type AgencyLoadedPage,
 } from "./agency-home";
-import { AgencyClientList, AgencyClientsError, AgencyClientsLoading, AgencyQueueList } from "./agency/AgencyViews";
+import { AgencyClientsError, AgencyQueueList } from "./agency/AgencyViews";
+import { AgencyEveryClient, AgencyEveryClientError, AgencyEveryClientLoading } from "./agency/AgencyEveryClient";
+import { AgencyDayOne } from "./agency/AgencyDayOne";
 import { AgencyAuthoring } from "./agency/AgencyAuthoring";
 import { ProviderClientQueue } from "./agency/ProviderClientQueue";
 import { AgencyTeamView } from "./agency/AgencyTeamView";
@@ -234,13 +236,16 @@ export function AgencyHome({
   const readyWebsiteDrafts = websiteDrafts ?? [];
   const retry = () => setAttempt((value) => value + 1);
 
-  const clientList = clients.status === "loading" ? <AgencyClientsLoading />
-    : clients.status === "error" ? <AgencyClientsError onRetry={retry} />
-    : <AgencyClientList
+  const canManage = current?.role === "owner" || current?.role === "admin";
+  const addClientHref = snapshot.releases?.agencyAddClient && canManage ? `/workspace/agency/clients/new?workspaceId=${encodeURIComponent(snapshot.workspaceId)}` : null;
+  // XA · A6: every client, in one table with one sentence above it.
+  const clientList = clients.status === "loading" ? <AgencyEveryClientLoading />
+    : clients.status === "error" ? <AgencyEveryClientError onRetry={retry} />
+    : <AgencyEveryClient
         clients={combined!.clients}
         agencyWorkspaceId={snapshot.workspaceId}
         viewerEmail={snapshot.actor.email}
-        canManage={current?.role === "owner" || current?.role === "admin"}
+        canManage={canManage}
         request={request}
         lastGoodReads={storedClients?.key.startsWith(`${snapshot.workspaceId}:`) ? storedClients.lastGoodReads : undefined}
         total={combined!.total}
@@ -253,6 +258,7 @@ export function AgencyHome({
         onOpen={onWorkspace}
         onRetryPage={retryPage}
         onMore={loadMore}
+        addClientHref={addClientHref}
       />;
 
   const queueList = clients.status === "loading" ? <p role="status" className="border-y border-gray-border py-5 text-[13px] text-gray-muted">Checking work across clients…</p>
@@ -307,6 +313,19 @@ export function AgencyHome({
   </section> : null;
 
   if (!canUseTools) return <StPage><StHead title="Clients" meta={agencyName} /><StNotice>{agencyName} shared some work with you to read. Clients, the queue and agency tools are for members of {agencyName}.</StNotice>{privateWork}</StPage>;
+
+  // XA · A3: an agency with no clients yet sees day one on its Today, not an empty table.
+  // Only inside the shell (controlledView), where the sidebar carries Queue, Library and Team.
+  if (released && controlledView === "home" && clients.status === "ready" && combined && combined.total === 0 && !combined.nextCursor) {
+    const agencyId = encodeURIComponent(snapshot.workspaceId);
+    return <div aria-busy={busy || undefined}><AgencyDayOne agencyName={agencyName} clients={0} openAgencyHref={`/workspace?workspaceId=${agencyId}`}
+      addClientHref={addClientHref} addClientBlocked={snapshot.releases?.agencyAddClient ? `An owner or admin of ${agencyName} adds clients.` : "Adding clients opens here next."}
+      verification={{ href: snapshot.releases?.agencySetup ? `/workspace/agency/start?workspaceId=${agencyId}` : undefined }}
+      team={{ inviteHref: current?.role === "owner" ? `/workspace/invitations?workspaceId=${agencyId}` : null, ownerOnly: `Only an owner of ${agencyName} invites people.` }}
+      brandHref={current?.role === "owner" ? `/workspace?workspaceId=${agencyId}&agencyView=team#agency-brand` : null}
+      importHref={snapshot.releases?.agencyImportClients && canManage ? `/workspace/agency/clients/import?workspaceId=${agencyId}` : null}
+      onAsk={text => onStart(text)} /></div>;
+  }
 
   const tab = (value: AgencyView) => ({ id: `${id}-${value}-tab`, panelId: `${id}-${value}-panel` });
   const choose = (value: string) => {

@@ -160,9 +160,10 @@ describe("auth access pages", () => {
     expect(signIn).toContain("Sign in");
     expect(signIn).toContain("&quot;next&quot;:&quot;/workspace&quot;");
     expect(signIn).not.toContain("AI Visibility");
-    expect(signUp).toContain("Create your account");
+    expect(signUp).toContain("Make your Strelva account");
     expect(signUp).toContain("&quot;next&quot;:&quot;/workspace/business/new&quot;");
-    expect(signUp).toContain("Already have an account? Sign in");
+    expect(signUp).toContain("Already have an account?");
+    expect(signUp).toContain('href="/sign-in?next=%2Fworkspace%2Fbusiness%2Fnew"');
   });
 
   it("asks business or agency when the agency front door is on, and sends agencies to setup", async () => {
@@ -177,14 +178,14 @@ describe("auth access pages", () => {
     expect(business).toContain("I run a business");
     expect(business).toContain('href="/sign-up?as=agency"');
     expect(business).toContain('aria-current="page"');
-    expect(business).toContain("Create your account");
+    expect(business).toContain("Make your Strelva account");
     expect(business).toContain("&quot;next&quot;:&quot;/workspace?save=scan_public123&quot;");
     // Strelva is not the default provider on the neutral front door (ADR 0012).
     expect(business).not.toContain("Request your build");
 
     const agency = renderToStaticMarkup(await SignUpPage({ searchParams: Promise.resolve({ as: "agency", next: "/workspace?save=scan_public123" }) }));
-    expect(agency).toContain("Create your account");
-    expect(agency).toContain("Clients own their workspace; you work inside it.");
+    expect(agency).toContain("Make your Strelva account");
+    expect(agency).toContain("Each client owns their business.");
     expect(agency).toContain("&quot;next&quot;:&quot;/workspace/agency/start&quot;");
     expect(agency).toContain('href="/sign-up?next=%2Fworkspace%3Fsave%3Dscan_public123"');
   });
@@ -197,7 +198,7 @@ describe("auth access pages", () => {
 
     const html = renderToStaticMarkup(await SignUpPage({ searchParams: Promise.resolve({ as: "agency" }) }));
     expect(html).not.toContain("Who is this for?");
-    expect(html).toContain("Create your account");
+    expect(html).toContain("Make your Strelva account");
     expect(html).toContain("&quot;next&quot;:&quot;/workspace/business/new&quot;");
   });
 
@@ -363,7 +364,7 @@ describe("auth access pages", () => {
     expect(closed).not.toContain("Who is this for?");
 
     const agency = renderToStaticMarkup(await SignUpPage({ searchParams: Promise.resolve({ as: "agency" }) }));
-    expect(agency).toContain("Create your account");
+    expect(agency).toContain("Make your Strelva account");
     expect(agency).toContain("&quot;next&quot;:&quot;/workspace/agency/start&quot;");
     expect(agency).not.toContain("I run a business");
 

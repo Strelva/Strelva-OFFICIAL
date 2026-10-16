@@ -18,3 +18,4 @@ export { XaAnswers, XaEmpty, XaHeadline, XaLabel, XaLede, XaLines, XaPage, XaPag
 export { XaChoices, XaDoors, XaField, XaSegmented, XaTextArea, type XaOption } from "./xa/inputs";
 export { XaCollapse, XaGlideList, XaRollingCount } from "./xa/motion";
 export { StComposerDock as XaComposerDock } from "./Kit";
+export { XaEntry, XaEntryCaption, XaEntryStack } from "./xa/entry";
