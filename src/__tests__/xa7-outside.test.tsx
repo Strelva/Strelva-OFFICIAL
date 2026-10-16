@@ -149,8 +149,16 @@ describe("XA · E4 the public booking page", () => {
     expect(html).toContain("November 23 to 28");
     expect(html.match(/Closed, Thanksgiving/g)).toHaveLength(2);
     expect(html).toContain('aria-label="Monday, Nov 23, 2026, 8:00 AM Eastern Time"');
-    expect(html).toContain("Choose a time for your new-patient exam");
-    expect(html).toContain("Harbor Dental accepts it or suggests another. Choose by Sunday, Nov 22 at 8:00 PM.");
+    // The business's own booking page: its name and phone head it, the service names the week, Strelva is one quiet line.
+    expect(html).toContain("Pick a time to see Harbor Dental");
+    expect(html).toContain("Harbor Dental accepts it or suggests another");
+    expect(html).toContain(">New-patient exam<");
+    expect(html).toContain("Choose by Sunday, Nov 22 at 8:00 PM.");
+    expect(html).toContain('href="tel:7165550142"');
+    expect(html).toContain("noValidate");
+    expect(html.match(/data-xa-primary/g)).toHaveLength(1);
+    expect(visible(html).match(/Strelva/g)).toEqual(["Strelva"]);
+    expect(visible(html)).toContain("Runs on Strelva");
     expect(visible(html).match(/Eastern/g)).toHaveLength(1);
     expect(clean(html)).toEqual([]);
   });

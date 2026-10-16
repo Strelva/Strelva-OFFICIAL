@@ -30,10 +30,12 @@ export type ManageBookingState =
   | { kind: "not_found" }
   /** The booking couldn't be read (store down). Nothing changed. */
   | { kind: "error" }
-  | { kind: "ended"; booking: ManagedBookingView }
+  | { kind: "ended"; booking: ManagedBookingView; /** Whose booking this is, so the page can wear the business's own look. Never rendered. */ tenantId?: string }
   | {
       kind: "ready";
       booking: ManagedBookingView;
+      /** Whose booking this is, so the page can wear the business's own look. Never rendered. */
+      tenantId?: string;
       /** Open times for a change, grouped by day. Empty when none are open or they couldn't be read. */
       days: Array<{ day: string; slots: Array<{ id: string; time: string }> }>;
       slotsUnavailable: boolean;
@@ -118,10 +120,10 @@ export async function loadManageState(
   if (!reservation) return { kind: "not_found" };
   const booking = managedView(reservation);
   // The link expires once the booking has ended.
-  if (Date.parse(reservation.end) <= deps.now() || (reservation.status === "held" && (!reservation.confirmUntil || Date.parse(reservation.confirmUntil) <= deps.now()))) return { kind: "ended", booking };
+  if (Date.parse(reservation.end) <= deps.now() || (reservation.status === "held" && (!reservation.confirmUntil || Date.parse(reservation.confirmUntil) <= deps.now()))) return { kind: "ended", booking, tenantId: reservation.tenantId };
   const notice: "cancelled" | "rescheduled" | "pending" | "confirmed" | undefined =
     query.done === "cancelled" || query.done === "rescheduled" || query.done === "pending" || query.done === "confirmed" ? query.done : undefined;
-  const base = { kind: "ready" as const, booking, ...(notice ? { notice } : {}), ...(query.error ? { error: manageErrorMessage(query.error) } : {}) };
+  const base = { kind: "ready" as const, booking, tenantId: reservation.tenantId, ...(notice ? { notice } : {}), ...(query.error ? { error: manageErrorMessage(query.error) } : {}) };
   if (reservation.status === "held") return { ...base, days: [], slotsUnavailable: false, changesClosed: true };
   if (reservation.status === "cancelled") return { ...base, days: [], slotsUnavailable: false, changesClosed: false };
   const now = deps.now();

@@ -18,6 +18,11 @@ export async function POST(request: Request, { params }: { params: Promise<{ tok
     if (request.headers.get("content-type")?.split(";", 1)[0]?.trim().toLowerCase() !== "application/x-www-form-urlencoded") throw new Error("invalid");
     const form = new URLSearchParams((await readBoundedBody(request, 2048)).toString("utf8"));
     const index = form.get("slot");
+    if (form.getAll("slot").length === 0) {
+      // No time picked (the form is noValidate): say so on the page, nothing was requested.
+      page.searchParams.set("error", "pick");
+      return new NextResponse(null, { status: 303, headers: { Location: page.toString() } });
+    }
     if (form.getAll("slot").length !== 1) throw new Error("invalid");
     if (typeof index !== "string" || !/^[0-2]$/.test(index)) throw new Error("invalid");
     await chooseInquiryBookingSlot(token, Number(index));

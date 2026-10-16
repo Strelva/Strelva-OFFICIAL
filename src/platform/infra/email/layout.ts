@@ -1,7 +1,7 @@
 import { brandColors, BRAND_CREDIT, type OwnerBrand } from "@/platform/infra/agency-brand";
 import { escapeEmailHtml } from "./escape";
 import { renderPaperEmailHtml, renderPaperEmailText, type PaperEmail } from "./paper";
-import { renderXaMailHtml, renderXaMailText, type XaMail } from "./xa-mail";
+import { renderXaMailHtml, renderXaMailText, type XaMail, type XaMailBrand } from "./xa-mail";
 import { visitorMailFromOptions } from "./visitor-mail";
 export { escapeEmailHtml } from "./escape";
 /**
@@ -108,6 +108,8 @@ export interface EmailOptions {
   brand?: OwnerBrand;
   /** End customers see the business that is contacting them. */
   businessName?: string;
+  /** Visitor mail: the business's own accent and logo (from its website or recorded branding). Presentation only. */
+  visitorBrand?: XaMailBrand;
   /** Hidden preview text shown in the inbox list before the body. */
   preheader?: string;
   /** The one h1. */
@@ -249,10 +251,10 @@ function footerHtml(opts: EmailOptions): string {
 
 /** Full branded HTML email document. */
 export function renderEmailHtml(opts: EmailOptions): string {
-  if (opts.xa) return renderXaMailHtml(opts.xa);
+  if (opts.xa) return renderXaMailHtml(opts.visitorBrand && !opts.xa.brand ? { ...opts.xa, brand: opts.visitorBrand } : opts.xa);
   // End customers read the business's own email in XA. Only the HTML changes:
   // the options (and so inquiry digests and the plain text) stay as they were.
-  if (opts.businessName && !opts.paper) return renderXaMailHtml(visitorMailFromOptions(opts));
+  if (opts.businessName && !opts.paper) return renderXaMailHtml({ ...visitorMailFromOptions(opts), ...(opts.visitorBrand ? { brand: opts.visitorBrand } : {}) });
   if (opts.paper) return renderPaperEmailHtml({ ...opts.paper, ...(opts.brand ? { brand: opts.brand } : {}), ...(opts.businessName ? { businessName: opts.businessName } : {}) });
   const colors = brandColors(opts.brand?.accentColor ?? TOKENS.accent);
   const preheader = opts.preheader

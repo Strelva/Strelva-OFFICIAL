@@ -191,6 +191,37 @@ who acted) blocks. Preview every screen and state at
 `/preview/strelva/xa/xs-leads/<screen>?state=…` (`&open=1` opens the picked
 item on a phone, `&prospect=<id>` picks a check result).
 
+### visitor lane · The business's own look (October 16, branch xa/fix-visitor)
+
+- **Brand:** [visitor-brand.ts](../../src/products/websites/visitor-brand.ts)
+  (`visitorBrandFromSiteDocument`, `visitorBrandFromAccent`, `visitorBrandStyle`,
+  `visitorBrandForMail`, exported from `@/products/websites/client`) reads a
+  business's published native website (palette, accent, logo, hero photo) or
+  its recorded tenant accent, drops any accent under 4.5:1 on the canvas, and
+  fills the `--visitor-*` variables. `readVisitorBrand(tenantId)`
+  (`@/products/websites`, lives in `hosted-public.tsx`) is the server read;
+  any failure is no brand. `/b`, `/book-inquiry` and `/inquiry-booking` pass it.
+  `/booking-confirm` cannot yet: its confirmation read returns no tenant.
+- **VisitorBookingShell** takes `brand` and `phone`: the logo or name links to
+  the business's site, the phone is a tap-to-call link, and "Runs on Strelva"
+  is one quiet line under every visitor page.
+- **Choosing a time (E4):** `InquiryBookingChoice` and `InquiryBookingOffer`
+  render the business's booking page: the sentence on the left (plus the
+  site's hero photo at 960 and wider), the service and week as one card on
+  the right; on a phone one column with the button riding at the bottom.
+- **VisitorTimeForm:** the one time-picking form (E4, offer, manage's change
+  time). `noValidate`; an empty submit is a sentence beside the button and
+  focus moves to the first time; the picked time is said back. Without
+  JavaScript the routes answer an empty pick with `?error=pick`.
+- **Visitor mail:** `XaMail.brand` / `EmailOptions.visitorBrand` put the
+  business's accent on the button, links and initial (and its logo when it is
+  https). Wired for the suggested-times email; other customer senders still
+  render XA ink until they pass a brand.
+- **Payer, after paying:** [PaidNote](../../src/app/pay/[slug]/PaidNote.tsx)
+  replaces the receipt sheet on `/pay/[slug]/receipt` with one sentence, the
+  reference line and Print. `PublicMoneyPage` fills the pay button with the
+  charging business's recorded accent.
+
 ### xs-visitor · What a business's visitors see (local, branch xa/lane-xs-visitor)
 
 No Pen render exists for these; they are designed in the XA language from

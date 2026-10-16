@@ -51,7 +51,9 @@ describe("xs-visitor: what a business's visitors see", () => {
     expect(renderToStaticMarkup(<VisitorBookingLoading />)).not.toContain("Business details unavailable");
     const view = confirmState("held");
     const html = renderToStaticMarkup(<BookingConfirmation identity={view.identity} error={null} actionUrl="/a" statusUrl="/s" />);
-    expect(primaries(html)).toBe(1); expect(html).toContain("Confirm my email and request this time"); expect(html).not.toContain("Strelva");
+    expect(primaries(html)).toBe(1); expect(html).toContain("Confirm my email and request this time");
+    // Strelva appears once, as the quiet credit under the business's page.
+    expect(html.match(/Strelva/g)).toHaveLength(1); expect(html).toContain("Runs on Strelva</footer>");
   });
   it("draws the link page and blog without gradients, uppercase or a second primary", () => {
     const links = renderToStaticMarkup(<SiteLinks siteName="Harbor Dental" links={harborLinks} />);

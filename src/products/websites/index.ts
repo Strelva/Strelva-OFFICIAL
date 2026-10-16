@@ -14,6 +14,7 @@ export const getHostedSite: typeof import("./hosted-public").getHostedSite = (..
 export const getPathHostedSite: typeof import("./hosted-public").getPathHostedSite = (...args) => import("./hosted-public").then(module => module.getPathHostedSite(...args));
 export const renderPathHostedPage: typeof import("./hosted-public").renderPathHostedPage = (...args) => import("./hosted-public").then(module => module.renderPathHostedPage(...args));
 export const hostedPageMetadata: typeof import("./hosted-public").hostedPageMetadata = (...args) => import("./hosted-public").then(module => module.hostedPageMetadata(...args));
+export const readVisitorBrand: typeof import("./hosted-public").readVisitorBrand = (...args) => import("./hosted-public").then(module => module.readVisitorBrand(...args));
 export const renderHostedPage: typeof import("./hosted-public").renderHostedPage = (...args) => import("./hosted-public").then(module => module.renderHostedPage(...args));
 export * from "./site-seo";
 export * from "./site-routing";

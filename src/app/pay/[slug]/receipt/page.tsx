@@ -4,7 +4,7 @@ import { XaTextLink } from "@/components/ui/strelva/Xa";
 import { resolveOwnerBrand } from "@/platform/agency-brand/server";
 import { issueAgencyPayLinkReceipt } from "@/platform/agency-pay-links";
 import { resolvePublicPayLink } from "@/platform/agency-pay-links/public";
-import { MoneyDocument } from "@/experience/workspace/billing/MoneyDocument";
+import { PaidNote } from "../PaidNote";
 import { PublicMoneyPage } from "@/experience/workspace/money/PublicMoneyPage";
 import styles from "@/experience/workspace/money/money.module.css";
 
@@ -14,7 +14,7 @@ export const metadata: Metadata = {
 };
 export const dynamic = "force-dynamic";
 
-/** The payer's Payment receipt. Numbered once the payment is confirmed, never emailed. */
+/** What the payer sees once a payment is confirmed: one sentence, its reference, and print. Numbered once confirmed, never emailed. */
 export default async function PayLinkReceiptPage({
   params,
 }: {
@@ -31,7 +31,6 @@ export default async function PayLinkReceiptPage({
         brand={brand}
         lead={
           <>
-            <p className={styles.publicKicker}>Payment receipt</p>
             <h1 className={styles.publicTitle}>
               No payment is recorded for this link yet.
             </h1>
@@ -55,7 +54,7 @@ export default async function PayLinkReceiptPage({
       brand={brand}
       single
       lead={
-        <MoneyDocument
+        <PaidNote
           doc={doc}
           back={{
             label: "Back to the payment link",

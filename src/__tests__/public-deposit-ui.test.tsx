@@ -30,7 +30,8 @@ describe("business deposit presentation", () => {
     expect(summary.textContent).toContain(refundable ? "eligible for a refund" : "non-refundable");
     expect(summary.textContent).not.toContain("until Nov");
     expect(payButton()).toBeDefined();
-    expect(container.querySelector("main")?.textContent).not.toContain("Strelva");
+    // Strelva appears only as the quiet credit under the business's page.
+    expect(container.querySelector("main")?.textContent?.replace("Runs on Strelva", "")).not.toContain("Strelva");
   });
 
   it("keeps immutable quote agreement text beside the amount", async () => {
@@ -114,7 +115,7 @@ describe("fictional deposit preview", () => {
     expect(container.textContent).toContain("Deposit received · simulated");
     expect(container.textContent).toContain("has not taken a payment or held a spot");
     expect(fetcher).not.toHaveBeenCalled();
-    expect(container.textContent).not.toMatch(/reservation|Strelva/);
+    expect(container.textContent?.replace("Runs on Strelva", "")).not.toMatch(/reservation|Strelva/);
   });
 
   it.each(["loading", "empty", "denied"] as const)("offers no charge in its %s state", async state => {

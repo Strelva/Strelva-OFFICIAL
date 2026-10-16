@@ -85,3 +85,5 @@ export { normalizeWebsiteRebuildUrl } from "./rebuild-url";
 export { bareHostname } from "./rebuild-possibility";
 export type { SiteResults, WorkspaceResults } from "./linked-results";
 export { domainConnectedPaperEmail } from "./domain-receipt-email";
+export { visitorBrandFromAccent, visitorBrandFromSiteDocument, visitorBrandForMail, visitorBrandStyle, visitorContrast } from "./visitor-brand";
+export type { VisitorBrand, VisitorBrandColors } from "./visitor-brand";

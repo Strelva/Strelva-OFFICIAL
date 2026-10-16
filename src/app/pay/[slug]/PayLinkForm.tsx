@@ -50,6 +50,12 @@ export function PayLinkForm({
 
   async function startCheckout(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    // The form is noValidate: a mistyped email is said in a sentence, never a browser bubble.
+    const email = customerEmail.trim();
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setError("That email address looks incomplete. Fix it, or leave it blank.");
+      return;
+    }
     setLoading(true);
     setError("");
     try {
@@ -79,6 +85,7 @@ export function PayLinkForm({
   return (
     <form
       onSubmit={startCheckout}
+      noValidate
       autoComplete="off"
       className={styles.section}
       aria-label="Pay this link"

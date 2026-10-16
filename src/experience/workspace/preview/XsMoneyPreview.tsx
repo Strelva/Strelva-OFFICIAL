@@ -36,6 +36,7 @@ import { SourceListing } from "@/experience/workspace/money/SourceListing";
 import styles from "@/experience/workspace/money/money.module.css";
 import { PaymentsScreen } from "@/app/workspace/payments/PaymentsScreen";
 import { ConnectedPayLink } from "@/app/pay/[slug]/ConnectedPayLink";
+import { PaidNote } from "@/app/pay/[slug]/PaidNote";
 import BusinessPayment from "@/app/pay/business/BusinessPayment";
 import CreatorMaintenance from "@/app/workspace/creator-maintenance/CreatorMaintenance";
 import ReviewQueue from "@/app/workspace/money-reconciliation/ReviewQueue";
@@ -620,7 +621,6 @@ export function XsMoneyPreview({
           brand={NORTH_BRAND}
           lead={
             <>
-              <p className={styles.publicKicker}>Payment receipt</p>
               <h1 className={styles.publicTitle}>
                 No payment is recorded for this link yet.
               </h1>
@@ -642,7 +642,7 @@ export function XsMoneyPreview({
           brand={NORTH_BRAND}
           single
           lead={
-            <MoneyDocument
+            <PaidNote
               doc={{
                 ...receiptDoc,
                 number: 4,

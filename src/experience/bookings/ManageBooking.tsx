@@ -2,6 +2,8 @@ import { VisitorBookingShell } from "./VisitorBookingShell";
 import { VisitorAppointment } from "./VisitorAppointment";
 import styles from "./visitor.module.css";
 import type { ManageBookingState, ManagedBookingView } from "@/platform/bookings/manage";
+import type { VisitorBrand } from "@/products/websites/client";
+import { VisitorTimeForm } from "./VisitorTimeForm";
 
 export type { ManageBookingState, ManagedBookingView };
 
@@ -34,7 +36,7 @@ const SAID: Record<NonNullable<Extract<ManageBookingState, { kind: "ready" }>["n
   cancelled: b => `Done. The time is open for someone else, and ${business(b)} has been told.`,
 };
 
-export function ManageBooking({ state, actionUrl }: { state: ManageBookingState; actionUrl: string }) {
+export function ManageBooking({ state, actionUrl, brand }: { state: ManageBookingState; actionUrl: string; /** The business's own look, from its website or recorded branding. */ brand?: VisitorBrand | null }) {
   if (state.kind === "not_found") {
     return <VisitorBookingShell>
       <div className={styles.page}>
@@ -53,7 +55,7 @@ export function ManageBooking({ state, actionUrl }: { state: ManageBookingState;
   }
   const { booking } = state;
   if (state.kind === "ended") {
-    return <VisitorBookingShell siteName={booking.siteName}>
+    return <VisitorBookingShell siteName={booking.siteName} brand={brand}>
       <div className={styles.page}>
         <h1 className={styles.title}>This booking link has expired</h1>
         <p className={styles.intro}>The appointment has ended or the confirmation window has closed, so this link can&apos;t change it. To book again, visit {business(booking)}&apos;s website.</p>
@@ -73,7 +75,7 @@ export function ManageBooking({ state, actionUrl }: { state: ManageBookingState;
     : booking.status === "held" ? "Nothing is booked until you confirm. This time is held for 15 minutes after your request."
     : "Your request is in. The business will accept this time or suggest another, and you will get an email either way.";
 
-  return <VisitorBookingShell siteName={booking.siteName}>
+  return <VisitorBookingShell siteName={booking.siteName} brand={brand}>
     <div className={styles.page}>
       <h1 className={styles.title}>{headline}</h1>
       {/* After an action, what just happened replaces the standing sentence, so the two never say the same thing.
@@ -100,8 +102,7 @@ export function ManageBooking({ state, actionUrl }: { state: ManageBookingState;
           ) : state.days.length === 0 ? (
             <p className={styles.note}>No other times are open in the next two weeks. Reply to your booking email to ask about another time.</p>
           ) : (
-            <form action={actionUrl} method="post">
-              <input type="hidden" name="action" value="reschedule" />
+            <VisitorTimeForm action={actionUrl} name="slotId" hiddenFields={{ action: "reschedule" }} submitLabel="Move my booking" emptyMessage="Pick a new time first. Your booking is unchanged.">
               <p className={styles.note}>Open times in the next two weeks, in {booking.timeZoneLabel}.</p>
               <fieldset className={`${styles.fieldset} ${styles.dayRows}`}>
                 <legend className={styles.srOnly}>Pick a new time</legend>
@@ -109,14 +110,13 @@ export function ManageBooking({ state, actionUrl }: { state: ManageBookingState;
                   <p className={styles.dayName}>{day.day}</p>
                   <div className={styles.times}>
                     {day.slots.map(slot => <label key={slot.id} className={styles.time}>
-                      <input type="radio" name="slotId" value={slot.id} required aria-label={`${day.day}, ${slot.time} ${booking.timeZoneLabel}`} />
+                      <input type="radio" name="slotId" value={slot.id} required aria-label={`${day.day}, ${slot.time} ${booking.timeZoneLabel}`} data-picked={`${day.day} at ${slot.time}`} />
                       <span aria-hidden="true">{slot.time}</span>
                     </label>)}
                   </div>
                 </div>)}
               </fieldset>
-              <div className={styles.actions}><button type="submit" data-xa-primary className={`${styles.button} ${styles.block}`}>Move my booking</button></div>
-            </form>
+            </VisitorTimeForm>
           )}
         </section>
 

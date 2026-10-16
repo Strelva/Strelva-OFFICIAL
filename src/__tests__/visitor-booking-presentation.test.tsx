@@ -22,11 +22,12 @@ const renderManage = (state: ManageBookingState) => renderToStaticMarkup(createE
 afterEach(() => vi.useRealTimers());
 
 describe("visitor presentation preserves explicit booking actions", () => {
-  it("shares one business header and a neutral identity failure without platform branding", () => {
+  it("shares one business header and a neutral identity failure, with Strelva only as the quiet credit", () => {
+    const credit = (html: string) => html.replace(/<footer[^>]*>Runs on Strelva<\/footer>/, "");
     const business = renderToStaticMarkup(<VisitorBookingShell siteName="Lakeview Yoga">Booking</VisitorBookingShell>);
-    expect(business).toContain("<header"); expect(business).toContain("Lakeview Yoga"); expect(business).not.toContain("Strelva");
+    expect(business).toContain("<header"); expect(business).toContain("Lakeview Yoga"); expect(credit(business)).not.toContain("Strelva");
     const missing = renderToStaticMarkup(<VisitorBookingShell>Unavailable</VisitorBookingShell>);
-    expect(missing).not.toContain("<header"); expect(missing).not.toContain("Business details unavailable"); expect(missing).not.toContain("Strelva");
+    expect(missing).not.toContain("<header"); expect(missing).not.toContain("Business details unavailable"); expect(credit(missing)).not.toContain("Strelva");
     const fixture = renderToStaticMarkup(createElement(InquiryBookingReceiptFixture));
     expect(fixture).toContain("The Mooney Firm"); expect(fixture).toContain("Ask about a consultation"); expect(fixture).not.toContain("form is unavailable");
   });

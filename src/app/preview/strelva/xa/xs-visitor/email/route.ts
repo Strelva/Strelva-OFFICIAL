@@ -1,5 +1,6 @@
 import { strelvaUiPreviewEnabled } from "@/experience/workspace/preview/enabled";
-import { genericVisitorEmails, newsletterIssue, previewBooking } from "@/experience/workspace/preview/xs-visitor-fixture";
+import { genericVisitorEmails, newsletterIssue, previewBooking, previewBrand } from "@/experience/workspace/preview/xs-visitor-fixture";
+import { visitorBrandForMail } from "@/products/websites/client";
 import { customerReminderEmail, ownerRequestReminderEmail, requestLapsedEmail, bookingWhen } from "@/platform/bookings/emails";
 import { bookingUpdateVisitorMail } from "@/platform/bookings/updates";
 import { renderEmailHtml, renderEmailText, type EmailOptions } from "@/platform/infra/email/layout";
@@ -14,6 +15,8 @@ const harbor = { name: "Harbor Dental", address: "1180 Elmwood Ave, Buffalo" };
 /**
  * Visitor emails, rendered by the real builders and the real renderer
  * (renderEmailHtml / renderXaMailHtml). Templates only: nothing is sent.
+ * Visitor mail wears Harbor Dental's own accent (&brand=none for XA ink); the
+ * owner's chase stays in XA ink because it is Strelva speaking to the owner.
  * ?kind=reminder|today|chase|lapsed|lapsed-none|confirmed|requested|held|cancelled|declined|newsletter|inquiry-reply|inquiry-offer|inquiry-follow|authored-reply|confirm-request&format=text
  */
 function mail(kind: string): { options?: EmailOptions; xa?: XaMail } | null {
@@ -38,6 +41,8 @@ export async function GET(request: Request) {
   const found = mail(url.searchParams.get("kind") ?? "reminder");
   if (!found) return new Response("Unknown kind", { status: 404 });
   const text = url.searchParams.get("format") === "text";
+  const brand = visitorBrandForMail(previewBrand(url.searchParams.get("brand") ?? undefined));
+  if (brand && url.searchParams.get("kind") !== "chase") { if (found.xa) found.xa = { ...found.xa, brand }; else if (found.options) found.options = { ...found.options, visitorBrand: brand }; }
   const raw = found.xa ? text ? renderXaMailText(found.xa) : renderXaMailHtml(found.xa) : text ? renderEmailText(found.options!) : renderEmailHtml(found.options!);
   // Mail clients that load web fonts read the Google Fonts <link> in the email.
   // This app's CSP blocks that host, so the preview adds the same face from

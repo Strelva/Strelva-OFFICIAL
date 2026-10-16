@@ -15,6 +15,7 @@ import type { SiteLinkItem } from "@/components/public/SiteLinks";
 import type { StoreBooking } from "@/platform/bookings/store";
 import type { EmailOptions } from "@/platform/infra/email/layout";
 import { XA_HARBOR, XA_NORTH } from "./xa-day";
+import { visitorBrandFromSiteDocument, type VisitorBrand } from "@/products/websites/client";
 
 export const HARBOR = { name: XA_HARBOR.name, doctor: XA_HARBOR.owner, street: XA_HARBOR.address, city: "Buffalo", region: "NY", phone: "(716) 555-0142", email: "hello@harbordental.example.test", zone: "America/New_York" } as const;
 export const PREVIEW_NOW = Date.parse("2026-11-20T14:05:00Z");
@@ -61,6 +62,19 @@ export const harborPosts: PublicBlogPost[] = [
   { id: "p2", slug: "first-visit", title: "What happens at your first visit", excerpt: "Sixty minutes, X-rays, and a plan you can take home. Here is the whole hour, step by step.", content: "## Before you come\n\nFill in the patient form online so you're not doing it on a clipboard.\n\n## The hour\n\n1. X-rays, about ten minutes\n2. The exam with Dr. Lin\n3. A plan, in writing, with what each step costs\n\nYou'll leave knowing what comes next, and nothing is booked without your say.", author: HARBOR.doctor, tags: ["New patients"], publishedAt: "2026-10-02T14:00:00Z" },
   { id: "p1", slug: "parking", title: "Where to park on Elmwood", excerpt: "There is free parking behind the building, off Bryant Street.", content: "There is free parking behind the building, off Bryant Street.", author: XA_HARBOR.name, tags: [], publishedAt: "2026-09-12T14:00:00Z" },
 ];
+
+
+/**
+ * Harbor Dental's own look on its visitor pages, read from its website the
+ * way /b, /book-inquiry and /inquiry-booking read a real business's published
+ * site. The photo stands in for the hero image a real site carries.
+ * ?brand=none on a preview shows the unbranded fallback.
+ */
+export const harborBrand: VisitorBrand = {
+  ...visitorBrandFromSiteDocument(harborSite, "https://harbordental.example.test"),
+  photo: { url: "/xa/photo-dentist.webp", alt: "Dr. Lin with a patient in the Elmwood office" },
+};
+export const previewBrand = (brand?: string): VisitorBrand | null => brand === "none" ? null : harborBrand;
 
 /* ---------- The business page (/biz) ---------- */
 

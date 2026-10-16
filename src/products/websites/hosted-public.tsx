@@ -13,6 +13,7 @@ import { readHostedBusinessFacts } from "./business-facts-server";
 import { isSitesPathHost } from "@/platform/infra/brand";
 import { websiteDocumentStore } from "./document-store";
 import { websiteRebuildReleaseEnabledForTenant } from "./rebuild-release";
+import { visitorBrandFromAccent, visitorBrandFromSiteDocument, type VisitorBrand } from "./visitor-brand";
 
 export const getHostedSite = cache(async () => {
   const requestHeaders = await headers();
@@ -61,4 +62,27 @@ export async function renderPathHostedPage(tenant: string, path: string) {
   if (target) permanentRedirect(`${basePath}${target}`);
   if (!site.document.pages.some(page => page.path === path)) notFound();
   return <SiteRenderer {...site} path={path} basePath={basePath} />;
+}
+
+const VISITOR_BRAND_TENANT = /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/;
+/**
+ * The business's own look for the pages its visitors open (/b, /book-inquiry,
+ * /inquiry-booking, its visitor email): its published website first, then its
+ * recorded branding. Presentation only: any failure is a page without a brand
+ * (neutral paper), never an error, and nothing here writes.
+ */
+export async function readVisitorBrand(tenantId: string | null | undefined): Promise<VisitorBrand | null> {
+  // A workspace-only business ("workspace:<id>") has no website or tenant branding yet.
+  if (!tenantId || !VISITOR_BRAND_TENANT.test(tenantId)) return null;
+  try {
+    const [document, config] = await Promise.all([
+      getPublishedSiteDocument(tenantId).catch(() => null),
+      getTenantConfig(tenantId).catch(() => undefined),
+    ]);
+    if (document) return visitorBrandFromSiteDocument(document, tenantCanonicalOrigin(tenantId, config));
+    const own = config?.productionDomain || config?.siteUrl ? tenantCanonicalOrigin(tenantId, config) : null;
+    return visitorBrandFromAccent(config?.branding?.accentColor, own);
+  } catch {
+    return null;
+  }
 }

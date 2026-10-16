@@ -2,6 +2,7 @@ import { formatVisitorTime } from "@/platform/bookings/public-admission-time";
 import { VisitorBookingShell } from "./VisitorBookingShell";
 import { VisitorAppointment, visitorAppointmentTime } from "./VisitorAppointment";
 import styles from "./visitor.module.css";
+import type { VisitorBrand } from "@/products/websites/client";
 
 /** What /booking-confirm/[token] reads: `readVisitorConfirmation`'s shape. */
 export interface VisitorConfirmationView {
@@ -21,13 +22,15 @@ export interface VisitorConfirmationView {
  * language). Opening the page is read-only, including for mail scanners; only
  * the one ink button posts. Every outcome keeps the time as the page's object.
  */
-export function BookingConfirmation({ identity, error, actionUrl, statusUrl, service }: {
+export function BookingConfirmation({ identity, error, actionUrl, statusUrl, service, brand }: {
   identity: VisitorConfirmationView | null;
   /** The redirect's error code, when the post did not complete. */
   error?: string | null;
   actionUrl: string;
   statusUrl: string;
   service?: string;
+  /** The business's own look. The confirmation record names the business but not yet which one, so the live page passes none. */
+  brand?: VisitorBrand | null;
 }) {
   const done = identity?.state === "placed";
   const confirmed = done && identity.bookingStatus === "confirmed";
@@ -50,7 +53,7 @@ export function BookingConfirmation({ identity, error, actionUrl, statusUrl, ser
   const when = identity ? visitorAppointmentTime(identity.start, identity.timeZone) : null;
   const canConfirm = !done && !failed && identity?.state === "held";
 
-  return <VisitorBookingShell siteName={identity?.businessName}>
+  return <VisitorBookingShell siteName={identity?.businessName} brand={brand}>
     <div className={styles.page}>
       <h1 className={styles.title}>{headline}</h1>
       <p role={failed ? "alert" : undefined} className={styles.intro}>{lede}</p>

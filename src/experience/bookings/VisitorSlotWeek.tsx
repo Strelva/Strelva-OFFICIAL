@@ -33,13 +33,21 @@ export function VisitorSlotWeek({ slots, timeZone, name, value, legend, closures
         <p className={styles.dayHead}><span>{day.weekday}</span><b>{day.date}</b></p>
         <div className={styles.times}>
           {day.times.length ? day.times.map(slot => <label key={slot.start} className={styles.time}>
-            <input type="radio" name={name} value={value(slot, slot.index)} required aria-label={formatVisitorTime(slot.start, week.zone)} />
+            <input type="radio" name={name} value={value(slot, slot.index)} required aria-label={formatVisitorTime(slot.start, week.zone)} data-picked={pickedWords(slot.start, week.zone)} />
             <span aria-hidden="true">{slot.label}</span>
           </label>) : <span className={day.closed ? styles.closed : styles.noTimes}>{day.closed ?? "Nothing open"}</span>}
         </div>
       </div>)}
     </div>
   </fieldset>;
+}
+
+/** "Tuesday, Nov 24 at 9:15 AM": the pick said back under the week; the week already names the zone. */
+function pickedWords(iso: string, zone: string): string {
+  const at = new Date(iso);
+  const day = new Intl.DateTimeFormat("en-US", { timeZone: zone, weekday: "long", month: "short", day: "numeric" }).format(at);
+  const time = new Intl.DateTimeFormat("en-US", { timeZone: zone, hour: "numeric", minute: "2-digit" }).format(at);
+  return `${day} at ${time}`;
 }
 
 /** A closed day as an offer carries it; the same shape the week reads. */

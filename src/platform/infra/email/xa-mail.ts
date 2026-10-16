@@ -78,7 +78,14 @@ export interface XaMail {
   settings?: XaMailAction;
   /** Further quiet links after the footer, e.g. "Unsubscribe". */
   footerLinks?: readonly XaMailAction[];
+  /**
+   * Visitor mail only: the business's own accent (already contrast-checked on
+   * white) for its button, links and initial, and its logo. Absent: XA ink.
+   */
+  brand?: XaMailBrand;
 }
+
+export interface XaMailBrand { accent: string; onAccent: string; logoUrl?: string | null }
 
 const e = escapeEmailHtml;
 function url(value: string): string {
@@ -89,20 +96,26 @@ function url(value: string): string {
   return e(value);
 }
 /** The business's initial in a small ink tile, when it has no logo. Never Strelva's mark. */
-const monogram = (name: string) => `<span style="display:inline-block;width:24px;height:24px;margin-right:8px;border-radius:7px;background:${X.ink};color:${X.onInk};font-size:13px;line-height:24px;font-weight:600;text-align:center;vertical-align:1px;">${e((name.trim().match(/[\p{L}\p{N}]/u)?.[0] ?? "?").toUpperCase())}</span>`;
+const HEX = /^#[0-9a-f]{6}$/i;
+/** The fill and label for the one button, the initial and links: the business's accent when it has one. */
+function tone(brand?: XaMailBrand) {
+  return brand && HEX.test(brand.accent) && HEX.test(brand.onAccent) ? { fill: brand.accent, on: brand.onAccent, link: brand.accent } : { fill: X.ink, on: X.onInk, link: X.moss };
+}
+const monogram = (name: string, brand?: XaMailBrand) => `<span style="display:inline-block;width:24px;height:24px;margin-right:8px;border-radius:7px;background:${tone(brand).fill};color:${tone(brand).on};font-size:13px;line-height:24px;font-weight:600;text-align:center;vertical-align:1px;">${e((name.trim().match(/[\p{L}\p{N}]/u)?.[0] ?? "?").toUpperCase())}</span>`;
 const table = (body: string, style = "", width = "100%") => `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="${width}" style="border-collapse:separate;${style}">${body}</table>`;
-const pill = (action: XaMailAction, block: boolean) => table(`<tr><td align="center" bgcolor="${X.ink}" style="background:${X.ink};border-radius:999px;"><a href="${url(action.url)}" style="display:block;padding:15px 28px;font-family:${X.font};font-size:17px;line-height:22px;font-weight:600;color:${X.onInk};text-decoration:none;border-radius:999px;">${e(action.label)}</a></td></tr>`, "", block ? "100%" : "");
+const pill = (action: XaMailAction, block: boolean, brand?: XaMailBrand) => table(`<tr><td align="center" bgcolor="${tone(brand).fill}" style="background:${tone(brand).fill};border-radius:999px;"><a href="${url(action.url)}" style="display:block;padding:15px 28px;font-family:${X.font};font-size:17px;line-height:22px;font-weight:600;color:${tone(brand).on};text-decoration:none;border-radius:999px;">${e(action.label)}</a></td></tr>`, "", block ? "100%" : "");
 
-function block(b: XaMailBlock): string {
+function block(b: XaMailBlock, brand?: XaMailBrand): string {
   switch (b.kind) {
-    case "identity": return `<p style="margin:0;font-size:16px;line-height:24px;font-weight:600;color:${X.text};">${b.logoUrl ? `<img src="${url(b.logoUrl)}" alt="" width="24" height="24" style="vertical-align:-6px;margin-right:8px;border:0;">` : monogram(b.business)}${e(b.business)}</p>`;
+    case "identity": { const logo = b.logoUrl ?? brand?.logoUrl;
+      return `<p style="margin:0;font-size:16px;line-height:24px;font-weight:600;color:${X.text};">${logo ? `<img src="${url(logo)}" alt="" width="24" height="24" style="vertical-align:-6px;margin-right:8px;border:0;">` : monogram(b.business, brand)}${e(b.business)}</p>`; }
     case "waits": return `<p style="margin:0;font-size:15px;line-height:22px;color:${X.need};"><span style="display:inline-block;width:7px;height:7px;margin-right:8px;border-radius:999px;background:${X.needDot};vertical-align:1px;"></span>${e(b.label)}</p>`;
     case "headline": return `<h1 style="margin:0;font-size:28px;line-height:34px;font-weight:600;letter-spacing:-0.6px;color:${X.text};overflow-wrap:anywhere;">${e(b.text)}</h1>${b.lede ? `<p style="margin:12px 0 0;font-size:16px;line-height:24px;color:${X.muted};">${e(b.lede)}</p>` : ""}`;
     case "page": return table(`<tr><td align="center" style="padding:10px 16px;background:${X.inset};border-bottom:1px solid ${X.line};border-radius:16px 16px 0 0;font-size:13px;line-height:18px;color:${X.muted};">${e(b.page.address)}</td></tr>
       <tr><td style="padding:20px 24px 22px;"><p style="margin:0 0 12px;font-size:20px;line-height:26px;font-weight:600;color:${X.text};">${e(b.page.title)}</p>
       ${table(`<tr><td style="padding:12px 14px;background:${X.tint};border-radius:10px;font-size:16px;line-height:24px;color:${X.text};">${e(b.page.change)}</td></tr>`)}
       ${b.page.note ? `<p style="margin:12px 0 0;font-size:13px;line-height:18px;color:${X.faint};">${e(b.page.note)}</p>` : ""}</td></tr>`, `border:1px solid ${X.line};border-radius:16px;background:${X.surface};`);
-    case "primary": return `${pill(b.action, b.align !== "start")}${b.note ? `<p style="margin:14px 0 0;text-align:center;font-size:13px;line-height:18px;color:${X.muted};">${e(b.note)}</p>` : ""}`;
+    case "primary": return `${pill(b.action, b.align !== "start", brand)}${b.note ? `<p style="margin:14px 0 0;text-align:center;font-size:13px;line-height:18px;color:${X.muted};">${e(b.note)}</p>` : ""}`;
     case "art": return `<p style="margin:0;text-align:center;"><img src="${url(b.url)}" alt="${e(b.alt)}" width="${b.width}" height="${b.height}" style="display:inline-block;max-width:100%;height:auto;border:0;"></p>`;
     case "period": return `<p style="margin:0;font-size:13px;line-height:18px;color:${X.faint};">${e(b.text)}</p>`;
     case "figure": return table(`<tr>${b.art ? `<td valign="middle" style="padding-right:14px;"><img src="${url(b.art.url)}" alt="${e(b.art.alt)}" width="64" height="64" style="display:block;border:0;"></td>` : ""}<td valign="middle" style="padding-right:16px;font-size:64px;line-height:64px;font-weight:300;letter-spacing:-2px;color:${X.text};font-variant-numeric:tabular-nums;white-space:nowrap;">${e(b.value)}</td><td valign="middle" style="width:100%;"><p style="margin:0;font-size:19px;line-height:26px;color:${X.text};">${e(b.label)}</p>${b.detail ? `<p style="margin:2px 0 0;font-size:14px;line-height:20px;color:${X.muted};">${e(b.detail)}</p>` : ""}</td></tr>`);
@@ -115,8 +128,8 @@ function block(b: XaMailBlock): string {
     case "rows": return table(b.rows.map(r => `<tr><td valign="top" style="padding:12px 16px 12px 0;border-bottom:1px solid ${X.line};font-size:14px;line-height:22px;color:${X.muted};white-space:nowrap;">${e(r.label)}</td><td valign="top" align="right" style="padding:12px 0;border-bottom:1px solid ${X.line};font-size:15px;line-height:22px;color:${X.text};overflow-wrap:anywhere;">${e(r.value)}</td></tr>`).join(""), `border-top:1px solid ${X.line};`);
     case "quote": return `<p style="margin:0 0 8px;font-size:13px;line-height:18px;color:${X.muted};">${e(b.label)}</p>${table(`<tr><td style="padding:12px 14px;background:${X.inset};border-radius:10px;font-size:15px;line-height:23px;color:${X.body};white-space:pre-line;overflow-wrap:anywhere;">${e(b.text)}</td></tr>`)}`;
     // One hairline-divided list inside the card, never a stack of boxes: each time is a link.
-    case "choices": return `${b.label ? `<p style="margin:0 0 4px;font-size:13px;line-height:18px;color:${X.muted};">${e(b.label)}</p>` : ""}${table(b.items.map(item => `<tr><td style="border-bottom:1px solid ${X.line};"><a href="${url(item.url)}" style="display:block;padding:13px 0;font-size:16px;line-height:22px;font-weight:600;color:${X.text};text-decoration:none;font-variant-numeric:tabular-nums;">${e(item.label)}<span style="float:right;font-size:15px;font-weight:600;color:${X.moss};">Pick</span></a></td></tr>`).join(""), `border-top:1px solid ${X.line};`)}`;
-    case "link": return `<p style="margin:0;text-align:center;"><a href="${url(b.action.url)}" style="display:inline-block;padding:4px 0;font-size:15px;line-height:22px;font-weight:600;color:${X.moss};text-decoration:none;">${e(b.action.label)}</a></p>`;
+    case "choices": return `${b.label ? `<p style="margin:0 0 4px;font-size:13px;line-height:18px;color:${X.muted};">${e(b.label)}</p>` : ""}${table(b.items.map(item => `<tr><td style="border-bottom:1px solid ${X.line};"><a href="${url(item.url)}" style="display:block;padding:13px 0;font-size:16px;line-height:22px;font-weight:600;color:${X.text};text-decoration:none;font-variant-numeric:tabular-nums;">${e(item.label)}<span style="float:right;font-size:15px;font-weight:600;color:${tone(brand).link};">Pick</span></a></td></tr>`).join(""), `border-top:1px solid ${X.line};`)}`;
+    case "link": return `<p style="margin:0;text-align:center;"><a href="${url(b.action.url)}" style="display:inline-block;padding:4px 0;font-size:15px;line-height:22px;font-weight:600;color:${tone(brand).link};text-decoration:none;">${e(b.action.label)}</a></p>`;
     case "html": return `<div style="font-size:16px;line-height:26px;color:${X.body};overflow-wrap:anywhere;">${b.html}</div>`;
   }
 }
@@ -125,7 +138,7 @@ const GAP: Partial<Record<XaMailBlock["kind"], number>> = { identity: 0, waits: 
 
 /** The card body. Also what the preview frames, so preview and mail never drift. */
 export function renderXaMailBody(mail: XaMail): string {
-  const rows = mail.blocks.map((b, i) => `<tr><td style="padding-top:${i ? GAP[b.kind] ?? 16 : 0}px;">${block(b)}</td></tr>`).join("");
+  const rows = mail.blocks.map((b, i) => `<tr><td style="padding-top:${i ? GAP[b.kind] ?? 16 : 0}px;">${block(b, mail.brand)}</td></tr>`).join("");
   const card = table(`<tr><td style="padding:36px 40px 32px;">${table(rows)}</td></tr>`, `max-width:640px;background:${X.surface};border-radius:16px;`, "100%");
   const links = [...(mail.settings ? [mail.settings] : []), ...(mail.footerLinks ?? [])].map(link => ` · <a href="${url(link.url)}" style="color:${X.faint};text-decoration:underline;">${e(link.label)}</a>`).join("");
   const footer = `<p style="margin:20px 0 0;text-align:center;font-size:12px;line-height:18px;color:${X.faint};">${e(mail.footer)}${links}</p>`;
