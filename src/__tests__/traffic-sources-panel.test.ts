@@ -38,38 +38,37 @@ function render(props: Parameters<typeof TrafficSourcesPanel>[0]): string {
 }
 
 describe("TrafficSourcesPanel — data state", () => {
-  it("shows sources and landing pages when GA4 is connected", () => {
+  it("shows where visitors come from when GA4 is connected", () => {
     const html = render({ ga: ga(), connectHref: "/dashboard/integrations" });
     expect(html).toContain("Where your visitors come from");
     expect(html).toContain("Google");
     // Raw GA4 tokens are humanized for the owner.
-    expect(html).toContain("Direct / typed in");
+    expect(html).toContain("Typed in or a saved link");
     expect(html).toContain("480");
-    expect(html).toContain("Where they land");
-    expect(html).toContain("/classes");
+    // Landing pages live in the search panel, named for the owner; no raw paths here.
+    expect(html).not.toContain("/classes");
   });
 });
 
 describe("TrafficSourcesPanel — connect state", () => {
   it("mirrors the GSC connect prompt when GA4 is unconfigured", () => {
     const html = render({ ga: UNCONFIGURED_GA, connectHref: "/x/dashboard/integrations" });
-    expect(html).toContain("Connect Google and we&#x27;ll show where your visitors come from");
+    expect(html).toContain("Connect Google and I show where your visitors come from");
     expect(html).toContain("/x/dashboard/integrations");
-    expect(html).not.toContain("Where they land");
   });
 
   it("shows the connect prompt when GA4 data is null (not loaded)", () => {
     const html = render({ ga: null, connectHref: "/dashboard/integrations" });
-    expect(html).toContain("Connect Google and we&#x27;ll show where your visitors come from");
+    expect(html).toContain("Connect Google and I show where your visitors come from");
   });
 });
 
 describe("TrafficSourcesPanel — configured but no data", () => {
   it("says the read failed when configured but unavailable", () => {
     const html = render({ ga: UNAVAILABLE_GA, connectHref: "/dashboard/integrations" });
-    expect(html).toContain("couldn&#x27;t be read this time");
+    expect(html).toContain("Google didn&#x27;t answer this time");
     expect(html).not.toMatch(/coming soon/i);
-    expect(html).not.toContain("Connect Google and we&#x27;ll show where your visitors come from");
+    expect(html).not.toContain("Connect Google and I show where your visitors come from");
   });
 
   it("invites patience when connected but no sessions measured yet", () => {

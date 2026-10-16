@@ -54,19 +54,18 @@ function render(props: Parameters<typeof WeeklyBriefClient>[0]): string {
 describe("Where you rank — AI answers row", () => {
   it("shows the business gets named when AI presence is true", () => {
     const html = render({ brief: brief(), benchmark: benchmark(true) });
-    expect(html).toContain("When people ask AI for this:");
-    expect(html).toContain("you get named");
+    expect(html).toContain("AI answers name you");
   });
 
   it("shows not-named-yet when AI presence is false", () => {
     const html = render({ brief: brief(), benchmark: benchmark(false) });
-    expect(html).toContain("When people ask AI for this:");
-    expect(html).toContain("not named yet");
+    expect(html).toContain("name you yet");
   });
 
   it("omits the AI row entirely when the answer wasn't probed (null)", () => {
     const html = render({ brief: brief(), benchmark: benchmark(null) });
-    expect(html).not.toContain("When people ask AI for this:");
+    expect(html).not.toContain("AI answers name you");
+    expect(html).not.toContain("name you yet");
   });
 });
 
@@ -83,18 +82,18 @@ describe("Search Console query table", () => {
 
   it("renders the full query list as a table sorted by visits", () => {
     const html = render({ brief: brief(), searchData });
-    expect(html).toContain("What people search to find you");
+    expect(html).toContain("What people searched before they found you");
     expect(html).toContain("yoga near me");
     expect(html).toContain("buffalo pilates");
     // Higher-click query is ordered before the lower one.
     expect(html.indexOf("yoga near me")).toBeLessThan(html.indexOf("buffalo pilates"));
     // The table replaces the single Search Signal tile.
-    expect(html).not.toContain("Search Signal");
+    expect(html).not.toContain("Top search");
   });
 
   it("degrades to the single Search Signal tile when there's no GSC data", () => {
     const html = render({ brief: brief(), searchData: null });
-    expect(html).not.toContain("What people search to find you");
-    expect(html).toContain("Search Signal");
+    expect(html).not.toContain("What people searched before they found you");
+    expect(html).toContain("Top search");
   });
 });

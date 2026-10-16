@@ -1,0 +1,9 @@
+/* Website-side pages of the legacy dashboard (S1 analog): the object people
+   see on the left, what Strelva keeps true beside it. */
+.split { display: grid; grid-template-columns: minmax(0, 1fr) minmax(260px, 340px); align-items: start; gap: 40px; }
+.hours { display: flex; flex-direction: column; margin: 0; padding: 0; list-style: none; }
+.hours li + li { border-top: 1px solid var(--st-line); }
+.hours li { display: flex; justify-content: space-between; gap: 16px; padding: 10px 0; color: var(--st-text); font-size: 15px; }
+.hours li span:first-child { color: var(--st-text-2); }
+.quiet { margin: 0; color: var(--st-text-2); font-size: 15px; line-height: 1.5; }
+@media (max-width: 1023px) { .split { grid-template-columns: minmax(0, 1fr); gap: 28px; } }

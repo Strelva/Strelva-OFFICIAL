@@ -45,15 +45,15 @@ describe("real website library kit consumers", () => {
   it("keeps settings blur-save and all existing keys", async () => {
     const request = vi.fn<typeof fetch>(async () => Response.json({ ok: true })); vi.stubGlobal("fetch", request);
     const node = await mount(createElement(BrandKitPanel, { initialSettings: { siteName: "Example", brandVoice: "Plain", customKey: "retained" } }));
-    const input = node.querySelector<HTMLInputElement>("input")!; change(input, "New name");
+    const input = node.querySelector<HTMLInputElement>("input")!; change(input, "New line");
     await act(async () => input.dispatchEvent(new FocusEvent("focusout", { bubbles: true })));
-    expect(request).toHaveBeenCalledWith("/client/example/api/content/settings", expect.objectContaining({ method: "PUT", credentials: "same-origin", body: JSON.stringify({ siteName: "New name", brandVoice: "Plain", customKey: "retained" }) }));
+    expect(request).toHaveBeenCalledWith("/client/example/api/content/settings", expect.objectContaining({ method: "PUT", credentials: "same-origin", body: JSON.stringify({ siteName: "Example", brandVoice: "Plain", customKey: "retained", siteTagline: "New line" }) }));
     expect(node.querySelector('[role="status"]')?.textContent).toBe("Saved");
   });
   it("keeps collection fields and the draft save contract", async () => {
     const request = vi.fn<typeof fetch>(async () => Response.json({ entries: [] })); vi.stubGlobal("fetch", request);
     const node = await mount(createElement(CollectionsManager, { types: ["blog"], initialType: "blog", initialEntries: [] }));
-    await act(async () => [...node.querySelectorAll("button")].find(button => button.textContent?.includes("New Blog"))!.click());
+    await act(async () => [...node.querySelectorAll("button")].find(button => button.textContent?.includes("New blog post"))!.click());
     change(node.querySelector<HTMLInputElement>("input")!, "A real article");
     await act(async () => [...node.querySelectorAll("button")].find(button => button.textContent === "Save draft")!.click());
     expect(request.mock.calls[0]?.[0]).toBe("/client/example/api/collections/blog");

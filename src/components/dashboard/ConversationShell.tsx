@@ -2,7 +2,9 @@
 
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { Eye, MessageCircle, ShieldAlert } from "lucide-react";
+import { MessageCircle } from "lucide-react";
+import { XaButton } from "@/components/ui/strelva/Xa";
+import { DashNote, DashShellNotes } from "./xa/DashboardXa";
 import { useHydrationReady } from "@/experience/app-frame";
 import { StrelvaShell } from "@/experience/app-frame/StrelvaShell";
 import { MANAGED_WEBSITES_LABEL } from "@/products/managed-presence";
@@ -29,12 +31,16 @@ interface ConversationShellProps {
   appBase?: string;
   signedIn?: boolean;
   signOut?: ReactNode;
+  /** Light or dark (data-workspace-mode); previews pass it, the account's choice later. */
+  mode?: "light" | "dark";
+  /** Extra shell-level sentences (billing, the move to the workspace), shown above the page. */
+  notes?: ReactNode;
 }
 
 export function ConversationShell({
   children, businessName, accountName, accountEmail, isSuperAdmin = false,
   pendingCount = 0, hasStore = false, inspect = false, inspectTenantName,
-  inspectExitHref, appBase = "", signedIn = true, signOut,
+  inspectExitHref, appBase = "", signedIn = true, signOut, mode, notes,
 }: ConversationShellProps) {
   // Cosmetic client preview does not change the actor or server authorization.
   const [viewAsClient, setViewAsClient] = useState(false);
@@ -42,7 +48,7 @@ export function ConversationShell({
   const hydrationReady = useHydrationReady();
   const pathname = usePathname();
   const discussionTriggerRef = useRef<HTMLButtonElement>(null);
-  const { tenantId, dashboardBasePath, impersonation, relationship } = useDashboard();
+  const { tenantId, dashboardBasePath, dashboardHref, impersonation, relationship } = useDashboard();
   const effectivePathname = dashboardBasePath && pathname?.startsWith(dashboardBasePath)
     ? pathname.slice(dashboardBasePath.length) || "/dashboard" : pathname || "";
   const isChatRoute = effectivePathname === "/dashboard/chat" || effectivePathname.startsWith("/dashboard/chat/");
@@ -55,10 +61,21 @@ export function ConversationShell({
 
   const relationshipLabel = relationship && relationship.status !== "user" ? RELATIONSHIP_STATUS_LABELS[relationship.status] : null;
 
+  const showAdmin = impersonation.isActive && !viewAsClient;
+  const shellNotes = inspect || showAdmin || notes ? <DashShellNotes>
+    {inspect ? <DashNote tone="waits" links={inspectExitHref ? [<a key="exit" href={inspectExitHref} className="font-medium text-[var(--st-accent)] hover:underline">Stop inspecting</a>] : undefined}>You are inspecting {inspectTenantName || businessName} as Strelva. The owner does not see this line.</DashNote> : null}
+    {showAdmin ? <DashNote tone="waits">{impersonation.actorEmail || "A Strelva admin"} is working in {businessName} as Strelva. Every save names Strelva in History.</DashNote> : null}
+    {notes}
+  </DashShellNotes> : undefined;
+
   return (
     <StrelvaShell
       tenantId={tenantId}
-      theme="dashboard"
+      theme="linen"
+      mode={mode}
+      navigationOnly
+      accountHref={dashboardHref("/dashboard/settings")}
+      workspaceName={businessName}
       active="work"
       title={MANAGED_WEBSITES_LABEL}
       appBase={appBase}
@@ -69,21 +86,11 @@ export function ConversationShell({
       context={<PropertySwitcher fallbackName={businessName} />}
       navigation={<ManagedNavigation businessName={businessName} pendingCount={pendingCount} isSuperAdmin={isSuperAdmin} viewAsClient={viewAsClient} onToggleViewAsClient={() => setViewAsClient((value) => !value)} appBase={appBase} />}
       contentId="main-content"
-      notice={<>
-        {inspect && <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-warning/30 bg-warning/12 px-6 py-3 text-[12px] text-warning">
-          <Eye size={16} aria-hidden="true" /><strong className="font-medium">Inspecting {inspectTenantName || businessName}</strong><span>Operator preview</span>
-          {inspectExitHref && <a className="ml-auto inline-flex min-h-10 items-center rounded-xl px-4 underline underline-offset-4" href={inspectExitHref}>Exit inspection</a>}
-        </div>}
-        {impersonation.isActive && !viewAsClient && <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-warning/30 bg-warning/12 px-6 py-3 text-[12px] text-warning">
-          <ShieldAlert size={16} aria-hidden="true" /><strong className="font-medium">Acting as Strelva admin</strong>
-          <span>{impersonation.actorEmail || "Super admin"} is viewing {businessName}. Admin saves are audit logged.</span>
-        </div>}
-      </>}
-      actions={!isChatRoute ? <button
-        ref={discussionTriggerRef} type="button" onClick={() => setDiscussionOpen((open) => !open)} disabled={!hydrationReady}
-        className="inline-flex shrink-0 items-center gap-2 border border-gray-border bg-surface-raised text-warm-black hover:border-accent/35"
+      notice={shellNotes}
+      actions={!isChatRoute ? <XaButton
+        ref={discussionTriggerRef} size="sm" onClick={() => setDiscussionOpen((open) => !open)} disabled={!hydrationReady}
         aria-expanded={discussionOpen} aria-controls="managed-discussion"
-      ><MessageCircle size={16} aria-hidden="true" /><span>Ask Strelva</span></button> : undefined}
+      ><MessageCircle size={15} aria-hidden="true" />Ask Strelva</XaButton> : undefined}
       rightRail={!isChatRoute ? <OptionalManagedDiscussion open={discussionOpen} ownerName={accountName} /> : undefined}
       rightRailOpen={!isChatRoute && discussionOpen}
       onCloseRightRail={() => setDiscussionOpen(false)}

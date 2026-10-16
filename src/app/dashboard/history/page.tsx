@@ -18,7 +18,7 @@ export default async function SiteHistoryPage({ searchParams }: { searchParams?:
   const historyHref = `${dashboardHref("/dashboard/history")}${params.request ? `?request=${encodeURIComponent(params.request)}` : ""}`;
 
   return (
-    <div className="h-full overflow-y-auto animate-route-enter px-4 py-6 sm:px-8 sm:py-8">
+    <div className="h-full w-full overflow-y-auto px-4 pb-28 pt-6 md:px-[88px] md:pt-14">
       <SiteHistoryContent tenant={tenant} dashboardHref={dashboardHref} historyHref={historyHref} selectedRequestId={params.request} />
     </div>
   );

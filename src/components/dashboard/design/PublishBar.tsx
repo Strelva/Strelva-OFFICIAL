@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Upload, Clock, History, Loader2, Check, AlertCircle, RotateCcw } from "lucide-react";
+import { XaButton, XaStatus, XaTextLink } from "@/components/ui/strelva/Xa";
 
 export interface PublishOutcome {
   liveSite?: {
@@ -35,17 +35,15 @@ export function PublishBar({
   const liveStatus = lastOutcome?.liveSite?.status;
   const publishedStatusLabel =
     liveStatus === "revalidated"
-      ? "Live site refreshed"
+      ? "Live on your site."
       : liveStatus === "failed"
-        ? "Saved - live refresh failed"
-        : "Changes saved";
-  const idleStatusLabel = liveSyncEnabled ? "Live sync ready" : "No draft changes";
-  const publishedButtonLabel =
-    liveStatus === "revalidated" ? "Live refreshed" : liveStatus === "failed" ? "Refresh failed" : "Saved";
-  const publishButtonLabel = liveSyncEnabled ? "Publish live" : "Save changes";
+        ? "Saved. The live site hasn't refreshed yet."
+        : "Saved.";
+  const idleStatusLabel = liveSyncEnabled ? "Everything here is live" : "No changes waiting";
+  const publishButtonLabel = liveSyncEnabled ? "Make it live" : "Save changes";
   const publishTitle = liveSyncEnabled
-    ? "Publishes your changes and asks your live site to refresh."
-    : "Saves your changes; live-site refresh isn't configured yet.";
+    ? "Puts your changes live and refreshes your site."
+    : "Saves your changes. Your live site refreshes when Strelva switches that on.";
 
   const handlePublish = async () => {
     setPublishing(true);
@@ -91,88 +89,24 @@ export function PublishBar({
     return `${days}d ago`;
   };
 
+  const status = hasDrafts
+    ? <XaStatus kind="waits" size="sm">Your changes wait for your yes. Visitors still see the live site.</XaStatus>
+    : publishing ? <XaStatus kind="working" size="sm">Putting it live</XaStatus>
+      : error ? <XaStatus kind="down" size="sm">It didn&apos;t go live. Nothing changed on your site.</XaStatus>
+        : published ? <XaStatus kind={liveStatus === "failed" ? "waits" : "live"} size="sm">{publishedStatusLabel}</XaStatus>
+          : <span className="text-[13px] text-[var(--st-text-3)]">{idleStatusLabel}{lastPublished ? `. Last put live ${formatTime(lastPublished)}` : ""}</span>;
+
   return (
-    <div className="h-12 border-t border-gray-border bg-surface flex items-center justify-between px-4 shrink-0">
-      <div className="flex items-center gap-3">
+    <div className="flex min-h-[56px] shrink-0 flex-wrap items-center justify-between gap-x-4 gap-y-2 border-t border-[var(--st-line)] bg-[var(--st-canvas)] px-4 py-2" role="region" aria-label="Your changes">
+      <div className="min-w-0" aria-live="polite">{status}</div>
+      <div className="flex items-center gap-4">
+        {onViewHistory ? <XaTextLink onClick={onViewHistory}>History</XaTextLink> : null}
+        {onDiscard && hasDrafts && !publishing ? <XaTextLink onClick={() => void handleDiscard()}>{discarding ? "Discarding" : "Discard draft"}</XaTextLink> : null}
         {hasDrafts ? (
-          <div className="flex items-center gap-1.5 text-warning">
-            <AlertCircle className="w-3.5 h-3.5" strokeWidth={1.5} />
-            <span className="text-[11px] font-medium">Draft preview active - review before publishing</span>
-          </div>
-        ) : (
-          <div className={`flex items-center gap-1.5 ${published && liveStatus === "failed" ? "text-warning" : "text-positive"}`}>
-            {published && liveStatus === "failed" ? (
-              <AlertCircle className="w-3.5 h-3.5" strokeWidth={1.5} />
-            ) : (
-              <Check className="w-3.5 h-3.5" strokeWidth={1.5} />
-            )}
-            <span className="text-[11px] font-medium">
-              {published ? publishedStatusLabel : idleStatusLabel}
-            </span>
-          </div>
-        )}
-        {lastPublished && (
-          <div className="flex items-center gap-1.5 text-gray-faint">
-            <Clock className="w-3 h-3" strokeWidth={1.5} />
-            <span className="text-[11px]">Published {formatTime(lastPublished)}</span>
-          </div>
-        )}
-      </div>
-      <div className="flex items-center gap-2">
-        {onViewHistory && (
-          <button
-            onClick={onViewHistory}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-medium text-gray-muted hover:text-warm-black hover:bg-gray-bg transition-colors"
-          >
-            <History className="w-3.5 h-3.5" strokeWidth={1.5} />
-            History
-          </button>
-        )}
-        {onDiscard && (
-          <button
-            onClick={handleDiscard}
-            disabled={!hasDrafts || publishing || discarding}
-            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-medium transition-colors ${
-              hasDrafts && !publishing && !discarding
-                ? "text-gray-muted hover:text-warm-white hover:bg-surface-raised"
-                : "text-gray-faint cursor-not-allowed"
-            }`}
-          >
-            {discarding ? (
-              <Loader2 className="w-3.5 h-3.5 animate-spin" strokeWidth={1.5} />
-            ) : (
-              <RotateCcw className="w-3.5 h-3.5" strokeWidth={1.5} />
-            )}
-            {discarding ? "Discarding..." : "Discard draft"}
-          </button>
-        )}
-        <button
-          onClick={handlePublish}
-          disabled={!hasDrafts || publishing}
-          title={publishTitle}
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium transition-colors ${
-            hasDrafts && !publishing
-              ? "bg-accent text-on-accent hover:bg-accent/90"
-              : "bg-gray-bg text-gray-faint cursor-not-allowed"
-          }`}
-        >
-          {publishing ? (
-            <Loader2 className="w-3.5 h-3.5 animate-spin" strokeWidth={1.5} />
-          ) : published ? (
-            <Check className="w-3.5 h-3.5" strokeWidth={1.5} />
-          ) : error ? (
-            <AlertCircle className="w-3.5 h-3.5 text-critical" strokeWidth={1.5} />
-          ) : (
-            <Upload className="w-3.5 h-3.5" strokeWidth={1.5} />
-          )}
-          {publishing
-            ? "Publishing..."
-            : published
-              ? publishedButtonLabel
-              : error
-                ? "Failed"
-                : publishButtonLabel}
-        </button>
+          <XaButton variant="primary" size="sm" busy={publishing} title={publishTitle} onClick={() => void handlePublish()}>
+            {publishButtonLabel}
+          </XaButton>
+        ) : null}
       </div>
     </div>
   );

@@ -2,10 +2,10 @@
 
 import { useState } from "react";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
-import { segmentPill as pill } from "./segment-pill";
+import { XaButton, XaField, XaSegmented } from "@/components/ui/strelva/Xa";
 
 const PRESETS = [
-  { key: "live", label: "Live" },
+  { key: "live", label: "Last 7 days" },
   { key: "week", label: "This week" },
   { key: "month", label: "This month" },
 ] as const;
@@ -30,57 +30,20 @@ export function AnalyticsRangeSelector({ current }: { current: string }) {
     router.push(`${pathname}?${sp.toString()}`);
   };
 
+  const value = (["live", "week", "month", "custom"] as const).find((key) => key === (customOpen ? "custom" : current)) ?? "live";
   return (
-    <div className="flex flex-wrap items-center gap-2">
-      {PRESETS.map((p) => (
-        <button
-          key={p.key}
-          type="button"
-          onClick={() => {
-            setCustomOpen(false);
-            go(p.key);
-          }}
-          className={pill(current === p.key)}
-        >
-          {p.label}
-        </button>
-      ))}
-      <button
-        type="button"
-        onClick={() => setCustomOpen((o) => !o)}
-        className={pill(current === "custom")}
-      >
-        Custom
-      </button>
+    <div className="flex flex-col items-start gap-3">
+      <XaSegmented label="Which days" value={value} onChange={(key) => {
+        if (key === "custom") { setCustomOpen(true); return; }
+        setCustomOpen(false);
+        go(key);
+      }} options={[...PRESETS.map((p) => ({ value: p.key, label: p.label })), { value: "custom" as const, label: "Pick days" }]} />
       {customOpen && (
-        <div className="flex flex-wrap items-center gap-2 rounded-lg border border-glass-border bg-glass px-3 py-2">
-          <input
-            type="date"
-            value={from}
-            max={to || today}
-            onChange={(e) => setFrom(e.target.value)}
-            className="rounded-md border border-glass-border bg-surface-base px-2 py-1 text-[13px] text-warm-black"
-            aria-label="From date"
-          />
-          <span className="text-[13px] text-gray-muted">to</span>
-          <input
-            type="date"
-            value={to}
-            min={from}
-            max={today}
-            onChange={(e) => setTo(e.target.value)}
-            className="rounded-md border border-glass-border bg-surface-base px-2 py-1 text-[13px] text-warm-black"
-            aria-label="To date"
-          />
-          <button
-            type="button"
-            disabled={!from || !to || from > to}
-            onClick={() => go("custom", { from, to })}
-            className="rounded-md bg-accent px-3 py-1 text-[13px] font-medium text-on-accent transition-opacity hover:opacity-90 disabled:opacity-40"
-          >
-            Apply
-          </button>
-        </div>
+        <form className="flex flex-wrap items-end gap-3" onSubmit={(event) => { event.preventDefault(); if (from && to && from <= to) go("custom", { from, to }); }}>
+          <div className="w-[170px]"><XaField label="From" type="date" value={from} max={to || today} onChange={(e) => setFrom(e.target.value)} /></div>
+          <div className="w-[170px]"><XaField label="To" type="date" value={to} min={from} max={today} onChange={(e) => setTo(e.target.value)} /></div>
+          <XaButton type="submit" disabled={!from || !to || from > to}>Show these days</XaButton>
+        </form>
       )}
     </div>
   );

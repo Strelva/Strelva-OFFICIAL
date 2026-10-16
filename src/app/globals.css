@@ -1387,8 +1387,10 @@ body {
   padding-right: 2.1rem;
 }
 
-[data-dashboard] .ai-prompt-box textarea:focus,
-[data-dashboard] .ai-prompt-box textarea:focus-visible {
+/* The XA composer draws its own focus on the whole field (:focus-within), so
+   the dashboard's generic ring stays off its textarea. */
+[data-dashboard] form[data-shape] > textarea:focus,
+[data-dashboard] form[data-shape] > textarea:focus-visible {
   border-color: transparent !important;
   box-shadow: none !important;
   outline: none !important;

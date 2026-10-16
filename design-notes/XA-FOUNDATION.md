@@ -140,6 +140,10 @@ Places map to the existing routes:
 - Minutes → `ongoing`
 - The full list → `apps`
 
+Added by lane xs-legacy-dashboard (October 16): `StrelvaShell navigationOnly accountHref`
+shows only the caller's `navigation` and the account, with no workspace places. The legacy
+website dashboard (`ConversationShell`) uses it, since a tenant there has no workspace to link to.
+
 No route or permission changed. All labels live in `XA_PLACE_LABELS`
 (`src/platform/presentation/place-labels.ts`).
 

@@ -1,15 +1,16 @@
 /**
- * The one pill style shared by every dashboard segmented control — the Website
- * section tabs, the Reports Weekly/Monthly toggle, and the Analytics range switch —
- * so they read as a single system instead of three different-looking strips. Was
- * duplicated verbatim in ReportsViewToggle + AnalyticsRangeSelector; the Website
- * sub-nav had its own square gray-active variant, which is why it looked off.
+ * The one segmented look for dashboard link tabs (Website sections, Reports
+ * Weekly/Monthly, Analytics range), drawn like XaSegmented (LX qIVLf): a quiet
+ * inset track with a white thumb on the current choice. Put `segmentTrack` on
+ * the container. Links keep navigation; XaSegmented is for in-page state.
  */
+export const segmentTrack = "inline-flex max-w-full items-center gap-0.5 overflow-x-auto rounded-full bg-[var(--st-inset)] p-1 [scrollbar-width:none]";
+
 export function segmentPill(active: boolean): string {
   return [
-    "inline-flex items-center rounded-full px-3.5 py-1.5 text-[13px] font-medium transition-colors",
+    "inline-flex min-h-[32px] shrink-0 items-center rounded-full px-3.5 text-[14px] font-medium transition-[background-color,color,box-shadow] duration-(--motion-fast) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--st-accent)]",
     active
-      ? "bg-accent text-on-accent"
-      : "border border-glass-border bg-glass text-gray-fg hover:text-warm-black",
+      ? "bg-[var(--st-surface)] text-[var(--st-text)] shadow-[var(--st-shadow-sm)]"
+      : "text-[var(--st-text-2)] hover:text-[var(--st-text)]",
   ].join(" ");
 }

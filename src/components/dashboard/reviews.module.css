@@ -1,0 +1,27 @@
+/* Reviews in XA: the words people wrote are the object; replies open in place. */
+.reviews { position: relative; z-index: 0; display: flex; flex-direction: column; margin: 0; padding: 0; list-style: none; }
+.review { position: relative; display: flex; flex-direction: column; gap: 8px; padding: 18px 0; }
+.review + .review::before { position: absolute; top: 0; left: 0; right: 0; height: 1px; background: var(--st-line); content: ""; }
+.reviewHead { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.reviewHead:focus-visible { outline: 2px solid var(--st-accent); outline-offset: 4px; border-radius: var(--st-r-sm); }
+.who { display: flex; min-width: 0; flex-direction: column; gap: 2px; }
+.author { color: var(--st-text); font-size: 15px; font-weight: 500; }
+.meta { color: var(--st-text-2); font-size: 13px; }
+.stars { color: var(--st-accent); letter-spacing: 1px; }
+.starsOff { color: var(--st-line-strong); }
+.state { flex-shrink: 0; color: var(--st-text-3); font-size: 13px; }
+.state[data-tone="waits"] { color: var(--st-need); }
+.text { margin: 0; max-width: 640px; color: var(--st-text-body); font-size: 16px; line-height: 1.55; }
+.reply { display: flex; flex-direction: column; gap: 14px; margin-top: 8px; padding: 18px 20px; border-radius: var(--st-r-lg); background: var(--st-surface); box-shadow: var(--st-shadow-sm); animation: st-xa-reviews-open var(--motion-base) var(--ease-settle) both; }
+.replyText { margin: 0; color: var(--st-text); font-size: 15px; line-height: 1.55; }
+.settled { margin: 0; color: var(--st-accent); font-size: 14px; }
+.actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.links { margin: 0; color: var(--st-text-3); font-size: 14px; }
+.error { margin: 0; color: var(--st-critical); font-size: 14px; }
+.section { display: flex; flex-direction: column; gap: 10px; }
+.prose { margin: 0; max-width: 620px; color: var(--st-text-body); font-size: 15px; line-height: 1.5; }
+.quote { margin: 0; max-width: 620px; padding-left: 14px; border-left: 2px solid var(--st-tint); color: var(--st-text); font-size: 15px; line-height: 1.5; }
+.url { overflow: hidden; color: var(--st-text-3); text-overflow: ellipsis; white-space: nowrap; }
+@keyframes st-xa-reviews-open { from { opacity: 0; translate: 0 -4px; } to { opacity: 1; translate: 0 0; } }
+@media (prefers-reduced-motion: reduce) { .reply { animation: none; } }
+@media (max-width: 767px) { .reviewHead { flex-direction: column; gap: 6px; } .reply { padding: 16px; } }

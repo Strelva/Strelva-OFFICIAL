@@ -1,12 +1,15 @@
 import Link from "next/link";
+import { XaStatus, XaSystemTile } from "@/components/ui/strelva/Xa";
+import { SECTION_LABELS } from "@/components/ui/section-labels";
+import styles from "./xa/dashboard-xa.module.css";
 import { selectWebsiteRequestHistory, type WebsiteRequestHistoryItem } from "@/lib/website-history";
 import type { UnifiedEvent } from "@/lib/types";
 
 function date(value: string): string {
   const parsed = new Date(value);
   return Number.isNaN(parsed.getTime())
-    ? "Date unavailable"
-    : parsed.toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" });
+    ? "on an unknown date"
+    : parsed.toLocaleString("en-US", { month: "short", day: "numeric" });
 }
 
 function statusLabel(item: WebsiteRequestHistoryItem): string {
@@ -24,12 +27,6 @@ function statusLabel(item: WebsiteRequestHistoryItem): string {
   return "Received";
 }
 
-function statusClass(item: WebsiteRequestHistoryItem): string {
-  if (item.status === "published" || item.status === "shipped") return "bg-success-dim text-success";
-  if (item.status === "declined" || item.status === "skipped") return "bg-gray-bg text-gray-muted";
-  return "bg-accent-dim text-accent";
-}
-
 export function WebsiteRequestHistory({
   events,
   dashboardHref,
@@ -41,56 +38,32 @@ export function WebsiteRequestHistory({
 }) {
   const items = selectWebsiteRequestHistory(events);
   return (
-    <section className="rounded-2xl border border-glass-border bg-glass p-5" aria-labelledby="website-request-history-title">
-      <div className="mb-4">
-        <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-gray-muted">Requests and outcomes</p>
-        <h2 id="website-request-history-title" className="mt-2 font-display text-[18px] font-normal text-warm-black">Site work stays together</h2>
-        <p className="mt-1.5 max-w-2xl text-[13px] leading-relaxed text-gray-muted">
-          Each website request keeps its proposal, review decision, result, and history under one reference. A request can remain here while it is waiting or being recovered.
-        </p>
-      </div>
+    <section className="flex flex-col gap-3" aria-labelledby="website-request-history-title">
+      <h2 id="website-request-history-title" className="m-0 text-[13px] font-medium text-[var(--st-text-3)]">Requests</h2>
       {items.length === 0 ? (
-        <p className="rounded-lg border border-gray-border/70 bg-surface-raised px-3 py-3 text-[13px] leading-relaxed text-gray-muted">
-          No website requests have been recorded yet. A request or governed site edit will appear here after it is saved.
+        <p className="m-0 text-[15px] text-[var(--st-text-2)]">
+          No website requests have been recorded yet. Each one you ask for shows up here with where it got to.
         </p>
       ) : (
-        <ol className="space-y-3">
+        <ol className={styles.list} aria-label="Website requests">
           {items.map((item) => {
             const selected = item.requestId === selectedRequestId;
+            const last = item.stages.at(-1);
+            const label = statusLabel(item);
+            const waits = label === "Needs review";
             return (
-              <li
-                key={item.requestId}
-                id={`website-request-${item.requestId}`}
-                data-request-id={item.requestId}
-                className={`rounded-xl border px-3 py-3 ${selected ? "border-accent/50 bg-accent-dim/30" : "border-gray-border/70 bg-surface-raised"}`}
-              >
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="text-[13px] font-medium text-warm-black">{item.title}</p>
-                    {item.body ? <p className="mt-1 line-clamp-2 text-[12px] leading-relaxed text-gray-muted">{item.body}</p> : null}
-                    <p className="mt-1.5 text-[11px] text-gray-faint">
-                      Requested {date(item.createdAt)}{item.section ? ` · ${item.section}` : ""} · Reference {item.requestId.slice(-8)}
-                    </p>
-                  </div>
-                  <span className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium ${statusClass(item)}`}>
-                    {statusLabel(item)}
-                  </span>
+              <li key={item.requestId} id={`website-request-${item.requestId}`} data-request-id={item.requestId} data-selected={selected || undefined}
+                className={selected ? "rounded-[var(--st-r-nav)] bg-[var(--st-tint)] px-3" : undefined}>
+                <XaSystemTile kind="website" size={32} />
+                <div className={styles.listText}>
+                  <span className={styles.listTitle}>{item.title}</span>
+                  {item.body ? <span className={styles.listDetail}>{item.body}</span> : null}
+                  <span className={styles.listDetail}>Asked {date(item.createdAt)}{item.section ? ` · ${(SECTION_LABELS[item.section] ?? item.section).toLowerCase()}` : ""}{last ? ` · ${last.status.replaceAll("_", " ")} ${date(last.at)}` : ""}</span>
                 </div>
-                {item.stages.length > 0 ? (
-                  <ol className="mt-3 flex flex-wrap gap-x-4 gap-y-1 border-t border-gray-border/60 pt-2 text-[11px] text-gray-muted" aria-label="Request history">
-                    {item.stages.map((stage, index) => (
-                      <li key={`${stage.status}-${stage.at}-${index}`}>
-                        <span className="font-medium text-warm-black">{stage.status.replaceAll("_", " ")}</span> · {date(stage.at)}
-                      </li>
-                    ))}
-                  </ol>
-                ) : null}
-                <Link
-                  href={`${dashboardHref("/dashboard/history")}?request=${encodeURIComponent(item.requestId)}#website-request-${encodeURIComponent(item.requestId)}`}
-                  className="mt-2 inline-flex text-[11px] font-medium text-accent hover:text-warm-black"
-                >
-                  Reopen this request history
-                </Link>
+                <div className={styles.listEnd}>
+                  {waits ? <XaStatus kind="waits" size="sm">Waits for you</XaStatus> : <span>{label}</span>}
+                  {waits ? <Link className="font-medium text-[var(--st-accent)] hover:underline" href={dashboardHref("/dashboard/review")}>Review it</Link> : null}
+                </div>
               </li>
             );
           })}

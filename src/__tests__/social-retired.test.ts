@@ -27,8 +27,9 @@ describe("social posting is retired", () => {
     expect(providerDefinition("instagram").acts).toBeNull();
   });
 
-  it("carries no draft-social copy in the prompt box or registry", () => {
-    for (const file of ["src/components/ui/ai-prompt-box.tsx", "src/lib/integration-registry.ts"]) {
+  it("carries no draft-social copy in the composer or registry", () => {
+    // The old prompt box is retired; Ask Strelva uses XaComposer (ChatPanel).
+    for (const file of ["src/components/dashboard/ChatPanel.tsx", "src/lib/integration-registry.ts"]) {
       expect(readFileSync(path.join(root, file), "utf8")).not.toContain("Draft social post");
     }
   });

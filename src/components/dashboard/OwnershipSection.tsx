@@ -192,12 +192,12 @@ export function OwnershipSection() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4 rounded-xl border border-glass-border bg-glass p-5 lg:flex-row lg:items-end lg:justify-between">
+      <div className="flex flex-col gap-4 border-t border-[var(--st-line)] pt-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <p className="mb-2 text-[11px] font-medium uppercase tracking-[0.16em] text-gray-muted">
+          <p className="mb-2 text-[13px] font-medium text-gray-muted">
             Handoff clarity
           </p>
-          <h2 className="text-[22px] font-semibold tracking-[-0.02em] text-warm-white">
+          <h2 className="text-[22px] font-medium tracking-[-0.4px] text-warm-black">
             Your domain, your content, your customers. Leave anytime, with everything.
           </h2>
           <p className="mt-2 max-w-2xl text-[13px] leading-relaxed text-gray-muted">
@@ -214,7 +214,7 @@ export function OwnershipSection() {
             Export content
           </Button>
           <Button
-            variant="primary"
+            variant="secondary"
             icon={downloading === "assets" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
             onClick={() => downloadExport("assets")}
             disabled={!!downloading}
@@ -225,20 +225,20 @@ export function OwnershipSection() {
       </div>
 
       {(notice || error) && (
-        <div className={`rounded-lg border px-4 py-3 text-[12px] ${error ? "border-warning/20 bg-warning/10 text-warning" : "border-positive/20 bg-positive/10 text-positive"}`}>
+        <div role={error ? "alert" : "status"} className={`text-[14px] ${error ? "text-[var(--st-need)]" : "text-[var(--st-accent)]"}`}>
           {error || notice}
         </div>
       )}
 
       {offboarding && (
-        <section className="rounded-xl border border-glass-border bg-glass p-5" aria-labelledby="offboarding-status-title">
+        <section className="border-t border-[var(--st-line)] pt-4" aria-labelledby="offboarding-status-title">
           <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
             <div>
-              <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-gray-muted">Exit status</p>
-              <h3 id="offboarding-status-title" className="mt-1 text-[18px] font-medium text-warm-white">See what is ready before anything changes</h3>
+              <p className="text-[13px] font-medium text-gray-muted">Exit status</p>
+              <h3 id="offboarding-status-title" className="mt-1 text-[18px] font-medium text-warm-black">See what is ready before anything changes</h3>
               <p className="mt-1.5 text-[12px] leading-relaxed text-gray-muted">This checklist reads your current exports, domains, billing state, and connected accounts. It does not cancel, delete, or revoke anything.</p>
             </div>
-            {offboarding.requestedAt ? <span className="shrink-0 text-[11px] text-gray-faint">File handoff requested</span> : null}
+            {offboarding.requestedAt ? <span className="shrink-0 text-[12px] text-gray-faint">File handoff requested</span> : null}
           </div>
           <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
             {offboarding.checkpoints.map((checkpoint) => <OffboardingCheckpointCard key={checkpoint.id} checkpoint={checkpoint} apiHref={apiHref} />)}
@@ -247,10 +247,10 @@ export function OwnershipSection() {
       )}
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <section className="rounded-xl border border-glass-border bg-glass p-5">
+        <section className="border-t border-[var(--st-line)] pt-4">
           <div className="mb-4 flex items-center gap-2">
             <ShieldCheck className="h-4 w-4 text-accent" strokeWidth={1.5} />
-            <h3 className="text-[16px] font-medium text-warm-white">Your business owns</h3>
+            <h3 className="text-[16px] font-medium text-warm-black">Your business owns</h3>
           </div>
           <div className="space-y-3">
             {OWNED_ITEMS.map((item) => (
@@ -262,10 +262,10 @@ export function OwnershipSection() {
           </div>
         </section>
 
-        <section className="rounded-xl border border-glass-border bg-glass p-5">
+        <section className="border-t border-[var(--st-line)] pt-4">
           <div className="mb-4 flex items-center gap-2">
             <Lock className="h-4 w-4 text-gray-muted" strokeWidth={1.5} />
-            <h3 className="text-[16px] font-medium text-warm-white">Strelva manages</h3>
+            <h3 className="text-[16px] font-medium text-warm-black">Strelva manages</h3>
           </div>
           <div className="space-y-3">
             {MANAGED_ITEMS.map((item) => (
@@ -278,13 +278,13 @@ export function OwnershipSection() {
         </section>
       </div>
 
-      <section className="rounded-xl border border-glass-border bg-glass p-5">
+      <section className="border-t border-[var(--st-line)] pt-4">
         <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div className="max-w-xl">
-            <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-gray-muted">
+            <p className="text-[13px] font-medium text-gray-muted">
               Your site files
             </p>
-            <h3 className="mt-1 text-[18px] font-medium text-warm-white">Request your site files</h3>
+            <h3 className="mt-1 text-[18px] font-medium text-warm-black">Request your site files</h3>
             <p className="mt-1.5 text-[12px] leading-relaxed text-gray-muted">
               One click tells Strelva you want the site repo and source files handed over. We&apos;ll confirm timing and walk the transfer with you. Your domain is already in your name, so there&apos;s nothing to move there.
             </p>
@@ -305,8 +305,8 @@ export function OwnershipSection() {
         </div>
 
         {confirmingHandoff && (
-          <div className="mb-6 rounded-lg border border-accent/30 bg-accent-dim/40 p-4">
-            <label htmlFor="handoff-note" className="block text-[12px] font-medium text-warm-white">
+          <div className="mb-6 flex flex-col gap-2 border-l-2 border-[var(--st-tint)] pl-4">
+            <label htmlFor="handoff-note" className="block text-[12px] font-medium text-warm-black">
               Anything we should know? (optional)
             </label>
             <p className="mt-1 text-[12px] leading-relaxed text-gray-muted">
@@ -319,7 +319,7 @@ export function OwnershipSection() {
               rows={3}
               maxLength={1000}
               placeholder="e.g. Hoping to move in the next month. What do you need from me?"
-              className="mt-3 w-full resize-none rounded-lg border border-gray-border bg-surface-raised px-3 py-2 text-[13px] text-warm-white placeholder:text-gray-faint focus:border-accent/50 focus:outline-none"
+              className="mt-3 w-full resize-none rounded-lg border border-gray-border bg-surface-raised px-3 py-2 text-[13px] text-warm-black placeholder:text-gray-faint focus:border-accent/50 focus:outline-none"
             />
             <div className="mt-3 flex flex-wrap items-center gap-2">
               <Button
@@ -340,40 +340,38 @@ export function OwnershipSection() {
               >
                 Cancel
               </Button>
-              <span className="text-[11px] text-gray-faint">Sending this doesn&apos;t cancel billing or move anything.</span>
+              <span className="text-[12px] text-gray-faint">Sending this doesn&apos;t cancel billing or move anything.</span>
             </div>
           </div>
         )}
 
         <div className="mb-5 border-t border-glass-border pt-5">
-          <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-gray-muted">
+          <p className="text-[13px] font-medium text-gray-muted">
             Offboarding checklist
           </p>
-          <h4 className="mt-1 text-[14px] font-semibold tracking-[-0.01em] text-warm-white">Move cleanly, in order</h4>
+          <h4 className="mt-1 text-[14px] font-semibold tracking-[-0.01em] text-warm-black">Move cleanly, in order</h4>
         </div>
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+        <ol className="m-0 flex list-none flex-col p-0">
           {HANDOFF_STEPS.map((step, index) => (
-            <div key={step.title} className="rounded-lg border border-gray-border bg-surface-raised p-4">
-              <div className="mb-2 flex items-center gap-2">
-                <span className="flex h-6 w-6 items-center justify-center rounded-md bg-accent-dim text-[11px] font-semibold text-accent">
-                  {index + 1}
-                </span>
-                <h4 className="text-[13px] font-medium text-warm-white">{step.title}</h4>
-              </div>
-              <p className="text-[12px] leading-relaxed text-gray-muted">{step.body}</p>
-            </div>
+            <li key={step.title} className="flex gap-3 border-b border-[var(--st-line)] py-3 last:border-b-0">
+              <span className="w-5 shrink-0 text-[15px] tabular-nums text-[var(--st-text-3)]">{index + 1}</span>
+              <span className="flex min-w-0 flex-col gap-0.5">
+                <span className="text-[15px] font-medium text-warm-black">{step.title}</span>
+                <span className="text-[14px] leading-relaxed text-gray-muted">{step.body}</span>
+              </span>
+            </li>
           ))}
-        </div>
+        </ol>
       </section>
 
       <div className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
-        <section className="rounded-xl border border-glass-border bg-glass p-5">
+        <section className="border-t border-[var(--st-line)] pt-4">
           <div className="mb-4 flex items-center gap-2">
             <Globe2 className="h-4 w-4 text-accent" strokeWidth={1.5} />
-            <h3 className="text-[16px] font-medium text-warm-white">DNS and domain handoff</h3>
+            <h3 className="text-[16px] font-medium text-warm-black">DNS and domain handoff</h3>
           </div>
           <div className="rounded-lg border border-gray-border">
-            <div className="grid grid-cols-[1fr_100px] border-b border-gray-border px-4 py-2 text-[11px] font-mono uppercase tracking-wide text-gray-faint">
+            <div className="grid grid-cols-[1fr_100px] border-b border-gray-border px-4 py-2 text-[13px] text-gray-faint">
               <span>Connected domain</span>
               <span>Status</span>
             </div>
@@ -382,7 +380,7 @@ export function OwnershipSection() {
             ) : domains.length ? (
               domains.map((domain) => (
                 <div key={domain.domain} className="grid grid-cols-[1fr_100px] border-b border-gray-border/50 px-4 py-3 last:border-b-0">
-                  <span className="truncate text-[13px] text-warm-white">{domain.domain}</span>
+                  <span className="truncate text-[13px] text-warm-black">{domain.domain}</span>
                   <span className={domain.status === "connected" ? "text-[12px] text-positive" : "text-[12px] text-warning"}>
                     {domain.status}
                   </span>
@@ -402,16 +400,16 @@ export function OwnershipSection() {
           </div>
         </section>
 
-        <section className="rounded-xl border border-glass-border bg-glass p-5">
+        <section className="border-t border-[var(--st-line)] pt-4">
           <div className="mb-4 flex items-center gap-2">
             <CreditCard className="h-4 w-4 text-accent" strokeWidth={1.5} />
-            <h3 className="text-[16px] font-medium text-warm-white">Billing cancellation</h3>
+            <h3 className="text-[16px] font-medium text-warm-black">Billing cancellation</h3>
           </div>
           <p className="text-[13px] leading-relaxed text-gray-muted">{BILLING_COPY[subscriptionStatus]}</p>
           <button
             onClick={openBillingPortal}
             disabled={openingPortal}
-            className="mt-4 inline-flex items-center gap-2 rounded-md border border-gray-border px-4 py-2 text-[12px] text-gray-muted transition-colors hover:bg-surface-raised hover:text-warm-white disabled:opacity-60"
+            className="mt-4 inline-flex items-center gap-2 rounded-md border border-gray-border px-4 py-2 text-[12px] text-gray-muted transition-colors hover:bg-surface-raised hover:text-warm-black disabled:opacity-60"
           >
             {openingPortal ? <Loader2 className="h-4 w-4 animate-spin" /> : <ExternalLink className="h-4 w-4" />}
             Open billing portal
@@ -420,7 +418,7 @@ export function OwnershipSection() {
           <div className="mt-5 border-t border-gray-border pt-4">
             <div className="mb-2 flex items-center gap-2">
               <UserMinus className="h-4 w-4 text-gray-muted" strokeWidth={1.5} />
-              <p className="text-[13px] font-medium text-warm-white">Admin revocation</p>
+              <p className="text-[13px] font-medium text-warm-black">Admin revocation</p>
             </div>
             <p className="text-[12px] leading-relaxed text-gray-muted">
               After exports, DNS handoff, and billing timing are confirmed, remove Strelva access from registrar, Google Business, booking, social, email, and analytics accounts.
@@ -448,11 +446,11 @@ function OffboardingCheckpointCard({ checkpoint, apiHref }: { checkpoint: Offboa
   return (
     <div className="rounded-lg border border-gray-border bg-surface-raised p-3.5">
       <div className="flex items-start justify-between gap-3">
-        <h4 className="text-[13px] font-medium text-warm-white">{checkpoint.label}</h4>
-        <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium ${stateClass[checkpoint.state]}`}>{stateCopy[checkpoint.state]}</span>
+        <h4 className="text-[13px] font-medium text-warm-black">{checkpoint.label}</h4>
+        <span className={`shrink-0 rounded-full px-2 py-0.5 text-[12px] font-medium ${stateClass[checkpoint.state]}`}>{stateCopy[checkpoint.state]}</span>
       </div>
       <p className="mt-2 text-[12px] leading-relaxed text-gray-muted">{checkpoint.detail}</p>
-      {checkpoint.href ? <a href={apiHref(checkpoint.href)} className="mt-2 inline-flex text-[11px] font-medium text-accent underline-offset-2 hover:underline">Open step</a> : null}
+      {checkpoint.href ? <a href={apiHref(checkpoint.href)} className="mt-2 inline-flex text-[12px] font-medium text-accent underline-offset-2 hover:underline">Open step</a> : null}
     </div>
   );
 }

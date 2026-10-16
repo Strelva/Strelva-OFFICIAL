@@ -1,22 +1,23 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
-import { AlertCircle, ExternalLink, Eye, Loader2, Maximize2, MessageCircle, Monitor, Pencil, RefreshCw, Smartphone, Sparkles, Tablet } from "lucide-react";
+import { Eye, MessageCircle, Pencil } from "lucide-react";
+import { XaButton, XaSays, XaSegmented, XaTextLink } from "@/components/ui/strelva/Xa";
 import { useDashboard } from "./DashboardContext";
 import { getDefaultPageConfig } from "@/lib/pageConfigDefaults";
 import { SECTION_LABELS } from "@/components/ui/section-labels";
 import type { EditableNode, EditableNodeType } from "@/lib/editor-types";
 import { getEditablePathValue, setEditablePathValue } from "@/lib/editable-path";
 
-type Breakpoint = { label: string; icon: typeof Monitor; width: number | null };
+type Breakpoint = { label: string; width: number | null };
 type PreviewStatus = "loading" | "ready" | "error";
 type PreviewSource = "live" | "editable";
 
+/** The three screens people see your site on, named in words, not icons. */
 const BREAKPOINTS: readonly Breakpoint[] = [
-  { label: "Mobile", icon: Smartphone, width: 375 },
-  { label: "Tablet", icon: Tablet, width: 768 },
-  { label: "Desktop", icon: Monitor, width: 1280 },
-  { label: "Fluid", icon: Maximize2, width: null },
+  { label: "Phone", width: 375 },
+  { label: "Tablet", width: 768 },
+  { label: "Computer", width: 1280 },
 ] as const;
 
 const PAGE_PATHS: Record<string, string> = {
@@ -134,6 +135,19 @@ export function SitePreview({
   const [previewErrorDismissed, setPreviewErrorDismissed] = useState(false);
   const [contextMenu, setContextMenu] = useState<ContextMenu | null>(null);
   const [canvasWidth, setCanvasWidth] = useState(0);
+  // On a phone the preview opens as the phone page itself, never a shrunken
+  // desktop; the screen switch is hidden there because only one screen fits.
+  const [narrow, setNarrow] = useState(false);
+  useEffect(() => {
+    const query = window.matchMedia("(max-width: 767px)");
+    const apply = () => {
+      setNarrow(query.matches);
+      if (query.matches) setBreakpoint(BREAKPOINTS[0]!);
+    };
+    apply();
+    query.addEventListener("change", apply);
+    return () => query.removeEventListener("change", apply);
+  }, []);
   const {
     refreshKey,
     scrollToSection,
@@ -168,7 +182,12 @@ export function SitePreview({
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const updateSize = () => setCanvasWidth(canvas.clientWidth);
+    // The frame scales to the canvas's content box, not its padded width, so a
+    // scaled page never spills past either edge.
+    const updateSize = () => {
+      const style = window.getComputedStyle(canvas);
+      setCanvasWidth(canvas.clientWidth - parseFloat(style.paddingLeft || "0") - parseFloat(style.paddingRight || "0"));
+    };
     updateSize();
     const observer = new ResizeObserver(updateSize);
     observer.observe(canvas);
@@ -228,13 +247,6 @@ export function SitePreview({
   const liveTargetUrl = `${siteUrl || base || ""}${pagePath}`;
   const isLivePreview = effectivePreviewSource === "live" && !!siteUrl;
   const previewKind = isLivePreview ? "Active site preview" : "Editable preview";
-  const previewBadgeLabel = !isEditing
-    ? "Preview"
-    : isLivePreview
-      ? "Active site"
-      : hasAnyDraft
-        ? "Draft preview"
-        : "Editable preview";
   const activeSectionLabel = activeSection ? SECTION_LABELS[activeSection] || activeSection : null;
   // Reset loading state when refreshKey or page changes (derived-state pattern).
   const [prevIframeKey, setPrevIframeKey] = useState({ refreshKey, pagePath, previewSource: effectivePreviewSource });
@@ -465,260 +477,96 @@ export function SitePreview({
     setRightTab("chat");
   }, [activeSectionLabel, setChatPrompt, setRightTab]);
 
+  const draftWord = isEditing && hasAnyDraft ? "Draft, not live yet" : null;
+
   return (
     <div className="flex h-full flex-col">
-      {/* Canvas chrome — one bar: status, view toggle, device, actions */}
-      <div className="flex items-center gap-2 border-b border-gray-border bg-surface px-3 py-2 shrink-0">
-        <span
-          className={`h-1.5 w-1.5 shrink-0 rounded-full ${
-            isLivePreview ? "bg-accent" : "bg-warning"
-          }`}
-        />
-        <span className="shrink-0 text-[11px] font-medium text-gray-muted">{previewBadgeLabel}</span>
-
-        <div className="flex-1" />
-
-        {isEditing && (
-          <>
-            <div className="flex items-center gap-0.5 rounded-lg bg-gray-bg-alt p-0.5">
-              {[
-                { value: "editable", label: "Edit" },
-                { value: "live", label: "Live" },
-              ].map((source) => {
-                const active = effectivePreviewSource === source.value;
-                // Live is unavailable with no live URL, and while unpublished
-                // draft changes exist the preview is forced to Edit — so disable
-                // (rather than silently ignore) the toggle and say why.
-                const disabled =
-                  source.value === "live" && (!siteUrl || hasAnyDraft);
-                const disabledReason =
-                  source.value === "live" && hasAnyDraft
-                    ? "Publish your draft changes to view the live site"
-                    : source.value === "live" && !siteUrl
-                      ? "Your live site isn't connected yet"
-                      : undefined;
-                return (
-                  <button
-                    key={source.value}
-                    type="button"
-                    disabled={disabled}
-                    title={disabledReason}
-                    onClick={() => setPreviewSource(source.value as PreviewSource)}
-                    aria-pressed={active}
-                    className={`h-7 rounded-md px-2.5 text-[12px] font-medium transition-colors ${
-                      active
-                        ? "bg-surface text-warm-white shadow-sm"
-                        : disabled
-                          ? "cursor-not-allowed text-gray-faint/60"
-                          : "text-gray-muted hover:text-warm-white"
-                    }`}
-                  >
-                    {source.label}
-                  </button>
-                );
-              })}
-            </div>
-
-            <span className="mx-0.5 h-5 w-px bg-gray-border" />
-          </>
-        )}
-
-        <div className="flex items-center gap-0.5 rounded-lg bg-gray-bg-alt p-0.5">
-          {BREAKPOINTS.map((bp) => {
-            const active = breakpoint.label === bp.label;
-            return (
-              <button
-                key={bp.label}
-                onClick={() => setBreakpoint(bp)}
-                aria-pressed={active}
-                aria-label={`${bp.label}${bp.width ? ` (${bp.width}px)` : ""}`}
-                title={bp.width ? `${bp.label} (${bp.width}px)` : bp.label}
-                className={`flex h-7 w-8 items-center justify-center rounded-md transition-colors ${
-                  active ? "bg-surface text-warm-white shadow-sm" : "text-gray-muted hover:text-warm-white"
-                }`}
-              >
-                <bp.icon className="h-[13px] w-[13px]" strokeWidth={1.5} />
-              </button>
-            );
-          })}
-        </div>
-
-        <span className="mx-0.5 h-5 w-px bg-gray-border" />
-
-        <button
-          type="button"
-          onClick={retryPreview}
-          title="Refresh preview"
-          className="flex h-7 w-7 items-center justify-center rounded-md text-gray-muted transition-colors hover:bg-surface-raised hover:text-warm-white"
-        >
-          <RefreshCw className="h-[13px] w-[13px]" strokeWidth={1.5} />
-        </button>
-        {siteUrl && (
-          <a
-            href={liveTargetUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            title="Open live site"
-            className="flex h-7 w-7 items-center justify-center rounded-md text-gray-muted transition-colors hover:bg-surface-raised hover:text-warm-white"
-          >
-            <ExternalLink className="h-[13px] w-[13px]" strokeWidth={1.5} />
-          </a>
-        )}
-
-        <span className="mx-0.5 h-5 w-px bg-gray-border" />
-        <button
-          type="button"
-          onClick={onToggleEdit}
-          className={
-            isEditing
-              ? "flex h-7 items-center gap-1.5 rounded-md border border-gray-border px-3 text-[12px] font-medium text-gray-muted transition-colors hover:bg-surface-raised hover:text-warm-white"
-              : "flex h-7 items-center gap-1.5 rounded-md bg-accent px-3 text-[12px] font-semibold text-on-accent transition-colors hover:bg-accent/85"
-          }
-        >
-          {isEditing ? (
-            <>
-              <Eye className="h-3.5 w-3.5" strokeWidth={1.6} />
-              Preview
-            </>
-          ) : (
-            <>
-              <Pencil className="h-3.5 w-3.5" strokeWidth={1.6} />
-              Edit site
-            </>
-          )}
-        </button>
+      {/* One bar, every control in words: what you see, which screen, reload, edit. */}
+      <div className="flex shrink-0 flex-wrap items-center gap-x-4 gap-y-2 border-b border-[var(--st-line)] bg-[var(--st-canvas)] px-3 py-2.5">
+        {isEditing ? (
+          <XaSegmented label="Which version" value={effectivePreviewSource} onChange={(value) => setPreviewSource(value)} options={[
+            { value: "editable", label: hasAnyDraft ? "Your draft" : "Editable" },
+            // Live is off without a live address, and while a draft exists the preview stays on it.
+            { value: "live", label: "Live site", disabled: !siteUrl || hasAnyDraft },
+          ]} />
+        ) : <span className="text-[13px] text-[var(--st-text-2)]">{draftWord ?? "How your site looks now"}</span>}
+        {draftWord && isEditing ? <span className="text-[13px] text-[var(--st-need)]">{draftWord}</span> : null}
+        <span className="flex-1" />
+        {!narrow ? <XaSegmented label="Screen size" value={breakpoint.label} onChange={(label) => setBreakpoint(BREAKPOINTS.find((bp) => bp.label === label) ?? BREAKPOINTS[2]!)}
+          options={BREAKPOINTS.map((bp) => ({ value: bp.label, label: bp.label }))} /> : null}
+        <XaTextLink onClick={retryPreview}>Reload</XaTextLink>
+        {siteUrl ? <a href={liveTargetUrl} target="_blank" rel="noopener noreferrer" className="whitespace-nowrap text-[14px] font-medium text-[var(--st-accent)] hover:underline">Open live site</a> : null}
+        <XaButton size="sm" onClick={onToggleEdit} className="whitespace-nowrap">
+          {isEditing ? <><Eye size={15} aria-hidden="true" />Done editing</> : <><Pencil size={15} aria-hidden="true" />Edit site</>}
+        </XaButton>
       </div>
 
-      {/* Canvas — a recessed well the document floats in */}
-      <div
-        ref={canvasRef}
-        className="relative flex flex-1 justify-center overflow-hidden bg-surface-base p-4 shadow-[inset_0_2px_6px_rgba(0,0,0,0.45)] xl:p-7"
-      >
-
+      {/* The page itself, framed at the chosen screen size on paper. */}
+      <div ref={canvasRef} className={`relative flex flex-1 overflow-hidden bg-[var(--st-canvas)] p-4 xl:p-7 ${shouldScaleFrame ? "justify-start" : "justify-center"}`}>
         <div
           key={`flash-${refreshKey}`}
-          className={`relative h-full w-full shrink-0 overflow-hidden rounded-xl bg-surface shadow-[0_0_0_1px_rgba(255,255,255,0.06),0_24px_60px_-16px_rgba(0,0,0,0.75),0_8px_20px_-8px_rgba(0,0,0,0.5)] transition-[max-width] duration-200 ease-out xl:rounded-2xl ${refreshKey > 0 ? "preview-flash" : ""}`}
+          className={`relative h-full w-full shrink-0 overflow-hidden rounded-[var(--st-r-lg)] bg-[var(--st-surface)] shadow-[var(--st-shadow-sm)] transition-[max-width] duration-(--motion-base) ease-out ${refreshKey > 0 ? "preview-flash" : ""}`}
           style={{
             width: breakpoint.width ? `${breakpoint.width}px` : "100%",
             maxWidth: breakpoint.width ? undefined : "100%",
             height: shouldScaleFrame ? `${100 / frameScale}%` : "100%",
-            marginInline: "auto",
+            // Scaled frames anchor top-left inside the canvas content box (an
+            // auto margin on an overflowing flex item collapses to 0 and the
+            // old top-center origin then shifted the page off one edge).
+            marginInline: shouldScaleFrame ? 0 : "auto",
+            alignSelf: "flex-start",
             transform: shouldScaleFrame ? `scale(${frameScale})` : undefined,
-            transformOrigin: "top center",
+            transformOrigin: "top left",
           }}
         >
           <iframe
             ref={iframeRef}
             key={`${effectivePreviewSource}-${refreshKey}-${pagePath}`}
             src={iframeSrc}
-            className="w-full h-full border-0"
+            className="h-full w-full border-0"
             title={previewKind}
             onLoad={() => setPreviewStatus("ready")}
           />
           {previewStatus === "loading" && (
-            <div className="absolute inset-0 flex items-center justify-center bg-gray-bg-alt">
-              <div className="flex max-w-sm flex-col items-center gap-2 px-6 text-center">
-                <Loader2 className="w-5 h-5 text-gray-muted animate-spin" strokeWidth={1.5} />
-                <span className="text-[11px] text-gray-muted">
-                  Loading {isLivePreview ? "your live site" : "your site"}
-                </span>
-              </div>
+            <div className="absolute inset-0 flex items-center justify-center bg-[var(--st-surface)]" role="status">
+              <span className="text-[14px] text-[var(--st-text-2)]">Opening {isLivePreview ? "your live site" : "your site"}</span>
             </div>
           )}
           {previewStatus === "error" && !previewErrorDismissed && (
-            <div className="absolute inset-0 flex items-center justify-center bg-gray-bg-alt p-6">
-              <div className="max-w-md rounded-xl border border-gray-border bg-surface px-5 py-4 text-center shadow-xl">
-                <AlertCircle className="mx-auto mb-3 h-5 w-5 text-warning" strokeWidth={1.5} />
-                <p className="text-sm font-medium text-warm-white">Your preview is taking longer than expected</p>
-                <p className="mt-2 text-xs leading-5 text-gray-muted">
-                  This is usually a brief network hiccup. You can still edit the selected section on the right, retry, or open your live site directly.
-                </p>
-                <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
-                  <button
-                    type="button"
-                    onClick={retryPreview}
-                    className="rounded-md bg-warm-white px-3 py-2 text-xs font-medium text-on-warm-white hover:bg-warm-white/90"
-                  >
-                    Retry preview
-                  </button>
-                  <a
-                    href={siteUrl || "/"}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="rounded-md border border-gray-border px-3 py-2 text-xs text-gray-muted hover:text-warm-white"
-                  >
-                    Open live site
-                  </a>
-                  <button
-                    type="button"
-                    onClick={() => setPreviewErrorDismissed(true)}
-                    className="rounded-md border border-gray-border px-3 py-2 text-xs text-gray-muted hover:text-warm-white"
-                  >
-                    Continue editing
-                  </button>
-                </div>
+            <div className="absolute inset-0 flex items-center justify-center bg-[var(--st-surface)] p-6">
+              <div className="flex max-w-md flex-col gap-4" role="alert">
+                <XaSays links={[
+                  <XaTextLink key="retry" onClick={retryPreview}>Try again</XaTextLink>,
+                  <a key="live" href={siteUrl || "/"} target="_blank" rel="noopener noreferrer" className="font-medium text-[var(--st-accent)] hover:underline">Open the live site</a>,
+                  <XaTextLink key="go" onClick={() => setPreviewErrorDismissed(true)}>Keep editing</XaTextLink>,
+                ]}>Your site is taking longer than usual to open here. It is still up; you can keep editing the part you picked.</XaSays>
               </div>
             </div>
           )}
         </div>
 
-        {/* Floating selection bar — contextual action for the selected section */}
+        {/* The part you picked, and the one thing to do with it. */}
         {isEditing && activeSectionLabel && previewStatus === "ready" && (
           <div className="pointer-events-none absolute inset-x-0 bottom-5 z-20 flex justify-center px-4">
-            <div className="pointer-events-auto flex items-center gap-2 rounded-full border border-white/10 bg-[rgba(10,10,12,0.82)] py-1.5 pl-3.5 pr-1.5 text-white shadow-[0_18px_50px_rgba(0,0,0,0.5)] backdrop-blur-xl animate-overlay-enter">
-              <span className="flex items-center gap-1.5 text-[11px] font-medium">
-                <span className="h-1.5 w-1.5 rounded-full bg-accent" />
-                <span className="max-w-[180px] truncate">{activeSectionLabel}</span>
-              </span>
-              <span className="h-4 w-px bg-white/12" />
-              <button
-                type="button"
-                onClick={askAIForActiveSection}
-                className="flex items-center gap-1.5 rounded-full bg-accent px-3 py-1 text-[11px] font-semibold text-on-accent transition-transform hover:scale-[1.03]"
-              >
-                <Sparkles className="h-3.5 w-3.5" strokeWidth={1.8} />
-                Ask Strelva to change this
-              </button>
-            </div>
+            <p className="pointer-events-auto m-0 flex items-center gap-3 rounded-full bg-[var(--st-surface)] py-2 pl-4 pr-4 text-[14px] text-[var(--st-text)] shadow-[var(--st-shadow-sm)]">
+              <span className="max-w-[200px] truncate font-medium">{activeSectionLabel}</span>
+              <XaTextLink onClick={askAIForActiveSection}>Ask Strelva to change this</XaTextLink>
+            </p>
           </div>
         )}
 
-        {/* Glass context menu */}
         {contextMenu && (
           <div
             ref={menuRef}
-            className="glass-menu absolute z-50 animate-overlay-enter"
-            style={{
-              left: `${contextMenu.x}px`,
-              top: `${contextMenu.y}px`,
-            }}
+            role="menu"
+            aria-label={contextMenu.label}
+            className="absolute z-50 min-w-[220px] overflow-hidden rounded-[var(--st-r-md)] bg-[var(--st-surface)] py-1 shadow-[var(--st-shadow-lg)]"
+            style={{ left: `${contextMenu.x}px`, top: `${contextMenu.y}px` }}
           >
-            <div className="px-3 py-2 border-b border-white/[0.06]">
-              <span className="text-[11px] font-medium text-white/90">{contextMenu.label}</span>
-            </div>
-            <div className="py-1">
-              <button
-                onClick={handleEditSection}
-                className="glass-menu-item"
-              >
-                <Pencil className="w-3.5 h-3.5" strokeWidth={1.5} />
-                Edit fields
-              </button>
-              <button
-                onClick={handleAskAI}
-                className="glass-menu-item"
-              >
-                <MessageCircle className="w-3.5 h-3.5" strokeWidth={1.5} />
-                Ask Strelva to update
-              </button>
-              <button
-                onClick={handleViewSection}
-                className="glass-menu-item"
-              >
-                <Eye className="w-3.5 h-3.5" strokeWidth={1.5} />
-                Scroll to section
-              </button>
-            </div>
+            <p className="m-0 border-b border-[var(--st-line)] px-3 py-2 text-[13px] font-medium text-[var(--st-text-2)]">{contextMenu.label}</p>
+            <button type="button" role="menuitem" onClick={handleEditSection} className="flex w-full items-center gap-2.5 border-0 bg-transparent px-3 py-2 text-left text-[14px] text-[var(--st-text)] hover:bg-[var(--st-hover)] focus-visible:bg-[var(--st-hover)] focus-visible:outline-none"><Pencil size={15} strokeWidth={1.6} aria-hidden="true" />Change its words</button>
+            <button type="button" role="menuitem" onClick={handleAskAI} className="flex w-full items-center gap-2.5 border-0 bg-transparent px-3 py-2 text-left text-[14px] text-[var(--st-text)] hover:bg-[var(--st-hover)] focus-visible:bg-[var(--st-hover)] focus-visible:outline-none"><MessageCircle size={15} strokeWidth={1.6} aria-hidden="true" />Ask Strelva to change it</button>
+            <button type="button" role="menuitem" onClick={handleViewSection} className="flex w-full items-center gap-2.5 border-0 bg-transparent px-3 py-2 text-left text-[14px] text-[var(--st-text)] hover:bg-[var(--st-hover)] focus-visible:bg-[var(--st-hover)] focus-visible:outline-none"><Eye size={15} strokeWidth={1.6} aria-hidden="true" />Scroll to it</button>
           </div>
         )}
       </div>

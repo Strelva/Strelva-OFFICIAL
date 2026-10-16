@@ -1,35 +1,23 @@
 "use client";
 
-import { useRef, useState, useCallback } from "react";
-import { Check, X, Star, Calendar, MessageSquare, Bot, Zap, Quote, GitBranch, ClipboardCheck, PackageCheck } from "lucide-react";
+import { useState } from "react";
 import type { UnifiedEvent } from "@/lib/types";
+import type { ReactNode } from "react";
+import { XaButton, XaLabel, XaPage, XaPageChange, XaPebbleAvatar, XaStatus, XaSystemTile, XaTextLink, XaYes } from "@/components/ui/strelva/Xa";
+import type { PreviewDiff } from "@/lib/agent-risk";
 import { UseAsTestimonialModal } from "./UseAsTestimonialModal";
+import { useDashboardOptional } from "./DashboardContext";
+import styles from "./queue.module.css";
 
-const SWIPE_THRESHOLD = 100;
+/**
+ * One thing that waits, as an open row (XA · O5). Opened, it becomes the
+ * decision in place: the page as visitors will see it with the new words
+ * tinted, then the one yes (XA · O3). Beside the yes sit two text links with
+ * what each one does: "Not now" closes it and keeps it waiting, "Skip" turns
+ * it down and nothing changes.
+ */
 
-const SOURCE_COLORS: Record<string, { bg: string; text: string }> = {
-  google: { bg: "bg-accent0/15", text: "text-accent" },
-  yelp: { bg: "bg-critical0/15", text: "text-critical" },
-  instagram: { bg: "bg-accent0/15", text: "text-accent" },
-  ai: { bg: "bg-accent0/15", text: "text-accent" },
-  website: { bg: "bg-gray-bg", text: "text-gray-fg" },
-  calendly: { bg: "bg-positive0/15", text: "text-positive" },
-  vegaro: { bg: "bg-positive0/15", text: "text-positive" },
-  default: { bg: "bg-gray-bg", text: "text-gray-muted" },
-};
-
-const SOURCE_ICONS: Record<string, React.ReactNode> = {
-  google: <Star className="w-3.5 h-3.5" strokeWidth={1.5} />,
-  yelp: <Star className="w-3.5 h-3.5" strokeWidth={1.5} />,
-  calendly: <Calendar className="w-3.5 h-3.5" strokeWidth={1.5} />,
-  vegaro: <Calendar className="w-3.5 h-3.5" strokeWidth={1.5} />,
-  website: <MessageSquare className="w-3.5 h-3.5" strokeWidth={1.5} />,
-  ai: <Bot className="w-3.5 h-3.5" strokeWidth={1.5} />,
-  instagram: <Zap className="w-3.5 h-3.5" strokeWidth={1.5} />,
-};
-
-// Owner-facing label for an event's source — never the raw internal slug
-// ("vegaro", "website"). The owner reads where it came from, not our plumbing.
+// Owner-facing label for an event's source, never the raw internal slug.
 const SOURCE_LABELS: Record<string, string> = {
   google: "Google",
   yelp: "Yelp",
@@ -42,54 +30,55 @@ const SOURCE_LABELS: Record<string, string> = {
 };
 
 function formatEventSource(source: string): string {
-  // Never leak a raw integration slug to the owner — an unmapped source reads as
-  // a generic "Activity" rather than "Vegaro"/"Acuity"/etc.
   return SOURCE_LABELS[source] ?? "Activity";
 }
 
-function formatEventStatus(event: UnifiedEvent): string {
+const SOURCE_CLAY: Record<string, string> = {
+  google: "reviews", yelp: "reviews", calendly: "bookings", vegaro: "bookings", website: "inbox", stripe: "payments", instagram: "newsletter",
+};
+
+export function queueLead(event: UnifiedEvent, size = 36) {
+  if (event.type === "change_request") return <XaSystemTile kind="website" size={size} />;
+  if (event.type === "newsletter_draft") return <XaSystemTile kind="newsletter" size={size} />;
+  if (event.metadata?.kind === "gbp_post_draft" || event.metadata?.kind === "gbp_hours_draft") return <XaSystemTile kind="listing" size={size} />;
+  if (event.source === "ai") return <XaPebbleAvatar size={size} />;
+  return <XaSystemTile kind={SOURCE_CLAY[event.source] ?? "website"} size={size} />;
+}
+
+export function formatEventStatus(event: UnifiedEvent): string {
   if (event.status === "approved") {
-    // Structural changes are handed to the builder, not auto-published — don't
-    // claim "Made live" for a change that hasn't shipped to the live site.
-    return event.type === "content_update" &&
-      event.metadata?.kind === "manual_structural_change"
+    // Structural changes are handed to the builder, not auto-published.
+    return event.type === "content_update" && event.metadata?.kind === "manual_structural_change"
       ? "Sent to your builder"
       : "Made live";
   }
   if (event.status === "auto_approved") return "Handled";
   if (event.status === "dismissed") return "Skipped";
-  return "Needs you";
+  return "Waits for you";
 }
 
-function formatTimestamp(iso: string): string {
+export function formatTimestamp(iso: string): string {
   const date = new Date(iso);
-  const now = new Date();
-  const diffMs = now.getTime() - date.getTime();
+  const diffMs = Date.now() - date.getTime();
+  if (!Number.isFinite(diffMs)) return "";
   const diffMin = Math.floor(diffMs / 60000);
   const diffHr = Math.floor(diffMs / 3600000);
   const diffDays = Math.floor(diffMs / 86400000);
-
   if (diffMin < 1) return "just now";
-  if (diffMin < 60) return `${diffMin}m ago`;
-  if (diffHr < 24) return `${diffHr}h ago`;
-  if (diffDays < 7) return `${diffDays}d ago`;
-  return date.toLocaleDateString();
+  if (diffMin < 60) return `${diffMin} min ago`;
+  if (diffHr < 24) return `${diffHr} h ago`;
+  if (diffDays < 7) return date.toLocaleDateString("en-US", { weekday: "short" });
+  return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
-interface QueueCardProps {
-  event: UnifiedEvent;
-  onApprove: (id: string) => void;
-  onDismiss: (id: string) => void;
-  onWorkflowAction?: (id: string, action: "triaged" | "quoted" | "accepted" | "in_progress" | "shipped" | "declined") => void;
-  disabled?: boolean;
-  /**
-   * Operator (super-admin) view. The custom-change-request fulfillment controls
-   * (Triaged/Start/Shipped/Decline), the internal repo name, and the triage-due
-   * date are operator-only — a client only ever sees a plain-English status of
-   * their request, never the workflow buttons or the repo. Defaults to false so
-   * the client-facing queue can't leak operator internals.
-   */
-  isOperator?: boolean;
+/** Who acted, then when: "Strelva prepared it · 2 h ago". */
+function whoAndWhen(event: UnifiedEvent, isCustomRequest: boolean): string {
+  const when = formatTimestamp(event.createdAt);
+  const who = isCustomRequest ? "You asked"
+    : event.type === "suggestion" ? "Strelva suggested it"
+      : event.source === "ai" ? "Strelva prepared it"
+        : `From ${formatEventSource(event.source)}`;
+  return when ? `${who} · ${when}` : who;
 }
 
 function metadataString(event: UnifiedEvent, key: string): string | null {
@@ -107,9 +96,7 @@ function formatWorkflowStatus(status: string | null): string {
   return "Requested";
 }
 
-// Client-facing status for a custom change request. The operator pipeline
-// (triaged/quoted/accepted) is internal — the owner just needs to know we have
-// it and we're on it, never the fulfillment stage or the repo.
+// Client-facing status for a custom change request: never the operator stage or the repo.
 function formatClientRequestStatus(status: string | null): string {
   if (status === "shipped") return "Done";
   if (status === "declined") return "Declined";
@@ -118,23 +105,107 @@ function formatClientRequestStatus(status: string | null): string {
   return "In progress";
 }
 
-export function QueueCard({ event, onApprove, onDismiss, onWorkflowAction, disabled, isOperator = false }: QueueCardProps) {
-  const DEFAULT_COLORS: { bg: string; text: string } = { bg: "bg-gray-bg", text: "text-gray-muted" };
-  const colors: { bg: string; text: string } = SOURCE_COLORS[event.source] ?? DEFAULT_COLORS;
-  const icon = SOURCE_ICONS[event.source] || <Zap className="w-3.5 h-3.5" strokeWidth={1.5} />;
+/* ---------- What the yes changes, as the page people will see ---------- */
+
+const MAX_DIFF_ROWS = 6;
+const DAY_LABELS: Record<string, string> = { MONDAY: "Monday", TUESDAY: "Tuesday", WEDNESDAY: "Wednesday", THURSDAY: "Thursday", FRIDAY: "Friday", SATURDAY: "Saturday", SUNDAY: "Sunday" };
+const PAGE_NAMES: Record<string, string> = { hero: "homepage", services: "Services page", faq: "FAQ", contact: "Contact page", about: "About page", testimonials: "reviews section" };
+
+function clock(value: string): string {
+  const m = /^(\d{1,2}):(\d{2})$/.exec(value.trim());
+  if (!m) return value;
+  const h = Number(m[1]);
+  return `${h % 12 === 0 ? 12 : h % 12}:${m[2]} ${h < 12 ? "AM" : "PM"}`;
+}
+
+function readDiffs(event: UnifiedEvent): PreviewDiff[] {
+  if (event.type !== "content_update" || !Array.isArray(event.metadata?.diffs)) return [];
+  return (event.metadata.diffs as unknown[]).filter((d): d is PreviewDiff => Boolean(d) && typeof d === "object" && typeof (d as PreviewDiff).field === "string" && ["added", "removed", "changed"].includes((d as PreviewDiff).type));
+}
+
+/** The address a change lands on, in owner words: "harbordental.com" for the homepage. */
+function pageAddress(event: UnifiedEvent, domain: string | null): string {
+  const section = typeof event.metadata?.section === "string" ? event.metadata.section : "hero";
+  const name = PAGE_NAMES[section] ?? "website";
+  if (!domain) return `Your ${name}`;
+  return section === "hero" ? domain : `${domain}/${section}`;
+}
+
+/**
+ * The change itself. A site edit is the page with the new words tinted moss
+ * and the words they replace under them; a Google post or hours draft is the
+ * listing the way people see it on Google. Nothing here is a label to trust:
+ * it is the thing the yes puts live.
+ */
+export function QueueChange({ event, domain }: { event: UnifiedEvent; domain: string | null }) {
+  const meta = event.metadata ?? {};
+  if (event.type === "content_update" && meta.kind === "gbp_post_draft" && typeof meta.summary === "string" && meta.summary.trim()) {
+    const cta = typeof meta.ctaUrl === "string" && meta.ctaUrl.trim() ? meta.ctaUrl.trim() : null;
+    return <div className={styles.change}>
+      <XaLabel>What will be posted to Google</XaLabel>
+      <XaPage address="Your Google listing · new post" flat>
+        <XaPageChange>{meta.summary.trim()}</XaPageChange>
+        {cta ? <p className={styles.pageNote}>Button link {cta}</p> : null}
+      </XaPage>
+    </div>;
+  }
+  if (event.type === "content_update" && meta.kind === "gbp_hours_draft" && Array.isArray(meta.hours)) {
+    const hours = (meta.hours as { day?: unknown; open?: unknown; close?: unknown }[]).filter((h) => typeof h?.day === "string" && typeof h.open === "string" && typeof h.close === "string") as { day: string; open: string; close: string }[];
+    if (hours.length) return <div className={styles.change}>
+      <XaLabel>New hours for Google</XaLabel>
+      <XaPage address="Your Google listing · hours" flat>
+        <dl className={styles.hours}>{hours.map((h, i) => <div key={`${h.day}-${i}`}><dt>{DAY_LABELS[h.day] ?? h.day}</dt><dd>{clock(h.open)} to {clock(h.close)}</dd></div>)}</dl>
+      </XaPage>
+    </div>;
+  }
+  const diffs = readDiffs(event);
+  if (!diffs.length) return null;
+  const shown = diffs.slice(0, MAX_DIFF_ROWS);
+  const extra = diffs.length - shown.length;
+  return <div className={styles.change}>
+    <XaLabel>What changed</XaLabel>
+    <XaPage address={pageAddress(event, domain)} flat>
+      {shown.map((d, i) => <div key={`${d.field}-${i}`} className={styles.diff}>
+        <span className={styles.diffField}>{d.field}</span>
+        {d.type === "removed"
+          ? <p className={`${styles.diffGone} line-through`}><span className="sr-only">Removed: </span>{d.before}</p>
+          : <XaPageChange>{d.after}</XaPageChange>}
+        {d.type === "changed" && d.before ? <p className={styles.pageNote}><span className="sr-only">Was: </span>Replaces <span className="line-through">{d.before}</span></p> : null}
+      </div>)}
+      {extra > 0 ? <p className={styles.pageNote}>+{extra} more field{extra === 1 ? "" : "s"} changed</p> : null}
+    </XaPage>
+  </div>;
+}
+
+type WorkflowAction = "triaged" | "quoted" | "accepted" | "in_progress" | "shipped" | "declined";
+
+interface QueueCardProps {
+  event: UnifiedEvent;
+  onApprove: (id: string) => void;
+  onDismiss: (id: string) => void;
+  onWorkflowAction?: (id: string, action: WorkflowAction) => void;
+  disabled?: boolean;
+  /** Operator (super-admin) view: the custom-request fulfillment controls, repo and triage date. */
+  isOperator?: boolean;
+  /** The row is open as the decision. */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+}
+
+export function QueueCard({ event, onApprove, onDismiss, onWorkflowAction, disabled, isOperator = false, open = false, onOpenChange }: QueueCardProps) {
   const isPending = event.status === "pending";
   const isCustomRequest = event.type === "change_request" && event.metadata?.kind === "custom_code_or_design_request";
+  const isSuggestion = event.type === "suggestion";
   const workflowStatus = isCustomRequest ? metadataString(event, "workflowStatus") || "requested" : null;
   const repo = isCustomRequest && event.metadata?.customRepo && typeof event.metadata.customRepo === "object"
     ? event.metadata.customRepo as Record<string, unknown>
     : null;
   const repoName = typeof repo?.repoName === "string" ? repo.repoName : null;
   const triageDueAt = isCustomRequest ? metadataString(event, "triageDueAt") : null;
-
-  // "Use as testimonial" modal state
   const [testimonialModalOpen, setTestimonialModalOpen] = useState(false);
+  const dashboard = useDashboardOptional();
+  const domain = dashboard?.siteUrl ? dashboard.siteUrl.replace(/^https?:\/\//, "").replace(/\/$/, "") || null : null;
 
-  // Check if this event is a review that can be converted to testimonial
   const isReview = event.source === "google" || event.source === "yelp";
   const reviewData = isReview && event.metadata
     ? {
@@ -146,246 +217,88 @@ export function QueueCard({ event, onApprove, onDismiss, onWorkflowAction, disab
       }
     : null;
 
-  // Swipe state
-  const cardRef = useRef<HTMLDivElement>(null);
-  const [swipeX, setSwipeX] = useState(0);
-  const [isSwiping, setIsSwiping] = useState(false);
-  const touchStartX = useRef(0);
-  const touchStartY = useRef(0);
-  const isHorizontalSwipe = useRef<boolean | null>(null);
+  const status = !isPending
+    ? <XaStatus kind={event.status === "dismissed" ? "draft" : "live"} size="sm">{formatEventStatus(event)}</XaStatus>
+    : isCustomRequest
+      ? <span className={styles.word}>{isOperator ? formatWorkflowStatus(workflowStatus) : formatClientRequestStatus(workflowStatus)}</span>
+      // Every open row waits; the word would repeat on each one. Only "working" is an exception.
+      : disabled ? <XaStatus kind="working" size="sm">Working</XaStatus> : null;
 
-  const handleTouchStart = useCallback((e: React.TouchEvent) => {
-    if (disabled || !isPending) return;
-    // touches[0] is always present when a touchstart fires.
-    touchStartX.current = e.touches[0]!.clientX;
-    touchStartY.current = e.touches[0]!.clientY;
-    isHorizontalSwipe.current = null;
-    setIsSwiping(true);
-  }, [disabled, isPending]);
-
-  const handleTouchMove = useCallback((e: React.TouchEvent) => {
-    if (!isSwiping || disabled || !isPending) return;
-
-    // touches[0] is always present during an active touch sequence.
-    const deltaX = e.touches[0]!.clientX - touchStartX.current;
-    const deltaY = e.touches[0]!.clientY - touchStartY.current;
-
-    // Determine swipe direction on first significant move
-    if (isHorizontalSwipe.current === null) {
-      if (Math.abs(deltaX) > 10 || Math.abs(deltaY) > 10) {
-        isHorizontalSwipe.current = Math.abs(deltaX) > Math.abs(deltaY);
-      }
-    }
-
-    // Only handle horizontal swipes
-    if (isHorizontalSwipe.current) {
-      e.preventDefault();
-      setSwipeX(deltaX);
-    }
-  }, [isSwiping, disabled, isPending]);
-
-  const handleTouchEnd = useCallback(() => {
-    if (!isSwiping) return;
-
-    if (swipeX > SWIPE_THRESHOLD) {
-      onApprove(event.id);
-    } else if (swipeX < -SWIPE_THRESHOLD) {
-      onDismiss(event.id);
-    }
-
-    setSwipeX(0);
-    setIsSwiping(false);
-    isHorizontalSwipe.current = null;
-  }, [isSwiping, swipeX, event.id, onApprove, onDismiss]);
-
-  // Calculate background hint based on swipe distance
-  const swipeProgress = Math.min(Math.abs(swipeX) / SWIPE_THRESHOLD, 1);
-  const isApproveSwipe = swipeX > 0;
-  const isDismissSwipe = swipeX < 0;
+  const canDecide = isPending && !isCustomRequest;
+  const rowBody = <>
+    {queueLead(event)}
+    <span className={styles.text}>
+      <span className={styles.title}>{event.title}</span>
+      <span className={styles.detail}>{whoAndWhen(event, isCustomRequest)}</span>
+    </span>
+    <span className={styles.end}>{status}</span>
+  </>;
 
   return (
-    <div className="queue-card-swipe-container relative overflow-hidden rounded-xl">
-      {/* Swipe hint backgrounds */}
-      {isPending && !disabled && (
-        <>
-          <div
-            className="absolute inset-0 bg-success pointer-events-none transition-opacity"
-            style={{ opacity: isApproveSwipe ? swipeProgress * 0.3 : 0 }}
-          />
-          <div
-            className="absolute inset-0 bg-gray-muted pointer-events-none transition-opacity"
-            style={{ opacity: isDismissSwipe ? swipeProgress * 0.3 : 0 }}
-          />
-          {/* Swipe icons */}
-          {isApproveSwipe && swipeProgress > 0.3 && (
-            <div className="absolute left-4 top-1/2 -translate-y-1/2 text-success transition-opacity" style={{ opacity: swipeProgress }}>
-              <Check className="w-6 h-6" strokeWidth={2} />
-            </div>
-          )}
-          {isDismissSwipe && swipeProgress > 0.3 && (
-            <div className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-fg transition-opacity" style={{ opacity: swipeProgress }}>
-              <X className="w-6 h-6" strokeWidth={2} />
-            </div>
-          )}
-        </>
+    <div className={styles.item} data-open={open || undefined} data-busy={disabled || undefined}>
+      {canDecide && onOpenChange ? (
+        <button type="button" className={styles.row} aria-expanded={open} onClick={() => onOpenChange(!open)}>{rowBody}</button>
+      ) : (
+        <div className={styles.row}>{rowBody}</div>
       )}
-      <div
-        ref={cardRef}
-        onTouchStart={handleTouchStart}
-        onTouchMove={handleTouchMove}
-        onTouchEnd={handleTouchEnd}
-        style={{
-          transform: `translateX(${swipeX}px)`,
-          transition: isSwiping ? 'none' : 'transform 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
-        }}
-        className={`queue-card-swipeable group rounded-xl border border-glass-border bg-glass p-4 relative transition-colors ${
-          disabled ? "opacity-50" : "hover:bg-gray-bg"
-        }`}
-      >
-      <div className="flex items-start gap-3">
-        {/* Source icon */}
-        <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${isCustomRequest ? "bg-warning0/15 text-warning0" : `${colors.bg} ${colors.text}`}`}>
-          {isCustomRequest ? <GitBranch className="w-3.5 h-3.5" strokeWidth={1.5} /> : icon}
-        </div>
 
-        {/* Content */}
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-1">
-            <span className="text-[11px] font-medium text-gray-muted uppercase tracking-wide">
-              {isCustomRequest ? "site change request" : formatEventSource(event.source)}
-            </span>
-            <span className="text-[11px] text-gray-subtle">
-              {formatTimestamp(event.createdAt)}
-            </span>
-            {!isPending && (
-              <span
-                className={`text-[11px] font-medium px-1.5 py-0.5 rounded ${
-                  event.status === "approved" || event.status === "auto_approved"
-                    ? "bg-success-dim text-success"
-                    : "bg-gray-bg text-gray-muted"
-                }`}
-              >
-                {formatEventStatus(event)}
-              </span>
-            )}
-          </div>
-          <h3 className="text-[14px] font-medium text-warm-black leading-snug">
-            {event.title}
-          </h3>
-          {event.body && (
-            <p className="text-[12px] text-gray-fg mt-1 line-clamp-2">
-              {event.body}
+      {open && canDecide ? (
+        <div className={styles.decision}>
+          {event.body ? <p className={styles.body}>{event.body}</p> : null}
+          <QueueChange event={event} domain={domain} />
+          <XaYes
+            state={disabled ? "going" : "waiting"}
+            yesLabel={isSuggestion ? "Use this idea" : "Make it live"}
+            onYes={() => onApprove(event.id)}
+            block={false}
+          />
+          <DecisionLinks
+            onNotNow={onOpenChange ? () => onOpenChange(false) : undefined}
+            onSkip={() => onDismiss(event.id)}
+            extra={isReview && reviewData ? <XaTextLink onClick={() => setTestimonialModalOpen(true)}>Put this review on your site</XaTextLink> : null}
+          />
+        </div>
+      ) : null}
+
+      {isCustomRequest ? (
+        <div className={styles.request}>
+          {event.body ? <p className={styles.body}>{event.body}</p> : null}
+          {isOperator && (repoName || (triageDueAt && workflowStatus === "requested")) ? (
+            <p className={styles.meta}>
+              {repoName ? `Repo ${repoName}` : null}
+              {repoName && triageDueAt && workflowStatus === "requested" ? " · " : null}
+              {triageDueAt && workflowStatus === "requested" ? `Triage by ${new Date(triageDueAt).toLocaleDateString()}` : null}
             </p>
-          )}
-          {isCustomRequest && (
-            <div className="mt-3 flex flex-wrap gap-1.5">
-              <span className="rounded-full bg-warning0/10 px-2 py-0.5 text-[11px] font-medium text-warning">
-                {isOperator ? formatWorkflowStatus(workflowStatus) : formatClientRequestStatus(workflowStatus)}
-              </span>
-              {isOperator && repoName && (
-                <span className="rounded-full bg-gray-bg px-2 py-0.5 text-[11px] font-medium text-gray-muted">
-                  Repo: {repoName}
-                </span>
-              )}
-              {isOperator && triageDueAt && workflowStatus === "requested" && (
-                <span className="rounded-full bg-gray-bg px-2 py-0.5 text-[11px] font-medium text-gray-muted">
-                  Triage by {new Date(triageDueAt).toLocaleDateString()}
-                </span>
-              )}
+          ) : null}
+          {isPending && !disabled && isOperator && onWorkflowAction ? (
+            <div className={styles.operator} aria-label="Strelva fulfillment">
+              {workflowStatus === "requested" ? <XaButton size="sm" onClick={() => onWorkflowAction(event.id, "triaged")}>Triaged</XaButton> : null}
+              {workflowStatus === "triaged" || workflowStatus === "quoted" || workflowStatus === "accepted" ? <XaButton size="sm" onClick={() => onWorkflowAction(event.id, "in_progress")}>Start</XaButton> : null}
+              <XaButton size="sm" onClick={() => onWorkflowAction(event.id, "shipped")}>Shipped</XaButton>
+              <XaButton size="sm" variant="quiet" onClick={() => onWorkflowAction(event.id, "declined")}>Decline</XaButton>
             </div>
-          )}
+          ) : null}
         </div>
+      ) : null}
 
-        {/* Actions */}
-        {isPending && !disabled && isCustomRequest && isOperator && onWorkflowAction && (
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-1.5 shrink-0">
-            {workflowStatus === "requested" && (
-              <button
-                onClick={() => onWorkflowAction(event.id, "triaged")}
-                className="h-9 rounded-lg bg-warning0/10 px-2.5 text-[12px] font-medium text-warning hover:bg-warning0 hover:text-warning flex items-center justify-center gap-1.5 transition-colors"
-                title="Mark triaged"
-              >
-                <ClipboardCheck className="w-4 h-4" strokeWidth={1.5} />
-                Triaged
-              </button>
-            )}
-            {(workflowStatus === "triaged" || workflowStatus === "quoted" || workflowStatus === "accepted") && (
-              <button
-                onClick={() => onWorkflowAction(event.id, "in_progress")}
-                className="h-9 rounded-lg bg-accent-dim px-2.5 text-[12px] font-medium text-accent hover:bg-accent hover:text-on-accent flex items-center justify-center gap-1.5 transition-colors"
-                title="Mark in progress"
-              >
-                <GitBranch className="w-4 h-4" strokeWidth={1.5} />
-                Start
-              </button>
-            )}
-            <button
-              onClick={() => onWorkflowAction(event.id, "shipped")}
-              className="h-9 rounded-lg bg-success-dim px-2.5 text-[12px] font-medium text-success hover:bg-success hover:text-on-positive flex items-center justify-center gap-1.5 transition-colors"
-              title="Mark shipped"
-            >
-              <PackageCheck className="w-4 h-4" strokeWidth={1.5} />
-              Shipped
-            </button>
-            <button
-              onClick={() => onWorkflowAction(event.id, "declined")}
-              className="h-9 rounded-lg bg-gray-bg px-2.5 text-[12px] font-medium text-gray-muted hover:bg-gray-bg-hover hover:text-gray-fg flex items-center justify-center gap-1.5 transition-colors"
-              title="Decline request"
-            >
-              <X className="w-4 h-4" strokeWidth={2} />
-              Decline
-            </button>
-          </div>
-        )}
-        {isPending && !disabled && !isCustomRequest && (
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-1.5 shrink-0">
-            {/* Use as Testimonial button for reviews */}
-            {isReview && reviewData && (
-              <button
-                onClick={() => setTestimonialModalOpen(true)}
-                disabled={disabled}
-                className="h-9 rounded-lg bg-sage/10 px-2.5 text-[12px] font-medium text-sage hover:bg-accent hover:text-on-accent flex items-center justify-center gap-1.5 transition-colors disabled:opacity-50"
-                title="Use as Testimonial"
-              >
-                <Quote className="w-4 h-4" strokeWidth={1.5} />
-                Use review
-              </button>
-            )}
-            <button
-              onClick={() => onApprove(event.id)}
-              disabled={disabled}
-              className="h-9 rounded-lg bg-success-dim px-2.5 text-[12px] font-medium text-success hover:bg-success hover:text-on-positive flex items-center justify-center gap-1.5 transition-colors disabled:opacity-50"
-              title="Make it live"
-            >
-              <Check className="w-4 h-4" strokeWidth={2} />
-              Make it live
-            </button>
-            <button
-              onClick={() => onDismiss(event.id)}
-              disabled={disabled}
-              className="h-9 rounded-lg bg-gray-bg px-2.5 text-[12px] font-medium text-gray-muted hover:bg-gray-bg-hover hover:text-gray-fg flex items-center justify-center gap-1.5 transition-colors disabled:opacity-50"
-              title="Skip"
-            >
-              <X className="w-4 h-4" strokeWidth={2} />
-              Skip
-            </button>
-          </div>
-        )}
-      </div>
-      </div>
-
-      {/* Use as Testimonial Modal */}
       {reviewData && (
         <UseAsTestimonialModal
           open={testimonialModalOpen}
           onClose={() => setTestimonialModalOpen(false)}
           review={reviewData}
-          onSuccess={() => {
-            // Mark the source review as handled after converting it.
-            onApprove(event.id);
-          }}
+          onSuccess={() => onApprove(event.id)}
         />
       )}
     </div>
   );
+}
+
+/** The two ways out of a decision, each saying what it does. */
+function DecisionLinks({ onNotNow, onSkip, extra }: { onNotNow?: () => void; onSkip: () => void; extra?: ReactNode }) {
+  return <p className={styles.links}>
+    {onNotNow ? <><XaTextLink onClick={onNotNow}>Not now</XaTextLink> · </> : null}
+    <XaTextLink onClick={onSkip}>Skip</XaTextLink>
+    <span className={styles.linksWhy}>{onNotNow ? "Not now keeps it here for later. " : ""}Skip turns it down and nothing on your site changes.</span>
+    {extra ? <span className={styles.linksExtra}>{extra}</span> : null}
+  </p>;
 }

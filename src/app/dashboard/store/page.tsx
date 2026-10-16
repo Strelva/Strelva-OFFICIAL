@@ -2,6 +2,7 @@ import { getTenantFromHeaders } from "@/lib/tenant";
 import { redirectIfDashboardPageMoved } from "@/platform/owner-entry/server";
 import { notFound } from "next/navigation";
 import { requireDashboardView } from "@/lib/dashboard-auth";
+import { withClientFallbackRoot } from "@/lib/client-fallback";
 import { getTenantConfig } from "@/lib/tenants";
 import { tenantHasStore } from "@/lib/dashboard-surfaces";
 import { isInspecting } from "@/lib/inspect-mode";
@@ -21,7 +22,7 @@ import { InspectPreviewBanner } from "@/components/dashboard/InspectPreviewBanne
 export default async function StorePage() {
   await redirectIfDashboardPageMoved(await getTenantFromHeaders(), "/store");
 
-  const { tenant } = await requireDashboardView();
+  const { tenant, clientFallbackRoot } = await requireDashboardView();
 
   const [config, summary, orders, products] = await Promise.all([
     getTenantConfig(tenant).catch(() => null),
@@ -45,7 +46,7 @@ export default async function StorePage() {
       {preview && <InspectPreviewBanner tenant={tenant} featureId="commerce" />}
       <EngagementTracker event="store-view" />
       <div className="min-h-0 flex-1 overflow-y-auto">
-        <StorePanel summary={summary} orders={orders} products={products} />
+        <StorePanel summary={summary} orders={orders} products={products} productsHref={withClientFallbackRoot(clientFallbackRoot, "/dashboard/collections")} />
       </div>
     </div>
   );

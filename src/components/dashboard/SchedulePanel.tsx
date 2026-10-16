@@ -1,20 +1,23 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { CalendarDays, Clock, Plus, Trash2, X } from "lucide-react";
+import { XaButton, XaEmpty, XaSegmented, XaSystemTile, XaTextLink } from "@/components/ui/strelva/Xa";
+import { TodayRoster, rosterHeadline } from "./RosterPanel";
+import { useDashboardOptional } from "./DashboardContext";
+import { DashNote, DashPage, DashSection, dashStyles as dash } from "./xa/DashboardXa";
 import type { Booking, BookingConfig, DateOverride, WeeklySlot } from "@/lib/types";
 import { ConfirmDialog } from "./ConfirmDialog";
 
 const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 const inputClass =
-  "rounded-lg border border-gray-border bg-surface-base px-3 py-2 text-[14px] text-warm-black outline-none transition-colors focus:border-accent/40 disabled:opacity-40";
+  "min-h-[40px] rounded-[var(--st-r-md)] border border-[var(--st-line)] bg-[var(--st-surface)] px-3 text-[15px] tabular-nums text-[var(--st-text)] outline-none transition-colors focus-visible:border-[var(--st-accent)] disabled:opacity-40";
 
 function formatTime(hhmm: string): string {
   const parts = hhmm.split(":").map(Number);
   const h = parts[0];
   const m = parts[1];
   if (h === undefined || Number.isNaN(h)) return hhmm;
-  const period = h >= 12 ? "PM" : "AM";
+  const period = h >= 12 ? "pm" : "am";
   const hour12 = h % 12 === 0 ? 12 : h % 12;
   return `${hour12}:${String(m).padStart(2, "0")} ${period}`;
 }
@@ -46,67 +49,48 @@ export function SchedulePanel({
   config,
   overrides,
   today,
+  initialView = "today",
 }: {
   bookings: Booking[];
   config: BookingConfig;
   overrides: DateOverride[];
   today: string;
+  initialView?: "today" | "week" | "availability";
 }) {
-  const [tab, setTab] = useState<"appointments" | "availability">("appointments");
+  // One Bookings System: today's roster, the week ahead, and when people can book.
+  const [tab, setTab] = useState<"today" | "week" | "availability">(initialView);
+  const [statuses, setStatuses] = useState<Record<string, Booking["status"]>>({});
+  const todays = bookings.filter((b) => b.date === today);
+  const weekCount = useMemo(() => {
+    const end = new Date(`${today}T00:00:00`); end.setDate(end.getDate() + 6);
+    const last = end.toISOString().slice(0, 10);
+    return bookings.filter((b) => b.date >= today && b.date <= last && b.status !== "cancelled").length;
+  }, [bookings, today]);
+  const title = tab === "today" ? rosterHeadline(todays, statuses)
+    : tab === "week" ? (weekCount ? `${weekCount} ${weekCount === 1 ? "appointment" : "appointments"} this week.` : "No one is booked this week.")
+      : "When people can book you.";
 
   return (
-    <div className="h-full overflow-y-auto animate-route-enter px-4 py-6 sm:px-8 sm:py-8">
-      <div className="mx-auto w-full max-w-3xl">
-        <div className="mb-5">
-          <p className="mb-2 text-[11px] font-medium uppercase tracking-[0.16em] text-gray-muted">
-            Schedule
-          </p>
-          <div className="flex items-center gap-1 rounded-lg border border-glass-border bg-glass p-1">
-            <TabButton active={tab === "appointments"} onClick={() => setTab("appointments")}>
-              Appointments
-            </TabButton>
-            <TabButton active={tab === "availability"} onClick={() => setTab("availability")}>
-              Availability
-            </TabButton>
-          </div>
-        </div>
-
-        {tab === "appointments" ? (
-          <Appointments bookings={bookings} today={today} />
-        ) : (
-          <Availability config={config} overrides={overrides} today={today} />
-        )}
-      </div>
-    </div>
-  );
-}
-
-function TabButton({
-  active,
-  onClick,
-  children,
-}: {
-  active: boolean;
-  onClick: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`flex-1 rounded-md px-3 py-1.5 text-[13px] font-medium transition-colors ${
-        active ? "bg-accent text-on-accent" : "text-gray-muted hover:text-warm-black"
-      }`}
+    <DashPage
+      title={title}
+      lead={<XaSystemTile kind="bookings" size={48} label="Bookings" />}
+      actions={<XaSegmented label="Bookings view" value={tab} onChange={setTab} options={[{ value: "today", label: "Today" }, { value: "week", label: "This week" }, { value: "availability", label: "When you're open" }]} />}
+      label="Bookings"
     >
-      {children}
-    </button>
+      {tab === "today" ? <TodayRoster bookings={todays} today={today} onChange={setStatuses} />
+        : tab === "week" ? <Appointments bookings={bookings} today={today} />
+          : <Availability config={config} overrides={overrides} today={today} />}
+    </DashPage>
   );
 }
 
 // --- Appointments --------------------------------------------------------------
 
 function Appointments({ bookings, today }: { bookings: Booking[]; today: string }) {
+  const dashboard = useDashboardOptional();
+  const apiHref = dashboard?.dashboardHref ?? ((path: string) => path);
   const [cancelled, setCancelled] = useState<Set<string>>(new Set());
+  const [openId, setOpenId] = useState<string | null>(null);
   const [confirmId, setConfirmId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -118,14 +102,6 @@ function Appointments({ bookings, today }: { bookings: Booking[]; today: string 
         .sort((a, b) => a.date.localeCompare(b.date) || a.startTime.localeCompare(b.startTime)),
     [bookings, today, cancelled]
   );
-
-  // Verdict: appointments within the next 7 days (today through today+6).
-  const weekEnd = useMemo(() => {
-    const d = new Date(`${today}T00:00:00`);
-    d.setDate(d.getDate() + 6);
-    return d.toISOString().slice(0, 10);
-  }, [today]);
-  const thisWeek = upcoming.filter((b) => b.date <= weekEnd).length;
 
   const groups = useMemo(() => {
     const map = new Map<string, Booking[]>();
@@ -141,7 +117,7 @@ function Appointments({ bookings, today }: { bookings: Booking[]; today: string 
     setBusy(true);
     setError(null);
     try {
-      const res = await fetch(`/api/booking/${id}`, {
+      const res = await fetch(apiHref(`/api/booking/${id}`), {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: "cancelled" }),
@@ -149,8 +125,9 @@ function Appointments({ bookings, today }: { bookings: Booking[]; today: string 
       if (!res.ok) throw new Error();
       setCancelled((prev) => new Set(prev).add(id));
       setConfirmId(null);
+      setOpenId(null);
     } catch {
-      setError("Couldn't cancel that appointment. Please try again.");
+      setError("That appointment wasn't cancelled. Try again.");
     } finally {
       setBusy(false);
     }
@@ -159,80 +136,47 @@ function Appointments({ bookings, today }: { bookings: Booking[]; today: string 
   if (upcoming.length === 0) {
     return (
       <>
-        {error && <ErrorBanner>{error}</ErrorBanner>}
-        <h2 className="mb-4 font-display text-[22px] font-normal tracking-[-0.01em] text-warm-black">
-          No appointments yet
-        </h2>
-        <div className="rounded-xl dashboard-panel p-6 text-center">
-          <div className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-lg bg-accent-dim text-accent">
-            <CalendarDays className="h-5 w-5" strokeWidth={1.5} />
-          </div>
-          <p className="text-[14px] font-medium text-warm-black">
-            Your booking page is live and ready
-          </p>
-          <p className="mx-auto mt-2 max-w-md text-[13px] leading-relaxed text-gray-muted">
-            As soon as someone books a time, their appointment shows up here, grouped by day,
-            with one-tap cancel when plans change.
-          </p>
-        </div>
+        {error ? <DashNote tone="down" role="alert">{error}</DashNote> : null}
+        <XaEmpty pose="resting" title="No one is booked yet." job="Your booking page is open and taking times">
+          The moment someone books, they show up here by day. Open one to call them or cancel it.
+        </XaEmpty>
       </>
     );
   }
 
+  const confirming = upcoming.find((b) => b.id === confirmId) ?? null;
   return (
     <>
-      {error && <ErrorBanner>{error}</ErrorBanner>}
-      <h2 className="mb-1 font-display text-[22px] font-normal tracking-[-0.01em] text-warm-black">
-        You have {thisWeek} {thisWeek === 1 ? "appointment" : "appointments"} this week
-      </h2>
-      <p className="mb-5 text-[13px] text-gray-muted">
-        {upcoming.length} upcoming in total
-      </p>
-
-      <div className="space-y-6">
-        {groups.map(([date, dayBookings]) => (
-          <div key={date}>
-            <p className="mb-2 text-[12px] font-semibold uppercase tracking-wide text-gray-muted">
-              {dayHeading(date, today)}
-            </p>
-            <div className="space-y-2">
-              {dayBookings.map((b) => (
-                <div
-                  key={b.id}
-                  className="flex items-center justify-between gap-3 rounded-xl dashboard-panel p-4"
-                >
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2 text-[13px] font-medium text-warm-black">
-                      <Clock className="h-3.5 w-3.5 shrink-0 text-accent" strokeWidth={1.5} />
-                      {formatTime(b.startTime)}
-                      <span className="text-gray-muted">–</span>
-                      <span className="text-gray-muted">{formatTime(b.endTime)}</span>
-                    </div>
-                    <p className="mt-1.5 truncate text-[14px] font-semibold tracking-[-0.01em] text-warm-black">
-                      {b.clientName}
-                    </p>
-                    <p className="mt-0.5 truncate text-[13px] text-gray-muted">{b.serviceName}</p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setConfirmId(b.id)}
-                    className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-gray-border px-3 py-2 text-[12px] font-medium text-gray-muted transition-colors hover:border-critical0/40 hover:text-critical"
-                  >
-                    <X className="h-3.5 w-3.5" strokeWidth={1.5} />
-                    Cancel
-                  </button>
-                </div>
-              ))}
-            </div>
-          </div>
-        ))}
-      </div>
+      {error ? <DashNote tone="down" role="alert">{error}</DashNote> : null}
+      {groups.map(([date, dayBookings]) => (
+        <DashSection key={date} label={dayHeading(date, today)}>
+          <ul className={dash.list} aria-label={dayHeading(date, today)}>
+            {dayBookings.map((b) => {
+              const open = openId === b.id;
+              return <li key={b.id} className="!block">
+                <button type="button" className="flex w-full items-start gap-[14px] border-0 bg-transparent p-0 text-left text-inherit" aria-expanded={open} onClick={() => setOpenId(open ? null : b.id)}>
+                  <span className="w-[76px] shrink-0 pt-[1px] text-[15px] tabular-nums text-[var(--st-text)]">{formatTime(b.startTime)}</span>
+                  <span className={dash.listText}>
+                    <span className={dash.listTitle}>{b.clientName}</span>
+                    <span className={dash.listDetail}>{b.serviceName} · until {formatTime(b.endTime)}</span>
+                  </span>
+                </button>
+                {open ? <p className="m-0 mt-3 flex flex-wrap gap-x-2 gap-y-1 pl-[90px] text-[14px] text-[var(--st-text-2)] max-md:pl-0">
+                  {b.clientPhone ? <><a className="font-medium text-[var(--st-accent)] hover:underline" href={`tel:${b.clientPhone}`}>Call {b.clientPhone}</a><span aria-hidden="true">·</span></> : null}
+                  {b.clientEmail ? <><a className="font-medium text-[var(--st-accent)] hover:underline" href={`mailto:${b.clientEmail}`}>Email</a><span aria-hidden="true">·</span></> : null}
+                  <XaTextLink onClick={() => setConfirmId(b.id)} aria-label={`Cancel ${b.clientName} at ${formatTime(b.startTime)}`}>Cancel this appointment</XaTextLink>
+                </p> : null}
+              </li>;
+            })}
+          </ul>
+        </DashSection>
+      ))}
 
       <ConfirmDialog
-        open={confirmId !== null}
-        title="Cancel this appointment?"
-        message="The time slot reopens for other customers. This can't be undone."
-        confirmLabel="Cancel appointment"
+        open={confirming !== null}
+        title={confirming ? `Cancel ${confirming.clientName} at ${formatTime(confirming.startTime)}?` : "Cancel this appointment?"}
+        message="The time opens up for someone else. This can't be undone from here."
+        confirmLabel="Cancel the appointment"
         cancelLabel="Keep it"
         destructive
         busy={busy}
@@ -254,6 +198,8 @@ function Availability({
   overrides: DateOverride[];
   today: string;
 }) {
+  const dashboard = useDashboardOptional();
+  const apiHref = dashboard?.dashboardHref ?? ((path: string) => path);
   const [schedule, setSchedule] = useState<WeeklySlot[]>(() => normalizeSchedule(config.weeklySchedule));
   const [slotDuration, setSlotDuration] = useState(config.slotDuration);
   const [bufferTime, setBufferTime] = useState(config.bufferTime);
@@ -282,7 +228,7 @@ function Availability({
         slotDuration,
         bufferTime,
       };
-      const res = await fetch("/api/booking/config", {
+      const res = await fetch(apiHref("/api/booking/config"), {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(next),
@@ -290,7 +236,7 @@ function Availability({
       if (!res.ok) throw new Error();
       setHoursSaved(true);
     } catch {
-      setHoursError("Couldn't save your hours. Please try again.");
+      setHoursError("Your hours didn't save. Try again.");
     } finally {
       setSavingHours(false);
     }
@@ -333,7 +279,7 @@ function Availability({
         ...(r.available && r.end ? { end: r.end } : {}),
         ...(r.reason?.trim() ? { reason: r.reason.trim() } : {}),
       }));
-      const res = await fetch("/api/booking/overrides", {
+      const res = await fetch(apiHref("/api/booking/overrides"), {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(cleaned),
@@ -341,233 +287,76 @@ function Availability({
       if (!res.ok) throw new Error();
       setOverridesSaved(true);
     } catch {
-      setOverridesError("Couldn't save your closed dates. Please try again.");
+      setOverridesError("Your dates didn't save. Try again.");
     } finally {
       setSavingOverrides(false);
     }
   }
 
   return (
-    <div className="space-y-6">
-      {/* Weekly hours */}
-      <section className="rounded-xl dashboard-panel p-5">
-        <h2 className="text-[15px] font-semibold text-warm-black">When you take bookings</h2>
-        <p className="mt-1 text-[13px] text-gray-muted">
-          Turn a day on or off, and set the hours customers can book within it.
-        </p>
-
-        <div className="mt-4 space-y-2">
+    <>
+      <DashSection label="When you take bookings">
+        <p className="m-0 text-[15px] text-[var(--st-text-2)]">Open or close each day, and set the hours people can book within it.</p>
+        <ul className={dash.list} aria-label="Weekly hours">
           {schedule.map((s) => (
-            <div key={s.day} className="flex flex-wrap items-center gap-3">
-              <button
-                type="button"
-                onClick={() => patchDay(s.day, { enabled: !s.enabled })}
-                className={`w-[86px] shrink-0 rounded-lg px-3 py-2 text-[12px] font-medium transition-colors ${
-                  s.enabled
-                    ? "bg-accent-dim text-accent"
-                    : "border border-gray-border text-gray-muted hover:text-warm-black"
-                }`}
-              >
-                {s.enabled ? "Open" : "Closed"}
-              </button>
-              <span className="w-[92px] shrink-0 text-[14px] text-warm-black">
+            <li key={s.day} className="flex-wrap items-center">
+              <label className="flex w-[150px] shrink-0 items-center gap-3 text-[15px] text-[var(--st-text)]">
+                <input type="checkbox" checked={s.enabled} onChange={() => patchDay(s.day, { enabled: !s.enabled })} className="h-4 w-4 accent-[var(--st-accent)]" />
                 {DAY_NAMES[s.day]}
-              </span>
-              <input
-                type="time"
-                value={s.start}
-                disabled={!s.enabled}
-                onChange={(e) => patchDay(s.day, { start: e.target.value })}
-                className={inputClass}
-                aria-label={`${DAY_NAMES[s.day]} opening time`}
-              />
-              <span className="text-[13px] text-gray-muted">to</span>
-              <input
-                type="time"
-                value={s.end}
-                disabled={!s.enabled}
-                onChange={(e) => patchDay(s.day, { end: e.target.value })}
-                className={inputClass}
-                aria-label={`${DAY_NAMES[s.day]} closing time`}
-              />
-            </div>
+              </label>
+              {s.enabled ? <span className="flex flex-wrap items-center gap-2">
+                <input type="time" value={s.start} onChange={(e) => patchDay(s.day, { start: e.target.value })} className={inputClass} aria-label={`${DAY_NAMES[s.day]} opening time`} />
+                <span className="text-[14px] text-[var(--st-text-2)]">to</span>
+                <input type="time" value={s.end} onChange={(e) => patchDay(s.day, { end: e.target.value })} className={inputClass} aria-label={`${DAY_NAMES[s.day]} closing time`} />
+              </span> : <span className="text-[15px] text-[var(--st-text-3)]">Closed</span>}
+            </li>
           ))}
-        </div>
-
-        <div className="mt-5 flex flex-wrap gap-5">
-          <label className="flex flex-col gap-1.5">
-            <span className="text-[12px] font-medium text-gray-muted">Appointment length (min)</span>
-            <input
-              type="number"
-              min={1}
-              max={1440}
-              value={slotDuration}
-              onChange={(e) => {
-                setSlotDuration(Number(e.target.value));
-                setHoursSaved(false);
-              }}
-              className={`w-32 ${inputClass}`}
-            />
+        </ul>
+        <div className="flex flex-wrap gap-5">
+          <label className="flex flex-col gap-2">
+            <span className="text-[13px] font-medium text-[var(--st-text-body)]">Appointment length, in minutes</span>
+            <input type="number" min={1} max={1440} value={slotDuration} onChange={(e) => { setSlotDuration(Number(e.target.value)); setHoursSaved(false); }} className={`w-36 ${inputClass}`} />
           </label>
-          <label className="flex flex-col gap-1.5">
-            <span className="text-[12px] font-medium text-gray-muted">Gap between (min)</span>
-            <input
-              type="number"
-              min={0}
-              max={1440}
-              value={bufferTime}
-              onChange={(e) => {
-                setBufferTime(Number(e.target.value));
-                setHoursSaved(false);
-              }}
-              className={`w-32 ${inputClass}`}
-            />
+          <label className="flex flex-col gap-2">
+            <span className="text-[13px] font-medium text-[var(--st-text-body)]">Gap between, in minutes</span>
+            <input type="number" min={0} max={1440} value={bufferTime} onChange={(e) => { setBufferTime(Number(e.target.value)); setHoursSaved(false); }} className={`w-36 ${inputClass}`} />
           </label>
         </div>
-
-        {hoursError && <ErrorBanner className="mt-4">{hoursError}</ErrorBanner>}
-
-        <div className="mt-5 flex items-center gap-3">
-          <button
-            type="button"
-            onClick={saveHours}
-            disabled={savingHours}
-            className="inline-flex min-h-[40px] items-center rounded-lg bg-accent px-4 text-[13px] font-medium text-on-accent transition-colors hover:bg-accent/85 disabled:opacity-60"
-          >
-            {savingHours ? "Saving…" : "Save hours"}
-          </button>
-          {hoursSaved && <span className="text-[13px] text-accent">Saved</span>}
+        {hoursError ? <DashNote tone="down" role="alert">{hoursError}</DashNote> : null}
+        <div className="flex items-center gap-4">
+          <XaButton busy={savingHours} onClick={saveHours}>Save your hours</XaButton>
+          {hoursSaved ? <span className="text-[14px] text-[var(--st-accent)]" role="status">Saved. Your booking page uses them now.</span> : null}
         </div>
-      </section>
+      </DashSection>
 
-      {/* Closed dates / special hours */}
-      <section className="rounded-xl dashboard-panel p-5">
-        <h2 className="text-[15px] font-semibold text-warm-black">Closed dates & special hours</h2>
-        <p className="mt-1 text-[13px] text-gray-muted">
-          Block off a holiday, or open different hours for one day. These override your weekly hours.
-        </p>
-
-        {rows.length > 0 && (
-          <div className="mt-4 space-y-3">
+      <DashSection label="Closed dates and special hours" aside={<XaTextLink onClick={addOverride}>Add a date</XaTextLink>}>
+        <p className="m-0 text-[15px] text-[var(--st-text-2)]">Close for a holiday, or open different hours for one day. These win over your weekly hours.</p>
+        {rows.length > 0 ? (
+          <ul className={dash.list} aria-label="Closed dates and special hours">
             {rows.map((r, idx) => (
-              <div
-                key={idx}
-                className="rounded-lg border border-gray-border bg-surface-raised p-3"
-              >
+              <li key={idx} className="flex-col items-stretch">
                 <div className="flex flex-wrap items-center gap-3">
-                  <input
-                    type="date"
-                    value={r.date}
-                    onChange={(e) => patchOverride(idx, { date: e.target.value })}
-                    className={inputClass}
-                    aria-label="Override date"
-                  />
-                  <div className="flex items-center gap-1 rounded-lg border border-gray-border p-0.5">
-                    <button
-                      type="button"
-                      onClick={() => patchOverride(idx, { available: false })}
-                      className={`rounded-md px-2.5 py-1.5 text-[12px] font-medium transition-colors ${
-                        !r.available ? "bg-accent text-on-accent" : "text-gray-muted hover:text-warm-black"
-                      }`}
-                    >
-                      Closed
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        patchOverride(idx, {
-                          available: true,
-                          start: r.start ?? "09:00",
-                          end: r.end ?? "17:00",
-                        })
-                      }
-                      className={`rounded-md px-2.5 py-1.5 text-[12px] font-medium transition-colors ${
-                        r.available ? "bg-accent text-on-accent" : "text-gray-muted hover:text-warm-black"
-                      }`}
-                    >
-                      Special hours
-                    </button>
-                  </div>
-                  {r.available && (
-                    <>
-                      <input
-                        type="time"
-                        value={r.start ?? "09:00"}
-                        onChange={(e) => patchOverride(idx, { start: e.target.value })}
-                        className={inputClass}
-                        aria-label="Special opening time"
-                      />
-                      <span className="text-[13px] text-gray-muted">to</span>
-                      <input
-                        type="time"
-                        value={r.end ?? "17:00"}
-                        onChange={(e) => patchOverride(idx, { end: e.target.value })}
-                        className={inputClass}
-                        aria-label="Special closing time"
-                      />
-                    </>
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => removeOverride(idx)}
-                    className="ml-auto inline-flex items-center rounded-lg border border-gray-border p-2 text-gray-muted transition-colors hover:border-critical0/40 hover:text-critical"
-                    aria-label="Remove this date"
-                  >
-                    <Trash2 className="h-3.5 w-3.5" strokeWidth={1.5} />
-                  </button>
+                  <input type="date" value={r.date} onChange={(e) => patchOverride(idx, { date: e.target.value })} className={inputClass} aria-label="Date" />
+                  <XaSegmented label="Closed or open" value={r.available ? "open" : "closed"} onChange={(value) => patchOverride(idx, value === "open" ? { available: true, start: r.start ?? "09:00", end: r.end ?? "17:00" } : { available: false })}
+                    options={[{ value: "closed", label: "Closed" }, { value: "open", label: "Special hours" }]} />
+                  {r.available ? <span className="flex flex-wrap items-center gap-2">
+                    <input type="time" value={r.start ?? "09:00"} onChange={(e) => patchOverride(idx, { start: e.target.value })} className={inputClass} aria-label="Special opening time" />
+                    <span className="text-[14px] text-[var(--st-text-2)]">to</span>
+                    <input type="time" value={r.end ?? "17:00"} onChange={(e) => patchOverride(idx, { end: e.target.value })} className={inputClass} aria-label="Special closing time" />
+                  </span> : null}
+                  <span className="ml-auto"><XaTextLink onClick={() => removeOverride(idx)} aria-label="Remove this date">Remove</XaTextLink></span>
                 </div>
-                <input
-                  type="text"
-                  value={r.reason ?? ""}
-                  onChange={(e) => patchOverride(idx, { reason: e.target.value })}
-                  placeholder="Reason (optional): e.g. Thanksgiving"
-                  maxLength={200}
-                  className={`mt-2 w-full ${inputClass}`}
-                />
-              </div>
+                <input type="text" value={r.reason ?? ""} onChange={(e) => patchOverride(idx, { reason: e.target.value })} placeholder="Why, if you like: Thanksgiving" maxLength={200} aria-label="Why" className={`w-full ${inputClass}`} />
+              </li>
             ))}
-          </div>
-        )}
-
-        <button
-          type="button"
-          onClick={addOverride}
-          className="mt-4 inline-flex items-center gap-1.5 rounded-lg border border-gray-border px-3 py-2 text-[13px] font-medium text-warm-black transition-colors hover:border-accent/35"
-        >
-          <Plus className="h-3.5 w-3.5" strokeWidth={1.5} />
-          Add a date
-        </button>
-
-        {overridesError && <ErrorBanner className="mt-4">{overridesError}</ErrorBanner>}
-
-        <div className="mt-5 flex items-center gap-3">
-          <button
-            type="button"
-            onClick={saveOverrides}
-            disabled={savingOverrides}
-            className="inline-flex min-h-[40px] items-center rounded-lg bg-accent px-4 text-[13px] font-medium text-on-accent transition-colors hover:bg-accent/85 disabled:opacity-60"
-          >
-            {savingOverrides ? "Saving…" : "Save dates"}
-          </button>
-          {overridesSaved && <span className="text-[13px] text-accent">Saved</span>}
+          </ul>
+        ) : <p className="m-0 text-[15px] text-[var(--st-text-3)]">No closed dates coming up.</p>}
+        {overridesError ? <DashNote tone="down" role="alert">{overridesError}</DashNote> : null}
+        <div className="flex items-center gap-4">
+          <XaButton busy={savingOverrides} onClick={saveOverrides}>Save dates</XaButton>
+          {overridesSaved ? <span className="text-[14px] text-[var(--st-accent)]" role="status">Saved.</span> : null}
         </div>
-      </section>
-    </div>
-  );
-}
-
-function ErrorBanner({
-  children,
-  className = "",
-}: {
-  children: React.ReactNode;
-  className?: string;
-}) {
-  return (
-    <div
-      className={`rounded-lg border border-critical0/30 bg-critical0/10 px-3 py-2 text-[13px] text-critical ${className}`}
-    >
-      {children}
-    </div>
+      </DashSection>
+    </>
   );
 }

@@ -1,0 +1,80 @@
+/*
+ * The legacy website dashboard (admin.<tenant>/dashboard) in the XA language.
+ * Composition only: every part comes from the LX kit (Xa*). Paper page, one
+ * column, a two-tone headline, open rows with hairlines, sentences for status.
+ * Borrowed structure: XA-4 S1 (Website), XA-8 R1/R3 (record, people),
+ * XA-3 O1/O5 (Today, Requests).
+ */
+.page { box-sizing: border-box; display: flex; width: 100%; min-height: 100%; flex-direction: column; gap: 36px; padding: 56px 64px 120px 88px; animation: st-xa-dash-in var(--motion-base) var(--ease-settle) both; }
+.column { display: flex; width: 100%; max-width: 880px; flex-direction: column; gap: 36px; }
+.page[data-width="wide"] .column { max-width: 1120px; }
+.page[data-width="narrow"] .column { max-width: 640px; }
+.scroll { height: 100%; min-width: 0; min-height: 0; flex: 1; overflow-y: auto; }
+
+.head { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 16px 24px; }
+.headText { display: flex; min-width: 0; max-width: 720px; flex: 1 1 420px; flex-direction: column; gap: 12px; }
+.actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.lead { display: flex; align-items: center; gap: 16px; }
+
+.section { display: flex; flex-direction: column; gap: 10px; }
+.sectionHead { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px 16px; }
+.sectionHead h2 { margin: 0; color: var(--st-text-3); font-size: 13px; font-weight: 500; line-height: 18px; }
+.sectionAside { color: var(--st-text-3); font-size: 13px; line-height: 18px; }
+
+/* A sentence with a dot: what changed, and the one thing to do about it. Never a banner. */
+.note { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; margin: 0; color: var(--st-text-body); font-size: 14px; line-height: 20px; }
+.note[data-tone="waits"] .noteDot { background: var(--st-need-dot); }
+.note[data-tone="down"] .noteDot { background: var(--st-critical); }
+.note[data-tone="live"] .noteDot { background: var(--st-live); }
+.note[data-tone="quiet"] { color: var(--st-text-2); }
+.note[data-tone="quiet"] .noteDot { background: var(--st-draft-dot); }
+.noteDot { display: inline-block; width: 7px; height: 7px; flex: 0 0 7px; align-self: center; border-radius: 999px; background: var(--st-text-3); }
+.noteText { min-width: 0; flex: 1 1 280px; }
+.noteLinks { display: inline-flex; flex-wrap: wrap; gap: 4px 6px; margin-left: 6px; color: var(--st-text-3); }
+.shellNotes { display: flex; flex-direction: column; gap: 6px; padding: 10px 24px; border-bottom: 1px solid var(--st-line); }
+
+.prose { margin: 0; max-width: 640px; color: var(--st-text-body); font-size: 15px; line-height: 1.55; }
+.meta { color: var(--st-text-3); font-size: 13px; line-height: 18px; font-variant-numeric: tabular-nums; }
+.figure { font-variant-numeric: tabular-nums; }
+
+.skeleton { display: flex; flex-direction: column; gap: 14px; }
+.center { box-sizing: border-box; display: grid; min-height: 100%; flex: 1; place-items: center; padding: 48px 24px; }
+
+@keyframes st-xa-dash-in { from { opacity: 0; translate: 0 4px; } to { opacity: 1; translate: 0 0; } }
+
+@media (max-width: 1180px) { .page { padding: 48px 40px 112px 48px; } }
+@media (max-width: 767px) {
+  .page { gap: 28px; padding: 20px 16px 120px; }
+  .column { gap: 28px; }
+  .head { align-items: flex-start; }
+  .actions { width: 100%; }
+  .shellNotes { padding: 10px 16px; }
+}
+@media (prefers-reduced-motion: reduce) { .page { animation: st-xa-dash-fade 120ms linear both; } }
+@keyframes st-xa-dash-fade { from { opacity: 0; } to { opacity: 1; } }
+
+/* Today (XA · O1): the composer column beside Pebble and what happened. */
+.split { box-sizing: border-box; display: grid; width: 100%; min-height: 100%; grid-template-columns: minmax(0, 580px) minmax(280px, 360px); justify-content: space-between; align-items: start; gap: 72px; padding: 72px 72px 120px 96px; animation: st-xa-dash-in var(--motion-base) var(--ease-settle) both; }
+.splitLead { display: flex; min-width: 0; flex-direction: column; gap: 32px; }
+.greeting { display: flex; flex-direction: column; gap: 10px; }
+.splitSide { position: sticky; top: 32px; display: flex; min-width: 0; flex-direction: column; align-items: stretch; gap: 32px; }
+.splitSide > :first-child { align-self: center; }
+@media (max-width: 1180px) { .split { gap: 40px; padding: 48px 32px 112px 48px; grid-template-columns: minmax(0, 1fr) minmax(260px, 320px); } }
+@media (max-width: 1023px) {
+  .split { grid-template-columns: minmax(0, 1fr); gap: 32px; padding: 20px 16px 120px; }
+  .splitLead > svg:first-child { display: none; }
+  .splitSide { position: static; }
+  .splitSide > :first-child { display: none; }
+}
+.shellNotes:empty { display: none; }
+
+/* An open list of people or records: hairline between, the row is the object. */
+.list { position: relative; z-index: 0; margin: 0; padding: 0; list-style: none; }
+.list > li { position: relative; display: flex; align-items: flex-start; gap: 14px; padding: 16px 0; }
+.list > li + li::before { position: absolute; top: 0; left: 0; right: 0; height: 1px; background: var(--st-line); content: ""; }
+.listText { display: flex; min-width: 0; flex: 1; flex-direction: column; gap: 3px; }
+.listTitle { color: var(--st-text); font-size: 15px; font-weight: 500; line-height: 21px; overflow-wrap: anywhere; }
+.listBody { margin: 2px 0 0; color: var(--st-text-body); font-size: 15px; line-height: 1.5; overflow-wrap: anywhere; }
+.listDetail { color: var(--st-text-2); font-size: 13px; line-height: 19px; overflow-wrap: anywhere; }
+.listEnd { display: flex; flex-shrink: 0; flex-direction: column; align-items: flex-end; gap: 6px; color: var(--st-text-3); font-size: 13px; font-variant-numeric: tabular-nums; }
+@media (max-width: 767px) { .list > li { flex-wrap: wrap; } .listEnd { width: 100%; flex-direction: row; justify-content: space-between; padding-left: 44px; } }

@@ -70,25 +70,26 @@ function renderPanel(props: Parameters<typeof SearchAnalyticsPanel>[0]): string 
 describe("dashboard — Search & Analytics panel", () => {
   it("shows friendly stats + queries + pages when ok", () => {
     const html = renderPanel({ search: search(), ga: ga(), connectHref: "/dashboard/integrations" });
+    // XA: the numbers are one sentence, pages are named for the owner, never raw paths.
     expect(html).toContain("How people find you on Google");
-    expect(html).toContain("Found you");
-    expect(html).toContain("Visitors");
-    expect(html).toContain("#4.2");
+    expect(html).toContain("clicked through");
+    expect(html).toContain("visited your site");
+    expect(html).toContain("spot 4.2");
     expect(html).toContain("yoga near me");
-    expect(html).toContain("Most-visited pages");
+    expect(html).toContain("Pages they opened most");
   });
 
   it("shows a gentle connect nudge when unconfigured (the common case)", () => {
     const html = renderPanel({ search: UNCONFIGURED_SEARCH, ga: UNCONFIGURED_GA, connectHref: "/x/dashboard/integrations" });
-    expect(html).toContain("Connect Google to see your search performance");
+    expect(html).toContain("Link Google and I show the searches people use to find you");
     expect(html).toContain("/x/dashboard/integrations");
-    expect(html).not.toContain("Most-visited pages");
+    expect(html).not.toContain("Pages they opened most");
   });
 
   it("says the read failed when configured but data is unavailable", () => {
     const html = renderPanel({ search: UNAVAILABLE_SEARCH, ga: UNAVAILABLE_GA, connectHref: "/dashboard/integrations" });
-    expect(html).toContain("couldn&#x27;t be read this time");
+    expect(html).toContain("Google didn&#x27;t answer this time");
     expect(html).not.toMatch(/coming soon/i);
-    expect(html).not.toContain("Connect Google to see your search performance");
+    expect(html).not.toContain("Link Google and I show the searches");
   });
 });

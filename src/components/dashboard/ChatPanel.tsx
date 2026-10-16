@@ -2,68 +2,29 @@
 
 import { useRef, useEffect, useLayoutEffect, useState, useCallback } from "react";
 import Link from "next/link";
-import {
-  Clock,
-  CalendarPlus,
-  Mail,
-  BarChart3,
-  ExternalLink,
-  Inbox,
-  CheckCircle2,
-  AlertCircle,
-  MessageCircle,
-  Mic,
-  MicOff,
-  X,
-} from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import { timeAgo } from "@/lib/utils";
-import { PromptInputBox } from "@/components/ui/ai-prompt-box";
-import type { UploadedFile } from "@/components/ui/ai-prompt-box";
 import { ShiningText } from "@/components/ui/shining-text";
+import { XaComposer, XaPebbleAvatar, XaRow, XaRows, XaSays, XaTextLink, XaWorking } from "@/components/ui/strelva/Xa";
+import { DashNote } from "./xa/DashboardXa";
 import { useDashboardOptional } from "./DashboardContext";
 import { ToolOutput } from "./ToolOutput";
 import { SectionErrorBoundary } from "@/components/public/SectionErrorBoundary";
-import { QueuePage } from "./QueuePage";
+import { queueLead } from "./QueueCard";
 import type { AgentResultContract, AgentResultReceipt, AgentResultStatus } from "@/lib/agent-results";
 import type { UnifiedEvent } from "@/lib/types";
 import type { EditableNode } from "@/lib/editor-types";
 import { formatEditablePathValue, getEditablePathValue } from "@/lib/editable-path";
 import { ConversationStreamDecoder, type ConversationStreamEvent } from "@/experience/conversation/stream";
 
-const SUGGESTION_CHIPS = [
-  { label: "Add this week's update", icon: Clock, description: "Tell me what changed and I'll update the site for you" },
-  { label: "Write this week's customer update", icon: CalendarPlus, description: "I'll turn the change into something ready to share with customers" },
-  { label: "Email customers about it", icon: Mail, description: "I'll draft a short note your customers can receive", hideOnMobile: true },
-  { label: "What should I work on next?", icon: BarChart3, description: "I'll look at what's working and suggest the next thing to do" },
+/** Things to ask on an empty conversation, each the owner's own words. */
+const SUGGESTIONS = [
+  "Add this week's update to my site",
+  "What should I change next?",
+  "Check my site for anything out of date",
 ];
 
-const INPUT_QUICK_ACTIONS = [
-  {
-    label: "What's working?",
-    icon: BarChart3,
-    description: "Summarize visits, clicks, updates, and what you are watching.",
-    message: "Give me a plain-English overview of what's working on my site right now. Include recent site changes, traffic or click signals if available, approvals waiting, and what you're watching for the next weekly report.",
-  },
-  {
-    label: "Suggest an update",
-    icon: Clock,
-    description: "Pick the most useful small change for the site today.",
-    message: "Suggest the most useful small website update I should make today. Explain why it matters and ask for any missing details before changing anything.",
-  },
-  {
-    label: "Show recent changes",
-    icon: CalendarPlus,
-    description: "Review what Strelva or your team changed lately.",
-    message: "Show me the recent changes made to my site and call out anything that belongs in Needs You or needs a closer look.",
-  },
-  {
-    label: "Check site health",
-    icon: AlertCircle,
-    description: "Look for stale content, weak CTAs, missing info, and issues.",
-    message: "Check my site health. Look for stale content, missing business details, weak calls to action, broken or risky areas, and the next practical fix.",
-  },
-];
+interface UploadedFile { name: string; url: string }
 
 // Minimal Web Speech API shape — webkitSpeechRecognition isn't in every TS DOM
 // lib, so we type only what we touch and feature-detect at runtime.
@@ -190,7 +151,8 @@ export function ChatPanel({ threadId, ownerName, onThreadCreated, variant = "ful
   const [toolStatus, setToolStatus] = useState<string | null>(null);
   // Rich inline tool cards (report/content/photos/connections) streamed via __CARD__.
   const [toolCards, setToolCards] = useState<{ id: string; tool: string; data: unknown }[]>([]);
-  const [needsDrawerOpen, setNeedsDrawerOpen] = useState(Boolean(needsYou?.openInitially));
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [micSupported, setMicSupported] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
@@ -385,9 +347,28 @@ export function ChatPanel({ threadId, ownerName, onThreadCreated, variant = "ful
     }
   }, [isListening]);
 
-  useEffect(() => {
-    if (needsYou?.openInitially) setNeedsDrawerOpen(true);
-  }, [needsYou?.openInitially]);
+  const uploadFiles = useCallback(async (files: FileList | null) => {
+    if (!files?.length || uploading) return;
+    setUploading(true);
+    try {
+      const uploaded: UploadedFile[] = [];
+      for (const file of Array.from(files)) {
+        const formData = new FormData();
+        formData.append("file", file);
+        const response = await fetch(dashboardHref("/api/upload"), { method: "POST", credentials: "same-origin", body: formData });
+        if (!response.ok) continue;
+        const body = await response.json().catch(() => null);
+        if (typeof body?.url === "string") uploaded.push({ name: file.name, url: body.url });
+      }
+      if (uploaded.length) {
+        setAttachments((current) => [...current, ...uploaded]);
+        requestAnimationFrame(() => inputRef.current?.focus());
+      }
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  }, [dashboardHref, uploading]);
 
   const sendChat = useCallback(
     async (text: string) => {
@@ -412,14 +393,14 @@ export function ChatPanel({ threadId, ownerName, onThreadCreated, variant = "ful
       setInput("");
       setAttachments([]);
       setIsLoading(true);
-      setToolStatus("Contacting AI...");
+      setToolStatus("Reading your question");
       setToolCards([]);
 
       const slowStatusTimer = window.setTimeout(() => {
-        if (!abortController.signal.aborted) setToolStatus("Checking the site context...");
+        if (!abortController.signal.aborted) setToolStatus("Reading your site");
       }, 2500);
       const longStatusTimer = window.setTimeout(() => {
-        if (!abortController.signal.aborted) setToolStatus("Still working. You can stop this if you want to revise the ask.");
+        if (!abortController.signal.aborted) setToolStatus("Still working. Stop it any time to change the ask.");
       }, 12000);
 
       // If no threadId, create a new thread first
@@ -671,331 +652,142 @@ export function ChatPanel({ threadId, ownerName, onThreadCreated, variant = "ful
     };
   }, [isEmpty]);
 
+  // The change this conversation drafted, if one waits: the newest pending
+  // item made since the conversation started. It is shown inline as the thing
+  // itself, with "See it" opening it in Needs you.
+  const conversationStart = messages[0]?.timestamp ?? Number.POSITIVE_INFINITY;
+  const drafted = needsYou?.pending
+    .filter((event) => event.status === "pending" && event.type !== "change_request" && new Date(event.createdAt).getTime() >= conversationStart - 5 * 60_000)
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0];
+  const needsYouHref = dashboardHref("/dashboard/review");
+  const compact = variant === "compact";
+
   return (
-    <div className={`relative flex h-full flex-col ${variant === "compact" ? "bg-surface" : ""}`}>
-      {/* Scrollable content area */}
-      <div
-        ref={scrollRef}
-        className="flex-1 overflow-y-auto"
-        onScroll={updateShouldStickToBottom}
-      >
+    <div className={`relative flex h-full w-full flex-col ${compact ? "bg-surface" : ""}`}>
+      <div ref={scrollRef} className="flex-1 overflow-y-auto" onScroll={updateShouldStickToBottom}>
         {isEmpty ? (
-          /* Empty state: greeting + chips */
-          <div className={`flex min-h-full flex-col items-center justify-start px-4 pb-8 ${variant === "compact" ? "pt-8" : "pt-16 sm:justify-center sm:px-8 sm:py-12"}`}>
-            <h1
-              className={`${variant === "compact" ? "text-[22px]" : "text-[30px] sm:text-[40px]"} font-display font-medium text-warm-black tracking-[-0.01em] text-center`}
-              suppressHydrationWarning
-            >
-              {getGreeting()}, {ownerName}
+          /* Empty (XA · AS1): Pebble greets, says what waits, offers three asks. */
+          <div className={`flex min-h-full flex-col justify-start gap-6 ${compact ? "px-4 pb-8 pt-6" : "mx-auto w-full max-w-[680px] px-4 pb-10 pt-12 sm:justify-center sm:px-6"}`}>
+            <XaPebbleAvatar size={compact ? 36 : 48} />
+            <h1 className={`m-0 ${compact ? "text-[22px]" : "text-[30px] sm:text-[40px]"} font-medium tracking-[-0.8px] text-[var(--st-text)]`} suppressHydrationWarning>
+              {getGreeting()}, {ownerName}.
+              <span className="block text-[var(--st-text-3)]">Say the change in your own words.</span>
             </h1>
-            <p className={`${variant === "compact" ? "text-[12px]" : "text-[14px] sm:text-[15px]"} text-gray-muted mt-3 text-center max-w-xl`}>
-              I&apos;m Strelva &mdash; I manage your site. Tell me the business change and I can update the site, draft the customer note, or show what needs your okay before it goes live.
-            </p>
-
-            {variant !== "compact" && (
-              <div className={`mt-6 w-full max-w-3xl flex-col gap-2 rounded-2xl border border-glass-border bg-glass p-3 sm:flex sm:flex-row sm:items-center sm:justify-between ${
-                pendingNeedsCount > 0 ? "flex" : "hidden"
-              }`}>
-                <div className="min-w-0">
-                  <p className="text-[12px] font-medium text-warm-black">
-                    {pendingNeedsCount > 0
-                      ? `${pendingNeedsCount} item${pendingNeedsCount === 1 ? "" : "s"} need your okay`
-                      : "No drafts need your okay right now"}
-                  </p>
-                  <p className="mt-1 text-[12px] leading-relaxed text-gray-muted">
-                    Review larger AI changes in a side panel while keeping the conversation open.
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setNeedsDrawerOpen(true)}
-                  className="inline-flex min-h-[38px] shrink-0 items-center justify-center gap-2 rounded-lg border border-gray-border bg-surface-raised px-3 text-[12px] font-medium text-warm-black transition-colors hover:border-accent/35"
-                >
-                  <Inbox className="h-4 w-4" strokeWidth={1.5} />
-                  Needs You
-                </button>
-              </div>
-            )}
-
-            {/* Suggestion chips - min-h-[48px] ensures 44px+ tap target */}
-            <div className={`grid grid-cols-1 gap-3 w-full max-w-3xl ${variant === "compact" ? "mt-6" : "sm:grid-cols-2 mt-8 sm:mt-10"}`}>
-              {SUGGESTION_CHIPS.slice(0, variant === "compact" ? 2 : SUGGESTION_CHIPS.length).map((chip) => (
-                <button
-                  key={chip.label}
-                  onClick={() => sendChat(chip.label)}
-                  className={`${variant === "compact" ? "min-h-[56px] px-3 py-2.5" : "min-h-[72px] px-4 py-3.5"} ${
-                    chip.hideOnMobile ? "hidden sm:block" : ""
-                  } rounded-2xl border border-glass-border bg-glass hover:bg-gray-bg-hover hover:border-gray-border active:bg-gray-bg transition-all text-left`}
-                >
-                  <div className="flex items-center gap-2 mb-1">
-                    <chip.icon className="w-4 h-4 text-gray-muted" strokeWidth={1.5} />
-                    <span className="text-[13px] font-medium text-warm-black">{chip.label}</span>
-                  </div>
-                  <span className="text-[12px] text-gray-muted leading-relaxed">
-                    {chip.description}
-                  </span>
-                </button>
+            {!compact && pendingNeedsCount > 0 ? (
+              <XaSays links={[<XaTextLink key="open" href={needsYouHref}>Open Needs you</XaTextLink>]}>
+                {pendingNeedsCount === 1 ? "One change waits" : `${pendingNeedsCount} changes wait`} for your yes from earlier.
+              </XaSays>
+            ) : null}
+            <XaRows label="Things to ask">
+              {SUGGESTIONS.slice(0, compact ? 2 : SUGGESTIONS.length).map((ask) => (
+                <XaRow key={ask} title={ask} onClick={() => { setInput(ask); requestAnimationFrame(() => inputRef.current?.focus()); }} />
               ))}
-            </div>
+            </XaRows>
           </div>
         ) : messages.length === 0 && isLoading ? (
-          <div className="flex min-h-full flex-col items-center justify-start px-4 pb-8 pt-20 sm:justify-center sm:px-8 sm:py-12">
-            <div className="ai-thinking-pop rounded-2xl border border-glass-border bg-glass px-4 py-3 shadow-[0_10px_30px_rgba(0,0,0,0.08)]">
-              <ShiningText text={toolStatus || "Strelva is thinking..."} className="text-[12px] font-medium" />
-            </div>
+          <div className="mx-auto flex min-h-full w-full max-w-[680px] flex-col justify-center px-4 py-12 sm:px-6">
+            <XaWorking title={toolStatus || "Reading your question"} steps={[{ id: "read", label: toolStatus || "Reading your site and your question", state: "active" }]} />
           </div>
         ) : (
-          /* Active conversation */
-          <div className={`${variant === "compact" ? "px-3 py-4" : "max-w-3xl mx-auto w-full px-4 sm:px-6 py-5 sm:py-7"} space-y-4`}>
-            {/* Update toast */}
-            {updateToast && (
-              <div
-                className={`flex items-start gap-3 px-3 py-3 rounded-lg animate-fade-in-up ${
-                  updateToast.status === "published" || updateToast.status === "applied" || updateToast.status === "drafted" || updateToast.status === "queued"
-                    ? "bg-success-dim border border-success/20"
-                    : "bg-critical0/10 border border-critical0/20"
-                }`}
-              >
-                {updateToast.status === "published" || updateToast.status === "applied" || updateToast.status === "drafted" || updateToast.status === "queued" ? (
-                  <CheckCircle2 className="w-4 h-4 text-success shrink-0 mt-0.5" strokeWidth={2} />
-                ) : (
-                  <AlertCircle className="w-4 h-4 text-critical shrink-0 mt-0.5" strokeWidth={2} />
-                )}
-                <div className="min-w-0 flex-1">
-                  <p
-                    className={`text-[12px] font-medium ${
-                      updateToast.status === "published" || updateToast.status === "applied" || updateToast.status === "drafted" || updateToast.status === "queued"
-                        ? "text-success"
-                        : "text-critical"
-                    }`}
-                  >
-                    {updateToast.text}
-                  </p>
-                  <p className="mt-0.5 text-[12px] leading-relaxed text-gray-fg">
-                    {updateToast.detail}
-                  </p>
-                  <p className="mt-1 text-[11px] leading-relaxed text-gray-muted">
-                    {updateToast.proof}
-                  </p>
-                  {updateToast.nextAction === "view_site" && (
-                    <a
-                      href={dashCtx?.siteUrl || "/dashboard/site"}
-                      target={dashCtx?.siteUrl ? "_blank" : undefined}
-                      rel={dashCtx?.siteUrl ? "noopener noreferrer" : undefined}
-                      className="mt-2 inline-flex items-center gap-1.5 text-[12px] font-medium text-success hover:underline"
-                    >
-                      <ExternalLink className="h-3.5 w-3.5" strokeWidth={1.5} />
-                      View site
-                    </a>
-                  )}
-                  {updateToast.nextAction === "review_queue" && (
-                    <Link
-                      href={dashCtx?.dashboardHref("/dashboard/review") || "/dashboard/review"}
-                      className="mt-2 inline-flex items-center gap-1.5 text-[12px] font-medium text-success hover:underline"
-                    >
-                      <Inbox className="h-3.5 w-3.5" strokeWidth={1.5} />
-                      Open Needs You
-                    </Link>
-                  )}
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setUpdateToast(null)}
-                  className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-gray-muted transition-colors hover:bg-white/10 hover:text-warm-black"
-                  aria-label="Dismiss update message"
-                >
-                  <X className="h-3.5 w-3.5" strokeWidth={1.5} />
-                </button>
-              </div>
-            )}
-
+          /* A conversation (XA · AS2): your words, Strelva's answer, and the thing it made. */
+          <div className={`${compact ? "px-3 py-4" : "mx-auto w-full max-w-[680px] px-4 py-6 sm:px-6 sm:py-10"} flex flex-col gap-6`}>
             {messages.map((message) => (
-              <div
-                key={message.id}
-                className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}
-              >
-                <div className={`${variant === "compact" ? "max-w-[94%]" : "max-w-[88%] sm:max-w-[80%]"} ${message.role === "user" ? "order-2" : ""}`}>
-                  {message.role === "assistant" && (
-                    <div className="flex items-center gap-2 mb-1.5">
-                      <div className="w-5 h-5 rounded-full bg-accent-dim flex items-center justify-center">
-                        <MessageCircle className="w-3 h-3 text-accent" strokeWidth={1.5} />
-                      </div>
-                      <span className="text-[11px] text-gray-muted">Strelva</span>
-                    </div>
-                  )}
-                  <div
-                    className={`${variant === "compact" ? "px-3 py-2.5 text-[12px]" : "px-4 py-3 text-[13px]"} rounded-2xl leading-relaxed shadow-[0_10px_30px_rgba(0,0,0,0.08)] ${
-                      message.role === "user"
-                        ? "bg-accent/15 text-warm-black border border-accent/20"
-                        : `bg-glass text-warm-black border border-glass-border ${message.content ? "ai-output-pop" : ""}`
-                    }`}
-                  >
-                    {message.content ? (
-                      message.role === "assistant" ? (
-                        <div className="chat-markdown whitespace-pre-wrap">
-                          <ReactMarkdown>{message.content.replace(/\\n/g, "\n")}</ReactMarkdown>
-                        </div>
-                      ) : (
-                        <p className="whitespace-pre-wrap">{message.content}</p>
-                      )
-                    ) : (
-                      <span className="flex items-center py-1">
-                        <ShiningText text={toolStatus || "Strelva is thinking..."} className="text-[12px] font-medium" />
-                      </span>
-                    )}
-                  </div>
-                  <span className="text-[11px] text-gray-subtle mt-1 block px-1">
-                    {timeAgo(message.timestamp)}
-                  </span>
+              message.role === "user" ? (
+                <div key={message.id} className="flex flex-col items-end gap-1">
+                  <p className={`m-0 max-w-[86%] whitespace-pre-wrap rounded-[var(--st-r-lg)] bg-[var(--st-inset)] px-4 py-2.5 ${compact ? "text-[14px]" : "text-[15px]"} leading-[1.5] text-[var(--st-text)]`}>{message.content}</p>
+                  <span className="px-1 text-[12px] text-[var(--st-text-3)]">You · {timeAgo(message.timestamp)}</span>
                 </div>
-              </div>
+              ) : (
+                <div key={message.id} className="flex items-start gap-3">
+                  <XaPebbleAvatar size={28} label="Strelva" />
+                  <div className="min-w-0 flex-1">
+                    {message.content ? (
+                      <div className={`chat-markdown whitespace-pre-wrap ${compact ? "text-[14px]" : "text-[15px]"} leading-[1.55] text-[var(--st-text)] ai-output-pop`}>
+                        <ReactMarkdown>{message.content.replace(/\\n/g, "\n")}</ReactMarkdown>
+                      </div>
+                    ) : (
+                      <ShiningText text={toolStatus || "Strelva is thinking"} className="text-[14px] font-medium" />
+                    )}
+                    <span className="mt-1 block text-[12px] text-[var(--st-text-3)]">Strelva · {timeAgo(message.timestamp)}</span>
+                  </div>
+                </div>
+              )
             ))}
 
             {showThinkingBubble && (
-              <div className="flex justify-start">
-                <div className="max-w-[80%]">
-                  <div className="flex items-center gap-2 mb-1.5">
-                    <div className="w-5 h-5 rounded-full bg-accent-dim flex items-center justify-center">
-                      <MessageCircle className="w-3 h-3 text-accent" strokeWidth={1.5} />
-                    </div>
-                    <span className="text-[11px] text-gray-muted">Strelva</span>
-                  </div>
-                  <div className="ai-thinking-pop px-4 py-3 rounded-2xl bg-glass border border-glass-border shadow-[0_10px_30px_rgba(0,0,0,0.08)]">
-                    <ShiningText text={toolStatus || "Strelva is thinking..."} className="text-[12px] font-medium" />
-                  </div>
-                </div>
+              <div className="flex items-start gap-3">
+                <XaPebbleAvatar size={28} label="Strelva" />
+                <ShiningText text={toolStatus || "Strelva is thinking"} className="pt-1 text-[14px] font-medium" />
               </div>
             )}
 
-            {/* Rich inline tool cards (report / content / photos / connections) */}
             {toolCards.length > 0 && (
-              <div className="flex justify-start">
-                <div className="max-w-[80%] space-y-2">
-                  {toolCards.map((card) => (
-                    // Contain a malformed card payload to its own bubble — a crash
-                    // here used to take down the whole conversation.
-                    <SectionErrorBoundary key={card.id}>
-                      <ToolOutput toolName={card.tool} result={card.data} status="complete" />
-                    </SectionErrorBoundary>
-                  ))}
-                </div>
+              <div className="flex flex-col gap-4 pl-10">
+                {toolCards.map((card) => (
+                  // Contain a malformed card payload to its own answer.
+                  <SectionErrorBoundary key={card.id}>
+                    <ToolOutput toolName={card.tool} result={card.data} status="complete" />
+                  </SectionErrorBoundary>
+                ))}
+              </div>
+            )}
+
+            {drafted && !isLoading ? (
+              <div className={compact ? "" : "pl-10"}>
+                <XaRows label="What this made">
+                  <XaRow lead={queueLead(drafted, 32)} title={drafted.title} detail="Waits for your yes in Needs you" tone="waits"
+                    action={<XaTextLink href={needsYouHref} aria-label={`See it: ${drafted.title}`}>See it</XaTextLink>} />
+                </XaRows>
+              </div>
+            ) : null}
+
+            {updateToast && (
+              <div role="status">
+                <XaSays links={[
+                  ...(updateToast.nextAction === "view_site" ? [<a key="site" href={dashCtx?.siteUrl || dashboardHref("/dashboard/site")} target={dashCtx?.siteUrl ? "_blank" : undefined} rel={dashCtx?.siteUrl ? "noopener noreferrer" : undefined} className="font-medium text-[var(--st-accent)] hover:underline">View site</a>] : []),
+                  ...(updateToast.nextAction === "review_queue" ? [<Link key="needs" href={needsYouHref} className="font-medium text-[var(--st-accent)] hover:underline">Open Needs you</Link>] : []),
+                  <XaTextLink key="close" onClick={() => setUpdateToast(null)} aria-label="Dismiss this note">Dismiss</XaTextLink>,
+                ]}>
+                  {updateToast.text}. {updateToast.detail} {updateToast.proof}
+                </XaSays>
               </div>
             )}
           </div>
         )}
       </div>
 
-      {/* Chat input - always at bottom, with safe area for notched devices */}
-      <div className={`${variant === "compact" ? "px-3 pb-3 pt-2" : "px-4 sm:px-6 pb-4 sm:pb-6 pt-3"} shrink-0 border-t border-glass-border bg-surface-base/78 backdrop-blur-xl keyboard-safe`}>
-        <div className="max-w-3xl mx-auto">
+      {/* The composer: one field, add a photo, say it, send. */}
+      <div className={`${compact ? "px-3 pb-3 pt-2" : "px-4 pb-4 pt-3 sm:px-6 sm:pb-6"} keyboard-safe shrink-0`}>
+        <div className="mx-auto flex max-w-[680px] flex-col gap-2">
           {readOnly ? (
-            <div className="rounded-2xl border border-glass-border bg-glass px-4 py-3 text-center">
-              <p className="text-[12px] leading-relaxed text-gray-muted">
-                This is a read-only demo.{" "}
-                <Link
-                  href="/access-request"
-                  className="font-medium text-accent hover:underline"
-                >
-                  Get your own site to chat with your AI
-                </Link>
-              </p>
-            </div>
+            <DashNote tone="quiet" links={[<Link key="own" href="/access-request" className="font-medium text-[var(--st-accent)] hover:underline">Get your own site</Link>]}>This is a demo you can look around. Asking is off here.</DashNote>
           ) : (
-          <>
-          {attachments.length > 0 && (
-            <div className="mb-2 flex flex-wrap gap-1.5">
-              {attachments.map((file) => (
-                <span key={file.url} className="rounded-full border border-warning/20 bg-warning/10 px-2 py-1 text-[11px] text-warning">
-                  {file.name}
-                </span>
-              ))}
-            </div>
-          )}
-          <div className="flex items-end gap-2">
-            {micSupported && (
-              <button
-                type="button"
-                onClick={toggleListening}
-                aria-pressed={isListening}
-                aria-label={isListening ? "Stop voice input" : "Start voice input"}
-                title={isListening ? "Stop voice input" : "Speak your message"}
-                className={`mb-0.5 inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border transition-colors ${
-                  isListening
-                    ? "animate-pulse border-accent/40 bg-accent/15 text-accent"
-                    : "border-gray-border bg-surface-raised text-gray-muted hover:border-accent/35 hover:text-warm-black"
-                }`}
-              >
-                {isListening ? (
-                  <MicOff className="h-4 w-4" strokeWidth={1.5} />
-                ) : (
-                  <Mic className="h-4 w-4" strokeWidth={1.5} />
-                )}
-              </button>
-            )}
-            <div className="min-w-0 flex-1">
-              <PromptInputBox
-                ref={inputRef}
+            <>
+              {attachments.length > 0 ? (
+                <p className="m-0 flex flex-wrap items-center gap-1.5 text-[13px] text-[var(--st-text-2)]">
+                  {attachments.map((file) => <span key={file.url} className="rounded-full bg-[var(--st-chip)] px-2.5 py-1 text-[var(--st-text-body)]">{file.name}</span>)}
+                </p>
+              ) : null}
+              <p className="m-0 flex flex-wrap gap-x-3 text-[13px] text-[var(--st-text-2)]">
+                {isLoading ? <span>{toolStatus || "Strelva is working"} · <XaTextLink onClick={handleStop}>Stop</XaTextLink></span>
+                  : <XaTextLink onClick={() => fileInputRef.current?.click()}>{uploading ? "Adding your photo" : "Add a photo"}</XaTextLink>}
+              </p>
+              {isListening ? <p className="m-0 text-[13px] text-[var(--st-text-2)]" role="status">Listening. Press the microphone again to stop.</p> : null}
+              <input ref={fileInputRef} type="file" accept="image/*,application/pdf" multiple className="hidden" onChange={(event) => void uploadFiles(event.target.files)} aria-hidden="true" tabIndex={-1} />
+              <XaComposer
                 value={input}
-                onValueChange={setInput}
-                onSend={sendChat}
-                onFilesUploaded={(files) => setAttachments((current) => [...current, ...files])}
-                onStop={handleStop}
-                isLoading={isLoading}
-                placeholder={
-                  variant === "compact" && selectedObjectLabel
-                    ? `Ask Strelva about ${selectedObjectLabel}`
-                    : "Tell me what you need..."
-                }
-                quickActions={INPUT_QUICK_ACTIONS}
-                className={variant === "compact" ? "rounded-2xl" : undefined}
+                onChange={setInput}
+                onSubmit={() => void sendChat(input)}
+                inputRef={inputRef}
+                busy={isLoading}
+                placeholder={compact && selectedObjectLabel ? `Ask Strelva about ${selectedObjectLabel}` : "Ask Strelva for a change to your site"}
+                scope={compact ? undefined : { label: "Your website" }}
+                onVoice={micSupported ? toggleListening : undefined}
               />
-            </div>
-          </div>
-          <p className={`${variant === "compact" ? "hidden" : ""} text-[11px] text-gray-subtle text-center mt-2`}>
-            Update your site, write content, check analytics
-          </p>
-          </>
+            </>
           )}
         </div>
       </div>
-      {needsYou && variant !== "compact" && needsDrawerOpen && (
-        <>
-          <button
-            type="button"
-            className="absolute inset-0 z-30 bg-[rgba(8,8,10,0.36)]"
-            onClick={() => setNeedsDrawerOpen(false)}
-            aria-label="Close Needs You"
-          />
-          <aside
-            role="dialog"
-            aria-modal="true"
-            aria-label="Needs You"
-            className="absolute inset-y-0 right-0 z-40 w-full max-w-[520px] border-l border-glass-border bg-surface-base shadow-[0_24px_80px_rgba(0,0,0,0.38)] animate-overlay-enter"
-          >
-            <div className="flex h-12 items-center justify-between border-b border-glass-border px-4">
-              <div className="flex min-w-0 items-center gap-2">
-                <Inbox className="h-4 w-4 text-gray-muted" strokeWidth={1.5} />
-                <span className="truncate text-[13px] font-medium text-warm-black">Needs You</span>
-              </div>
-              <button
-                type="button"
-                onClick={() => setNeedsDrawerOpen(false)}
-                className="flex h-8 w-8 items-center justify-center rounded-md text-gray-muted transition-colors hover:bg-gray-bg hover:text-warm-black"
-                aria-label="Close Needs You"
-              >
-                <X className="h-4 w-4" strokeWidth={1.5} />
-              </button>
-            </div>
-            <QueuePage
-              initialPending={needsYou.pending}
-              initialResolved={needsYou.resolved}
-              pendingCount={needsYou.pendingCount}
-              staleSectionCount={needsYou.staleSectionCount}
-              compact
-            />
-          </aside>
-        </>
-      )}
     </div>
   );
 }

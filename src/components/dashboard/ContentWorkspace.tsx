@@ -1,8 +1,10 @@
 "use client";
 
+import { XaButtonLink, XaIconButton, XaSegmented } from "@/components/ui/strelva/Xa";
+import { DashEmpty } from "./xa/DashboardXa";
+
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ChevronDown, PanelRightOpen } from "lucide-react";
-import Link from "next/link";
 import { useDashboard } from "./DashboardContext";
 import { SitePreview } from "./SitePreview";
 import { PropertiesEditor } from "./PropertiesEditor";
@@ -189,38 +191,15 @@ export function ContentWorkspace({
 
   const rightPanelContent = (
     <>
-      {/* One slim mode switch — Edit the selected element, or ask the AI */}
-      <div className="flex items-center justify-between gap-2 border-b border-gray-border bg-surface px-2 py-2 shrink-0">
-        <div className="flex items-center gap-0.5 rounded-lg bg-gray-bg-alt p-0.5">
-          {[
-            { value: "properties", label: "Edit" },
-            { value: "chat", label: "Ask Strelva" },
-          ].map((item) => {
-            const active = item.value === "chat" ? inChat : !inChat && !inRequest;
-            return (
-              <button
-                key={item.value}
-                type="button"
-                onClick={() => setRightTab(item.value as "properties" | "chat")}
-                className={`flex h-7 items-center rounded-md px-3.5 text-[12px] font-medium transition-colors ${
-                  active
-                    ? "bg-surface text-warm-white shadow-sm"
-                    : "text-gray-muted hover:text-warm-white"
-                }`}
-              >
-                {item.label}
-              </button>
-            );
-          })}
-        </div>
-        <button
-          type="button"
-          onClick={() => setRightTab(inRequest ? "properties" : "request")}
-          className={`rounded-md px-2 py-1 text-[11px] font-medium transition-colors ${
-            inRequest ? "text-warm-white" : "text-gray-faint hover:text-gray-muted"
-          }`}
-        >
-          Request a change
+      {/* One slim mode switch: change the selected part, or ask Strelva */}
+      <div className="flex shrink-0 items-center justify-between gap-2 border-b border-[var(--st-line)] px-3 py-2.5">
+        <XaSegmented label="Edit or ask" value={inChat ? "chat" : "properties"} onChange={(value) => setRightTab(value)} options={[
+          { value: "properties", label: "Edit" },
+          { value: "chat", label: "Ask Strelva" },
+        ]} />
+        <button type="button" onClick={() => setRightTab(inRequest ? "properties" : "request")} aria-pressed={inRequest}
+          className={`border-0 bg-transparent p-0 text-[13px] font-medium ${inRequest ? "text-[var(--st-text)]" : "text-[var(--st-accent)] hover:underline"}`}>
+          {inRequest ? "Back to editing" : "Ask for a bigger change"}
         </button>
       </div>
 
@@ -238,46 +217,20 @@ export function ContentWorkspace({
 
   if (readOnly) {
     return (
-      <div className="flex h-full flex-col items-center justify-center bg-surface-base px-6">
-        <div className="max-w-md text-center">
-          <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-gray-muted">
-            Read-only demo
-          </p>
-          <h2 className="mt-3 text-[20px] font-semibold tracking-[-0.02em] text-warm-white">
-            The site editor is view-only here
-          </h2>
-          <p className="mt-2 text-[13px] leading-relaxed text-gray-muted">
-            This is a live look at the dashboard. Editing the site, layout, and content is turned off in the demo.
-          </p>
-          <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
-            <Link
-              href="/access-request"
-              className="inline-flex min-h-[40px] items-center justify-center rounded-lg bg-accent px-4 text-[13px] font-medium text-on-accent transition-colors hover:bg-accent/85"
-            >
-              Get your own site
-            </Link>
-            {siteUrl && (
-              <a
-                href={siteUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex min-h-[40px] items-center justify-center rounded-lg border border-gray-border px-4 text-[13px] font-medium text-gray-muted transition-colors hover:bg-surface-raised hover:text-warm-white"
-              >
-                View live site
-              </a>
-            )}
-          </div>
-        </div>
-      </div>
+      <DashEmpty pose="website" title="The site editor is view-only here." job="Your live site is unchanged"
+        action={<XaButtonLink href="/access-request">Get your own site</XaButtonLink>}
+        secondary={siteUrl ? <a href={siteUrl} target="_blank" rel="noopener noreferrer" className="text-[15px] font-medium text-[var(--st-accent)] hover:underline">View the live site</a> : undefined}>
+        This is a demo you can look around. Changing the site, its layout and its words is off.
+      </DashEmpty>
     );
   }
 
   return (
-    <div className="flex flex-col h-full bg-surface-base">
+    <div className="flex h-full min-w-0 flex-1 flex-col">
       <div className="flex min-h-0 flex-1 flex-col">
       {viewportMode === null && (
-        <div className="flex flex-1 items-center justify-center text-[12px] text-gray-muted">
-          Loading editor...
+        <div className="flex flex-1 items-center justify-center text-[14px] text-[var(--st-text-2)]" role="status">
+          Opening your site
         </div>
       )}
 
@@ -305,7 +258,7 @@ export function ContentWorkspace({
             </main>
 
             <aside
-              className={`border-l border-gray-border flex flex-col shrink-0 transition-[width] duration-200 ease-out ${
+              className={`border-l border-[var(--st-line)] flex flex-col shrink-0 transition-[width] duration-200 ease-out ${
                 rightCollapsed ? "w-[44px]" : "w-[360px] xl:w-[380px]"
               }`}
             >
@@ -322,7 +275,7 @@ export function ContentWorkspace({
       {viewportMode === "tablet" && (
         isEditing ? (
           <div className="flex flex-col flex-1 min-h-0">
-            <div className="h-[58%] border-b border-gray-border shrink-0 flex min-h-0 flex-col">
+            <div className="h-[58%] border-b border-[var(--st-line)] shrink-0 flex min-h-0 flex-col">
               <div className="min-h-0 flex-1">
                 <SitePreview isEditing onToggleEdit={() => setIsEditing(false)} />
               </div>
@@ -341,7 +294,7 @@ export function ContentWorkspace({
       {viewportMode === "mobile" && (
         isEditing ? (
           <div className="flex flex-1 min-h-0 flex-col">
-            <div className="h-[46%] min-h-[260px] max-h-[430px] shrink-0 border-b border-gray-border">
+            <div className="h-[46%] min-h-[260px] max-h-[430px] shrink-0 border-b border-[var(--st-line)]">
               <SitePreview isEditing onToggleEdit={() => setIsEditing(false)} />
             </div>
             <div className="flex min-h-0 flex-1 flex-col">
@@ -384,17 +337,14 @@ function SectionsRail({
   onSelect: (value: string) => void;
 }) {
   return (
-    <aside className="flex w-[212px] shrink-0 flex-col border-r border-gray-border bg-surface">
-      <div className="shrink-0 border-b border-gray-border/60 px-4 py-3">
-        <span className="mb-1.5 block text-[11px] font-medium uppercase tracking-[0.16em] text-gray-faint">
-          Page
-        </span>
-        <div className="relative">
+    <aside className="flex w-[220px] shrink-0 flex-col border-r border-[var(--st-line)] bg-[var(--st-sidebar)]" aria-label="Pages and parts">
+      <label className="flex shrink-0 flex-col gap-2 border-b border-[var(--st-line)] px-4 py-3">
+        <span className="text-[13px] font-medium text-[var(--st-text-3)]">Page</span>
+        <span className="relative">
           <select
             value={activePage}
             onChange={(event) => onPageChange(event.target.value)}
-            className="w-full appearance-none rounded-lg border border-gray-border bg-surface-raised py-2 pl-3 pr-8 text-[12.5px] font-medium text-warm-white outline-none transition-colors hover:border-gray-muted focus:border-gray-muted"
-            aria-label="Page"
+            className="w-full appearance-none rounded-[var(--st-r-md)] border border-[var(--st-line)] bg-[var(--st-surface)] py-2 pl-3 pr-8 text-[14px] font-medium text-[var(--st-text)] outline-none focus-visible:border-[var(--st-accent)]"
           >
             {pages.map((page) => (
               <option key={page.value} value={page.value}>
@@ -402,41 +352,24 @@ function SectionsRail({
               </option>
             ))}
           </select>
-          <ChevronDown
-            className="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-muted"
-            strokeWidth={1.5}
-          />
-        </div>
-      </div>
-
-      <div className="flex shrink-0 items-center justify-between px-4 pb-1.5 pt-3.5">
-        <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-gray-faint">
-          Sections
+          <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[var(--st-text-3)]" strokeWidth={1.5} aria-hidden="true" />
         </span>
-        <span className="text-[11px] tabular-nums text-gray-faint/70">{sections.length}</span>
-      </div>
+      </label>
+
+      <p className="m-0 shrink-0 px-4 pb-1.5 pt-3.5 text-[13px] font-medium text-[var(--st-text-3)]">{sections.length} parts on this page</p>
       <div className="min-h-0 flex-1 space-y-px overflow-y-auto px-2.5 pb-2">
-        {sections.map((section, index) => {
+        {sections.map((section) => {
           const active = section.value === activeSection;
           return (
             <button
               key={section.value}
               type="button"
               onClick={() => onSelect(section.value)}
-              className={`group relative flex w-full items-center gap-2.5 rounded-lg py-2 pl-3.5 pr-2.5 text-left text-[12.5px] transition-colors ${
-                active
-                  ? "bg-surface-raised font-medium text-warm-white"
-                  : "text-gray-muted hover:bg-surface-raised/50 hover:text-warm-white"
+              aria-current={active ? "true" : undefined}
+              className={`relative flex w-full items-center rounded-[var(--st-r-nav)] px-3 py-2 text-left text-[14px] transition-colors duration-(--motion-fast) focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--st-accent)] ${
+                active ? "bg-[var(--st-selected)] font-medium text-[var(--st-text)]" : "text-[var(--st-text-body)] hover:bg-[var(--st-hover)]"
               }`}
             >
-              <span
-                className={`absolute left-0 top-1/2 h-4 w-[3px] -translate-y-1/2 rounded-r-full bg-accent transition-opacity ${
-                  active ? "opacity-100" : "opacity-0"
-                }`}
-              />
-              <span className="w-3.5 shrink-0 text-[11px] tabular-nums text-gray-faint/60 group-hover:text-gray-faint">
-                {index + 1}
-              </span>
               <span className="truncate">{section.label}</span>
             </button>
           );
@@ -448,16 +381,11 @@ function SectionsRail({
 
 function CollapsedRight() {
   const { toggleRight } = useDashboard();
-
   return (
-    <div className="flex flex-col items-center py-4 gap-2">
-      <button
-        onClick={toggleRight}
-        className="w-8 h-8 rounded-md flex items-center justify-center text-gray-muted hover:text-warm-black hover:bg-gray-bg transition-colors duration-150"
-        title="Expand panel"
-      >
-        <PanelRightOpen className="h-4 w-4" strokeWidth={1.5} />
-      </button>
+    <div className="flex flex-col items-center gap-2 py-4">
+      <XaIconButton label="Open the editing panel" tone="plain" onClick={toggleRight}>
+        <PanelRightOpen className="h-4 w-4" strokeWidth={1.5} aria-hidden="true" />
+      </XaIconButton>
     </div>
   );
 }

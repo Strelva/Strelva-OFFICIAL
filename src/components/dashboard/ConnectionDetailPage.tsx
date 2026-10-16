@@ -1,19 +1,19 @@
 "use client";
 
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { useState, useEffect, useMemo } from "react";
-import { ArrowLeft, CircleCheck, Unplug, Loader2, AlertCircle, RefreshCw } from "lucide-react";
+import { XaAnswers, XaButton, XaField, XaSays, XaStatus, XaSystemTile, XaTextArea, XaTextLink } from "@/components/ui/strelva/Xa";
+import { DashEmpty, DashNote, DashPage } from "./xa/DashboardXa";
+import { ConfirmDialog } from "./ConfirmDialog";
+import { connectionStatusWord } from "./ConnectionsPage";
 import {
-  INTELLIGENCE_CATEGORY_LABELS,
   deriveIntelligenceStatus,
   getIntegrationDefinition,
-  getIntegrationCategories,
   normalizeIntegrationStatus,
   type IntegrationStatus,
   type RawConnectionStatus,
   type RawTenantConnectionSettings,
 } from "@/lib/integration-registry";
-import { SourceHealthBadge } from "./SourceHealthBadge";
 import { useDashboardOptional } from "./DashboardContext";
 
 function formatRelativeTime(isoDate: string): string {
@@ -24,15 +24,14 @@ function formatRelativeTime(isoDate: string): string {
   const diffHours = Math.floor(diffMs / 3600000);
   const diffDays = Math.floor(diffMs / 86400000);
 
-  if (diffMins < 1) return "Just now";
-  if (diffMins < 60) return `${diffMins}m ago`;
-  if (diffHours < 24) return `${diffHours}h ago`;
-  if (diffDays < 7) return `${diffDays}d ago`;
-  return date.toLocaleDateString();
+  if (diffMins < 1) return "just now";
+  if (diffMins < 60) return `${diffMins} ${diffMins === 1 ? "minute" : "minutes"} ago`;
+  if (diffHours < 24) return `${diffHours} ${diffHours === 1 ? "hour" : "hours"} ago`;
+  if (diffDays < 7) return `${diffDays} ${diffDays === 1 ? "day" : "days"} ago`;
+  return `on ${date.toLocaleDateString("en-US", { month: "short", day: "numeric" })}`;
 }
 
 export function ConnectionDetailPage({ connectionId }: { connectionId: string }) {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const dashboard = useDashboardOptional();
   const dashboardHref = useMemo(
@@ -51,9 +50,10 @@ export function ConnectionDetailPage({ connectionId }: { connectionId: string })
   const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(null);
   const [platformReady, setPlatformReady] = useState(true);
   const [disconnecting, setDisconnecting] = useState(false);
+  const [confirmDisconnect, setConfirmDisconnect] = useState(false);
   const isConnected = status === "connected";
 
-  // Check URL params for OAuth callback results
+  // Check URL params for the provider sign-in callback results
   useEffect(() => {
     const success = searchParams.get("success");
     const errorParam = searchParams.get("error");
@@ -194,294 +194,83 @@ export function ConnectionDetailPage({ connectionId }: { connectionId: string })
 
   if (!detail) {
     return (
-      <div className="flex-1 flex items-center justify-center">
-        <p className="text-gray-muted">Connection not found</p>
-      </div>
+      <DashEmpty pose="alone" title="There's no connection by that name." job="Your other connections are unchanged"
+        action={<XaTextLink href={dashboardHref("/dashboard/integrations")}>See every connection</XaTextLink>} />
     );
   }
 
   const intelligenceStatus = deriveIntelligenceStatus(detail, status);
-  const categories = getIntegrationCategories(detail);
   const canUseNow = intelligenceStatus === "ai_using_it" ||
     intelligenceStatus === "can_act_here" ||
     intelligenceStatus === "signal_available";
   const setupPath = status === "connected"
-    ? "Connected and available according to the current sync status."
+    ? `Connected. Strelva ${lastSyncedAt ? `last read it ${formatRelativeTime(lastSyncedAt)}` : "reads it every day"}.`
     : detail.connectionProvider === "google"
-      ? "Connect Google once to link your Business Profile, Search Console, and Analytics. Then Strelva can use this as trusted business context."
+      ? "Connect Google once and Strelva can read your Google listing, what people search, and who visits your site."
       : detail.id === "google-search-console"
-        ? "This integration uses manual Search Console credential setup today, not OAuth."
+        ? "This one uses a key you paste in below, not a sign-in button."
         : detail.connectionProvider
-          ? "Connect the provider before this integration influences AI decisions."
+          ? "Connect it first. Until then Strelva doesn't use it."
           : detail.builtIn
-            ? "This is a built-in Strelva signal."
-            : "Set this up before it influences AI decisions.";
+            ? "This comes built into Strelva. Nothing to connect."
+            : "Set it up first. Until then Strelva doesn't use it.";
+
+  const state = connectionStatusWord(status);
+  const oauthHref = !isConnected && platformReady && detail.connectionProvider && ["google", "calendly", "instagram"].includes(detail.connectionProvider)
+    ? dashboardHref(`/api/oauth/${detail.connectionProvider}`) : null;
+  const providerName = detail.connectionProvider === "google" ? "Google" : detail.connectionProvider === "calendly" ? "Calendly" : detail.connectionProvider === "instagram" ? "Instagram" : detail.displayName;
 
   return (
-    <div className="h-full min-h-0 overflow-y-auto px-4 py-6 sm:px-8 lg:px-14 lg:py-10 animate-route-enter">
-      {/* Back link */}
-      <button
-        onClick={() => router.push(dashboardHref("/dashboard/integrations"))}
-        className="flex items-center gap-1.5 text-gray-faint hover:text-gray-muted transition-colors mb-8"
-      >
-        <ArrowLeft className="w-3.5 h-3.5" strokeWidth={1.5} />
-        <span className="text-[13px]">Integrations</span>
-      </button>
+    <DashPage
+      title={`${detail.displayName}.`}
+      quiet={`${detail.shortDescription}.`}
+      lead={detail.id === "google-business" ? <XaSystemTile kind="listing" size={48} /> : undefined}
+      actions={oauthHref ? <XaButton variant="primary" onClick={() => window.location.assign(oauthHref)}>Connect with {providerName}</XaButton>
+        : state.kind === "waits" || state.kind === "down" ? <XaStatus kind={state.kind}>{state.word}</XaStatus> : null}
+      width="narrow"
+      label={detail.displayName}
+    >
+      <p className="m-0 text-[14px]"><XaTextLink href={dashboardHref("/dashboard/integrations")}>Back to Connections</XaTextLink></p>
+      {!isConnected && !platformReady ? <DashNote tone="quiet">Strelva hasn&apos;t switched {detail.displayName} on yet. Connecting works once it has.</DashNote> : null}
+      {error ? <DashNote tone="down" role="alert">{error}</DashNote> : null}
+      {saved ? <DashNote tone="live" role="status">Saved. {detail.displayName} is connected.</DashNote> : null}
 
-      {/* Header */}
-      <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:gap-5">
-        <div className="w-16 h-16 rounded-[18px] bg-accent-dim border border-accent/20 flex items-center justify-center">
-          <span className="text-[20px] font-bold text-accent">{detail.icon}</span>
-        </div>
-        <div className="flex-1 min-w-0">
-          <h1 className="text-[22px] font-semibold text-warm-black">{detail.displayName}</h1>
-          <p className="text-[13px] text-gray-muted mt-1">
-            {detail.shortDescription}
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-3">
-          <SourceHealthBadge status={intelligenceStatus} lastSync={lastSyncedAt} compact />
-          {!isConnected && !platformReady && (
-            <p className="text-[13px] text-gray-muted">
-              Strelva hasn’t set up {detail.displayName} yet. Connecting will work once it has.
-            </p>
-          )}
-          {!isConnected && platformReady && detail.connectionProvider === "google" && (
-            <a
-              href={dashboardHref("/api/oauth/google")}
-              className="rounded-xl bg-accent px-6 py-2.5 text-[13px] font-medium text-on-accent hover:bg-accent/80 transition-colors inline-flex items-center"
-            >
-              Connect with Google
-            </a>
-          )}
-          {!isConnected && platformReady && detail.connectionProvider === "calendly" && (
-            <a
-              href={dashboardHref("/api/oauth/calendly")}
-              className="rounded-xl bg-accent px-6 py-2.5 text-[13px] font-medium text-on-accent hover:bg-accent/80 transition-colors inline-flex items-center"
-            >
-              Connect with Calendly
-            </a>
-          )}
-          {!isConnected && platformReady && detail.connectionProvider === "instagram" && (
-            <a
-              href={dashboardHref("/api/oauth/instagram")}
-              className="rounded-xl bg-accent px-6 py-2.5 text-[13px] font-medium text-on-accent hover:bg-accent/80 transition-colors inline-flex items-center"
-            >
-              Connect with Instagram
-            </a>
-          )}
-        </div>
-      </div>
+      <XaSays>{setupPath}</XaSays>
 
-      <div className="mb-8 rounded-2xl border border-gray-border bg-surface-raised p-5">
-        <div>
-          <p className="text-[11px] uppercase tracking-[0.14em] text-gray-faint">Setup path</p>
-          <p className="mt-2 text-[13px] leading-relaxed text-gray-muted">{detail.description}</p>
-          <p className="mt-3 text-[12px] leading-relaxed text-gray-fg">{setupPath}</p>
-        </div>
-      </div>
+      <XaAnswers labelWidth={160} rows={[
+        ["What it gives Strelva", <>{detail.addsIntelligence} {canUseNow ? "Strelva uses it when it answers you, suggests a change, and writes your weekly report." : "Until it is connected, Strelva shows no numbers from it."}</>],
+        ...(detail.actionPaths?.length ? [["What Strelva can do", `${detail.actionPaths.join(". ")}.`] as const] : []),
+      ]} />
 
-      <div className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr] mb-8">
-        <div className="rounded-2xl border border-gray-border bg-surface-raised p-5">
-          <span className="text-[11px] text-gray-faint uppercase tracking-wider">
-            What this signal is
-          </span>
-          <p className="mt-2 text-[14px] font-semibold tracking-[-0.01em] text-warm-black">{detail.addsIntelligence}</p>
-          {canUseNow ? (
-            <p className="mt-3 text-[12px] leading-relaxed text-gray-muted">
-              This integration is active. The AI uses it in chat, suggestions, and the weekly report when relevant data lands.
-            </p>
-          ) : (
-            <p className="mt-3 text-[12px] leading-relaxed text-gray-muted">
-              Connect this integration before Strelva uses it. Until then, it stays silent: no fabricated insights, no fake numbers.
-            </p>
-          )}
-        </div>
-        <div className="rounded-2xl border border-gray-border bg-surface-raised p-5">
-          <span className="text-[11px] text-gray-faint uppercase tracking-wider">Connection state</span>
-          <div className="mt-3">
-            <SourceHealthBadge status={intelligenceStatus} lastSync={lastSyncedAt} />
-          </div>
-          <div className="mt-5">
-            <span className="text-[11px] text-gray-faint uppercase tracking-wider">Where this appears</span>
-            <div className="mt-2 flex flex-wrap gap-2">
-              {detail.appearsIn.map((item) => (
-                <span key={item} className="rounded-full border border-gray-border bg-surface-inset px-2.5 py-1 text-[11px] text-gray-muted">
-                  {item}
-                </span>
-              ))}
-            </div>
-          </div>
-          <div className="mt-5">
-            <span className="text-[11px] text-gray-faint uppercase tracking-wider">Intelligence group</span>
-            <div className="mt-2 flex flex-wrap gap-2">
-              {categories.map((category) => (
-                <span key={category} className="rounded-full border border-gray-border bg-surface-inset px-2.5 py-1 text-[11px] text-gray-muted">
-                  {INTELLIGENCE_CATEGORY_LABELS[category]}
-                </span>
-              ))}
-            </div>
-          </div>
-          {detail.actionPaths?.length ? (
-            <div className="mt-5">
-              <span className="text-[11px] text-gray-faint uppercase tracking-wider">Action paths</span>
-              <ul className="mt-2 space-y-1.5">
-                {detail.actionPaths.map((path) => (
-                  <li key={path} className="text-[12px] leading-relaxed text-gray-muted">
-                    {path}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ) : null}
-        </div>
-      </div>
-
-      <div className="mb-8 grid gap-4 sm:grid-cols-3">
-        <div>
-          <span className="text-[11px] text-gray-faint uppercase tracking-wider">Refresh behavior</span>
-          <p className="text-[13px] text-warm-black mt-1">{detail.syncFrequency}</p>
-        </div>
-        {lastSyncedAt && (
-          <div>
-            <span className="text-[11px] text-gray-faint uppercase tracking-wider">Last synced</span>
-            <p className="text-[13px] text-warm-black mt-1 flex items-center gap-1.5">
-              <RefreshCw className="w-3 h-3 text-gray-faint" />
-              {formatRelativeTime(lastSyncedAt)}
-            </p>
-          </div>
-        )}
-        <div>
-          <span className="text-[11px] text-gray-faint uppercase tracking-wider">Used in</span>
-          <p className="text-[13px] text-warm-black mt-1">{detail.usedIn}</p>
-        </div>
-      </div>
-
-      {/* Error message */}
-      {error && (
-        <div className="mb-6 flex items-center gap-2 rounded-xl bg-terra/10 border border-terra/20 px-4 py-3 text-[13px] text-terra">
-          <AlertCircle className="w-4 h-4" />
-          {error}
-        </div>
-      )}
-
-      {/* Success message */}
-      {saved && (
-        <div className="mb-6 flex items-center gap-2 rounded-xl bg-accent/10 border border-accent/20 px-4 py-3 text-[13px] text-accent">
-          <CircleCheck className="w-4 h-4" />
-          Connection saved successfully
-        </div>
-      )}
-
-      {/* Yelp credentials form */}
       {detail.connectionProvider === "yelp" && !isConnected && (
-        <div className="mb-8 max-w-[600px]">
-          <h3 className="text-[13px] font-medium text-warm-black mb-3">Yelp API Credentials</h3>
-          <div className="space-y-3">
-            <div>
-              <label className="text-[12px] text-gray-muted block mb-1.5">API Key</label>
-              <input
-                type="password"
-                value={yelpApiKey}
-                onChange={(e) => setYelpApiKey(e.target.value)}
-                placeholder="Your Yelp Fusion API key"
-                className="w-full rounded-xl bg-surface-raised border border-gray-border px-4 py-2.5 text-[13px] text-warm-black placeholder:text-gray-faint font-mono focus:outline-none focus:ring-1 focus:ring-accent/50"
-              />
-            </div>
-            <div>
-              <label className="text-[12px] text-gray-muted block mb-1.5">Business ID</label>
-              <input
-                type="text"
-                value={yelpBusinessId}
-                onChange={(e) => setYelpBusinessId(e.target.value)}
-                placeholder="your-business-name-city"
-                className="w-full rounded-xl bg-surface-raised border border-gray-border px-4 py-2.5 text-[13px] text-warm-black placeholder:text-gray-faint font-mono focus:outline-none focus:ring-1 focus:ring-accent/50"
-              />
-            </div>
-            <button
-              onClick={handleYelpConnect}
-              disabled={saving || !yelpApiKey.trim() || !yelpBusinessId.trim()}
-              className="rounded-xl bg-accent px-5 py-2 text-[13px] font-medium text-on-accent hover:bg-accent/80 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-            >
-              {saving && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-              {saving ? "Connecting..." : "Connect Yelp"}
-            </button>
-            <p className="text-[11px] text-gray-faint leading-relaxed">
-              Get your API key from the{" "}
-              <a
-                href="https://www.yelp.com/developers/v3/manage_app"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-accent hover:underline"
-              >
-                Yelp Fusion API
-              </a>
-              . Your Business ID is the last part of your Yelp page URL.
-            </p>
-          </div>
-        </div>
+        <form className="flex max-w-[520px] flex-col gap-4" onSubmit={(event) => { event.preventDefault(); void handleYelpConnect(); }}>
+          <XaField label="Yelp API key" type="password" value={yelpApiKey} onChange={(e) => setYelpApiKey(e.target.value)} placeholder="Your Yelp Fusion API key" autoComplete="off" />
+          <XaField label="Yelp business ID" value={yelpBusinessId} onChange={(e) => setYelpBusinessId(e.target.value)} placeholder="your-business-name-city"
+            hint={<>Find the key in <a className="text-[var(--st-accent)] hover:underline" href="https://www.yelp.com/developers/v3/manage_app" target="_blank" rel="noopener noreferrer">Yelp Fusion</a>. The business ID is the last part of your Yelp page address.</>} />
+          <div><XaButton type="submit" busy={saving} disabled={!yelpApiKey.trim() || !yelpBusinessId.trim()}>Connect Yelp</XaButton></div>
+        </form>
       )}
 
-      {/* Credentials form for configurable connections */}
       {detail.configField && (
-        <div className="mb-8 max-w-[600px]">
-          <h3 className="text-[13px] font-medium text-warm-black mb-3">
-            {detail.id === "google-search-console" ? "Service Account Key (JSON)" : "Credentials"}
-          </h3>
-          <textarea
+        <form className="flex max-w-[560px] flex-col gap-4" onSubmit={(event) => { event.preventDefault(); void handleSaveCredentials(); }}>
+          <XaTextArea
+            label={detail.id === "google-search-console" ? "Service account key" : "Credentials"}
             value={credentialsValue}
             onChange={(e) => setCredentialsValue(e.target.value)}
-            placeholder={
-              detail.id === "google-search-console"
-                ? 'Paste your Google Cloud service account JSON key here...'
-                : "Enter credentials..."
-            }
+            placeholder={detail.id === "google-search-console" ? "Paste the key file Google Cloud gave you" : "Paste the credentials"}
             rows={6}
-            className="w-full rounded-xl bg-surface-raised border border-gray-border px-4 py-3 text-[13px] text-warm-black placeholder:text-gray-faint font-mono resize-none focus:outline-none focus:ring-1 focus:ring-accent/50"
+            hint={detail.id === "google-search-console" ? "Make a service account in Google Cloud, download its key, paste it here, and give it access to your Search Console property." : undefined}
           />
-          <div className="flex items-center gap-4 mt-3">
-            <button
-              onClick={handleSaveCredentials}
-              disabled={saving || !credentialsValue.trim()}
-              className="rounded-xl bg-accent px-5 py-2 text-[13px] font-medium text-on-accent hover:bg-accent/80 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-            >
-              {saving && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-              {saving ? "Saving..." : "Save Credentials"}
-            </button>
-            {saved && (
-              <span className="text-[12px] text-accent flex items-center gap-1.5">
-                <CircleCheck className="w-3.5 h-3.5" />
-                Saved
-              </span>
-            )}
-            {error && (
-              <span className="text-[12px] text-terra">{error}</span>
-            )}
-          </div>
-          {detail.id === "google-search-console" && (
-            <p className="text-[11px] text-gray-faint mt-3 leading-relaxed">
-              Create a service account in Google Cloud Console, download the JSON key, and paste it above.
-              Make sure the service account has access to your Search Console property.
-            </p>
-          )}
-        </div>
+          <div><XaButton type="submit" busy={saving} disabled={!credentialsValue.trim()}>Save credentials</XaButton></div>
+        </form>
       )}
 
-      {/* Disconnect */}
-      {isConnected && detail.connectionProvider && (
-        <button
-          onClick={handleDisconnect}
-          disabled={disconnecting}
-          className="flex items-center gap-3 text-terra hover:text-terra-light transition-colors disabled:opacity-50"
-        >
-          {disconnecting ? (
-            <Loader2 className="w-4 h-4 animate-spin" strokeWidth={1.5} />
-          ) : (
-            <Unplug className="w-4 h-4" strokeWidth={1.5} />
-          )}
-          <span className="text-[13px] font-medium">{disconnecting ? "Disconnecting..." : "Disconnect"}</span>
-        </button>
-      )}
-    </div>
+      {isConnected && detail.connectionProvider ? (
+        <p className="m-0 text-[14px]"><XaTextLink onClick={() => setConfirmDisconnect(true)}>Disconnect {detail.displayName}</XaTextLink></p>
+      ) : null}
+      <ConfirmDialog open={confirmDisconnect} busy={disconnecting} destructive title={`Disconnect ${detail.displayName}?`} confirmLabel="Disconnect" cancelLabel="Keep it connected"
+        message={`Strelva stops reading ${detail.displayName}. Nothing already on your site or listing changes, and you can connect it again any time.`}
+        onCancel={() => setConfirmDisconnect(false)} onConfirm={async () => { await handleDisconnect(); setConfirmDisconnect(false); }} />
+    </DashPage>
   );
 }

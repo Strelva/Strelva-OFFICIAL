@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { MessageSquarePlus } from "lucide-react";
+import { XaTextLink } from "@/components/ui/strelva/Xa";
 import { useDashboardOptional } from "./DashboardContext";
 
 /**
@@ -19,16 +19,6 @@ export function StoreChatButton({ prompt, label }: { prompt: string; label: stri
   if (!setChatPrompt) return null;
 
   return (
-    <button
-      type="button"
-      onClick={() => {
-        setChatPrompt(prompt);
-        router.push(dashboardHref("/dashboard/chat"));
-      }}
-      className="inline-flex min-h-[32px] shrink-0 items-center gap-1.5 rounded-lg border border-glass-border bg-glass px-2.5 text-[12px] font-medium text-warm-black transition-colors hover:bg-gray-bg"
-    >
-      <MessageSquarePlus className="h-3.5 w-3.5 text-accent" strokeWidth={1.6} />
-      {label}
-    </button>
+    <XaTextLink onClick={() => { setChatPrompt(prompt); router.push(dashboardHref("/dashboard/chat")); }}>{label}</XaTextLink>
   );
 }

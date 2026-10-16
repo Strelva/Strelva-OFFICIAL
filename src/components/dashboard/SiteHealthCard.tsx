@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
-import { Loader2, RefreshCw, CheckCircle2 } from "lucide-react";
+import { Loader2, CheckCircle2 } from "lucide-react";
 import { useDashboard } from "./DashboardContext";
 import type { AuditResult, CategoryResult } from "@/lib/audit/types";
 
@@ -63,7 +63,7 @@ function TrendBand({ history }: { history: TrendPoint[] }) {
   const max = Math.max(100, ...scores);
 
   return (
-    <div className="flex items-center justify-between gap-4 border-b border-glass-border px-5 py-3">
+    <div className="flex items-center justify-between gap-4 border-b border-[var(--st-line)] py-3">
       <div className="flex items-end gap-[3px]" aria-hidden>
         {scores.slice(-10).map((s, i) => (
           <div
@@ -151,45 +151,35 @@ export function SiteHealthCard() {
 
   if (state === "loading") {
     return (
-      <div className="flex items-center gap-2 rounded-xl border border-glass-border bg-glass px-5 py-8 text-sm text-gray-muted">
-        <Loader2 className="h-4 w-4 animate-spin" />
-        Checking your site health...
-      </div>
+      <p className="m-0 flex items-center gap-2 text-[15px] text-[var(--st-text-2)]" role="status">
+        <Loader2 className="h-4 w-4 motion-safe:animate-spin" aria-hidden="true" />
+        Reading the last site check
+      </p>
     );
   }
 
   if (state === "empty") {
     return (
-      <div className="rounded-xl border border-glass-border bg-glass px-5 py-8 text-center">
-        <p className="text-sm font-medium text-warm-black">Site health is not available yet</p>
-        <p className="mt-1 text-[13px] text-gray-muted">
-          Strelva checks your site once a day. Your health score appears here after the first check.
-        </p>
-      </div>
+      <p className="m-0 text-[15px] text-[var(--st-text-2)]">Strelva checks your site once a day. Your score shows up here after the first check.</p>
     );
   }
 
   if (state === "error") {
     return (
-      <div className="rounded-xl border border-critical0/30 bg-critical0/10 px-5 py-6 text-center">
-        <p className="text-sm font-medium text-critical">{error}</p>
-        <button
-          type="button"
-          onClick={() => void load(false)}
-          className="mt-3 text-[13px] font-medium text-warm-black underline underline-offset-2"
-        >
-          Try again
-        </button>
-      </div>
+      <p className="m-0 flex flex-wrap items-baseline gap-2 text-[15px] text-[var(--st-text)]" role="alert">
+        <span className="inline-block h-[7px] w-[7px] self-center rounded-full bg-[var(--st-critical)]" aria-hidden="true" />
+        {error}
+        <button type="button" onClick={() => void load(false)} className="border-0 bg-transparent p-0 text-[15px] font-medium text-[var(--st-accent)] hover:underline">Try again</button>
+      </p>
     );
   }
 
   if (!audit) return null;
 
   return (
-    <div className="rounded-2xl border border-glass-border bg-surface-raised">
+    <div className="flex flex-col">
       {/* Header: score + grade + rescan */}
-      <div className="flex items-center justify-between gap-4 border-b border-glass-border px-5 py-4">
+      <div className="flex items-center justify-between gap-4 border-b border-[var(--st-line)] pb-4">
         <div className="flex items-center gap-4">
           <div
             className="flex size-16 shrink-0 items-center justify-center rounded-full border-4"
@@ -205,15 +195,15 @@ export function SiteHealthCard() {
               >
                 {audit.overallScore}
               </div>
-              <div className="text-[11px] font-semibold" style={{ color: gradeColor(audit.grade) }}>
+              <div className="text-[12px] font-semibold" style={{ color: gradeColor(audit.grade) }}>
                 {audit.grade}
               </div>
             </div>
           </div>
           <div>
-            <h2 className="text-[14px] font-semibold tracking-[-0.01em] text-warm-black">Site Health</h2>
-            <p className="text-[12px] text-gray-muted">
-              Scanned {new Date(audit.scannedAt).toLocaleDateString()}
+            <p className="m-0 text-[15px] font-medium text-[var(--st-text)]">Score {audit.overallScore}, grade {audit.grade}</p>
+            <p className="m-0 text-[13px] text-[var(--st-text-2)]">
+              Checked {new Date(audit.scannedAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
             </p>
           </div>
         </div>
@@ -221,10 +211,9 @@ export function SiteHealthCard() {
           type="button"
           onClick={() => void load(true)}
           disabled={rescanning}
-          className="inline-flex items-center gap-1.5 rounded-md border border-glass-border px-3 py-1.5 text-[13px] font-medium text-warm-black transition-colors hover:bg-glass disabled:opacity-60"
+          className="border-0 bg-transparent p-0 text-[14px] font-medium text-[var(--st-accent)] hover:underline disabled:opacity-60"
         >
-          <RefreshCw className={`h-3.5 w-3.5 ${rescanning ? "animate-spin" : ""}`} />
-          {rescanning ? "Scanning" : "Re-scan"}
+          {rescanning ? "Checking now" : "Check again"}
         </button>
       </div>
 
@@ -235,7 +224,7 @@ export function SiteHealthCard() {
           opportunities to climb, not a red problem list (the raw issue detail is
           admin-side). The action is "ask Strelva", never a DIY how-to. */}
       {audit.topFixes.length > 0 && (
-        <div className="border-b border-glass-border px-5 py-4">
+        <div className="border-b border-[var(--st-line)] py-4">
           <div className="flex items-baseline justify-between gap-3">
             <p className="text-[13px] font-semibold text-warm-black">
               {audit.grade === "A" ? "Ways to stay ahead" : "Quick wins to reach an A"}
@@ -253,15 +242,15 @@ export function SiteHealthCard() {
           </p>
           <ul className="mt-3 grid gap-2">
             {audit.topFixes.map((fix) => (
-              <li key={`${fix.category}-${fix.name}`} className="rounded-lg bg-glass px-3 py-2">
+              <li key={`${fix.category}-${fix.name}`} className="py-1">
                 <div className="flex items-baseline justify-between gap-2">
                   <span className="text-[13px] font-medium text-warm-black">{fix.name}</span>
                   {fix.quantified ? (
-                    <span className="shrink-0 text-[11px] font-semibold tabular-nums text-warm-black">
+                    <span className="shrink-0 text-[12px] font-semibold tabular-nums text-warm-black">
                       {fix.quantified}
                     </span>
                   ) : (
-                    <span className="shrink-0 text-[11px] uppercase tracking-wide text-gray-muted">
+                    <span className="shrink-0 text-[13px] text-gray-muted">
                       {fix.category}
                     </span>
                   )}
@@ -276,7 +265,7 @@ export function SiteHealthCard() {
       )}
 
       {/* Category bars */}
-      <div className="grid gap-2.5 px-5 py-4">
+      <div className="grid gap-2.5 py-4">
         {audit.categories
           .filter((c: CategoryResult) => c.weight > 0)
           .map((cat: CategoryResult) => (
@@ -285,7 +274,7 @@ export function SiteHealthCard() {
                 {categoryMarker(cat.score)}
               </span>
               <span className="w-40 shrink-0 truncate text-[13px] text-warm-black">{cat.name}</span>
-              <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-glass">
+              <div className="h-1.5 flex-1 overflow-hidden rounded-full">
                 <div
                   className="h-full rounded-full"
                   style={{ width: `${cat.score}%`, backgroundColor: barColor(cat.score) }}

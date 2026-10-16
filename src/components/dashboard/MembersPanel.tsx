@@ -1,14 +1,15 @@
-import { Star, Users } from "lucide-react";
 import type { Member } from "@/lib/rewards/types";
+import { XaInitial, XaSays } from "@/components/ui/strelva/Xa";
+import { StoreChatButton } from "./StoreChatButton";
+import { DashEmpty, DashPage } from "./xa/DashboardXa";
+import styles from "./xa/dashboard-xa.module.css";
 
 /**
  * Read-only members surface. The page decides which state to render:
- *  - not configured (KV off / feature not wired) -> honest "not set up" state
- *  - configured + members    -> the list with a verdict header
+ *  - not configured (KV off / feature not wired) -> honest "not on yet" state
+ *  - configured + members    -> the list with a plain count
  *  - configured + no members -> honest empty state
- *
- * This is intentionally read-only — adding/editing members and adjusting points
- * is a separate, deferred build. Here we only surface what already exists.
+ * Adding members and adjusting points is a separate, deferred build.
  */
 type MembersPanelProps =
   | { configured: false }
@@ -19,63 +20,16 @@ const TIER_LABEL: Record<Member["tier"], string> = {
   "super-snapper": "Top member",
 };
 
-function Shell({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="h-full overflow-y-auto animate-route-enter px-4 py-6 sm:px-8 sm:py-8">
-      <div className="mx-auto w-full max-w-3xl">{children}</div>
-    </div>
-  );
-}
-
-function MemberRow({ member }: { member: Member }) {
-  const name = member.displayName?.trim() || member.email;
-  const showEmail = Boolean(member.displayName?.trim());
-  return (
-    <div className="flex items-center justify-between gap-3 rounded-xl dashboard-panel p-4">
-      <div className="min-w-0">
-        <p className="text-[14px] font-medium text-warm-black truncate">{name}</p>
-        {showEmail && (
-          <p className="mt-1 text-[11px] text-gray-muted truncate">{member.email}</p>
-        )}
-      </div>
-      <div className="flex shrink-0 items-center gap-3">
-        <span className="rounded-md border border-glass-border bg-glass px-2 py-0.5 text-[11px] font-medium uppercase tracking-wide text-gray-muted">
-          {TIER_LABEL[member.tier]}
-        </span>
-        <span className="inline-flex items-center gap-1 text-[13px] font-medium text-warm-black">
-          <Star className="h-3.5 w-3.5 text-accent" strokeWidth={1.5} />
-          {member.starsAvailable.toLocaleString()}
-        </span>
-      </div>
-    </div>
-  );
-}
-
 export function MembersPanel(props: MembersPanelProps) {
   if (!props.configured) {
     return (
-      <Shell>
-        <div className="mb-5">
-          <p className="mb-2 text-[11px] font-medium uppercase tracking-[0.16em] text-gray-muted">
-            Members
-          </p>
-          <h1 className="font-display text-[24px] font-normal tracking-[-0.01em] text-warm-black sm:text-[30px]">
-            Membership isn&apos;t turned on yet
-          </h1>
-        </div>
-        <div className="rounded-xl dashboard-panel p-6 text-center">
-          <div className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-lg bg-accent-dim text-accent">
-            <Users className="h-5 w-5" strokeWidth={1.5} />
-          </div>
-          <p className="text-[14px] font-medium text-warm-black">
-            A members and points program isn&apos;t set up for your site
-          </p>
-          <p className="mx-auto mt-2 max-w-md text-[13px] leading-relaxed text-gray-muted">
-            Want to reward repeat customers with points and perks? Ask Strelva to turn on
-            membership for your site and we&apos;ll get it running.
-          </p>
-        </div>
-      </Shell>
+      <DashEmpty
+        pose="alone"
+        title="Membership isn't on for your site."
+        job="Nothing is collecting points yet"
+      >
+        To reward repeat customers with points and perks, ask Strelva to turn membership on. Nothing changes on your site until you say yes.
+      </DashEmpty>
     );
   }
 
@@ -83,53 +37,44 @@ export function MembersPanel(props: MembersPanelProps) {
 
   if (members.length === 0) {
     return (
-      <Shell>
-        <div className="mb-5">
-          <p className="mb-2 text-[11px] font-medium uppercase tracking-[0.16em] text-gray-muted">
-            Members
-          </p>
-          <h1 className="font-display text-[24px] font-normal tracking-[-0.01em] text-warm-black sm:text-[30px]">
-            No members yet
-          </h1>
-        </div>
-        <div className="rounded-xl dashboard-panel p-6 text-center">
-          <div className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-lg bg-accent-dim text-accent">
-            <Users className="h-5 w-5" strokeWidth={1.5} />
-          </div>
-          <p className="text-[14px] font-medium text-warm-black">
-            When customers join your program, they&apos;ll show up here
-          </p>
-          <p className="mx-auto mt-2 max-w-md text-[13px] leading-relaxed text-gray-muted">
-            Each member&apos;s points and status will appear in this list as they earn.
-          </p>
-        </div>
-      </Shell>
+      <DashEmpty pose="resting" title="No members yet." job="Waiting for the first customer to join">
+        Each member and their points appear here as they join and earn.
+      </DashEmpty>
     );
   }
 
-  const pointsAwarded = members.reduce((sum, m) => sum + m.starsLifetime, 0);
+  // Who to thank next: the member with the most points waiting to be spent.
+  const next = [...members].sort((a, b) => b.starsAvailable - a.starsAvailable)[0]!;
+  const nextName = next.displayName?.trim() || next.email;
+  const first = nextName.split(/\s+/)[0] || nextName;
+  const others = members.length - 1;
 
   return (
-    <Shell>
-      <div className="mb-5">
-        <p className="mb-2 text-[11px] font-medium uppercase tracking-[0.16em] text-gray-muted">
-          Members
-        </p>
-        <h1 className="font-display text-[24px] font-normal tracking-[-0.01em] text-warm-black sm:text-[30px]">
-          Your members
-        </h1>
-        <p className="mt-3 flex items-center gap-1.5 text-[14px] text-gray-muted">
-          <Users className="h-4 w-4 text-accent" strokeWidth={1.5} />
-          {members.length} {members.length === 1 ? "member" : "members"} ·{" "}
-          {pointsAwarded.toLocaleString()} points awarded
-        </p>
-      </div>
-
-      <div className="space-y-3">
-        {members.map((member) => (
-          <MemberRow key={member.email} member={member} />
-        ))}
-      </div>
-    </Shell>
+    <DashPage
+      title={`${nextName} has ${next.starsAvailable.toLocaleString()} points to spend.`}
+      quiet={`Thank ${first} next.`}
+      label="Members"
+    >
+      <XaSays links={[<StoreChatButton key="thank" label={`Ask Strelva to write ${first} a thank-you`} prompt={`Write a short, warm thank-you I can send ${nextName}, a ${next.tier === "super-snapper" ? "top member" : "member"} with ${next.starsAvailable} points to spend. Suggest one reward they could use them on.`} />]}>
+        {first} has earned {next.starsLifetime.toLocaleString()} points in all{next.tier === "super-snapper" ? " and is one of your top members" : ""}. A note from you brings people back.
+      </XaSays>
+      {others > 0 ? <section className="flex flex-col gap-2" aria-label="Every member">
+        <h2 className="m-0 text-[13px] font-medium text-[var(--st-text-3)]">{members.length} members</h2>
+        <ul className={styles.list} aria-label="Members">
+          {members.map((member) => {
+            const name = member.displayName?.trim() || member.email;
+            return (
+              <li key={member.email}>
+                <XaInitial name={name} shape="round" size={30} />
+                <div className={styles.listText}>
+                  <span className={styles.listTitle}>{name}</span>
+                  <span className={styles.listDetail}>{member.starsAvailable.toLocaleString()} points to spend{member.tier === "super-snapper" ? ` · ${TIER_LABEL[member.tier]}` : ""}</span>
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      </section> : null}
+    </DashPage>
   );
 }

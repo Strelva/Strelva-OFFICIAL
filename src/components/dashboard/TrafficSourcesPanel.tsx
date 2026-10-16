@@ -1,5 +1,4 @@
-import Link from "next/link";
-import { Compass, Link2 } from "lucide-react";
+import { XaLabel, XaSays, XaTextLink } from "@/components/ui/strelva/Xa";
 import type { GaPerf } from "@/lib/analytics";
 
 interface TrafficSourcesPanelProps {
@@ -13,8 +12,8 @@ interface TrafficSourcesPanelProps {
  *  "(not set)" — owners shouldn't see raw analytics tokens. */
 function sourceLabel(source: string): string {
   const s = source.trim().toLowerCase();
-  if (!s || s === "(not set)" || s === "(none)") return "Direct / typed in";
-  if (s === "(direct)") return "Direct / typed in";
+  if (!s || s === "(not set)" || s === "(none)") return "Typed in or a saved link";
+  if (s === "(direct)") return "Typed in or a saved link";
   if (s === "google") return "Google";
   if (s === "bing") return "Bing";
   if (s.includes("maps")) return "Google Maps";
@@ -24,157 +23,55 @@ function sourceLabel(source: string): string {
   return source;
 }
 
-/** Section shell — matches the Search & Analytics panel eyebrow rhythm so the
- *  two GA-backed panels read as one system. */
 function Shell({ children }: { children: React.ReactNode }) {
   return (
-    <section className="space-y-3">
-      <div>
-        <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-gray-muted">
-          Traffic
-        </p>
-        <h2 className="mt-1 font-display text-[18px] font-normal text-warm-black">
-          Where your visitors come from
-        </h2>
-      </div>
+    <section className="flex flex-col gap-3" aria-labelledby="sources-label">
+      <XaLabel id="sources-label">Where your visitors come from</XaLabel>
       {children}
     </section>
   );
 }
 
 /**
- * "Where your visitors come from" — the GA4 traffic-sources view. GA4 totals and
- * most-visited pages already render in the Search & Analytics panel; this fills
- * the missing piece (which channels send people your way) plus the pages they
- * land on. Connect-state mirrors the GSC connect prompt when GA4 is unconfigured.
+ * Which channels send people to the site, as labelled bars (the label sits on
+ * the bar, no legend). Search totals and pages live in the search panel above.
  */
 export function TrafficSourcesPanel({ ga, connectHref }: TrafficSourcesPanelProps) {
   const ok = ga?.status === "ok";
   const unavailable = ga?.status === "unavailable";
 
-  // Not linked yet — read as a next step, not a broken tab.
   if (!ok && !unavailable) {
     return (
       <Shell>
-        <div className="rounded-xl border border-accent/20 bg-accent-dim/40 p-5">
-          <div className="flex items-start gap-3">
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-surface-raised text-accent">
-              <Compass className="h-4 w-4" strokeWidth={1.5} />
-            </div>
-            <div className="min-w-0">
-              <p className="text-[14px] font-medium text-warm-black">
-                Connect Google and we&apos;ll show where your visitors come from
-              </p>
-              <p className="mt-1 text-[13px] leading-relaxed text-gray-muted">
-                Search, maps, social, or a direct link. See which channels send people to your
-                site and the pages they land on.
-              </p>
-              <Link
-                href={connectHref}
-                className="mt-3 inline-flex min-h-[40px] items-center justify-center gap-2 rounded-lg bg-accent px-4 text-[13px] font-medium text-on-accent transition-colors hover:bg-accent/85"
-              >
-                <Link2 className="h-4 w-4" strokeWidth={1.5} />
-                Connect Google
-              </Link>
-            </div>
-          </div>
-        </div>
+        <XaSays links={[<XaTextLink key="connect" href={connectHref}>Connect Google</XaTextLink>]}>Connect Google and I show where your visitors come from: search, maps, social or a direct link.</XaSays>
       </Shell>
     );
   }
-
-  // Configured, but data isn't ready this cycle. Honest, not alarming, no raw API error.
   if (!ok) {
-    return (
-      <Shell>
-        <div className="rounded-xl border border-glass-border bg-glass p-5">
-          <p className="text-[13px] leading-relaxed text-gray-muted">
-            Visitor sources couldn&apos;t be read this time. Strelva tries again on the next refresh.
-          </p>
-        </div>
-      </Shell>
-    );
+    return <Shell><p className="m-0 text-[15px] text-[var(--st-text-2)]">Google didn&apos;t answer this time. Strelva tries again at the next refresh.</p></Shell>;
   }
-
-  // ok === true implies ga?.status === "ok", so ga is defined here.
-  // Return early rather than casting so TypeScript narrows ga to GaPerf.
   if (!ga) return null;
   const sources = ga.topSources.filter((s) => s.sessions > 0).slice(0, 6);
-  const pages = ga.topPages.filter((p) => p.views > 0).slice(0, 5);
-
-  // Connected, but nothing measured yet (fresh property, no sessions).
-  if (sources.length === 0 && pages.length === 0) {
-    return (
-      <Shell>
-        <div className="rounded-xl border border-glass-border bg-glass p-5">
-          <p className="text-[13px] leading-relaxed text-gray-muted">
-            Google is connected. As visitors arrive, we&apos;ll show which channels bring them here.
-          </p>
-        </div>
-      </Shell>
-    );
+  if (sources.length === 0) {
+    return <Shell><p className="m-0 text-[15px] text-[var(--st-text-2)]">Google is connected. As visitors arrive, this shows which channels bring them.</p></Shell>;
   }
-
   const maxSessions = Math.max(1, ...sources.map((s) => s.sessions));
 
   return (
     <Shell>
-      <p className="text-[12px] text-gray-muted">Last 4 weeks</p>
-
-      {sources.length > 0 && (
-        <div className="space-y-2.5">
-          {sources.map((s, i) => {
-            const pct = Math.round((s.sessions / maxSessions) * 100);
-            return (
-              <div key={`${s.source}-${i}`} className="rounded-xl border border-glass-border bg-glass p-3.5">
-                <div className="flex items-center justify-between gap-3">
-                  <span className="truncate text-[13px] font-medium text-warm-black">
-                    {sourceLabel(s.source)}
-                  </span>
-                  <span className="shrink-0 text-[13px] tabular-nums text-gray-muted">
-                    {s.sessions.toLocaleString()} {s.sessions === 1 ? "visit" : "visits"}
-                  </span>
-                </div>
-                <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-surface-raised">
-                  <div
-                    className="h-full rounded-full bg-accent"
-                    style={{ width: `${pct}%` }}
-                    aria-hidden="true"
-                  />
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
-
-      {pages.length > 0 && (
-        <div className="space-y-2">
-          <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-gray-muted">
-            Where they land
-          </p>
-          <div className="overflow-hidden rounded-xl border border-glass-border bg-glass">
-            <table className="w-full text-left text-[13px]">
-              <thead>
-                <tr className="border-b border-glass-border text-[11px] uppercase tracking-wide text-gray-muted">
-                  <th scope="col" className="px-4 py-2.5 font-medium">Page</th>
-                  <th scope="col" className="px-4 py-2.5 text-right font-medium">Visits</th>
-                </tr>
-              </thead>
-              <tbody>
-                {pages.map((p, i) => (
-                  <tr key={`${p.path}-${i}`} className="border-t border-glass-border first:border-t-0">
-                    <td className="px-4 py-2.5 text-warm-black">{p.path}</td>
-                    <td className="px-4 py-2.5 text-right tabular-nums text-gray-fg">
-                      {p.views.toLocaleString()}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
+      <ul className="m-0 flex max-w-[640px] list-none flex-col gap-3 p-0" aria-label="Visits by where people came from, last 4 weeks">
+        {sources.map((s, i) => (
+          <li key={`${s.source}-${i}`} className="flex flex-col gap-1.5">
+            <div className="flex items-baseline justify-between gap-3 text-[15px]">
+              <span className="text-[var(--st-text)]">{sourceLabel(s.source)}</span>
+              <span className="tabular-nums text-[var(--st-text-2)]">{s.sessions.toLocaleString()} {s.sessions === 1 ? "visit" : "visits"}</span>
+            </div>
+            <div className="h-1.5 w-full overflow-hidden rounded-full bg-[var(--st-inset)]" aria-hidden="true">
+              <div className="h-full rounded-full bg-[var(--st-accent)]" style={{ width: `${Math.round((s.sessions / maxSessions) * 100)}%` }} />
+            </div>
+          </li>
+        ))}
+      </ul>
     </Shell>
   );
 }

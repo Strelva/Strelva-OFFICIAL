@@ -67,10 +67,10 @@ export function StatTile({
   const showDelta = typeof delta === "number" && delta !== 0;
 
   return (
-    <div className="flex flex-col rounded-xl border border-glass-border bg-glass p-4">
+    <div className="flex flex-col rounded-xl border border-glass-border p-4">
       <div className="mb-3 flex items-center gap-2 text-gray-muted">
         {icon}
-        <span className="text-[11px] font-medium uppercase tracking-[0.14em]">{label}</span>
+        <span className="text-[13px] font-medium">{label}</span>
       </div>
       <p className="font-display text-[30px] font-medium leading-none text-warm-black">
         {countUp && typeof value === "number" ? <CountUp end={value} /> : value}

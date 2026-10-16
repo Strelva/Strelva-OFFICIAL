@@ -34,16 +34,17 @@ describe("owner journey copy and links", () => {
   });
 
   it("leads the dashboard root with the verdict, not a static slogan", () => {
-    const dashboardPage = readRepoFile("src/app/dashboard/page.tsx");
+    const dashboardPage = readRepoFile("src/app/dashboard/page.tsx") + readRepoFile("src/components/dashboard/DashboardToday.tsx");
 
     // The old static slogan is gone; Today now leads with the weekly-report
     // verdict via the same buildVerdict pattern Analytics uses.
     expect(dashboardPage).not.toContain("See what is working. Change what is next.");
     expect(dashboardPage).toContain("buildVerdict");
-    expect(dashboardPage).toContain("People found you");
-    expect(dashboardPage).toContain("Customer actions");
+    // XA: the numbers are one sentence, never a KPI row.
+    expect(dashboardPage).toContain("found you so far");
+    expect(dashboardPage).toContain("clicked to book or called");
     expect(dashboardPage).toContain("Needs you");
-    expect(dashboardPage).toContain("Edit site");
+    expect(dashboardPage).not.toContain("<StatTile");
     expect(dashboardPage).not.toContain('redirect(withClientFallbackRoot(clientFallbackRoot, "/dashboard/chat"))');
   });
 
@@ -67,7 +68,7 @@ describe("owner journey copy and links", () => {
   });
 
   it("lands new owners on a single onboarding card, not a wall of welcome panels", () => {
-    const dashboardPage = readRepoFile("src/app/dashboard/page.tsx");
+    const dashboardPage = readRepoFile("src/app/dashboard/page.tsx") + readRepoFile("src/components/dashboard/DashboardToday.tsx");
 
     // Onboarding/welcome/retention are demoted to at most one contextual card:
     // fresh owners get the self-gating OnboardingChecklist (opened on day one),
@@ -75,7 +76,7 @@ describe("owner journey copy and links", () => {
     // welcome/next-move walls.
     expect(dashboardPage).toContain("OnboardingChecklist");
     expect(dashboardPage).toContain("defaultOpen={isFresh}");
-    expect(dashboardPage).toContain("{!isFresh ? <RetentionPanel signals={retentionSignals} /> : null}");
+    expect(dashboardPage).toContain("{!isFresh ? <RetentionPanel signals=");
     expect(dashboardPage).not.toContain("Your starter site is ready. Make the first useful wins.");
     expect(dashboardPage).not.toContain("Next useful move");
   });
@@ -83,18 +84,18 @@ describe("owner journey copy and links", () => {
   it("keeps rollback safety reachable under the Website History tab", () => {
     // Safety net + recent changes moved off the dashboard into Website > History
     // (site-management tools, not at-a-glance metrics).
-    const historyPage = readRepoFile("src/components/dashboard/SiteHistoryContent.tsx");
+    const historyPage = readRepoFile("src/components/dashboard/SiteHistoryContent.tsx") + readRepoFile("src/components/dashboard/SiteHistoryView.tsx");
     const safetyPanel = readRepoFile("src/components/dashboard/SiteSafetyPanel.tsx");
     const snapshotRoute = readRepoFile("src/app/api/site-snapshots/route.ts");
     const maintenance = readRepoFile("src/app/api/cron/maintenance/route.ts");
 
     expect(historyPage).toContain("getSiteSnapshots(tenant, 60)");
-    expect(historyPage).toContain('snapshots.status === "fulfilled"');
-    expect(historyPage).toContain("<SiteSafetyPanel snapshots={snapshots.value} />");
-    expect(safetyPanel).toContain("Restore from History");
-    expect(safetyPanel).toContain("Save to History");
-    // Per-row restore over the whole version history, not just the latest.
-    expect(safetyPanel).toContain("Restore this saved state");
+    expect(historyPage).toContain("<SiteSafetyPanel snapshots={snapshots} />");
+    // XA: saved versions, a named save, and a per-row way back over the whole history.
+    expect(safetyPanel).toContain("Saved versions");
+    expect(safetyPanel).toContain("Save one now");
+    expect(safetyPanel).toContain("Go back to this");
+    expect(safetyPanel).toContain("<ConfirmDialog");
     expect(snapshotRoute).toContain("restoreSiteSnapshot");
     expect(snapshotRoute).toContain("Saved a full-site backup");
     expect(snapshotRoute).toContain("Restored full site from");
@@ -105,7 +106,7 @@ describe("owner journey copy and links", () => {
   it("keeps retention proof and re-engagement signals wired into owner surfaces", () => {
     const packageJson = readRepoFile("package.json");
     const rootLayout = readRepoFile("src/app/layout.tsx");
-    const dashboardPage = readRepoFile("src/app/dashboard/page.tsx");
+    const dashboardPage = readRepoFile("src/app/dashboard/page.tsx") + readRepoFile("src/components/dashboard/DashboardToday.tsx");
     const chatPage = readRepoFile("src/app/dashboard/chat/page.tsx");
     // Report view moved onto the merged Analytics surface.
     const analyticsPage = readRepoFile("src/app/dashboard/analytics/page.tsx");
@@ -124,7 +125,8 @@ describe("owner journey copy and links", () => {
     expect(analyticsBoundary).toContain("analyticsAllowedPath(pathname)");
     expect(dashboardPage).toContain("getOwnerRetentionSignals(tenant)");
     expect(dashboardPage).toContain('<EngagementTracker event="dashboard-open" />');
-    expect(dashboardPage).toContain("<RetentionPanel signals={retentionSignals} />");
+    expect(dashboardPage).toContain("<RetentionPanel signals=");
+    expect(dashboardPage).toContain("retentionSignals");
     expect(chatPage).toContain('<EngagementTracker event="ai-chat-open" />');
     expect(analyticsPage).toContain('<EngagementTracker event="report-view" />');
     expect(tracker).toContain('"dashboard-open"');
@@ -132,9 +134,9 @@ describe("owner journey copy and links", () => {
     expect(tracker).toContain('"report-view"');
     expect(tracker).toContain('import { track } from "@vercel/analytics"');
     expect(tracker).toContain("track(event)");
-    expect(retentionPanel).toContain("Updates this week");
-    expect(retentionPanel).toContain("Traffic after updates");
-    expect(retentionPanel).toContain("Engagement signals");
+    // XA: the week's numbers are said once on Today; the panel is Pebble's one suggestion, never stat rows.
+    expect(retentionPanel).toContain("ownerNextAction");
+    expect(retentionPanel).not.toContain("<XaAnswers");
     expect(retentionPanel).not.toContain("Retention engine");
     expect(retention).toContain("queueRetentionReengagement");
     expect(retention).toContain("retention_reengagement");
@@ -163,10 +165,9 @@ describe("owner journey copy and links", () => {
     // Verdict-first: lead with a plain-English verdict + the 30-day trend.
     expect(weeklyBrief).toContain("buildVerdict");
     expect(trendChart).toContain("Last 30 days");
-    expect(weeklyBrief).toContain("Your first weekly report is still warming up");
-    // Links back to a real proof surface — "Go to Today" (the empty-report CTA;
-    // "Open dashboard" was misleading since the user is already in the dashboard).
-    expect(weeklyBrief).toContain("Go to Today");
+    expect(weeklyBrief).toContain("Your first report is on its way.");
+    // The empty report offers one useful next step instead of a wall of links.
+    expect(weeklyBrief).toContain("Ask Strelva for a small change meanwhile");
   });
 
   it("keeps the site editor focused on direct editing instead of embedded chat", () => {
@@ -183,17 +184,18 @@ describe("owner journey copy and links", () => {
     expect(workspace).not.toContain('label: "AI Chat"');
     expect(preview).toContain('useState<PreviewSource>("editable")');
     expect(preview).toContain("Active site");
-    expect(preview).toContain("Draft preview");
+    expect(preview).toContain("Your draft");
+    expect(preview).toContain("Screen size");
     expect(preview).toContain("Editable preview");
     expect(preview).toContain("buildAskAIPrompt");
     expect(preview).toContain("addEditReceipts");
     expect(properties).toContain("in the preview");
     expect(properties).toContain("Draft saved - preview updated");
-    expect(publishBar).toContain("Publish live");
-    // Owner-facing copy uses outcome language, not the internal platform name.
+    // GLOSSARY: the live approval reads "Make it live"; outcome language, no platform names.
+    expect(publishBar).toContain("Make it live");
     expect(publishBar).toContain("Save changes");
-    expect(publishBar).toContain("Live site refreshed");
-    expect(publishBar).toContain("Saved - live refresh failed");
+    expect(publishBar).toContain("Live on your site.");
+    expect(publishBar).toContain("The live site hasn't refreshed yet.");
   });
 
   it("keeps Integrations honest about setup and availability", () => {
@@ -201,15 +203,15 @@ describe("owner journey copy and links", () => {
     const detail = readRepoFile("src/components/dashboard/ConnectionDetailPage.tsx");
     const badges = readRepoFile("src/components/dashboard/SourceHealthBadge.tsx");
 
-    expect(sources).toContain("Connect your accounts");
-    expect(sources).toContain("expands what we can see and update");
-    // Plain-English setup status, no provider jargon ("OAuth ready" / "Manual
-    // Search Console setup" both leaked the mechanism).
+    expect(sources).toContain("Connections.");
+    expect(sources).toContain("lets Strelva see or do a little more");
+    // Plain-English setup status, no provider jargon.
     expect(sources).toContain("Not connected yet");
-    expect(sources).toContain("Needs a quick manual step");
-    expect(sources).not.toContain("OAuth ready");
+    expect(sources).toContain("Needs one manual step");
+    expect(sources).not.toContain("OAuth");
     expect(sources).not.toContain("Sources the AI can actually use");
-    expect(detail).toContain("not OAuth");
+    expect(detail).toContain("a key you paste in below, not a sign-in button");
+    expect(detail).not.toContain("OAuth");
     expect(badges).toContain("Setup needed");
   });
 
@@ -218,7 +220,7 @@ describe("owner journey copy and links", () => {
     const agentResults = readRepoFile("src/lib/agent-results.ts");
 
     expect(chatPanel).toContain("View site");
-    expect(chatPanel).toContain("Open Needs You");
+    expect(chatPanel).toContain("Open Needs you");
     expect(agentResults).toContain("The live site has the change");
     expect(chatPanel).not.toContain("Queued for review");
   });
@@ -253,7 +255,7 @@ describe("owner journey copy and links", () => {
 
     expect(ownerFiles).toContain("Make it live");
     expect(ownerFiles).toContain("Skip");
-    expect(ownerFiles).toContain("Needs You");
+    expect(ownerFiles).toContain("Needs you");
     expect(ownerFiles).toContain("Nothing needs you right now");
     expect(ownerFiles).not.toMatch(/Approval queue|Queued for review|admin review|stale section/);
   });

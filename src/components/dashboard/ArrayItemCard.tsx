@@ -61,7 +61,7 @@ function NestedArrayEditor({
   return (
     <div className="space-y-1.5">
       {rows.length === 0 && (
-        <p className="text-[11px] text-gray-muted italic">No {field.label.toLowerCase()} yet.</p>
+        <p className="text-[12px] text-gray-muted italic">No {field.label.toLowerCase()} yet.</p>
       )}
       {rows.map((row, idx) => (
         <div
@@ -70,7 +70,7 @@ function NestedArrayEditor({
         >
           {itemFields.map((f) => (
             <div key={f.key}>
-              <label className="block text-[11px] text-gray-muted mb-0.5">{f.label}</label>
+              <label className="block text-[12px] text-gray-muted mb-0.5">{f.label}</label>
               <FieldInput
                 field={f}
                 value={row[f.key]}
@@ -113,7 +113,7 @@ function NestedArrayEditor({
       <button
         type="button"
         onClick={(e) => { e.stopPropagation(); addRow(); }}
-        className="flex items-center gap-1 text-[11px] text-gray-fg hover:text-warm-black transition-colors px-1 py-0.5"
+        className="flex items-center gap-1 text-[12px] text-gray-fg hover:text-warm-black transition-colors px-1 py-0.5"
       >
         <Plus className="w-3 h-3" strokeWidth={2} />
         Add row
@@ -217,7 +217,7 @@ export function ArrayItemCard({
         <div className="min-w-0 flex-1">
           <p className="text-[12px] text-warm-black truncate font-medium leading-tight">{name}</p>
           {detail && !isExpanded && (
-            <p className="text-[11px] text-gray-faint truncate mt-0.5 leading-tight">{truncate(detail, 60)}</p>
+            <p className="text-[12px] text-gray-faint truncate mt-0.5 leading-tight">{truncate(detail, 60)}</p>
           )}
         </div>
         <ChevronDown
@@ -234,12 +234,12 @@ export function ArrayItemCard({
               <div key={field.key}>
                 {field.type === "toggle" ? (
                   <div className="flex items-center justify-between py-0.5">
-                    <span className="text-[11px] text-gray-fg">{field.label}</span>
+                    <span className="text-[12px] text-gray-fg">{field.label}</span>
                     <FieldInput field={field} value={item[field.key]} onChange={(val) => onChange(field.key, val)} />
                   </div>
                 ) : (
                   <>
-                    <label className="block text-[11px] text-gray-muted mb-0.5">
+                    <label className="block text-[12px] text-gray-muted mb-0.5">
                       {field.label}
                     </label>
                     <FieldInput
@@ -280,18 +280,18 @@ export function ArrayItemCard({
 
             {confirmDelete ? (
               <div className="flex items-center gap-2">
-                <span className="text-[11px] text-terra">Remove?</span>
+                <span className="text-[12px] text-terra">Remove?</span>
                 <button
                   type="button"
                   onClick={(e) => { e.stopPropagation(); onDelete(); }}
-                  className="text-[11px] font-medium text-critical hover:text-critical transition-colors"
+                  className="text-[12px] font-medium text-critical hover:text-critical transition-colors"
                 >
                   Yes
                 </button>
                 <button
                   type="button"
                   onClick={(e) => { e.stopPropagation(); setConfirmDelete(false); }}
-                  className="text-[11px] text-gray-muted hover:text-warm-black transition-colors"
+                  className="text-[12px] text-gray-muted hover:text-warm-black transition-colors"
                 >
                   No
                 </button>

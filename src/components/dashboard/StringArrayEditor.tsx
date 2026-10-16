@@ -59,7 +59,7 @@ export function StringArrayEditor({ config, data, onDataChange }: StringArrayEdi
     <div className="px-4 pt-2 pb-4">
       <div className="flex items-center gap-2 mb-2">
         <div className="h-px flex-1 bg-gray-border" />
-        <span className="text-[11px] text-gray-faint shrink-0">
+        <span className="text-[12px] text-gray-faint shrink-0">
           {config.label}: {items.length}
         </span>
       </div>
@@ -120,7 +120,7 @@ export function StringArrayEditor({ config, data, onDataChange }: StringArrayEdi
       <button
         type="button"
         onClick={handleAdd}
-        className="mt-2 w-full flex items-center justify-center gap-1 px-3 py-2 rounded-lg text-[11px] text-sage font-medium hover:bg-sage/[0.06] transition-colors duration-150"
+        className="mt-2 w-full flex items-center justify-center gap-1 px-3 py-2 rounded-lg text-[12px] text-sage font-medium hover:bg-sage/[0.06] transition-colors duration-150"
       >
         <Plus className="w-3 h-3" strokeWidth={2} />
         {config.addLabel}

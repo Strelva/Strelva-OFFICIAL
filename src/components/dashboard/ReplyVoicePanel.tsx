@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { MessageSquare, Check, Loader2, ChevronDown, Sparkles } from "lucide-react";
+import { XaButton, XaChoices, XaTextArea, XaTextLink } from "@/components/ui/strelva/Xa";
 import {
   REPLY_TEMPLATE_KINDS,
   type ReplyMode,
@@ -10,9 +10,9 @@ import {
 } from "@/lib/reviews/reply-voice";
 
 const MODES: { value: ReplyMode; label: string; blurb: string }[] = [
-  { value: "auto", label: "Auto-post", blurb: "Replies post automatically — you do nothing." },
-  { value: "approve", label: "Draft for me", blurb: "Each reply is written for you; you tap approve before it posts." },
-  { value: "off", label: "Off", blurb: "Strelva won't touch your reviews." },
+  { value: "auto", label: "Post them for me", blurb: "Replies post on their own after a short wait. You do nothing." },
+  { value: "approve", label: "Write them, I say yes", blurb: "Each reply is written for you and waits for your yes before it posts." },
+  { value: "off", label: "Leave my reviews alone", blurb: "Strelva doesn't write or post replies." },
 ];
 
 export function ReplyVoicePanel({ initialVoice }: { initialVoice: ReplyVoice }) {
@@ -54,117 +54,53 @@ export function ReplyVoicePanel({ initialVoice }: { initialVoice: ReplyVoice }) 
     }
   }
 
-  const activeMode = MODES.find((m) => m.value === mode);
+  const hasVoice = Boolean(guidance || Object.values(examples).some(Boolean));
 
   return (
-    <section className="mb-5 rounded-xl dashboard-panel p-5">
-      <div className="flex items-start gap-3">
-        <span className="mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-accent-dim text-accent">
-          <MessageSquare className="h-[18px] w-[18px]" strokeWidth={1.6} />
-        </span>
-        <div className="min-w-0 flex-1">
-          <h2 className="text-[15px] font-semibold text-warm-black">How Strelva answers your reviews</h2>
-          <p className="mt-0.5 text-[13px] leading-relaxed text-gray-muted">
-            Strelva answers your reviews in your voice. {activeMode?.blurb}
-          </p>
-        </div>
-      </div>
+    <section className="flex flex-col gap-4" aria-labelledby="reply-voice-label">
+      <XaChoices
+        label={<span id="reply-voice-label">How Strelva answers your reviews</span>}
+        value={mode}
+        onChange={setMode}
+        options={MODES.map((m) => ({ value: m.value, label: m.label, detail: m.blurb }))}
+      />
 
-      {/* Mode selector */}
-      <div className="mt-4 grid gap-2 sm:grid-cols-3">
-        {MODES.map((m) => {
-          const on = mode === m.value;
-          return (
-            <button
-              key={m.value}
-              type="button"
-              onClick={() => setMode(m.value)}
-              className={`rounded-lg border p-3 text-left transition-colors ${
-                on ? "border-accent/60 bg-accent-dim" : "border-glass-border bg-glass hover:border-gray-border"
-              }`}
-            >
-              <div className="flex items-center justify-between">
-                <span className={`text-[13px] font-semibold ${on ? "text-warm-black" : "text-warm-black/90"}`}>{m.label}</span>
-                {on && <Check className="h-4 w-4 text-accent" strokeWidth={2.4} />}
-              </div>
-              <p className="mt-1 text-[11.5px] leading-snug text-gray-muted">{m.blurb}</p>
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Voice editor — collapsed by default so the surface stays calm */}
       {mode !== "off" && (
-        <div className="mt-4">
-          <button
-            type="button"
-            onClick={() => setOpen((v) => !v)}
-            className="flex w-full items-center justify-between rounded-lg border border-glass-border bg-glass px-3.5 py-2.5 text-[13px] font-medium text-warm-black transition-colors hover:border-gray-border"
-          >
-            <span className="flex items-center gap-2">
-              <Sparkles className="h-4 w-4 text-accent" strokeWidth={1.7} />
-              Tune your voice
-              {(guidance || Object.values(examples).some(Boolean)) && (
-                <span className="rounded-full bg-accent-dim px-2 py-0.5 text-[10.5px] font-semibold text-accent">set</span>
-              )}
-            </span>
-            <ChevronDown className={`h-4 w-4 text-gray-muted transition-transform ${open ? "" : "-rotate-90"}`} strokeWidth={2} />
-          </button>
-
+        <div className="flex flex-col gap-4">
+          <p className="m-0 text-[14px]">
+            <XaTextLink onClick={() => setOpen((v) => !v)} aria-label={open ? "Hide your voice" : "Tune your voice"}>{open ? "Hide your voice" : hasVoice ? "Change your voice" : "Tune your voice"}</XaTextLink>
+          </p>
           {open && (
-            <div className="mt-3 space-y-4">
-              <label className="block">
-                <span className="text-[12px] font-medium text-warm-black">How you sound</span>
-                <span className="mt-0.5 block text-[11.5px] text-gray-muted">
-                  One line on your tone &mdash; e.g. &ldquo;warm, straight-talking, we use first names and never sound corporate.&rdquo;
-                </span>
-                <textarea
-                  value={guidance}
-                  onChange={(e) => setGuidance(e.target.value)}
+            <div className="flex max-w-[620px] flex-col gap-4">
+              <XaTextArea
+                label="How you sound"
+                hint="One line on your tone, like: warm, straight-talking, first names, never corporate."
+                value={guidance}
+                onChange={(e) => setGuidance(e.target.value)}
+                rows={2}
+                maxLength={600}
+                placeholder="Friendly and down to earth. First names, no jargon, quick to thank people by name."
+              />
+              {REPLY_TEMPLATE_KINDS.map((k) => (
+                <XaTextArea
+                  key={k.key}
+                  label={`Example reply: ${k.label.toLowerCase()}`}
+                  hint={k.hint}
+                  value={examples[k.key]}
+                  onChange={(e) => setExamples((prev) => ({ ...prev, [k.key]: e.target.value }))}
                   rows={2}
-                  maxLength={600}
-                  placeholder="Friendly and down to earth. First names, no jargon, quick to thank people by name."
-                  className="mt-1.5 w-full resize-none rounded-lg border border-glass-border bg-glass px-3 py-2 text-[13px] text-warm-black placeholder:text-gray-faint focus:border-accent/50 focus:outline-none"
+                  maxLength={500}
                 />
-              </label>
-
-              <div className="space-y-3">
-                <span className="text-[12px] font-medium text-warm-black">Example replies</span>
-                <span className="-mt-2 block text-[11.5px] text-gray-muted">
-                  Write one reply the way you&rsquo;d actually say it for each type. Strelva mirrors the tone &mdash; never copies the words.
-                </span>
-                {REPLY_TEMPLATE_KINDS.map((k) => (
-                  <label key={k.key} className="block">
-                    <span className="flex items-baseline gap-2 text-[12px] font-medium text-warm-black">
-                      {k.label}
-                      <span className="text-[11px] font-normal text-gray-faint">{k.hint}</span>
-                    </span>
-                    <textarea
-                      value={examples[k.key]}
-                      onChange={(e) => setExamples((prev) => ({ ...prev, [k.key]: e.target.value }))}
-                      rows={2}
-                      maxLength={500}
-                      className="mt-1 w-full resize-none rounded-lg border border-glass-border bg-glass px-3 py-2 text-[13px] text-warm-black placeholder:text-gray-faint focus:border-accent/50 focus:outline-none"
-                    />
-                  </label>
-                ))}
-              </div>
+              ))}
+              <p className="m-0 text-[13px] text-[var(--st-text-3)]">Strelva mirrors the tone of your examples and never copies the words.</p>
             </div>
           )}
         </div>
       )}
 
-      <div className="mt-4 flex items-center gap-3">
-        <button
-          type="button"
-          onClick={save}
-          disabled={saving}
-          className="inline-flex items-center gap-2 rounded-lg bg-accent px-4 py-2 text-[13px] font-medium text-on-accent transition-colors hover:bg-accent/85 disabled:opacity-60"
-        >
-          {saving ? <Loader2 className="h-4 w-4 animate-spin" strokeWidth={2} /> : saved ? <Check className="h-4 w-4" strokeWidth={2.4} /> : null}
-          {saved ? "Saved" : "Save"}
-        </button>
-        {error && <span className="text-[12px] text-critical">{error}</span>}
+      <div className="flex flex-wrap items-center gap-3">
+        <XaButton busy={saving} onClick={save}>{saved ? "Saved" : "Save how Strelva answers"}</XaButton>
+        {error ? <span className="text-[14px] text-[var(--st-critical)]" role="alert">{error}</span> : null}
       </div>
     </section>
   );

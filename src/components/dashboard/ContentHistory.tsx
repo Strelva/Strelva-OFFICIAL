@@ -228,19 +228,19 @@ export function ContentHistory({ section, onRestored }: ContentHistoryProps) {
         <div className="flex items-center gap-2 px-4 py-2.5 border-b border-gray-border shrink-0">
           <button
             onClick={() => setSelected(null)}
-            className="flex items-center gap-1 text-[11px] text-gray-muted hover:text-warm-black transition-colors"
+            className="flex items-center gap-1 text-[12px] text-gray-muted hover:text-warm-black transition-colors"
           >
             <ArrowLeft className="w-3 h-3" strokeWidth={1.5} />
             Back
           </button>
-          <span className="text-[11px] text-gray-muted">
+          <span className="text-[12px] text-gray-muted">
             {relativeTime(selected.time)} · {selected.actor ?? "user"}
           </span>
-          {selected.requestId ? <span className="text-[11px] text-gray-muted">Request {selected.requestId.slice(-8)}</span> : null}
+          {selected.requestId ? <span className="text-[12px] text-gray-muted">Request {selected.requestId.slice(-8)}</span> : null}
         </div>
 
         <div className="flex items-center justify-between px-4 py-2 border-b border-gray-border bg-gray-bg-alt shrink-0">
-          <span className="text-[11px] text-gray-muted">Preview (read-only)</span>
+          <span className="text-[12px] text-gray-muted">Preview (read-only)</span>
           <Button
             variant="primary"
             size="sm"
@@ -255,24 +255,24 @@ export function ContentHistory({ section, onRestored }: ContentHistoryProps) {
         {status === "success" && (
           <div className="flex items-center gap-2 px-4 py-2 border-b border-gray-border bg-positive0/[0.04] shrink-0">
             <Check className="w-3 h-3 text-positive" strokeWidth={1.5} />
-            <span className="text-[11px] text-positive">Restored to draft. Review before publishing</span>
+            <span className="text-[12px] text-positive">Restored to draft. Review before publishing</span>
           </div>
         )}
         {status === "error" && (
           <div className="flex items-center gap-2 px-4 py-2 border-b border-gray-border bg-critical0/[0.04] shrink-0">
             <AlertCircle className="w-3 h-3 text-critical0" strokeWidth={1.5} />
-            <span className="text-[11px] text-critical">Couldn&apos;t restore. Try again</span>
+            <span className="text-[12px] text-critical">Couldn&apos;t restore. Try again</span>
           </div>
         )}
 
         <div className="flex-1 overflow-y-auto">
           {preview.length === 0 ? (
-            <p className="px-4 py-3 text-[11px] text-gray-muted">No fields in this snapshot.</p>
+            <p className="px-4 py-3 text-[12px] text-gray-muted">No fields in this snapshot.</p>
           ) : (
             <ul className="divide-y divide-gray-border">
               {preview.map((row, i) => (
                 <li key={`${row.key}-${i}`} className="px-4 py-2">
-                  <div className="text-[11px] uppercase tracking-wider text-gray-muted truncate">
+                  <div className="text-[13px] text-gray-muted truncate">
                     {row.key}
                   </div>
                   <div className="text-[12px] text-warm-black break-words line-clamp-3">
@@ -291,7 +291,7 @@ export function ContentHistory({ section, onRestored }: ContentHistoryProps) {
   return (
     <div className="flex flex-col h-full bg-surface">
       <div className="px-4 py-2.5 border-b border-gray-border shrink-0">
-        <span className="text-[11px] uppercase tracking-wider text-gray-muted">
+        <span className="text-[13px] text-gray-muted">
           History · {entries.length} saved {entries.length === 1 ? "state" : "states"}
         </span>
       </div>
@@ -312,12 +312,12 @@ export function ContentHistory({ section, onRestored }: ContentHistoryProps) {
                   <span className="text-[12px] font-medium text-warm-black">
                     {relativeTime(entry.time)}
                   </span>
-                  <span className="text-[11px] text-gray-muted uppercase tracking-wider">
+                  <span className="text-[13px] text-gray-muted">
                     {entry.actor ?? "user"}
                   </span>
                 </div>
-                <div className="text-[11px] text-gray-muted mt-0.5 truncate">{summary}</div>
-                {entry.requestId ? <div className="text-[10px] text-gray-faint mt-0.5">Governed request {entry.requestId.slice(-8)}</div> : null}
+                <div className="text-[12px] text-gray-muted mt-0.5 truncate">{summary}</div>
+                {entry.requestId ? <div className="text-[12px] text-gray-faint mt-0.5">Governed request {entry.requestId.slice(-8)}</div> : null}
               </button>
             </li>
           );

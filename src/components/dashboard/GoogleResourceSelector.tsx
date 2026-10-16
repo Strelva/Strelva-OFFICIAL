@@ -1,16 +1,17 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Check, Loader2, RefreshCw } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { useDashboardOptional } from "./DashboardContext";
 import type { GoogleResource, GoogleResourceCatalog } from "@/lib/google-resources";
 
 type ResourceKind = "gsc" | "ga4" | "gbp";
 
-const LABELS: Record<ResourceKind, { title: string; empty: string }> = {
-  gsc: { title: "Search Console", empty: "No Search Console properties are available to this Google account." },
-  ga4: { title: "Analytics", empty: "No GA4 properties are available to this Google account." },
-  gbp: { title: "Business Profile", empty: "No Business Profile locations are available to this Google account." },
+/** What each Google account part is for, in owner words (GLOSSARY: Google listing). */
+const WORDS: Record<ResourceKind, { what: string; ask: string; none: string }> = {
+  gsc: { what: "what people search before they find you", ask: "Which site should Strelva read searches for?", none: "This Google account has no search data for your site yet." },
+  ga4: { what: "who visits your site", ask: "Which site should Strelva count visits for?", none: "This Google account has no visit counts for your site yet." },
+  gbp: { what: "your Google listing", ask: "Which Google listing is yours?", none: "This Google account has no Google listing yet." },
 };
 
 function selectedId(kind: ResourceKind, catalog: GoogleResourceCatalog): string {
@@ -20,53 +21,40 @@ function selectedId(kind: ResourceKind, catalog: GoogleResourceCatalog): string 
   return catalog[kind].selected ?? "";
 }
 
-function ResourceSelect({
-  kind,
-  catalog,
-  saving,
-  onSelect,
-}: {
-  kind: ResourceKind;
-  catalog: GoogleResourceCatalog;
-  saving: ResourceKind | null;
-  onSelect: (kind: ResourceKind, id: string) => void;
-}) {
-  const group = catalog[kind];
-  const label = LABELS[kind];
-  const value = selectedId(kind, catalog);
-  const disabled = group.status !== "ready" || saving !== null;
-  const statusText = group.status === "not_granted"
-    ? "Reconnect Google to grant this permission."
-    : group.status === "unavailable"
-      ? "Could not load resources. Try again."
-      : group.resources.length === 0
-        ? label.empty
-        : "Choose the resource this business uses.";
+function chosen(kind: ResourceKind, catalog: GoogleResourceCatalog): GoogleResource | null {
+  const id = selectedId(kind, catalog);
+  return id ? catalog[kind].resources.find((item) => item.id === id) ?? null : null;
+}
 
-  return (
-    <label className="block rounded-xl border border-gray-border bg-surface-raised p-3.5">
-      <span className="flex items-center justify-between gap-3 text-[13px] font-medium text-warm-black">
-        {label.title}
-        {value ? <Check className="h-3.5 w-3.5 text-positive" aria-label="Selected" /> : null}
-      </span>
-      <select
-        value={value}
-        onChange={(event) => onSelect(kind, event.target.value)}
-        disabled={disabled}
-        className="mt-2 w-full rounded-lg border border-gray-border bg-surface-base px-3 py-2 text-[13px] text-warm-black outline-none focus:border-accent/50 disabled:cursor-not-allowed disabled:opacity-60"
-        aria-label={`${label.title} resource`}
-      >
-        <option value="">{group.resources.length ? "Choose a resource" : "No resource selected"}</option>
-        {group.resources.map((item: GoogleResource) => (
-          <option key={item.id} value={item.id}>
-            {item.label}{item.detail ? ` · ${item.detail}` : ""}
-          </option>
-        ))}
-      </select>
-      <span className="mt-1.5 block text-[11px] leading-relaxed text-gray-muted">{statusText}</span>
-      {saving === kind ? <span className="mt-2 inline-flex items-center gap-1.5 text-[11px] text-gray-muted"><Loader2 className="h-3 w-3 animate-spin" />Saving selection…</span> : null}
-    </label>
-  );
+/** A choice is missing when Google offers more than one and none is picked, or the permission was never given. */
+function missing(kind: ResourceKind, catalog: GoogleResourceCatalog): boolean {
+  const group = catalog[kind];
+  if (group.status === "not_granted") return true;
+  return group.status === "ready" && !selectedId(kind, catalog) && group.resources.length > 0;
+}
+
+/** One missing choice as one sentence, with the choice beside it. */
+function ResourceChoice({ kind, catalog, saving, onSelect }: { kind: ResourceKind; catalog: GoogleResourceCatalog; saving: ResourceKind | null; onSelect: (kind: ResourceKind, id: string) => void }) {
+  const group = catalog[kind];
+  const words = WORDS[kind];
+  if (group.status === "not_granted") return <p className="m-0 text-[15px] leading-[1.5] text-[var(--st-text-body)]">Strelva can&apos;t see {words.what} yet. Connect Google again and allow it.</p>;
+  return <label className="flex flex-col gap-2">
+    <span className="text-[15px] leading-[1.5] text-[var(--st-text-body)]">{words.ask}</span>
+    <select value={selectedId(kind, catalog)} onChange={(event) => onSelect(kind, event.target.value)} disabled={saving !== null}
+      className="min-h-[44px] w-full max-w-[420px] rounded-[var(--st-r-md)] border border-[var(--st-line)] bg-[var(--st-surface)] px-3 text-[15px] text-[var(--st-text)] outline-none focus-visible:border-[var(--st-accent)] disabled:cursor-not-allowed disabled:opacity-60">
+      <option value="">Pick one</option>
+      {group.resources.map((item: GoogleResource) => <option key={item.id} value={item.id}>{item.label}{item.detail ? `, ${item.detail}` : ""}</option>)}
+    </select>
+    {saving === kind ? <span className="inline-flex items-center gap-1.5 text-[13px] text-[var(--st-text-2)]"><Loader2 className="h-3 w-3 motion-safe:animate-spin" aria-hidden="true" />Saving</span> : null}
+  </label>;
+}
+
+/** What Strelva reads from Google, as one sentence: "Strelva reads harbordental.com and your Harbor Dental listing from Google." */
+function readsSentence(catalog: GoogleResourceCatalog): string | null {
+  const site = chosen("gsc", catalog) ?? chosen("ga4", catalog);
+  const listing = chosen("gbp", catalog);
+  const parts = [site ? site.label : null, listing ? `your ${listing.label} listing` : null].filter(Boolean);
+  return parts.length ? `Strelva reads ${parts.join(" and ")} from Google.` : null;
 }
 
 export function GoogleResourceSelector({ connected }: { connected: boolean }) {
@@ -117,25 +105,15 @@ export function GoogleResourceSelector({ connected }: { connected: boolean }) {
   }
 
   if (!connected) return null;
+  const kinds = (["gbp", "gsc", "ga4"] as const).filter((kind) => catalog && missing(kind, catalog));
+  const sentence = catalog ? readsSentence(catalog) : null;
 
   return (
-    <section className="mb-8 rounded-2xl border border-glass-border bg-glass p-4 sm:p-5" aria-labelledby="google-resource-title">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-gray-muted">Google account setup</p>
-          <h2 id="google-resource-title" className="mt-1 text-[16px] font-medium text-warm-black">Choose what Strelva should use</h2>
-          <p className="mt-1.5 max-w-2xl text-[12px] leading-relaxed text-gray-muted">Your Google account can contain more than one property or listing. Pick the right ones here so nobody has to copy IDs into an admin screen.</p>
-        </div>
-        <button type="button" onClick={() => void load()} disabled={loading || saving !== null} className="inline-flex min-h-[34px] shrink-0 items-center justify-center gap-2 rounded-lg border border-gray-border px-3 py-2 text-[12px] text-gray-muted hover:border-accent/35 hover:text-warm-black disabled:opacity-60">
-          <RefreshCw className={loading ? "h-3.5 w-3.5 animate-spin" : "h-3.5 w-3.5"} />
-          Refresh
-        </button>
-      </div>
-      {loading && !catalog ? <p className="mt-5 text-[12px] text-gray-muted">Loading resources from Google…</p> : null}
-      {catalog ? <div className="mt-5 grid gap-3 md:grid-cols-3">
-        {(["gsc", "ga4", "gbp"] as const).map((kind) => <ResourceSelect key={kind} kind={kind} catalog={catalog} saving={saving} onSelect={(nextKind, id) => void select(nextKind, id)} />)}
-      </div> : null}
-      {error ? <p className="mt-4 text-[12px] text-critical" role="alert">{error}</p> : null}
+    <section className="flex flex-col gap-3" aria-label="What Strelva reads from Google">
+      {loading && !catalog ? <p className="m-0 text-[15px] text-[var(--st-text-2)]">Asking Google what this account holds</p> : null}
+      {sentence ? <p className="m-0 text-[15px] leading-[1.5] text-[var(--st-text-body)]">{sentence}</p> : null}
+      {catalog ? kinds.map((kind) => <ResourceChoice key={kind} kind={kind} catalog={catalog} saving={saving} onSelect={(nextKind, id) => void select(nextKind, id)} />) : null}
+      {error ? <p className="m-0 text-[14px] text-[var(--st-critical)]" role="alert">{error} <button type="button" onClick={() => void load()} className="border-0 bg-transparent p-0 font-medium text-[var(--st-accent)] hover:underline">Try again</button></p> : null}
     </section>
   );
 }

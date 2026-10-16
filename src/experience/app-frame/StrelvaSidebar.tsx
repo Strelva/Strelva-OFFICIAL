@@ -81,6 +81,9 @@ interface Props {
   allClients?: { href: string; onOpen?: () => void };
   /** October 15: XA is the default look; "paper" keeps the October 9 sidebar. */
   look?: "xa" | "paper";
+  /** XA only: the sidebar shows the caller's navigation and the account, no workspace places. */
+  navigationOnly?: boolean;
+  accountHref?: string;
   /** XA: the business's agency, shown under "Your agency". */
   agency?: StrelvaAgencyLink;
   /** XA: which business details place is open (billing and export set it). */

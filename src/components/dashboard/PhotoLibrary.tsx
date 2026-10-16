@@ -3,10 +3,13 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { Upload } from "lucide-react";
 import Image from "next/image";
-import { StEmpty, StHead, StMono, StNotice, StPage, StPill, StRow, StRows, StSkeleton, StState } from "@/components/ui/strelva/Kit";
+import { StSkeleton } from "@/components/ui/strelva/Kit";
+import { XaButton, XaEmpty, XaRow, XaRows } from "@/components/ui/strelva/Xa";
+import { DashNote, DashPage } from "@/components/dashboard/xa/DashboardXa";
 import styles from "./website-library.module.css";
 import { cn } from "@/lib/cn";
 import type { MediaAsset } from "@/lib/media";
+import { photoCaption } from "@/lib/media";
 import { PhotoDetail } from "@/components/dashboard/PhotoDetail";
 import { useDashboardOptional } from "@/components/dashboard/DashboardContext";
 
@@ -35,16 +38,8 @@ export function PhotoLibrary() {
   const [uploadProgress, setUploadProgress] = useState<{ current: number; total: number } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dragCounterRef = useRef(0);
-  const newestUpload = Math.max(
-    0,
-    ...assets.map((asset) => new Date(asset.createdAt || 0).getTime()).filter(Number.isFinite),
-  );
-  const recentCount = newestUpload
-    ? assets.filter((asset) => {
-        const uploaded = new Date(asset.createdAt || 0).getTime();
-        return Number.isFinite(uploaded) && newestUpload - uploaded < 30 * 86_400_000;
-      }).length
-    : 0;
+  const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).getTime();
+  const thisMonth = assets.filter((asset) => new Date(asset.createdAt || 0).getTime() >= monthStart).length;
 
   // Fetch assets on mount
   useEffect(() => {
@@ -75,7 +70,7 @@ export function PhotoLibrary() {
         results.push({
           name: file.name,
           status: "unsupported",
-          message: "Unsupported file type. Upload an image file.",
+          message: "Not a photo. Add an image file.",
         });
         setUploadResults([...results]);
         continue;
@@ -85,7 +80,7 @@ export function PhotoLibrary() {
         results.push({
           name: file.name,
           status: "too-large",
-          message: "Too large. Max size is 5MB.",
+          message: "Too large. Photos can be up to 5 MB.",
         });
         setUploadResults([...results]);
         continue;
@@ -111,14 +106,14 @@ export function PhotoLibrary() {
           results.push({
             name: file.name,
             status: "failed",
-            message: "Upload failed. Try again.",
+            message: "Didn't upload. Try again.",
           });
         }
       } catch {
         results.push({
           name: file.name,
           status: "failed",
-          message: "Upload failed. Check your connection and try again.",
+          message: "Didn't upload. Check your connection and try again.",
         });
       }
       setUploadResults([...results]);
@@ -190,18 +185,39 @@ export function PhotoLibrary() {
     }
   };
 
+  const upload = () => fileInputRef.current?.click();
+
   return <div className={styles.library} onDragEnter={handleDragEnter} onDragLeave={handleDragLeave} onDragOver={handleDragOver} onDrop={handleDrop}>
-    <StPage><StHead title="Photos and files" meta={`${assets.length} photos · uploads are images up to 5 MB`} actions={<StPill variant="soft" busy={uploading} disabled={readOnly} onClick={() => fileInputRef.current?.click()}><Upload size={16} aria-hidden="true" />{uploading ? "Uploading…" : "Upload photos"}</StPill>} />
-      <input ref={fileInputRef} type="file" accept="image/*" multiple className="hidden" onChange={handleFileChange} disabled={readOnly} />
-      {readOnly ? <StNotice>You can see these photos. Only an owner or admin can upload or remove them.</StNotice> : null}
-      {uploading && uploadProgress ? <StNotice><span role="status">Uploading <StMono>{uploadProgress.current} of {uploadProgress.total}</StMono>…</span></StNotice> : null}
-      {!uploading && uploadSummary ? <div className={styles.stack}><StState kind={uploadSummary.failed ? "need" : "live"}>{uploadSummary.uploaded} uploaded, {uploadSummary.failed} failed or skipped</StState><StRows label="Upload results">{uploadResults.map((result, index) => <StRow key={`${result.name}-${index}`} title={result.name} end={<StState kind={result.status === "uploaded" ? "live" : "need"}>{result.message}</StState>} />)}</StRows></div> : null}
-      {dragging && !readOnly ? <StNotice>Drop photos here to upload them.</StNotice> : null}
-      {loading ? <section className={styles.stack} aria-busy="true" aria-label="Loading photos"><StSkeleton /><StSkeleton width="80%" /></section> : loadError ? <StNotice tone="critical">The photos could not be read. Reload this page to try again; the library is unchanged.</StNotice> : assets.length === 0 ? <StEmpty action={<StPill variant="soft" disabled={readOnly} onClick={() => fileInputRef.current?.click()}>Add first photos</StPill>}>No photos yet. Add photos of your space, team, and work for Strelva to use on the site.</StEmpty> : <>
-        <p className={styles.description}><StMono>{recentCount}</StMono> added within 30 days of the latest photo.</p>
-        <div className={styles.photoGrid}>{assets.map(asset => <div key={asset.id} className={styles.photoItem}><button type="button" aria-label={`Open ${asset.filename}`} aria-pressed={selected?.id === asset.id} onClick={() => setSelected(selected?.id === asset.id ? null : asset)} className={cn(styles.photo, selected?.id === asset.id && styles.selected)}><Image src={asset.url} alt={asset.filename} fill className="object-cover" sizes="(max-width: 767px) 50vw, 25vw" /></button><span>{asset.filename}</span><StMono>{asset.width} × {asset.height}</StMono></div>)}</div>
-      </>}
-    </StPage>
+    <DashPage
+      title="Photos."
+      quiet={assets.length ? `${assets.length} ${assets.length === 1 ? "photo" : "photos"} Strelva can use on your site.` : "Photos Strelva can use on your site."}
+      actions={assets.length > 0 || loading || loadError ? <XaButton busy={uploading} disabled={readOnly} onClick={upload}><Upload size={15} aria-hidden="true" />{uploading ? "Uploading" : "Add photos"}</XaButton> : undefined}
+      width="wide"
+      label="Photos"
+    >
+      <input ref={fileInputRef} type="file" accept="image/*" multiple className="hidden" onChange={handleFileChange} disabled={readOnly} aria-label="Choose photos to add" />
+      {readOnly ? <DashNote tone="quiet">You can see these photos. Only an owner or admin can add or remove them.</DashNote> : null}
+      {uploading && uploadProgress ? <DashNote tone="quiet" role="status">Adding <span className="tabular-nums">{uploadProgress.current} of {uploadProgress.total}</span>.</DashNote> : null}
+      {!uploading && uploadSummary ? <section className="flex flex-col gap-2" aria-label="Upload results">
+        <DashNote tone={uploadSummary.failed ? "waits" : "live"} role="status">{uploadSummary.uploaded} uploaded, {uploadSummary.failed} failed or skipped</DashNote>
+        {uploadSummary.failed ? <XaRows label="Upload results">{uploadResults.filter((result) => result.status !== "uploaded").map((result, index) => <XaRow key={`${result.name}-${index}`} title={result.name} detail={result.message} tone="waits" />)}</XaRows> : null}
+      </section> : null}
+      {dragging && !readOnly ? <DashNote tone="quiet">Drop the photos anywhere here to add them.</DashNote> : null}
+      {loading ? <section className="flex flex-col gap-3" aria-busy="true" aria-label="Loading photos"><StSkeleton /><StSkeleton width="80%" /></section>
+        : loadError ? <DashNote tone="down" role="alert">The photos could not be read. Reload this page to try again; the library is unchanged.</DashNote>
+        : assets.length === 0 ? <XaEmpty pose="adds" title="No photos yet." job="Ready to place your photos on the site" action={<XaButton variant="primary" disabled={readOnly} onClick={upload}>Add your first photos</XaButton>}>Photos of your space, your team and your work. Images up to 5 MB.</XaEmpty>
+        : <>
+          <p className="m-0 text-[14px] text-[var(--st-text-2)]">{thisMonth === 0 ? "None added this month." : `${thisMonth} added this month.`} Drop photos anywhere here to add more.</p>
+          <div className={styles.photoGrid}>{assets.map(asset => {
+            const caption = photoCaption(asset.filename);
+            return <div key={asset.id} className={styles.photoItem}>
+              <button type="button" aria-label={`Open ${caption}`} aria-pressed={selected?.id === asset.id} onClick={() => setSelected(selected?.id === asset.id ? null : asset)} className={cn(styles.photo, selected?.id === asset.id && styles.selected)}><Image src={asset.url} alt={caption} fill className="object-cover" sizes="(max-width: 767px) 50vw, 25vw" /></button>
+              <span>{caption}</span>
+              <span className="text-[13px] text-[var(--st-text-3)]">Added {new Date(asset.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}</span>
+            </div>;
+          })}</div>
+        </>}
+    </DashPage>
     <PhotoDetail asset={selected} onClose={() => setSelected(null)} onDelete={readOnly ? undefined : deleteAsset} />
   </div>;
 }

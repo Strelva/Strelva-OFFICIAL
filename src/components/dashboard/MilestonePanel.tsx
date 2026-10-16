@@ -1,127 +1,39 @@
-import { ArrowRight, Flag, Gauge, MessageSquareText, Star, Users } from "lucide-react";
-import type { ComponentType } from "react";
+import { XaAnswers, XaLabel } from "@/components/ui/strelva/Xa";
 import type { Milestone, MilestoneMetric } from "@/lib/milestone";
-import { Sparkline } from "./Sparkline";
 
-const METRIC_ICON: Record<MilestoneMetric["key"], ComponentType<{ className?: string; strokeWidth?: number }>> = {
-  visitors: Users,
-  reviews: MessageSquareText,
-  rating: Star,
-  health: Gauge,
-};
-
-/** Up is the only celebrated direction. Flat/down/new render neutrally — the
- *  product rule is that a metric that didn't move is shown honestly, never spun. */
-function valueClass(direction: MilestoneMetric["direction"]): string {
-  return direction === "up" ? "text-positive" : "text-warm-black";
-}
-
-function MetricTile({ metric, series }: { metric: MilestoneMetric; series?: number[] }) {
-  const Icon = METRIC_ICON[metric.key];
-
-  return (
-    <div className="flex flex-col rounded-xl border border-gray-border/70 bg-surface-raised p-4">
-      <div className="mb-3 flex items-center gap-2 text-gray-muted">
-        <Icon className="h-4 w-4" strokeWidth={1.5} />
-        <span className="text-[11px] font-medium uppercase tracking-[0.12em]">{metric.label}</span>
-      </div>
-
-      {metric.kind === "total" ? (
-        <p className={`text-[28px] font-semibold leading-none ${valueClass(metric.direction)}`}>
-          {metric.now}
-        </p>
-      ) : metric.then !== null ? (
-        // then -> now, the before/after the whole panel exists to show.
-        <div className="flex items-baseline gap-2">
-          <span className="text-[20px] font-medium leading-none text-gray-muted">{metric.then}</span>
-          <ArrowRight className="h-4 w-4 shrink-0 text-gray-muted" strokeWidth={1.6} />
-          <span className={`text-[28px] font-semibold leading-none ${valueClass(metric.direction)}`}>
-            {metric.now}
-          </span>
-        </div>
-      ) : (
-        // No earlier baseline yet: show where you are now + when tracking began,
-        // never a fabricated "then".
-        <div>
-          <p className={`text-[28px] font-semibold leading-none ${valueClass(metric.direction)}`}>
-            {metric.now}
-          </p>
-          {metric.trackingSince && (
-            <p className="mt-1.5 text-[11px] font-medium uppercase tracking-[0.1em] text-gray-muted">
-              tracking since {metric.trackingSince}
-            </p>
-          )}
-        </div>
-      )}
-
-      <p className="mt-2 text-[12px] leading-relaxed text-gray-muted">{metric.caption}</p>
-      {series && series.length > 1 && (
-        <div className="mt-3 pt-0.5">
-          <Sparkline series={series} />
-        </div>
-      )}
-    </div>
-  );
+/** One metric as a plain then-to-now answer. A metric that didn't move is said honestly, never spun. */
+function answer(metric: MilestoneMetric): string {
+  if (metric.kind === "total") return `${metric.now}. ${metric.caption}`;
+  if (metric.then !== null) return `${metric.then} then, ${metric.now} now. ${metric.caption}`;
+  return `${metric.now}${metric.trackingSince ? `, tracking since ${metric.trackingSince}` : ""}. ${metric.caption}`;
 }
 
 /**
- * The 90-day "prove it" milestone. Surfaces a concrete before/after so a client
- * sees a real win before the churn window — the retention wedge. Two states:
- * a forward-looking "building" state for young/quiet tenants, and the full
- * then -> now recap once there's enough measured history.
+ * The 90-day "prove it" milestone: a concrete before and after, said as
+ * answers. Two states: building (young or quiet businesses) and the full
+ * then-to-now recap once there's enough measured history.
  */
-export function MilestonePanel({ milestone, visitorSeries }: { milestone: Milestone; visitorSeries?: number[] }) {
+export function MilestonePanel({ milestone }: { milestone: Milestone; visitorSeries?: number[] }) {
   if (milestone.state === "building") {
     const daysIn = milestone.daysSinceStart;
     const daysRemaining = Math.max(0, 90 - daysIn);
-    const daysInLabel = daysIn === 1 ? "1 day" : `${daysIn} days`;
-    const daysRemainingLabel = daysRemaining === 1 ? "around 1 more day" : `around ${daysRemaining} more days`;
-
     return (
-      <section className="rounded-2xl border border-glass-border bg-glass p-5">
-        <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-gray-muted">
-          Your first 90 days
+      <section className="flex flex-col gap-3" aria-labelledby="milestone-label">
+        <XaLabel id="milestone-label">Your first 90 days</XaLabel>
+        <p className="m-0 max-w-[640px] text-[15px] leading-[1.5] text-[var(--st-text-body)]">
+          {daysIn > 0
+            ? `${daysIn} ${daysIn === 1 ? "day" : "days"} in. In about ${daysRemaining} more, this shows your visits, reviews and site health against day one.`
+            : "After a few weeks of data, this shows what changed since you started: visits, reviews and site health against day one."}
         </p>
-        <div className="mt-3 flex items-start gap-2.5">
-          <Flag className="mt-0.5 h-4 w-4 shrink-0 text-accent" strokeWidth={1.6} />
-          <div className="min-w-0">
-            <h2 className="text-[16px] font-semibold text-warm-black">
-              {daysIn > 0 ? `You're ${daysInLabel} in` : "Your recap is building"}
-            </h2>
-            <p className="mt-1.5 max-w-2xl text-[13px] leading-relaxed text-gray-muted">
-              {daysIn > 0
-                ? `In ${daysRemainingLabel}, this panel will show your full 90-day picture — traffic compared to day one, how your reviews have grown, and how your site health has held up. Everything we track from here becomes the proof.`
-                : "Once we've gathered a few weeks of data, this shows exactly what's changed since you started — traffic, reviews, and site health compared to day one."}
-            </p>
-          </div>
-        </div>
       </section>
     );
   }
 
   return (
-    <section className="rounded-2xl border border-glass-border bg-glass p-5">
-      <div className="flex items-start gap-2.5">
-        <Flag className="mt-0.5 h-4 w-4 shrink-0 text-accent" strokeWidth={1.6} />
-        <div className="min-w-0">
-          <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-gray-muted">
-            Since you started
-          </p>
-          <h2 className="mt-1.5 text-[18px] font-semibold leading-snug text-warm-black">
-            {milestone.headline}
-          </h2>
-        </div>
-      </div>
-
-      <div className="mt-4 grid gap-3 sm:grid-cols-2">
-        {milestone.metrics.map((metric) => (
-          <MetricTile
-            key={metric.key}
-            metric={metric}
-            series={metric.key === "visitors" ? visitorSeries : undefined}
-          />
-        ))}
-      </div>
+    <section className="flex flex-col gap-3" aria-labelledby="milestone-label">
+      <XaLabel id="milestone-label">Since you started</XaLabel>
+      <p className="m-0 max-w-[640px] text-[17px] leading-[1.45] text-[var(--st-text)]">{milestone.headline}</p>
+      <XaAnswers labelWidth={140} rows={milestone.metrics.map((metric) => [metric.label, answer(metric)] as const)} />
     </section>
   );
 }

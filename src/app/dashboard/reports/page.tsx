@@ -72,39 +72,22 @@ export default async function ReportsPage({
   return (
     <>
       <EngagementTracker event="report-view" />
-      <div className="flex h-full flex-col">
-        {(hasMonthly || hasWeekly) && (
-          <div className="shrink-0 px-4 pt-5 sm:px-8 sm:pt-7">
-            <div className="mx-auto w-full max-w-5xl space-y-5">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-gray-muted">Reports</p>
-                {hasMonthly ? (
-                  <ReportsViewToggle current={view} />
-                ) : hasWeekly ? (
-                  <p className="text-[12px] text-gray-muted">Your monthly recap will appear here after your first full month.</p>
-                ) : null}
-              </div>
-            </div>
-          </div>
-        )}
-        <div className="min-h-0 flex-1">
-          <WeeklyBriefClient
-            brief={brief}
-            history={history}
-            periodLabel={periodLabel}
-            chartLabel={chartLabel}
-            dailyMetrics={chartMetrics}
-            proofCards={proofCards}
-            goal={goal}
-            benchmark={benchmark}
-            aiVisibility={aiVisibility}
-            searchData={searchData}
-            searchPerf={searchPerf}
-            gaPerf={gaPerf}
-            analyticsConnectHref={connectHref}
-          />
-        </div>
-      </div>
+      <WeeklyBriefClient
+        brief={brief}
+        history={history}
+        periodLabel={periodLabel}
+        chartLabel={chartLabel}
+        dailyMetrics={chartMetrics}
+        proofCards={proofCards}
+        goal={goal}
+        benchmark={benchmark}
+        aiVisibility={aiVisibility}
+        searchData={searchData}
+        searchPerf={searchPerf}
+        gaPerf={gaPerf}
+        analyticsConnectHref={connectHref}
+        viewToggle={hasMonthly ? <ReportsViewToggle current={view} /> : hasWeekly ? <span className="text-[13px] text-[var(--st-text-3)]">Your monthly recap comes after your first full month.</span> : undefined}
+      />
     </>
   );
 }

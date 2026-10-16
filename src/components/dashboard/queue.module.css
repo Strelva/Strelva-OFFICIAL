@@ -1,0 +1,41 @@
+/* Needs you as open rows; the opened one is the decision in place (XA · O5, O3). */
+.list { position: relative; z-index: 0; display: flex; flex-direction: column; margin: 0; padding: 0; list-style: none; }
+.list > li + li > .item::before { position: absolute; top: 0; left: 0; right: 0; height: 1px; background: var(--st-line); content: ""; }
+.item { position: relative; display: flex; flex-direction: column; }
+.row { position: relative; box-sizing: border-box; display: flex; width: 100%; min-height: 64px; align-items: center; gap: 14px; padding: 14px 0; border: 0; background: none; color: inherit; font: inherit; text-align: left; }
+button.row { cursor: pointer; }
+button.row::after { position: absolute; inset: 2px -12px; z-index: -1; border-radius: var(--st-r-nav); content: ""; transition: background-color var(--motion-fast) var(--ease-settle); }
+button.row:hover::after { background: var(--st-hover); }
+button.row:focus-visible { outline: 2px solid var(--st-accent); outline-offset: 2px; border-radius: var(--st-r-nav); }
+.text { display: flex; min-width: 0; flex: 1; flex-direction: column; gap: 2px; }
+.title { color: var(--st-text); font-size: 15px; font-weight: 500; line-height: 21px; overflow-wrap: anywhere; }
+.detail { color: var(--st-text-2); font-size: 13px; line-height: 19px; }
+.end { display: flex; flex-shrink: 0; align-items: center; gap: 10px; }
+.word { color: var(--st-text-3); font-size: 14px; }
+.decision { display: flex; flex-direction: column; gap: 18px; margin: 0 0 18px 50px; padding: 0; animation: st-xa-queue-open var(--motion-base) var(--ease-settle) both; }
+.body { margin: 0; color: var(--st-text-body); font-size: 15px; line-height: 1.5; }
+.change { display: flex; flex-direction: column; gap: 10px; }
+.diff { display: flex; flex-direction: column; gap: 6px; }
+.diff + .diff { padding-top: 6px; }
+.diffField { color: var(--st-text-3); font-size: 13px; line-height: 18px; }
+.diffGone { margin: 0; color: var(--st-text-3); font-size: 16px; line-height: 1.45; }
+.pageNote { margin: 0; color: var(--st-text-3); font-size: 13px; line-height: 18px; overflow-wrap: anywhere; }
+.hours { display: flex; flex-direction: column; gap: 6px; margin: 0; }
+.hours > div { display: flex; justify-content: space-between; gap: 12px; font-size: 15px; }
+.hours dt { color: var(--st-text-2); }
+.hours dd { margin: 0; color: var(--st-text); font-variant-numeric: tabular-nums; }
+.links { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 6px; margin: -6px 0 0; color: var(--st-text-3); font-size: 14px; line-height: 20px; }
+.linksWhy { flex-basis: 100%; color: var(--st-text-3); font-size: 13px; line-height: 18px; }
+.linksExtra { flex-basis: 100%; padding-top: 4px; }
+.request { display: flex; flex-direction: column; gap: 10px; margin: -6px 0 16px 50px; }
+.meta { margin: 0; color: var(--st-text-3); font-size: 13px; }
+.operator { display: flex; flex-wrap: wrap; gap: 8px; }
+.item[data-busy] .row { opacity: 0.8; }
+@keyframes st-xa-queue-open { from { opacity: 0; translate: 0 -4px; } to { opacity: 1; translate: 0 0; } }
+@media (prefers-reduced-motion: reduce) { .decision { animation-duration: 120ms; animation-name: st-xa-queue-fade; } }
+@keyframes st-xa-queue-fade { from { opacity: 0; } to { opacity: 1; } }
+@media (max-width: 767px) {
+  .decision, .request { margin-left: 0; padding: 16px; }
+  .row { align-items: flex-start; flex-wrap: wrap; }
+  .end { width: 100%; padding-left: 50px; }
+}

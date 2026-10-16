@@ -1,15 +1,22 @@
 "use client";
 
 import { useState } from "react";
-import { X } from "lucide-react";
+import { XaSays, XaTextLink } from "@/components/ui/strelva/Xa";
 import { useDashboardOptional } from "./DashboardContext";
 
 interface BillingBannerProps {
-  subscriptionStatus: string;
+  /** Defaults to the dashboard's own subscription status. */
+  subscriptionStatus?: string;
 }
 
-export function BillingBanner({ subscriptionStatus }: BillingBannerProps) {
+/**
+ * The payment decision, said by Pebble in frame where it matters: on Today and
+ * on Settings > Plan beside "Manage billing". Never a shell banner. Renders
+ * nothing while the plan is in good standing.
+ */
+export function BillingBanner({ subscriptionStatus: given }: BillingBannerProps) {
   const dashboard = useDashboardOptional();
+  const subscriptionStatus = given ?? dashboard?.subscriptionStatus ?? "active";
   const dashboardHref = dashboard?.dashboardHref ?? ((path: string) => path);
   const [dismissed, setDismissed] = useState(false);
   const [openingPortal, setOpeningPortal] = useState(false);
@@ -51,30 +58,12 @@ export function BillingBanner({ subscriptionStatus }: BillingBannerProps) {
 
   if (isNone) {
     return (
-      <div className="flex items-center justify-between gap-4 border-b border-positive bg-positive px-4 py-3 text-sm text-positive">
-        <div>
-          <p>
-            Your site is built and ready. Start your subscription to publish
-            changes and go live.{" "}
-            <button
-              type="button"
-              onClick={startSubscription}
-              disabled={starting}
-              className="font-medium underline text-positive disabled:opacity-60"
-            >
-              {starting ? "Opening…" : "Start your subscription"}
-            </button>
-          </p>
-          {error && <p className="mt-1 text-xs opacity-80">{error}</p>}
-        </div>
-        <button
-          onClick={() => setDismissed(true)}
-          className="ml-4 shrink-0 flex items-center justify-center opacity-60 hover:opacity-100"
-          aria-label="Dismiss"
-        >
-          <X className="h-4 w-4" strokeWidth={2} />
-        </button>
-      </div>
+      <div role="status"><XaSays links={[
+        <XaTextLink key="start" onClick={startSubscription}>{starting ? "Opening" : "Start your plan"}</XaTextLink>,
+        <XaTextLink key="later" onClick={() => setDismissed(true)}>Later</XaTextLink>,
+      ]}>
+        Your site is built and ready. Start your plan to make changes live.{error ? ` ${error}` : ""}
+      </XaSays></div>
     );
   }
 
@@ -109,34 +98,13 @@ export function BillingBanner({ subscriptionStatus }: BillingBannerProps) {
     }
   }
 
+  // No "Later" here: a billing problem (past due / ended) must not be hideable.
   return (
-    <div
-      className={`flex items-center justify-between px-4 py-3 text-sm ${
-        isCancelled
-          ? "bg-critical text-critical border-b border-critical"
-          : "bg-warning text-warning border-b border-warning"
-      }`}
-    >
-      <div>
-        <p>
-          {isCancelled
-            ? "Your subscription has ended. Restart it to keep managing your site."
-            : "Your payment didn't go through. Update your card to keep your site running."}
-          {" "}
-          <button
-            type="button"
-            onClick={openBillingPortal}
-            disabled={openingPortal}
-            className={`underline font-medium disabled:opacity-60 ${
-              isCancelled ? "text-critical" : "text-warning"
-            }`}
-          >
-            {openingPortal ? "Opening..." : "Manage billing"}
-          </button>
-        </p>
-        {error && <p className="mt-1 text-xs opacity-80">{error}</p>}
-      </div>
-      {/* No dismiss button: a billing problem (past due / cancelled) must not be hideable. */}
-    </div>
+    <div role="alert"><XaSays links={[<XaTextLink key="billing" onClick={openBillingPortal}>{openingPortal ? "Opening" : isCancelled ? "Restart your plan" : "Update your card"}</XaTextLink>]}>
+      {isCancelled
+        ? "Your plan has ended. Your site stays up, and changes wait until you restart it."
+        : "Your last payment didn't go through. Your site is still up; update your card to keep it that way."}
+      {error ? ` ${error}` : ""}
+    </XaSays></div>
   );
 }

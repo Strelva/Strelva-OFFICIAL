@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useDashboard } from "./DashboardContext";
-import { segmentPill } from "./segment-pill";
+import { segmentPill, segmentTrack } from "./segment-pill";
 
 /**
  * The ONE sub-nav for the Website pillar. Folds every Website sub-section —
@@ -35,20 +35,20 @@ export function SectionSubNav({ hasStore = false }: { hasStore?: boolean }) {
   if (!WEBSITE_ROUTES.some((r) => eff.startsWith(r))) return null;
 
   const items = [
-    { href: "/dashboard/site", label: "Preview" },
-    { href: "/dashboard/collections", label: "Content" },
-    { href: "/dashboard/assets", label: "Media" },
-    { href: "/dashboard/brand-kit", label: "Brand Kit" },
+    { href: "/dashboard/site", label: "Your site" },
+    { href: "/dashboard/collections", label: "Lists" },
+    { href: "/dashboard/assets", label: "Photos" },
+    { href: "/dashboard/brand-kit", label: "Brand" },
     ...(hasStore ? [{ href: "/dashboard/store", label: "Store" }] : []),
     { href: "/dashboard/history", label: "History" },
   ];
 
   return (
     <nav
-      className="shrink-0 overflow-x-auto border-b border-glass-border px-4 py-3 sm:px-8 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      className="shrink-0 px-4 pt-4 md:px-[88px] md:pt-6"
       aria-label="Website sections"
     >
-      <div className="flex items-center gap-1.5">
+      <div className={segmentTrack}>
         {items.map((item) => {
           const isActive = eff.startsWith(item.href);
           return (
@@ -56,7 +56,7 @@ export function SectionSubNav({ hasStore = false }: { hasStore?: boolean }) {
               key={item.href}
               href={dashboardHref(item.href)}
               prefetch={false}
-              className={`min-h-[36px] shrink-0 ${segmentPill(isActive)}`}
+              className={segmentPill(isActive)}
               aria-current={isActive ? "page" : undefined}
             >
               {item.label}
