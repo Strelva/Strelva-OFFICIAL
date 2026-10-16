@@ -138,7 +138,9 @@ function readinessSignals(html: string, robots: string | null, _input: ScoreInpu
   for (const block of ldBlocks) {
     try {
       const parsed = JSON.parse(block);
-      const arr = Array.isArray(parsed) ? parsed : [parsed];
+      const top = Array.isArray(parsed) ? parsed : [parsed];
+      // Most CMS and hand-built sites nest their entities in one "@graph" block.
+      const arr = top.flatMap((node) => (Array.isArray(node?.["@graph"]) ? [node, ...node["@graph"]] : [node]));
       for (const node of arr) {
         const t = node?.["@type"];
         if (typeof t === "string") schemaTypes.push(t);
