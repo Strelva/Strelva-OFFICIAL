@@ -14,7 +14,7 @@ import { systemHref } from "@/experience/systems/model";
 import { WorkspaceInquiries } from "@/experience/places/WorkspaceInquiries";
 import { WorkspaceInquirySystem } from "@/experience/places/WorkspaceInquirySystem";
 import { WorkspaceRequestContext } from "../WorkspaceRequest";
-import { XA4_SITE, XA4_WORKSPACE, type Xa4Screen, type Xa4State, harborForm, harborFormDetail, harborLeads, harborPossibility, harborWebsite, harborWebsiteDetail } from "./xa4-systems-fixture";
+import { XA4_INBOX, XA4_SITE, XA4_WORKSPACE, type Xa4Screen, type Xa4State, harborBookingRequestDecision, harborForm, harborFormDetail, harborInbox, harborLeads, harborPossibility, harborWebsite, harborWebsiteDetail } from "./xa4-systems-fixture";
 
 
 const BASE = "/preview/strelva/xa/xa4-systems";
@@ -22,6 +22,8 @@ const never = () => new Promise<Response>(() => undefined);
 
 /** One fixture answer per route the screens call. Unknown calls stay unanswered rather than reaching a server. */
 function fixtureFetch(screen: Xa4Screen, state: Xa4State): typeof fetch {
+  // The one booking request is decided once; afterwards Needs you no longer lists it.
+  let bookingDecided = false;
   return async (input, init) => {
     const url = new URL(typeof input === "string" ? input : input instanceof URL ? input.href : input.url, window.location.origin);
     const method = init?.method ?? (input instanceof Request ? input.method : "GET");
@@ -36,12 +38,14 @@ function fixtureFetch(screen: Xa4Screen, state: Xa4State): typeof fetch {
     if (path === "/api/workspace/systems/make-real") {
       await new Promise(resolve => setTimeout(resolve, 900));
       if (state === "error") return Response.json({ error: "harbordental.com did not answer." }, { status: 502 });
-      return Response.json({ live: { live: true, status: "done", headline: "Live on harbordental.com", activationId: "fixture-activation" } });
+      return Response.json({ live: { live: true, status: "done", headline: screen === "form" ? "The new-patient form is live" : "Live on harbordental.com", activationId: "fixture-activation" } });
     }
     if (path === "/api/workspace/site-changes") return Response.json({ requestId: "4a000000-0000-4000-8000-0000000000aa", requests: [] }, { status: 201 });
     if (path === "/api/workspace/inquiries/reply" && method === "POST") return Response.json({ outcome: { status: "suppressed", providerMessageId: null, acceptedAt: null, retryable: false } });
-    if (path === "/api/workspace/inquiries/system") return Response.json({ details: [harborFormDetail] });
-    if (path === "/api/workspace/inquiries") return Response.json({ data: { sites: [], denied: [], workspaceReplies: true } });
+    if (path === "/api/workspace/inquiries/system") return Response.json({ details: [state === "done" && screen === "form" ? { ...harborFormDetail, lifecycle: "live", health: "Patients get it in their booking confirmation." } : harborFormDetail] });
+    if (path === "/api/workspace/inquiries") return Response.json({ data: harborLeads("empty") });
+    if (path === "/api/workspace/needs-you" && method === "POST") { bookingDecided = true; await new Promise(resolve => setTimeout(resolve, 600)); return Response.json({ status: "done" }); }
+    if (path === "/api/workspace/needs-you") return Response.json({ role: "owner", items: screen === "bookings" && state === "waiting" && !bookingDecided ? [harborBookingRequestDecision()] : [], complete: true, handled: [], handledAvailable: true });
     if (path === "/api/workspace/bookings" && method === "POST") return Response.json({ error: "This fictional preview cannot change bookings." }, { status: 403 });
     if (path.startsWith("/api/workspace/owner-brand")) return Response.json({ brand: null });
     if (path.startsWith("/api/")) return never();
@@ -70,7 +74,7 @@ export function Xa4SystemsPreview({ screen, state, mode, children }: { screen: X
     { id: "website", kind: "website", title: "Website", href: href("website"), current: screen === "website" || screen === "possibility" || screen === "history", ...(screen === "possibility" ? { detail: "1 idea" } : state === "error" && screen === "website" ? { state: "waits" as const } : { detail: "Live" }) },
     { id: "bookings", kind: "bookings", title: "Bookings", href: href("bookings"), current: screen === "bookings", detail: "6 this week" },
     { id: "inbox", kind: "inquiries", title: "Inquiries", href: href("inbox"), current: screen === "inbox", ...(screen === "inbox" && (state === "done" || state === "empty") ? { detail: "Nothing new" } : { state: "waits" as const }) },
-    { id: "form", kind: "inquiries", title: "New-patient form", href: href("form"), current: screen === "form", ...(formLive ? { detail: "Live" } : { state: "draft" as const }) },
+    { id: "form", kind: "app", title: "New-patient form", href: href("form"), current: screen === "form", ...(formLive ? { detail: "Live" } : { state: "draft" as const }) },
   ];
   const shell = {
     appBase: "/preview/strelva", signOut: null, systemsReleased: true, mode, workspaceName: "Harbor Dental", accountName: "Dr. Amy Lin",
@@ -82,15 +86,15 @@ export function Xa4SystemsPreview({ screen, state, mode, children }: { screen: X
     <WorkspaceRequestContext.Provider value={request}>{ready ? children : null}</WorkspaceRequestContext.Provider>
   </StrelvaShell>;
   const page = {
-    workspaceId: XA4_WORKSPACE, appBase: "/preview/strelva", readOnly: false, canMakeReal: true, sources: [], businessName: "Harbor Dental", localPreview: true,
-    systemHref: (id: string) => systemHref("/preview/strelva", XA4_WORKSPACE, id), onHome: () => router.push("/preview/strelva/xa"), onAsk: () => undefined,
+    workspaceId: XA4_WORKSPACE, appBase: "/preview/strelva", readOnly: false, canMakeReal: true, sources: [], businessName: "Harbor Dental", ownerName: "Dr. Lin", localPreview: true,
+    systemHref: (id: string) => id === XA4_INBOX ? href("inbox") : id === XA4_SITE ? href("website") : systemHref("/preview/strelva", XA4_WORKSPACE, id), onHome: () => router.push("/preview/strelva/xa"), onAsk: () => undefined,
   } as const;
 
   if (screen === "website" || screen === "possibility" || screen === "history") {
     const site = harborWebsite(screen === "possibility" ? "waiting" : state === "error" ? "error" : state === "empty" ? "empty" : state === "waiting" ? "waiting" : state === "done" ? "done" : "ready");
     const system = screen === "possibility" ? { ...site, possibilities: [harborPossibility(state === "waiting")] } : site;
-    return frame(system.name, <SystemPage key={`${screen}:${state}`} {...page} system={state === "loading" && screen === "website" ? undefined : system} systems={[system]} loading={state === "loading"}
-      initialView={screen === "history" ? "history" : "site"} initialPossibilityId={screen === "possibility" ? system.possibilities[0]?.id : undefined} />);
+    return frame(system.name, <SystemPage key={`${screen}:${state}`} {...page} system={state === "loading" && screen === "website" ? undefined : system} loading={state === "loading"}
+      initialView={screen === "history" ? "history" : "site"} initialPossibilityId={screen === "possibility" ? system.possibilities[0]?.id : undefined} systems={[system, harborInbox()]} />);
   }
   if (screen === "form") {
     const form = harborForm();

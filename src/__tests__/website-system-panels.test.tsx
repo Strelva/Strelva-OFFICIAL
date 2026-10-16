@@ -29,8 +29,8 @@ describe("website System page: domains, Waiting on you, Requests and History", (
     expect(page).toContain("Put the spring consultation offer at the top of the homepage until May 1");
     expect(page).toContain("A change to the questions and answers is ready for review");
     expect(page).toContain("Add a private consultations page"); expect(page).toContain("In progress");
-    expect(page).toContain("New office hours in the footer"); expect(page).toContain("Deploy · Actor not recorded");
-    expect(page).toContain("Saved copy"); expect(page).toContain("Content · Actor not recorded");
+    expect(page).toContain("New office hours in the footer"); expect(page).toContain("Deploy · "); expect(page).not.toContain("Actor not recorded");
+    expect(page).toContain("Saved copy"); expect(page).toContain("Content · ");
   });
   it("omits empty context blocks and keeps the one next-action link", () => {
     const page = html({ websiteDetail: { status: "ready", detail: previewWebsiteDetail(SITE, "empty") } });
@@ -52,7 +52,8 @@ describe("website System page: domains, Waiting on you, Requests and History", (
   it("disables asking for a change when the page is read-only", () => {
     const page = html({ readOnly: true, websiteDetail: { status: "ready", detail: previewWebsiteDetail(SITE, "empty") } });
     const node = document.createElement("div");node.innerHTML = page;
-    expect([...node.querySelectorAll("button")].find(button => button.textContent === "Ask for a change")?.disabled).toBe(true);
+    // The composer is the one way to ask; read-only leaves no enabled ask anywhere.
+    expect([...node.querySelectorAll("button")].filter(button => button.textContent === "Ask for a change").every(button => button.disabled)).toBe(true);
     expect(node.querySelector<HTMLTextAreaElement>("[data-st-composer-dock] textarea")?.disabled).toBe(true);
   });
   it.each(["unavailable", "unassigned"] as const)("omits missing agency identity (%s) while keeping recorded attribution", status => {
@@ -60,8 +61,8 @@ describe("website System page: domains, Waiting on you, Requests and History", (
     const page = html({ system: { ...site, operatedBy: undefined, providerIdentityStatus: status }, websiteDetail: detail });
     expect(page).not.toContain("Agency identity could not be loaded");
     expect(page).not.toContain("No agency of record");
-    expect(page).not.toContain("Agency of record:");
-    expect(html({ websiteDetail: detail })).toContain("Agency of record: Strelva");
+    expect(page).not.toContain("looks after this site");
+    expect(html({ websiteDetail: detail })).toContain("Strelva looks after this site");
   });
   it("does not show website lists on other kinds of System", () => {
     const tool: SystemView = { ...site, kind: "app", surface: { kind: "work", workId: "w", productId: "unknown" } };

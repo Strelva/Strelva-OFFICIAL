@@ -37,6 +37,8 @@ export interface SystemHealth {
   summary: string;
   lastVerifiedAt?: string | null;
   signals?: string[];
+  /** The signals that failed, exactly as written in `signals`. Marked with a waits dot; never inferred from wording. */
+  failing?: string[];
 }
 
 export type SystemConnectionKind = "read" | "act" | "appear" | "share" | "depend" | "trigger";
@@ -80,6 +82,10 @@ export interface SystemPossibility {
   tryHref?: string;
   /** Why it went back to Exploring, in plain words. */
   staleReason?: string;
+  /** Whoever proposed it, when the source recorded them. Never inferred. */
+  actor?: RecordedActor | null;
+  /** When it was proposed (ISO). */
+  proposedAt?: string;
 }
 
 /** Make real that is running or partly live, as the System page and In progress read it. */

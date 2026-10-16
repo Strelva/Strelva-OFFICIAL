@@ -11,11 +11,11 @@ import Link from "next/link";
 import { ContentWorkspace } from "@/experience/publishing/ContentWorkspace";
 import { useRef, useState, type ReactNode } from "react";
 import { ArrowUpRight, History } from "lucide-react";
-import { XaAnswers, XaButton, XaButtonLink, XaComposer, XaComposerDock, XaDecision, XaEmpty, XaHeadline, XaSays, XaStatus, XaSystemTile, XaTextLink, XaYes } from "@/components/ui/strelva/Xa";
+import { XaAnswers, XaButton, XaButtonLink, XaComposer, XaComposerDock, XaDecision, XaEmpty, XaHeadline, XaSays, XaStatus, XaSystemTile, XaTextLink, XaYes, xaSystemKind } from "@/components/ui/strelva/Xa";
 import { SidePanel, SystemHead } from "./xa/SystemHead";
 import { PossibilityView } from "./xa/PossibilityView";
 import { WebsiteHistoryView } from "./xa/WebsiteHistoryView";
-import { requestMakeReal } from "./make-real-request";
+import { LIVE_YES, ownerOnlyReason, requestMakeReal } from "./make-real-request";
 import x from "./xa/system-xa.module.css";
 import { InquiryServerWorkspaceExperience } from "@/experience/inquiries/InquiryServerExperience";
 import type { InquirySurfaceAdapter } from "@/experience/inquiries/contracts";
@@ -65,6 +65,8 @@ export interface SystemPageProps {
   readOnlyReason?: string;
   /** Only owners can make a Possibility real. When false, say why. */
   canMakeReal?: boolean;
+  /** The owner's name, so a blocked yes can say who may give it ("Only Dr. Lin can say yes to this."). */
+  ownerName?: string;
   makeRealReason?: string;
   loading?: boolean;
   sources: readonly WorkspaceWork[];
@@ -102,12 +104,15 @@ export function SystemPage(props: SystemPageProps) {
   const [askingChange, setAskingChange] = useState(false);
   const [ask, setAsk] = useState("");
   const [detailVersion, setDetailVersion] = useState(0);
+  const composerRef = useRef<HTMLTextAreaElement>(null);
+  // S4: once the yes lands, the decision's own dot says Live (one sentence below says what happened).
+  const [draftLive, setDraftLive] = useState(false);
   const fetchedDetail = useWebsiteSystemDetail(props.workspaceId, system?.id ?? "", Boolean(system && system.kind === "website" && !props.websiteDetail), detailVersion);
   const websiteDetail = props.websiteDetail ?? fetchedDetail;
   const siteHref = props.operator && system && system.surface.kind === "website" && system.surface.editing ? (tab: "connections" | "google") => workspaceSiteHref({ workspaceId: props.workspaceId, systemId: system.id, tab }, props.appBase || "") : undefined;
   const back = <button type="button" className={x.back} onClick={onHome}>‹ Home</button>;
-  if (loading && !system) return <div className={x.screen} aria-busy="true">{back}<XaEmpty size="sm" pose="alone" title="Opening this system…" job="Pebble is reading its latest state" /><StSkeleton label="Opening this system" /></div>;
-  if (!system) return <div className={x.screen}>{back}<XaEmpty size="sm" pose="alone" title="This system isn’t available here." job="Pebble checked this business and found nothing under that name">It may belong to another business, or your access may have changed. Nothing about it was changed.</XaEmpty></div>;
+  if (loading && !system) return <div className={x.screen} aria-busy="true">{back}<XaEmpty size="sm" bare pose="alone" title="Opening this system…" job="Pebble is reading its latest state" /><StSkeleton label="Opening this system" /></div>;
+  if (!system) return <div className={x.screen}>{back}<XaEmpty size="sm" bare pose="alone" title="This system isn’t available here." job="Pebble checked this business and found nothing under that name">It may belong to another business, or your access may have changed. Nothing about it was changed.</XaEmpty></div>;
   // Website panels and the site's own editor links count as context too.
   const filesRequests = system.kind === "website" && system.surface.kind === "website" && Boolean(system.surface.editing) && !readOnly;
   const showAside = hasContext(system) || (system.kind === "website" && hasWebsiteDetail(websiteDetail)) || Boolean(siteHref) || (filesRequests && askingChange);
@@ -126,46 +131,59 @@ export function SystemPage(props: SystemPageProps) {
   const lifecycleStatus = { kind: system.lifecycle === "live" ? "live" as const : "draft" as const, label: LIFECYCLE_LABEL[system.lifecycle], breathe: system.lifecycle === "live" };
   const askButton = <XaButton disabled={readOnly} title={readOnly ? readOnlyReason : undefined} aria-expanded={filesRequests ? askingChange : undefined} onClick={askForChange}>Ask for a change</XaButton>;
   const readOnlyLine = readOnly && readOnlyReason ? <p className={x.note} role="note">{readOnlyReason}</p> : null;
-  const agencyLine = system.operatedBy ? <p className={x.quiet}>Agency of record: {system.operatedBy}</p> : system.providerIdentityStatus === "unavailable" ? <p className={x.quiet}>Agency identity could not be loaded</p> : system.providerIdentityStatus === "unassigned" ? <p className={x.quiet}>No agency of record</p> : null;
+  const agencyLine = system.operatedBy ? <p className={x.quiet}>{system.operatedBy} looks after this</p> : system.providerIdentityStatus === "unavailable" ? <p className={x.quiet}>Agency identity could not be loaded</p> : system.providerIdentityStatus === "unassigned" ? <p className={x.quiet}>No agency of record</p> : null;
   const pausedLine = system.lifecycle === "paused" ? <p className={x.sentence} role="note">{PAUSED_KEEPS[system.kind] ?? "Paused. Its records are kept."}</p> : null;
   const needsYou = <SystemNeedsYou system={system} state={props.needsYou} agencyState={props.agencyDecisions} businessName={props.businessName} workspaceId={props.workspaceId} appBase={props.appBase} />;
 
   if (system.surface.kind !== "website") {
     const titled = system.surface.kind !== "work";
-    const tileKind = system.surface.kind === "work" ? system.surface.productId === "unknown" ? system.kind : system.surface.productId : system.kind;
+    // A form made as its own System (an inquiry System opened as work) reads as the clipboard, not the mailbox.
+    const tileKind = system.surface.kind === "work" ? system.surface.productId === "unknown" ? system.kind === "inquiries" ? "form" : system.kind : system.surface.productId : system.kind;
     // S4: a System in Draft. One ready alternative that can go live is the yes; anything else stays in its own controls.
     const ready = system.possibilities.filter(item => item.status === "ready" && !item.staleReason && item.executionAvailability === "live");
     const heldByYes = system.lifecycle === "draft" && ready.length === 1 && system.possibilities.length === 1 ? ready[0] : undefined;
+    const possibilitiesPanel = (system.possibilities.length && !heldByYes) || system.storedVersionId ? <PossibilitiesPanel key={`${props.workspaceId}:${system.id}`} systemHref={props.systemHref} versionReadOnly={props.versionReadOnly} system={system} systems={systems} workspaceId={props.workspaceId} readOnly={readOnly} readOnlyReason={readOnlyReason} canMakeReal={props.canMakeReal ?? !readOnly} makeRealReason={props.makeRealReason ?? readOnlyReason} ownerName={props.ownerName} appBase={props.appBase || ""} comparingId={compareId} onCompare={compare} onAsk={onAsk} heldByYes={heldByYes?.id} /> : null;
     const aside = showAside ? <div className={x.side} aria-label={`About ${system.name}`}>
       {system.activations?.length ? <ActivationsPanel system={system} /> : null}
-      {(system.possibilities.length && !heldByYes) || system.storedVersionId ? <PossibilitiesPanel key={`${props.workspaceId}:${system.id}`} systemHref={props.systemHref} versionReadOnly={props.versionReadOnly} system={system} systems={systems} workspaceId={props.workspaceId} readOnly={readOnly} readOnlyReason={readOnlyReason} canMakeReal={props.canMakeReal ?? !readOnly} makeRealReason={props.makeRealReason ?? readOnlyReason} appBase={props.appBase || ""} comparingId={compareId} onCompare={compare} onAsk={onAsk} heldByYes={heldByYes?.id} /> : null}
+      {possibilitiesPanel}
       <SystemContextSections {...props} system={system} />
     </div> : <p className={x.note}><XaTextLink onClick={readOnly ? undefined : () => onAsk(`What else could ${system.name} become? `)}>Ask what else {system.name} could become.</XaTextLink></p>;
-    const surface = <section className={x.main} aria-label={`${system.name}, the actual ${SYSTEM_KIND_LABEL[system.kind].toLowerCase()}`}><SystemSurface {...props} system={system} /></section>;
-    if (system.lifecycle === "draft") return <div className={x.screen} aria-busy={loading || undefined}>
-      {back}
-      <div className={x.draft}>
-        <div className={x.brief}>
-          <XaSystemTile kind={tileKind} size={64} />
-          <XaHeadline size="sm" quiet="Draft. Nobody outside your business can see it yet.">{titled ? system.name : system.detail || system.name}</XaHeadline>
-          <XaAnswers labelWidth={150} rows={[
-            ...(system.operatedBy ? [["Made by", system.operatedBy] as const] : []),
-            ...(system.builtInApp ? [["Runs on", system.builtInApp.label] as const] : []),
-            ...(system.detail && titled ? [["What it is for", system.detail] as const] : []),
-            ...connectionAnswers(system),
-            ["Checks", healthLine] as const,
-          ]} />
-          {readOnlyLine}
-          {needsYou}
+    if (system.lifecycle === "draft") {
+      const name = titled ? system.name : system.detail || system.name;
+      const stale = !heldByYes && system.possibilities.length === 1 ? system.possibilities[0]!.staleReason : undefined;
+      const blocked = readOnly || props.canMakeReal === false ? props.makeRealReason || readOnlyReason || ownerOnlyReason(props.ownerName) : undefined;
+      // The decision holds only the thing itself and the yes; records, Connections and History stay outside it.
+      const yes = heldByYes ? <DraftYes key={`${props.workspaceId}:${system.id}:${heldByYes.id}`} possibility={heldByYes} workspaceId={props.workspaceId} systemHref={props.systemHref(system.id)} blockedReason={blocked} onLive={() => setDraftLive(true)} />
+        : stale ? <XaSays links={readOnly ? undefined : [<XaTextLink key="fresh" onClick={() => onAsk(`About ${system.name}: make a fresh version that can go live. `)}>Ask for a fresh one</XaTextLink>]}>{stale} It can&apos;t go live until a fresh version is made.</XaSays>
+          : <p className={x.note}>Nothing here is ready to go live yet. Say what is missing below and it comes back here for your yes.</p>;
+      const more = possibilitiesPanel || system.connections.length || system.history?.length || system.versions.length || system.activations?.length;
+      const formLike = xaTileIsForm(tileKind);
+      return <><div className={x.screen} aria-busy={loading || undefined}>
+        {back}
+        <div className={x.draft}>
+          <div className={x.brief}>
+            <XaSystemTile kind={tileKind} size={64} />
+            <XaHeadline size="sm" quiet={draftLive ? undefined : "Nobody outside your business can see it yet."}>{name}</XaHeadline>
+            <XaAnswers labelWidth={150} rows={[
+              ...(system.operatedBy ? [["Made by", system.operatedBy] as const] : []),
+              ...(system.builtInApp ? [["Runs on", system.builtInApp.label] as const] : []),
+              ...(system.detail && titled ? [["What it is for", system.detail] as const] : []),
+              ...connectionAnswers(system),
+              // A row that says nothing ("Unknown. Nothing checks a draft…") is left out; pending evidence is still said.
+              ...(system.health.state !== "unknown" ? [["Checks", healthLine] as const] : system.health.summary && !/^nothing checks/i.test(system.health.summary) ? [["Checks", system.health.summary] as const] : []),
+            ]} />
+            {readOnlyLine}
+            {needsYou}
+            {more ? <details className={x.more}><summary>More about {formLike ? "this form" : name}</summary><div className={x.moreBody}>{aside}</div></details> : null}
+          </div>
+          <XaDecision label={draftLive ? `${system.name}, live` : `${system.name}, not live yet`} status={draftLive ? <XaStatus kind="live" breathe>Live</XaStatus> : <XaStatus kind="draft">Draft</XaStatus>} yes={yes}>
+            <SystemSurface {...props} system={system} part="form" />
+          </XaDecision>
         </div>
-        <XaDecision label={`${system.name}, not live yet`} status={<XaStatus kind="draft">Draft</XaStatus>} meta="Nothing is live"
-          yes={heldByYes ? <DraftYes key={`${props.workspaceId}:${system.id}:${heldByYes.id}`} possibility={heldByYes} workspaceId={props.workspaceId} systemHref={props.systemHref(system.id)} blockedReason={readOnly || props.canMakeReal === false ? props.makeRealReason || readOnlyReason || "Only an owner of this business can make a possibility real." : undefined} />
-            : <p className={x.quiet}>Nothing is waiting for a yes yet. {readOnly ? null : <XaTextLink onClick={askForChange}>Ask for a change</XaTextLink>}</p>}>
-          {surface}
-        </XaDecision>
-        <div className={x.draftAside}>{aside}</div>
       </div>
-    </div>;
+      <XaComposerDock inset={{ start: 72, end: 620 }}><XaComposer placeholder={formLike ? "Change something on the form" : `Ask for a change to ${name}`} inputLabel={`Ask Strelva about ${system.name}`} value={ask} onChange={setAsk} disabled={readOnly || loading} maxLength={3000} onSubmit={() => onAsk(`About ${system.name}: ${ask.trim()}`)} /></XaComposerDock></>;
+    }
+    const surface = <section className={x.main} aria-label={`${system.name}, the actual ${SYSTEM_KIND_LABEL[system.kind].toLowerCase()}`}><SystemSurface {...props} system={system} /></section>;
     return <div className={x.screen} aria-busy={loading || undefined}>
       <SystemHead kind={tileKind} back={back} title={titled ? system.name : system.detail || SYSTEM_KIND_LABEL[system.kind]}
         status={system.lifecycle === "live" ? (healthTone ? { kind: "waits", label: HEALTH_LABEL[system.health.state] } : lifecycleStatus) : { kind: "draft", label: LIFECYCLE_LABEL[system.lifecycle] }}
@@ -184,33 +202,46 @@ export function SystemPage(props: SystemPageProps) {
   const website = system.kind === "website";
   const surface = system.surface;
   const withSurface = { ...system, surface };
-  if (website && view === "history") return <WebsiteHistoryView workspaceId={props.workspaceId} systemId={system.id} siteName={system.name} state={websiteDetail} systemHistory={system.history} canRestore={!readOnly && (props.operator || (props.canMakeReal ?? true))} appBase={props.appBase} onBack={() => setView("site")} onPrepared={() => setDetailVersion(version => version + 1)} onAskRestore={filesRequests ? () => { setView("site"); setAskingChange(true); } : undefined} />;
+  const reload = () => setDetailVersion(version => version + 1);
+  if (website && view === "history") return <WebsiteHistoryView workspaceId={props.workspaceId} systemId={system.id} siteName={system.name} state={websiteDetail} systemHistory={system.history} canRestore={!readOnly && (props.operator || (props.canMakeReal ?? true))} appBase={props.appBase} address={surface.domain} livePreviewSrc={surface.previewSrc} sandbox={websiteSandbox} onBack={() => setView("site")} onPrepared={reload} onReload={reload} onAskRestore={filesRequests ? () => { setView("site"); setAskingChange(true); } : undefined} />;
   if (comparing && mode !== "current") {
-    return <PossibilityView system={withSurface} systems={systems} possibility={comparing} workspaceId={props.workspaceId} appBase={props.appBase || ""} readOnly={readOnly} canMakeReal={props.canMakeReal ?? !readOnly} blockedReason={readOnly || props.canMakeReal === false ? props.makeRealReason || readOnlyReason : undefined} systemHref={props.systemHref} sandbox={websiteSandbox} onBack={() => { setMode("current"); setCompareId(null); }} />;
+    return <PossibilityView system={withSurface} systems={systems} possibility={comparing} workspaceId={props.workspaceId} appBase={props.appBase || ""} readOnly={readOnly} canMakeReal={props.canMakeReal ?? !readOnly} blockedReason={readOnly || props.canMakeReal === false ? props.makeRealReason || readOnlyReason || ownerOnlyReason(props.ownerName) : undefined} systemHref={props.systemHref} sandbox={websiteSandbox} onBack={() => { setMode("current"); setCompareId(null); }} />;
   }
   const checks = system.health.signals ?? [];
+  const failing = new Set(system.health.failing ?? []);
   const reads = system.connections.filter(connection => connection.kind === "read" && connection.status === "connected");
   const checkedAt = system.health.lastVerifiedAt ? new Date(system.health.lastVerifiedAt) : null;
   // The one thing that waits sits on the composer, beside where the owner would type (LX · Composer · With a yes).
   const waitingPossibility = readOnly ? undefined : system.possibilities.find(item => item.previewSrc && item.status === "ready" && !item.staleReason);
   const waitingDecision = website && websiteDetail?.status === "ready" ? websiteDetail.detail.waiting.find(item => item.href) : undefined;
-  const waitingItem = waitingPossibility ? { kicker: "Waits for you · a Possibility", title: waitingPossibility.title, from: { pebble: true } as const, action: <XaButton size="sm" onClick={() => compare(waitingPossibility)}>Compare</XaButton> }
+  const proposer = waitingPossibility ? actorPresentation(waitingPossibility.actor).name : null;
+  const waitingItem = waitingPossibility ? { kicker: proposer ? `Waits for you · from ${proposer}` : "Waits for you · a Possibility", title: waitingPossibility.title, from: proposer && proposer !== "Strelva" ? { name: proposer, color: "#2f5236" } : { pebble: true } as const, action: <XaButton size="sm" onClick={() => compare(waitingPossibility)}>Compare</XaButton> }
     : waitingDecision?.href ? { kicker: "Waits for you", title: waitingDecision.title, from: { pebble: true } as const, action: <XaButtonLink size="sm" href={waitingDecision.href}>Review</XaButtonLink> } : undefined;
   const websiteAside = showAside || checks.length > 0 || reads.length > 0;
   const historyReady = website && websiteDetail?.status === "ready" && (websiteDetail.detail.history.length > 0 || Boolean(system.history?.length));
+  const openHistory = () => setView("history");
+  // Everything past Checks and Reads from folds into one place, so the live site stays the one dominant object.
+  const more = (website && hasWebsiteDetail(websiteDetail)) || system.activations?.length || system.possibilities.length || system.storedVersionId || system.parts?.length
+    || system.connections.length || system.versions.length || system.history?.length || system.audits?.length || siteHref || system.offers?.length;
+  // When a check fails, Pebble says it and offers one way forward.
+  const inbox = systems.find(item => item.kind === "inquiries" && item.surface.kind !== "work");
+  const aboutInbox = [...failing].some(signal => /inbox|form/i.test(signal));
+  const failLink = aboutInbox && inbox ? <XaTextLink key="held" href={props.systemHref(inbox.id)}>See held messages</XaTextLink>
+    : readOnly ? null : <XaTextLink key="ask" onClick={() => { setAsk(`What failed on ${system.name}? `); composerRef.current?.focus(); }}>Ask about it</XaTextLink>;
   return <><div className={x.screen} data-lifecycle={system.lifecycle} aria-busy={loading || undefined}>
     <SystemHead kind="website" back={back} title={system.name} status={healthTone ? { kind: "waits", label: HEALTH_LABEL[system.health.state] } : lifecycleStatus} line={healthTone ? undefined : system.health.state === "healthy" ? system.health.summary : healthLine} tone={healthTone}
       actions={<>
-        {historyReady ? <XaButton onClick={() => setView("history")}><History size={14} aria-hidden="true" />History</XaButton> : null}
-        {askButton}
+        {historyReady ? <span className={x.deskOnly}><XaButton onClick={openHistory}><History size={14} aria-hidden="true" />History</XaButton></span> : null}
         {surface.liveUrl ? <XaButtonLink variant="primary" href={surface.liveUrl} target="_blank" rel="noreferrer"><ArrowUpRight size={14} aria-hidden="true" />Open site</XaButtonLink> : null}
       </>} />
-    {surface.editing || surface.manageHref || system.operatedBy ? <p className={x.textLinks}>
-      {system.operatedBy ? <span className={x.quiet}>Agency of record: {system.operatedBy}</span> : null}
+    {surface.editing || surface.manageHref || system.operatedBy || historyReady ? <p className={x.textLinks}>
+      {system.operatedBy ? <span className={x.quiet}>{system.operatedBy} looks after this site</span> : null}
+      {historyReady ? <button type="button" className={`${x.linkButton} ${x.phoneOnlyInline}`} onClick={openHistory}>History</button> : null}
+      {filesRequests || (surface.editing && readOnly) ? <button type="button" className={x.linkButton} disabled={readOnly} title={readOnly ? readOnlyReason : undefined} aria-expanded={askingChange} onClick={askForChange}>{system.operatedBy ? `Send a Request to ${system.operatedBy}` : "Send a Request"}</button> : null}
       {surface.editing ? <a href={workspaceSiteHref({ workspaceId: props.workspaceId, systemId: system.id, tab: "request" }, props.appBase || "")}>Changes to this site</a>
         : surface.manageHref ? <a href={surface.manageHref}>Website controls</a> : null}
     </p> : null}
-    {healthTone ? <div role="status"><XaSays>{system.health.summary}</XaSays></div> : null}
+    {healthTone ? <div role="status"><XaSays links={failLink ? [failLink] : undefined}>{system.health.summary}</XaSays></div> : null}
     {readOnlyLine}{pausedLine}
     {system.storedVersionId ? <SystemCreator workspaceId={props.workspaceId} systemId={system.id} /> : null}
     {needsYou}
@@ -220,23 +251,38 @@ export function SystemPage(props: SystemPageProps) {
         {system.publishing && !props.localPreview ? <ContentWorkspace key={system.id} workspaceId={props.workspaceId} systemId={system.id} kind="website" readOnly={readOnly || system.lifecycle === "paused"} /> : null}
       </section>
       {websiteAside ? <aside className={x.side} aria-label={`About ${system.name}`}>
-        {filesRequests && askingChange ? <WebsiteChangeAsk workspaceId={props.workspaceId} systemId={system.id} siteName={system.name} onFiled={() => setDetailVersion(version => version + 1)} onClose={() => setAskingChange(false)} /> : null}
+        {filesRequests && askingChange ? <WebsiteChangeAsk workspaceId={props.workspaceId} systemId={system.id} siteName={system.name} onFiled={reload} onClose={() => setAskingChange(false)} /> : null}
         {checks.length ? <SidePanel title="Checks" intro={checkedAt && !Number.isNaN(checkedAt.getTime()) ? `Last checked ${checkedAt.toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}` : undefined}>
-          <ul className={x.facts} aria-label="Website health evidence">{checks.map(signal => <li key={signal}><span>{signal}</span></li>)}</ul>
+          <ul className={x.facts} aria-label="Website health evidence">{checks.map(signal => {
+            const [label, value] = splitSignal(signal);
+            return <li key={signal}><span>{label}</span>{failing.has(signal) ? <XaStatus kind="waits" size="sm">{value || "Failed"}</XaStatus> : value ? <strong>{value}</strong> : null}</li>;
+          })}</ul>
         </SidePanel> : null}
-        {reads.length ? <SidePanel title="Reads from"><ul className={x.chips}>{reads.map(connection => <li key={connection.id} className={x.chip} title={connection.sentence}>{connection.target}</li>)}</ul></SidePanel> : null}
-        {website && websiteDetail ? <WebsiteSystemPanels workspaceId={props.workspaceId} systemId={system.id} state={websiteDetail} onAsk={onAsk} onAskChange={filesRequests ? () => setAskingChange(true) : undefined} readOnly={readOnly} includeHistory={false} /> : null}
-        {system.activations?.length ? <ActivationsPanel system={system} /> : null}
-        {system.possibilities.length || system.storedVersionId ? <PossibilitiesPanel key={`${props.workspaceId}:${system.id}`} systemHref={props.systemHref} versionReadOnly={props.versionReadOnly} system={system} systems={systems} workspaceId={props.workspaceId} readOnly={readOnly} readOnlyReason={readOnlyReason} canMakeReal={props.canMakeReal ?? !readOnly} makeRealReason={props.makeRealReason ?? readOnlyReason} appBase={props.appBase || ""} comparingId={null} onCompare={compare} onAsk={onAsk} /> : null}
-        <PartsPanel system={system} />
-        <SystemContextSections {...props} system={system} websiteDetail={websiteDetail ?? undefined} siteHref={siteHref} onPrepared={() => setDetailVersion(version => version + 1)} onAskRestore={filesRequests ? () => setAskingChange(true) : undefined} />
-        {system.audits?.length ? <AuditsPanel system={system} workspaceId={props.workspaceId} appBase={props.appBase || ""} /> : null}
-        {checkedAt && !Number.isNaN(checkedAt.getTime()) && system.health.state === "healthy" ? <XaSays>Pebble last checked the site {checkedAt.toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}. Every check passed.</XaSays> : null}
+        {reads.length ? <SidePanel title="Reads from your business record"><ul className={x.chips}>{reads.map(connection => <li key={connection.id} className={x.chip} title={connection.sentence}>{connection.target}</li>)}</ul></SidePanel> : null}
+        {more ? <details className={x.more}>
+          <summary>More about this site</summary>
+          <div className={x.moreBody}>
+            {website && websiteDetail ? <WebsiteSystemPanels workspaceId={props.workspaceId} systemId={system.id} state={websiteDetail} onAsk={onAsk} onAskChange={filesRequests ? () => setAskingChange(true) : undefined} readOnly={readOnly} includeHistory={false} /> : null}
+            {system.activations?.length ? <ActivationsPanel system={system} /> : null}
+            {system.possibilities.length || system.storedVersionId ? <PossibilitiesPanel key={`${props.workspaceId}:${system.id}`} systemHref={props.systemHref} versionReadOnly={props.versionReadOnly} system={system} systems={systems} workspaceId={props.workspaceId} readOnly={readOnly} readOnlyReason={readOnlyReason} canMakeReal={props.canMakeReal ?? !readOnly} makeRealReason={props.makeRealReason ?? readOnlyReason} ownerName={props.ownerName} appBase={props.appBase || ""} comparingId={null} onCompare={compare} onAsk={onAsk} /> : null}
+            <PartsPanel system={system} />
+            <SystemContextSections {...props} system={system} websiteDetail={websiteDetail ?? undefined} siteHref={siteHref} onPrepared={reload} onAskRestore={filesRequests ? () => setAskingChange(true) : undefined} />
+            {system.audits?.length ? <AuditsPanel system={system} workspaceId={props.workspaceId} appBase={props.appBase || ""} /> : null}
+          </div>
+        </details> : null}
       </aside> : null}
     </div>
     {showAside ? null : <p className={x.note}><XaTextLink onClick={readOnly ? undefined : () => onAsk(`What else could ${system.name} become? `)}>Ask what else {system.name} could become.</XaTextLink></p>}
-  </div><XaComposerDock><XaComposer waiting={waitingItem} placeholder={`Ask for a change to ${system.name}`} inputLabel={`Ask Strelva about ${system.name}`} value={ask} onChange={setAsk} disabled={readOnly || loading} maxLength={3000} onSubmit={() => onAsk(`About ${system.name}: ${ask.trim()}`)} /></XaComposerDock></>;
+  </div><XaComposerDock inset={{ start: 56, end: websiteAside ? 372 : 40 }}><XaComposer inputRef={composerRef} waiting={waitingItem} placeholder={`Ask for a change to ${system.name}`} inputLabel={`Ask Strelva about ${system.name}`} value={ask} onChange={setAsk} disabled={readOnly || loading} maxLength={3000} onSubmit={() => onAsk(`About ${system.name}: ${ask.trim()}`)} /></XaComposerDock></>;
 }
+
+/** "Links work: 41 of 41" reads as a label and its value (S1 Checks). A signal without a value stays one line. */
+function splitSignal(signal: string): [string, string | null] {
+  const at = signal.indexOf(": ");
+  return at > 0 ? [signal.slice(0, at), signal.slice(at + 2)] : [signal, null];
+}
+
+const xaTileIsForm = (kind: string) => xaSystemKind(kind) === "form";
 
 /** Plain answers about what a System reads and where its answers go, from its recorded Connections. */
 function connectionAnswers(system: SystemView): Array<readonly [string, string]> {
@@ -250,10 +296,15 @@ function connectionAnswers(system: SystemView): Array<readonly [string, string]>
   ];
 }
 
-/** S4's yes for a Draft System with one ready alternative: the same Make real call as the list, said as one gesture. */
-function DraftYes({ possibility, workspaceId, systemHref, blockedReason }: { possibility: SystemPossibility; workspaceId: string; systemHref: string; blockedReason?: string }) {
+/**
+ * S4's yes for a Draft System with one ready alternative: the same Make real
+ * call as the list, said as one gesture. Once it answers, Strelva says what
+ * happened in one sentence with "See it"; nothing else claims a state the
+ * page has not read back yet.
+ */
+function DraftYes({ possibility, workspaceId, systemHref, blockedReason, onLive }: { possibility: SystemPossibility; workspaceId: string; systemHref: string; blockedReason?: string; onLive?: () => void }) {
   const request = useWorkspaceRequest();
-  const [state, setState] = useState<"waiting" | "going" | "live" | "expired">("waiting");
+  const [state, setState] = useState<"waiting" | "going" | "settled">("waiting");
   const [outcome, setOutcome] = useState<MakeRealOutcome | null>(null);
   const inFlight = useRef(false);
   async function yes() {
@@ -263,15 +314,17 @@ function DraftYes({ possibility, workspaceId, systemHref, blockedReason }: { pos
     const next = await requestMakeReal(request, workspaceId, possibility.id, "live");
     inFlight.current = false;
     setOutcome(next);
-    setState(next.kind === "live" ? "live" : "expired");
+    setState("settled");
+    if (next.kind === "live" || (next.kind === "result" && next.result.status === "made_real")) onLive?.();
   }
-  const message = outcome?.kind === "result" ? `${outcome.result.headline} ${makeRealSummary(outcome.result)}` : outcome && outcome.kind !== "live" ? outcome.message : null;
-  return <>
-    <XaYes state={state} onYes={() => void yes()} disabledReason={blockedReason}
-      working={{ title: outcome?.kind === "live" ? outcome.headline : "Putting it live", steps: state === "going" ? [{ id: "ask", label: "Asking to put it live", state: "active" }] : outcome?.kind === "live" ? [{ id: "ask", label: outcome.started ? "Started. Reload to see what landed." : "Reload to check the current outcome.", state: "done" }] : [] }}
-      liveLabel={outcome?.kind === "live" ? outcome.headline : undefined} />
-    {message ? <div role={outcome?.kind === "result" ? "status" : "alert"}><XaSays links={outcome?.kind === "result" ? undefined : [<XaTextLink key="reload" href={systemHref}>Reload now</XaTextLink>]}>{message}</XaSays></div> : null}
-  </>;
+  if (state === "settled" && outcome) {
+    const live = outcome.kind === "live" || (outcome.kind === "result" && outcome.result.status === "made_real");
+    const sentence = outcome.kind === "live" ? `${outcome.headline}.`
+      : outcome.kind === "result" ? `${outcome.result.headline} ${makeRealSummary(outcome.result)}` : outcome.message;
+    return <div role={live || outcome.kind === "result" ? "status" : "alert"}><XaSays links={[<XaTextLink key="see" href={systemHref}>{live ? "See it" : "Reload now"}</XaTextLink>]}>{sentence.replace(/\.\.$/, ".")}</XaSays></div>;
+  }
+  return <XaYes state={state === "going" ? "going" : "waiting"} onYes={() => void yes()} disabledReason={blockedReason} yesLabel={LIVE_YES}
+    working={{ title: "Making it live", steps: [{ id: "ask", label: "Asking to make it live", state: "active" }] }} />;
 }
 
 /** Spec behavior 11-12: an empty block is not drawn; nothing at all is one line under the surface. */
@@ -313,10 +366,10 @@ export function websiteSandbox(src: string): string {
   }
 }
 
-function SystemSurface({ system, workspaceId, readOnly, versionReadOnly, useReadOnly = readOnly, canEditApplications = false, rebuildEnabled, managed, agency, canMakeReal, sources, localPreview, workspaceStopped, calendarRecoveryAllowed, inquiryAdapter, inquiryInbox }: SystemPageProps & { system: SystemView }) {
+function SystemSurface({ system, workspaceId, readOnly, versionReadOnly, useReadOnly = readOnly, canEditApplications = false, rebuildEnabled, managed, agency, canMakeReal, sources, localPreview, workspaceStopped, calendarRecoveryAllowed, inquiryAdapter, inquiryInbox, part }: SystemPageProps & { system: SystemView; /** "form": only the thing a Draft decision holds (S4), without its records. */ part?: "form" }) {
   // A registry-only inquiry System can open the released business inbox
   // without first appearing on a tenant website. Native access still applies.
-  if (system.kind === "inquiries" && inquiryInbox) return <WorkspaceInquirySystem key={workspaceId} workspaceId={workspaceId} />;
+  if (system.kind === "inquiries" && inquiryInbox) return <WorkspaceInquirySystem key={workspaceId} workspaceId={workspaceId} part={part === "form" ? "form" : "all"} />;
   if (system.surface.kind === "inquiries") {
     const adapter = inquiryAdapter?.tenantId === system.surface.tenantId ? inquiryAdapter.adapter : undefined;
     return <InquiryServerWorkspaceExperience tenantId={system.surface.tenantId} adapter={adapter} initialView="home" basePath="/workspace" routePrefix="inquiry" />;
@@ -413,7 +466,7 @@ function MakeRealState({ outcome, onAsk, title }: { outcome: MakeRealOutcome; on
   </div>;
 }
 
-function PossibilitiesPanel({ systemHref, versionReadOnly, system, systems, workspaceId, readOnly, readOnlyReason, canMakeReal, makeRealReason, appBase, comparingId, onCompare, onAsk, heldByYes }: { heldByYes?: string; systemHref: (id: string) => string; versionReadOnly?: boolean; system: SystemView; systems: readonly SystemView[]; workspaceId: string; readOnly: boolean; readOnlyReason?: string; canMakeReal: boolean; makeRealReason?: string; appBase: string; comparingId: string | null; onCompare?: (possibility: SystemPossibility) => void; onAsk: (request: string) => void }) {
+function PossibilitiesPanel({ systemHref, versionReadOnly, system, systems, workspaceId, readOnly, readOnlyReason, canMakeReal, makeRealReason, ownerName, appBase, comparingId, onCompare, onAsk, heldByYes }: { heldByYes?: string; ownerName?: string; systemHref: (id: string) => string; versionReadOnly?: boolean; system: SystemView; systems: readonly SystemView[]; workspaceId: string; readOnly: boolean; readOnlyReason?: string; canMakeReal: boolean; makeRealReason?: string; appBase: string; comparingId: string | null; onCompare?: (possibility: SystemPossibility) => void; onAsk: (request: string) => void }) {
   const request = useWorkspaceRequest();
   const [outcome, setOutcome] = useState<{ id: string; outcome: MakeRealOutcome } | null>(null);
   const [running, setRunning] = useState<string | null>(null);
@@ -435,7 +488,7 @@ function PossibilitiesPanel({ systemHref, versionReadOnly, system, systems, work
     {system.possibilities.length ? <StRows>{system.possibilities.map(possibility => {
       const scope = possibilityScope(possibility, systems);
       const execution = possibility.executionAvailability ?? "unavailable";
-      const blockedReason = readOnly || !canMakeReal ? makeRealReason || readOnlyReason || "Only an owner of this business can make a possibility real." : execution === "unavailable" ? "Live execution is unavailable for this Possibility. You can still open and compare it." : possibility.staleReason ? "Refresh this Possibility before making it real." : possibility.status !== "ready" ? "Still being explored. It can be made real once it is ready." : needsReload ? "Reload this System to check the current outcome before making another change." : running ? "Wait for the current live change request to finish." : undefined;
+      const blockedReason = readOnly || !canMakeReal ? makeRealReason || readOnlyReason || ownerOnlyReason(ownerName) : execution === "unavailable" ? "Live execution is unavailable for this Possibility. You can still open and compare it." : possibility.staleReason ? "Refresh this Possibility before it can go live." : possibility.status !== "ready" ? "Still being explored. It can be made real once it is ready." : needsReload ? "Reload this System to check the current outcome before making another change." : running ? "Wait for the current live change request to finish." : undefined;
       return <StRow key={possibility.id} title={possibility.title} detail={possibility.summary}>
         <StState kind="draft">{POSSIBILITY_STATUS_LABEL[possibility.status]}</StState>
         {possibility.staleReason ? <small role="note">{possibility.staleReason} A fresh check is needed.</small> : null}
@@ -444,7 +497,7 @@ function PossibilitiesPanel({ systemHref, versionReadOnly, system, systems, work
         <span className={styles.possibilityActions}>
           {onCompare && possibility.previewSrc ? <StPill variant="soft" aria-pressed={comparingId === possibility.id} onClick={() => onCompare(possibility)}>Compare</StPill> : null}
           {possibility.openHref ? <StPillLink variant="soft" href={`${appBase}${possibility.openHref}`}>{possibility.tryHref ? "Try it as a visitor" : "Open"}</StPillLink> : null}
-          {heldByYes === possibility.id ? null : <StPill variant={system.surface.kind !== "website" && (system.possibilities.length === 1 || comparingId === possibility.id) ? "primary" : "soft"} disabled={Boolean(blockedReason)} busy={running === possibility.id} title={blockedReason} onClick={() => void makeReal(possibility)}>{running === possibility.id ? execution === "rehearsal" ? "Rehearsing…" : "Making it live…" : execution === "rehearsal" ? "Rehearse this change" : execution === "unavailable" ? "Live unavailable" : "Make it live"}</StPill>}
+          {heldByYes === possibility.id ? null : <StPill variant={system.surface.kind !== "website" && (system.possibilities.length === 1 || comparingId === possibility.id) ? "primary" : "soft"} disabled={Boolean(blockedReason)} busy={running === possibility.id} title={blockedReason} onClick={() => void makeReal(possibility)}>{running === possibility.id ? execution === "rehearsal" ? "Rehearsing…" : "Making it live…" : execution === "rehearsal" ? "Rehearse this change" : execution === "unavailable" ? "Live unavailable" : LIVE_YES}</StPill>}
         </span>
         {comparingId === possibility.id && possibility.previewSrc && system.surface.kind !== "website" ? <PossibilityComparison title={possibility.title}
           live={<StEmpty>The current System is open above. A visitor preview has not been recorded.</StEmpty>}

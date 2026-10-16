@@ -39,11 +39,13 @@ export function summarizeBookingHours(hours: BookingHoursView): string {
   return days.length ? days.join(" · ") : "Not taking bookings on any day.";
 }
 
-export function BookingHoursEditor({ workspaceId, tenantId, siteName, hours }: {
+export function BookingHoursEditor({ workspaceId, tenantId, siteName, hours, summary = true }: {
   workspaceId: string;
   tenantId: string;
   siteName: string;
   hours: BookingHoursView;
+  /** False when the hours are already drawn beside it (XA · S2): then only "Change booking hours" shows. */
+  summary?: boolean;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -121,13 +123,13 @@ export function BookingHoursEditor({ workspaceId, tenantId, siteName, hours }: {
   }
 
   return (
-    <div className="border-t border-gray-border pt-4">
+    <div className={summary ? "border-t border-gray-border pt-4" : undefined}>
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
+        {summary ? <div>
           <p className="text-sm font-medium">Booking hours</p>
           <p className="mt-0.5 text-sm text-gray-muted">{summarizeBookingHours(hours)}</p>
-        </div>
-        {!open ? <StTextButton onClick={() => setOpen(true)} aria-label={`Change booking hours for ${siteName}`}>Change</StTextButton> : null}
+        </div> : null}
+        {!open ? <StTextButton onClick={() => setOpen(true)} aria-label={`Change booking hours for ${siteName}`}>Change booking hours</StTextButton> : null}
       </div>
       {open ? (
         <div className="mt-4"><StSurface label="Booking hours"><form onSubmit={submit}>

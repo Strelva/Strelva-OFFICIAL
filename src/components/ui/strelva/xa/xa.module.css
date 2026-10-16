@@ -49,7 +49,9 @@
 .button:active:not(:disabled) { scale: var(--motion-press-scale); }
 .button:disabled, .button[aria-disabled="true"] { cursor: not-allowed; opacity: 0.45; }
 .button:focus-visible, .iconButton:focus-visible { outline: 2px solid var(--st-accent); outline-offset: 2px; }
-.buttonHint { color: inherit; font-size: 13px; font-weight: 500; opacity: 0.55; font-variant-numeric: tabular-nums; }
+.buttonHint { color: inherit; font-size: 13px; font-weight: 500; opacity: 0; font-variant-numeric: tabular-nums; transition: opacity var(--motion-fast) var(--ease-settle); }
+/* The keyboard hint is for people already reaching for keys: shown on hover or keyboard focus only. */
+.button:hover .buttonHint, .button:focus-visible .buttonHint { opacity: 0.55; }
 @media (pointer: coarse) { .buttonHint { display: none; } .button[data-size="sm"] { height: 44px; } }
 
 .iconButton {
@@ -112,6 +114,9 @@
 .sceneArt[data-leaving="true"] { animation: none; opacity: 0; transition: opacity var(--motion-base) var(--ease-settle); }
 .scene[data-bare="true"] { background: none; }
 .scene[data-bare="true"]::after { display: none; }
+/* An empty state's clay on the page itself, no felt disc (bad news keeps Pebble in frame, not in a badge). */
+.empty[data-bare="true"] .scene { height: calc(var(--xa-size, 140px) * 0.58); }
+.empty[data-bare="true"] .sceneArt { top: 0; height: 100%; }
 
 /* ---------- Composer (T4ln9 resting, LHF4o with a yes, C3 typing/attached) ---------- */
 .composer {

@@ -9,13 +9,11 @@ it("keeps an unsent reply when the owner opens another person and returns", asyn
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
   const container = document.createElement("div"); document.body.append(container);
   const root = createRoot(container);
-  const button = (name: string) => Array.from(container.querySelectorAll("button")).find(item => item.textContent?.trim() === name)!;
   try {
     await act(async () => root.render(<InquiryInbox entries={[
       { id: "one", name: "First person", summary: "First inquiry", at: "Oct 9", waiting: true, record: <WorkspaceInquiryReply workspaceId="workspace" rowId="one" name="First person" email="first@example.invalid" /> },
       { id: "two", name: "Second person", summary: "Second inquiry", at: "Oct 8", waiting: false, record: <p>Second inquiry record</p> },
     ]} />));
-    await act(async () => button("Reply to First person").click());
     const field = container.querySelector("textarea")!;
     await act(async () => { Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")!.set!.call(field, "Keep this exact draft"); field.dispatchEvent(new Event("input", { bubbles: true })); });
     const rows = container.querySelectorAll('ul[aria-label="People who reached out"] button');
@@ -37,10 +35,9 @@ it("keeps the fictional System preview reply entirely in the browser", async () 
   const button = (name: string) => Array.from(container.querySelectorAll("button")).find(item => item.textContent?.trim() === name)!;
   try {
     await act(async () => root.render(<InquirySystemPreview />));
-    await act(async () => button("Reply to Priya S.").click());
     const field = container.querySelector('[aria-label="Reply to Priya S."] textarea')!;
     await act(async () => { Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")!.set!.call(field, "This is fictional"); field.dispatchEvent(new Event("input", { bubbles: true })); });
-    await act(async () => button("Approve and send reply").click());
+    await act(async () => button("Send to Priya").click());
     expect(container.textContent).toContain("Email is paused. Nothing was sent.");
     expect(outside).not.toHaveBeenCalled();
   } finally { await act(async () => root.unmount()); expect(window.fetch).toBe(outside); container.remove(); vi.unstubAllGlobals(); }

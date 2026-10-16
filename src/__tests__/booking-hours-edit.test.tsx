@@ -60,12 +60,14 @@ describe("reading booking hours on the bookings screen", () => {
       } as never] } },
     }));
     const narrowed = ready({ record: RECORD, bookable: [{ day: 1, opens: "10:00", closes: "12:00" }] });
-    expect(narrowed).toContain("Booking hours");
-    expect(narrowed).toContain("Mon 10:00 AM–12:00 PM");
+    // The card beside the list already draws the hours, so the editor is one labeled link.
+    expect(narrowed).toContain(">Change booking hours<");
+    expect(narrowed).toContain("10–12");
+    expect(narrowed).not.toContain("Mon 10:00 AM–12:00 PM");
     expect(narrowed).toContain('aria-label="Change booking hours for Twin Trees"');
     expect(ready({ record: RECORD, bookable: null })).toContain("Same as your opening hours.");
     expect(ready({ record: null, bookable: null })).toContain("add the business&#x27;s opening hours first");
-    expect(ready(undefined)).not.toContain("Booking hours");
+    expect(ready(undefined)).not.toContain("Change booking hours");
   });
 
   it("summarizes a closed week honestly", () => {

@@ -8,11 +8,12 @@
  * one-step reversal here; History holds the way back.
  */
 import { useRef, useState } from "react";
-import { XaButtonLink, XaHeadline, XaSays, XaSystemTile, XaTextLink, XaYes, type XaWorkingStep, type XaYesState } from "@/components/ui/strelva/Xa";
+import { XaButtonLink, XaHeadline, XaInitial, XaSays, XaSystemTile, XaTextLink, XaYes, type XaWorkingStep, type XaYesState } from "@/components/ui/strelva/Xa";
+import { actorPresentation, recordedActor } from "@/platform/presentation/actor";
 import { useWorkspaceRequest } from "@/experience/workspace/WorkspaceRequest";
 import { possibilityScope } from "../from-workspace";
 import { makeRealSummary, type MakeRealOutcome, type SystemPossibility, type SystemView } from "../model";
-import { requestMakeReal } from "../make-real-request";
+import { LIVE_YES, ownerOnlyReason, requestMakeReal } from "../make-real-request";
 import { WebsiteSystemCanvas, type WebsiteCanvasMode } from "../WebsiteSystemCanvas";
 import styles from "./system-xa.module.css";
 
@@ -38,9 +39,9 @@ export function PossibilityView({ system, systems, possibility, workspaceId, app
   const execution = possibility.executionAvailability ?? "unavailable";
   const rehearsal = execution === "rehearsal";
   const scope = possibilityScope(possibility, systems);
-  const reason = blockedReason ?? (readOnly || !canMakeReal ? "Only an owner of this business can make a possibility real."
+  const reason = blockedReason ?? (readOnly || !canMakeReal ? ownerOnlyReason()
     : execution === "unavailable" ? "Live execution is unavailable for this Possibility. You can still open and compare it."
-      : possibility.staleReason ? "Refresh this Possibility before making it real."
+      : possibility.staleReason ? "Refresh this Possibility before it can go live."
         : possibility.status !== "ready" ? "Still being explored. It can be made real once it is ready." : undefined);
 
   async function putLive() {
@@ -53,14 +54,20 @@ export function PossibilityView({ system, systems, possibility, workspaceId, app
     setYes(next.kind === "live" ? "live" : "expired");
   }
 
-  const steps: XaWorkingStep[] = [{ id: "ask", label: rehearsal ? "Running it on an isolated copy" : "Asking to put it live", state: "active" }];
+  const steps: XaWorkingStep[] = [{ id: "ask", label: rehearsal ? "Running it on an isolated copy" : "Asking to make it live", state: "active" }];
+  // Name whoever proposed it, when recorded; never an anonymous proposal dressed as one.
+  const actor = recordedActor(possibility.actor);
+  const proposer = actorPresentation(possibility.actor).name;
+  const proposedOn = possibility.proposedAt && !Number.isNaN(Date.parse(possibility.proposedAt)) ? new Date(possibility.proposedAt).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : null;
+  const kickerLead = actor?.kind === "agency" && proposer ? <XaInitial name={actor.displayName.split(" at ").pop() || proposer} size={24} color="#2f5236" /> : <XaSystemTile kind="website" size={24} />;
+  const kickerText = proposer ? `A Possibility from ${proposer}${proposedOn ? ` · ${proposedOn}` : ""}` : `A Possibility for ${system.name}`;
   const try_ = possibility.tryHref ?? possibility.openHref;
   const settled = outcome?.kind === "result" ? `${outcome.result.headline} ${makeRealSummary(outcome.result)}` : outcome && outcome.kind !== "live" ? outcome.message : undefined;
 
   return <div className={styles.screen} aria-labelledby="xa-possibility-title">
     <button type="button" className={styles.back} onClick={onBack}>‹ {system.name}</button>
     <div className={styles.compareHead}>
-      <p className={styles.kicker}><XaSystemTile kind="website" size={24} />A Possibility for {system.name}{scope.length > 1 ? ` · also changes ${scope.filter(name => name !== system.name).join(", ")}` : ""}</p>
+      <p className={styles.kicker}>{kickerLead}{kickerText}{scope.length > 1 ? ` · also changes ${scope.filter(name => name !== system.name).join(", ")}` : ""}</p>
       <XaHeadline id="xa-possibility-title" size="sm" quiet={rehearsal ? "It runs on an isolated copy. Your live site stays as it is." : "Your site stays as it is until you say yes."}>{possibility.title}</XaHeadline>
       {possibility.staleReason ? <p className={styles.sentence} data-tone="waits">{possibility.staleReason} A fresh check is needed.</p> : null}
     </div>
@@ -72,8 +79,8 @@ export function PossibilityView({ system, systems, possibility, workspaceId, app
       <div className={styles.compareActions}>
         {try_ && yes === "waiting" ? <XaButtonLink href={`${appBase}${try_}`} size="lg">{possibility.tryHref ? "Try it as a visitor" : "Open it"}</XaButtonLink> : null}
         {outcome?.kind === "result" ? null : <XaYes state={yes} block={false} onYes={() => void putLive()} onNotYet={yes === "waiting" ? onBack : undefined}
-          yesLabel={rehearsal ? "Rehearse this change" : undefined}
-          working={yes === "going" ? { title: rehearsal ? "Rehearsing this change" : "Putting it live", steps } : undefined}
+          yesLabel={rehearsal ? "Rehearse this change" : LIVE_YES}
+          working={yes === "going" ? { title: rehearsal ? "Rehearsing this change" : "Making it live", steps } : undefined}
           liveLabel={outcome?.kind === "live" ? outcome.headline : undefined}
           disabledReason={reason} />}
       </div>

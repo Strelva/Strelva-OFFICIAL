@@ -1,13 +1,22 @@
 "use client";
 import { useEffect, useState } from "react";
-import { XaButton, XaEmpty } from "@/components/ui/strelva/Xa";
+import { XaEmpty, XaTextLink } from "@/components/ui/strelva/Xa";
 import { WorkspaceInquiries } from "./WorkspaceInquiries";
 import { InquirySystemDetails } from "./InquirySystemDetails";
 import type { WorkspaceLeads } from "@/products/inquiries";
 import type { PlaceState } from "./WorkspacePlace";
 
-/** Customer System surface; internal drafts and policies stay on operator views. */
-export function WorkspaceInquirySystem({ workspaceId }: { workspaceId: string }) {
+/**
+ * Customer System surface; internal drafts and policies stay on operator views.
+ * `part="form"` is the form alone, as a Draft decision holds it (XA · S4):
+ * the people who wrote in, Connections and History stay outside that card.
+ */
+export function WorkspaceInquirySystem({ workspaceId, part = "all" }: { workspaceId: string; part?: "all" | "form" }) {
+  if (part === "form") return <InquirySystemDetails key={workspaceId} workspaceId={workspaceId} formOnly />;
+  return <InquiryRecords workspaceId={workspaceId} />;
+}
+
+function InquiryRecords({ workspaceId }: { workspaceId: string }) {
   const [loaded, setLoaded] = useState<{ workspaceId: string; state: PlaceState<WorkspaceLeads> } | null>(null);
   const [retry, setRetry] = useState(0);
   useEffect(() => {
@@ -25,7 +34,8 @@ export function WorkspaceInquirySystem({ workspaceId }: { workspaceId: string })
   // A business switch must hide the previous records and any open reply
   // before the next fetch completes, including its loading and error states.
   const state = loaded?.workspaceId === workspaceId ? loaded.state : null;
-  if (!state) return <div aria-busy="true"><XaEmpty size="sm" pose="alone" title="Opening inquiries…" job="Pebble is reading everyone who reached out" /></div>;
-  const records = <><WorkspaceInquiries key={workspaceId} workspaceId={workspaceId} state={state} embedded head={false} />{state.kind === "error" ? <div><XaButton onClick={() => { setLoaded(null); setRetry(value => value + 1); }}>Try again</XaButton></div> : null}</>;
+  if (!state) return <div aria-busy="true"><XaEmpty size="sm" bare pose="alone" title="Opening inquiries…" job="Pebble is reading everyone who reached out" /></div>;
+  const records = <WorkspaceInquiries key={workspaceId} workspaceId={workspaceId} state={state} embedded head={false}
+    reload={<XaTextLink onClick={() => { setLoaded(null); setRetry(value => value + 1); }}>Reload</XaTextLink>} />;
   return state.kind === "ready" ? <InquirySystemDetails key={workspaceId} workspaceId={workspaceId} records={records} /> : records;
 }

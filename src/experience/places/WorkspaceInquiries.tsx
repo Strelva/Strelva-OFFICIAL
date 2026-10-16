@@ -1,5 +1,7 @@
+"use client";
+import { useState, type ReactNode } from "react";
 import { ProposeBookingTimes } from "@/experience/bookings/ProposeBookingTimes";
-import { XaAnswers, XaButtonLink, XaEmpty, XaInitial, XaStatus } from "@/components/ui/strelva/Xa";
+import { XaAnswers, XaButtonLink, XaEmpty, XaInitial, XaSegmented, XaStatus, XaTextLink } from "@/components/ui/strelva/Xa";
 import { SidePanel, SystemHead } from "@/experience/systems/xa/SystemHead";
 import x from "@/experience/systems/xa/system-xa.module.css";
 import type { HeldInquiries, HeldView, LeadView, WorkspaceLeads } from "@/products/inquiries/client";
@@ -12,8 +14,8 @@ import { placeHomeHref, whenLabel, type PlaceState } from "./WorkspacePlace";
 /**
  * Inquiries, in the workspace: everyone who reached out through the site,
  * newest first, with a one-tap email reply. The home of /dashboard/leads.
- * XA · S3: people on the left, the open person on the right; status only
- * where someone still waits for a reply.
+ * XA · S3: the people who wait on the left, the open person on the right,
+ * Open / Done in the header; status only where someone still waits.
  */
 
 function sourceLabel(source: string): string {
@@ -42,7 +44,7 @@ function LeadCard({ lead, workspaceId, tenantId, bookingProposals, replies, book
       </div> : null}
       {replies && lead.reply && Object.hasOwn(REPLY_OUTCOME, lead.reply.status) ? <p role="status" className={x.sentence}>{REPLY_OUTCOME[lead.reply.status]}</p>
         : lead.email && replies && lead.rowId && lead.replyPermission === "none" ? <p className={x.note}>The owner or the assigned team member can reply to this inquiry.</p>
-          : lead.email && replies && lead.rowId ? <div className={x.replyForm}><WorkspaceInquiryReply workspaceId={workspaceId} rowId={lead.rowId} name={lead.name} email={lead.email} bookingOffers={bookingOffers && lead.replyPermission !== "member"} member={lead.replyPermission === "member"} /><p className={x.quiet}>Replies go out as {siteName}.</p></div>
+          : lead.email && replies && lead.rowId ? <div className={x.replyForm}><WorkspaceInquiryReply workspaceId={workspaceId} rowId={lead.rowId} name={lead.name} email={lead.email} siteName={siteName} bookingOffers={bookingOffers && lead.replyPermission !== "member"} member={lead.replyPermission === "member"} /></div>
             : lead.email ? <div className={x.replyRow}><XaButtonLink href={`mailto:${encodeURIComponent(lead.email).replace(/%40/g, "@")}`}>Reply by email</XaButtonLink><span className={x.quiet}>Opens your own email</span></div> : null}
     </article>
   );
@@ -82,25 +84,29 @@ function HeldSection({ held, workspaceId }: { held: HeldInquiries; workspaceId: 
   </SidePanel>;
 }
 
-export function WorkspaceInquiries({ workspaceId, state, embedded = false, forwarding = false, head = true }: { workspaceId: string; state: PlaceState<WorkspaceLeads>; embedded?: boolean; forwarding?: boolean; /** False inside a System page, which already says what this is. */ head?: boolean }) {
+export function WorkspaceInquiries({ workspaceId, state, embedded = false, forwarding = false, head = true, reload }: { workspaceId: string; state: PlaceState<WorkspaceLeads>; embedded?: boolean; forwarding?: boolean; /** False inside a System page, which already says what this is. */ head?: boolean; /** The one way forward when the records couldn't load; defaults to reloading this page. */ reload?: ReactNode }) {
   const data = state.kind === "ready" ? state.data : null;
   const waiting = data ? data.sites.reduce((n, site) => n + site.leads.filter(lead => !!lead.email && data.workspaceReplies === true && !lead.reply).length, 0) : 0;
+  const total = data ? data.sites.reduce((n, site) => n + site.leads.length, 0) : 0;
+  const [tab, setTab] = useState<"open" | "done">(waiting ? "open" : "done");
+  const segment = data && total ? <XaSegmented label="Which inquiries" value={tab} onChange={setTab} options={[{ value: "open", label: `Open ${waiting}` }, { value: "done", label: `Done ${total - waiting}` }]} /> : undefined;
   const recent = data && !data.paged ? data.sites.reduce((n, site) => n + (site.unavailable ? 0 : site.lastThirtyDays), 0) : null;
   const meta = data?.durable ? "People who contacted you through your site. Your inquiries stay on record." : "People who contacted you through your site. Strelva keeps the last 90 days here.";
   const content = <>
     {head ? <SystemHead kind="inquiries" title="Inquiries" back={embedded ? undefined : <a className={x.back} href={placeHomeHref(workspaceId)}>‹ Home</a>}
       status={waiting ? { kind: "waits", label: `${waiting} ${waiting === 1 ? "waits" : "wait"} for you` } : undefined} tone={waiting ? "waits" : undefined}
-      line={recent !== null ? `${recent} in the last 30 days` : undefined} /> : null}
+      line={recent !== null ? `${recent} in the last 30 days` : undefined} actions={segment} /> : null}
     {state.kind === "permission" ? <XaEmpty size="sm" pose="alone" title="These inquiries belong to another business" job="Pebble kept them closed to your account" action={<XaButtonLink href="/workspace">Open your workspace</XaButtonLink>}>Your account isn&apos;t a member of this business. Ask its owner to invite you.</XaEmpty>
-      : state.kind === "error" ? <XaEmpty size="sm" pose="fixing" title="Inquiries couldn't load" job="Pebble will read them again when you reload">Inquiries couldn&apos;t load. Nothing is lost. Reload to check the current records.</XaEmpty> : <>
-        <p className={x.note}>{meta}</p>
+      : state.kind === "error" ? <XaEmpty size="sm" bare pose="fixing" title="Inquiries couldn't load just now" job="Pebble kept every message. Nothing is lost." action={reload ?? <XaTextLink href={`/workspace/inquiries?workspaceId=${encodeURIComponent(workspaceId)}`}>Reload</XaTextLink>} /> : <>
+        {head ? null : segment ? <div className={x.inboxHead}>{segment}</div> : null}
+        {total ? null : <p className={x.note}>{meta}</p>}
         {data?.denied.length ? <p className={x.sentence} data-tone="waits">Your account can&apos;t open {data.denied.map(site => site.siteName).join(", ")} yet. Ask the owner to finish adding you.</p> : null}
-        {data && data.sites.length === 0 && data.denied.length === 0 && !forwarding ? <XaEmpty size="sm" pose="resting" title="No inquiries yet" job="Pebble is waiting for a site to send its contact form here">No site is connected to this business yet. Inquiries start once a connected site sends its contact form here.</XaEmpty> : null}
+        {data && data.sites.length === 0 && data.denied.length === 0 && !forwarding ? <XaEmpty size="sm" bare pose="resting" title="No inquiries yet" job="Pebble is waiting for a site to send its contact form here">No site is connected to this business yet. Inquiries start once a connected site sends its contact form here.</XaEmpty> : null}
         {data?.sites.map(site => <section key={site.key} className={x.main} id={`site-${site.key.replace(/[^a-z0-9-]/gi, "-")}`} aria-label={site.connected ? `${site.siteName} (your site)` : site.siteName}>
           {data.sites.length > 1 ? <h2 className={x.panelHead}>{site.connected ? `${site.siteName} (your site)` : site.siteName}{site.unavailable ? null : <span>{data.paged ? "" : `${site.lastThirtyDays} in the last 30 days · `}{site.leads.length} shown</span>}</h2> : null}
           {site.unavailable ? <p className={x.sentence} data-tone="waits" role="status">Messages for {site.siteName} couldn&apos;t be read right now. Reload to check the current records.</p>
-            : site.leads.length === 0 ? <XaEmpty size="sm" pose="resting" title="No one has reached out yet" job={`Pebble is watching ${site.siteName} for the next message`}>{site.forwarded ? "No forwarded email yet. Each inquiry you forward shows up here with the sender and what they asked." : <>No one has reached out yet. When someone contacts you through {site.siteName}, they show up here with their name and what they asked.</>}</XaEmpty>
-              : <InquiryInbox key={`${workspaceId}:${site.key}`} entries={site.leads.map(lead => ({ id: lead.id, name: lead.name, summary: lead.message, at: shortDay(lead.createdAt), waiting: !!lead.email && data.workspaceReplies === true && !lead.reply, record: <LeadCard lead={lead} workspaceId={workspaceId} tenantId={site.tenantId} bookingProposals={site.bookingProposals} replies={data.workspaceReplies} bookingOffers={data.bookingOffers} siteName={site.siteName} /> }))} />}
+            : site.leads.length === 0 ? <XaEmpty size="sm" bare pose="resting" title="No one has reached out yet" job={`Pebble is watching ${site.siteName} for the next message`}>{site.forwarded ? "No forwarded email yet. Each inquiry you forward shows up here with the sender and what they asked." : <>No one has reached out yet. When someone contacts you through {site.siteName}, they show up here with their name and what they asked.</>}</XaEmpty>
+              : <InquiryInbox key={`${workspaceId}:${site.key}`} show={tab} onShowDone={() => setTab("done")} entries={site.leads.map(lead => ({ id: lead.id, name: lead.name, summary: lead.message, at: shortDay(lead.createdAt), waiting: !!lead.email && data.workspaceReplies === true && !lead.reply, record: <LeadCard lead={lead} workspaceId={workspaceId} tenantId={site.tenantId} bookingProposals={site.bookingProposals} replies={data.workspaceReplies} bookingOffers={data.bookingOffers} siteName={site.siteName} /> }))} />}
         </section>)}
         {data?.nextPage ? <p className={x.textLinks}><a href={`/workspace/inquiries?workspaceId=${encodeURIComponent(workspaceId)}&before=${encodeURIComponent(data.nextPage.before)}&beforeId=${encodeURIComponent(data.nextPage.beforeId)}`}>Earlier inquiries</a></p> : null}
         {data?.held ? <HeldSection held={data.held} workspaceId={workspaceId} /> : null}

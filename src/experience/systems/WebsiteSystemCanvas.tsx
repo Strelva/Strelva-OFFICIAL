@@ -34,8 +34,9 @@ export function WebsiteSystemCanvas({ system, comparing, mode, onModeChange, san
   return <div className={styles.main}>
     <div className={styles.phoneOnly}><XaSegmented label="What to show" block value={mode === "possibility" ? "possibility" : "both"} options={[{ value: "both", label: "Live now" }, { value: "possibility", label: "Proposed" }]} onChange={value => onModeChange(value)} /></div>
     <div className={styles.compare} data-show={show ?? "live"}>
-      <div className={styles.compareCol}><XaStatus kind="live" size="sm">Live now</XaStatus>{live}</div>
-      <div className={styles.compareCol}><XaStatus kind="draft" size="sm">Proposed</XaStatus>
+      {/* On a phone the segment above names each side, so the column labels step aside. */}
+      <div className={styles.compareCol}><span className={styles.colLabel}><XaStatus kind="live" size="sm">Live now</XaStatus></span>{live}</div>
+      <div className={styles.compareCol}><span className={styles.colLabel}><XaStatus kind="draft" size="sm">Proposed</XaStatus></span>
         <XaPage bleed address={address} label={`${comparing.title}, not live`}>
           <iframe className={styles.frame} title={`${comparing.title}, not live`} src={comparing.previewSrc} sandbox="" loading="lazy" referrerPolicy="no-referrer" tabIndex={-1} />
         </XaPage>

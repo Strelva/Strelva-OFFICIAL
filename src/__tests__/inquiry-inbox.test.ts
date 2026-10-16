@@ -1,3 +1,4 @@
+import { createElement } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { readWorkspaceInquiryInbox, type InboxDependencies } from "@/products/inquiries/workspace-inbox";
 import { renderToStaticMarkup } from "react-dom/server";
@@ -21,7 +22,7 @@ describe("retained inquiry inbox", () => {
     const result = await readWorkspaceInquiryInbox(actor, workspace, cursor, d);
     expect(result.sites[0]?.leads).toHaveLength(100); expect(result).toMatchObject({ durable: true, paged: true, nextPage: { before: rows[99]!.capturedAt, beforeId: rows[99]!.id } });
     expect(d.rpc).toHaveBeenCalledWith("read_workspace_inquiry_inbox_page", expect.objectContaining({ p_user_id: actor.userId, p_workspace_id: workspace, p_before: cursor.before, p_before_id: cursor.beforeId }), expect.any(Function));
-    const markup = renderToStaticMarkup(WorkspaceInquiries({ workspaceId: workspace, state: { kind: "ready", data: result }, embedded: true }));
+    const markup = renderToStaticMarkup(createElement(WorkspaceInquiries, { workspaceId: workspace, state: { kind: "ready", data: result }, embedded: true }));
     expect(markup).toContain("Earlier inquiries"); expect(markup).not.toContain("last 30 days"); expect(markup).not.toContain("<main");
   });
   it("malformed storage is unavailable rather than a truncated or empty success", async () => {

@@ -254,6 +254,8 @@ export function readBusinessSystems(input: SystemsInput): BusinessSystems {
       openHref: (possibility.tryHref && sameAppHref(possibility.tryHref)) || `/workspace?workspaceId=${encodeURIComponent(snapshot.workspaceId)}&view=websites&work=${encodeURIComponent(possibility.workId)}`,
       ...(possibility.tryHref && sameAppHref(possibility.tryHref) ? { tryHref: sameAppHref(possibility.tryHref) || undefined } : {}),
       ...(possibility.staleReason ? { staleReason: possibility.staleReason } : {}),
+      ...(possibility.actor ? { actor: possibility.actor } : {}),
+      ...(possibility.proposedAt ? { proposedAt: possibility.proposedAt } : {}),
     };
     for (const id of new Set([...view.affects, ...(possibility.sourceSystemIds ?? []).filter(id => byId.has(id))])) byId.get(id)!.possibilities.push(view);
   }

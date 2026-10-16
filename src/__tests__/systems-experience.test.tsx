@@ -300,8 +300,8 @@ describe("Make real and the System page", () => {
   });
 
   it("gives a non-owner a visible permission state on Make real", () => {
-    const html = render({ readOnly: true, canMakeReal: false, readOnlyReason: "Ask an owner or admin to make changes.", makeRealReason: "Only an owner of this business can make a possibility real." });
-    expect(html).toContain("Only an owner of this business can make a possibility real.");
+    const html = render({ readOnly: true, canMakeReal: false, readOnlyReason: "Ask an owner or admin to make changes.", makeRealReason: "Only the owner of this business can say yes to this." });
+    expect(html).toContain("Only the owner of this business can say yes to this.");
     expect(html.match(/<button[^>]*disabled=""[^>]*>[^]*?Rehearse this change/)).not.toBeNull();
   });
 

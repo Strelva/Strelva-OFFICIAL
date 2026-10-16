@@ -531,6 +531,9 @@ a.row:hover, button.row:hover { margin-inline: -12px; padding-inline: 12px; bord
 .composerSend:disabled { opacity: 0.4; cursor: not-allowed; }
 .composer:focus-within { border-color: color-mix(in srgb, var(--st-accent) 40%, var(--st-line)); }
 .composerDock { box-sizing: border-box; display: flex; width: 100%; flex: 0 0 auto; justify-content: center; margin-top: auto; padding: 16px 24px 20px; }
+/* Column-scoped: the composer stays under the column it speaks to (XA · S1, S4). */
+.composerDock[data-inset] { padding-left: var(--dock-start, 24px); padding-right: var(--dock-end, 24px); }
+@media (max-width: 1100px) { .composerDock[data-inset] { padding-left: 24px; padding-right: 24px; } }
 /* Without an AppFrame slot, keep both the work and dock in normal flow. */
 :global([data-frame-main]):has(.composerDock) { overflow-y: auto; }
 :global([data-frame-main]):has(> .composerDock) > * { flex-shrink: 0; }
@@ -571,7 +574,7 @@ a.row:hover, button.row:hover { margin-inline: -12px; padding-inline: 12px; bord
 textarea.composerInput { resize: none; max-height: 144px; }
 
 @media (pointer: coarse) { .composerSend { width: 44px; height: 44px; } }
-@media (max-width: 767px) { .composerDock { padding-inline: 8px; padding-bottom: calc(16px + var(--st-phone-navigation-height, 0px) + var(--st-workspace-safe-area, 0px)); } .composerScope { display: none; } }
+@media (max-width: 767px) { .composerDock, .composerDock[data-inset] { padding-inline: 8px; padding-bottom: calc(16px + var(--st-phone-navigation-height, 0px) + var(--st-workspace-safe-area, 0px)); } .composerScope { display: none; } }
 
 /* Shared fields, switches and open tables. */
 .input { display: flex; flex-direction: column; gap: 8px; min-width: 0; color: var(--st-text-2); font-size: 13px; line-height: 20px; }

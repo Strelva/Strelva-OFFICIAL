@@ -18,6 +18,8 @@ export const XA4_WORKSPACE = "4a000000-0000-4000-8000-000000000001";
 export const XA4_SITE = "4a000000-0000-4000-8000-000000000002";
 export const XA4_FORM = "4a000000-0000-4000-8000-000000000003";
 export const XA4_POSSIBILITY = "4a000000-0000-4000-8000-000000000004";
+export const XA4_INBOX = "4a000000-0000-4000-8000-000000000005";
+export const XA4_BOOKING_REQUEST = "4a000000-0000-4000-8000-0000000000b6";
 const BASE = "/preview/strelva/xa/xa4-systems";
 
 const MAYA = { kind: "agency" as const, displayName: "Maya at North Studio" };
@@ -31,9 +33,9 @@ export function harborWebsite(state: "ready" | "waiting" | "error" | "empty" | "
   return {
     id: XA4_SITE, kind: "website", name: "harbordental.com", detail: "Harbor Dental", lifecycle: "live",
     health: broken
-      ? { state: "degraded", summary: "The contact form stopped reaching your inbox at 6:40. Pebble is holding new messages.", lastVerifiedAt: "2026-10-15T10:40:00Z", signals: ["Loads on a phone in 1.2 s", "41 of 41 links work", "Forms reach your inbox: stopped at 6:40", "Hours match your business record"] }
+      ? { state: "degraded", summary: "The contact form stopped reaching your inbox at 6:40. Pebble is holding new messages.", lastVerifiedAt: "2026-10-15T10:40:00Z", signals: ["Loads on a phone: 1.2 s", "Links work: 41 of 41", "Forms reach your inbox: Stopped at 6:40", "Hours match your record: Match"], failing: ["Forms reach your inbox: Stopped at 6:40"] }
       : state === "empty" ? { state: "unknown", summary: "Nothing has checked this yet." }
-        : { state: "healthy", summary: "Every check passed at 7:02.", lastVerifiedAt: "2026-10-15T11:02:00Z", signals: ["Loads on a phone in 1.2 s", "41 of 41 links work", "Forms reach your inbox in 4 s", "Hours match your business record"] },
+        : { state: "healthy", summary: "Every check passed at 7:02.", lastVerifiedAt: "2026-10-15T11:02:00Z", signals: ["Loads on a phone: 1.2 s", "Links work: 41 of 41", "Forms reach your inbox: 4 s", "Hours match your record: Match"] },
     surface: state === "empty"
       ? { kind: "website", domain: "harbordental.com", previewLabel: "harbordental.com", editing: "request" }
       : { kind: "website", domain: "harbordental.com", liveUrl: "https://harbordental.com", previewSrc: `${BASE}/site?v=live&preview=true`, previewLabel: "harbordental.com, as patients see it", editing: "request" },
@@ -54,6 +56,7 @@ export function harborPossibility(stale = false) {
     id: XA4_POSSIBILITY, title: "Put booking at the top of your home page.", summary: "Book a visit moves above the photo, with the next opening.",
     status: stale ? "exploring" as const : "ready" as const, executionAvailability: "live" as const, affects: [XA4_SITE],
     evidence: "64% of visits come from phones, where Book a visit sits below the fold today.",
+    actor: MAYA, proposedAt: "2026-10-13T16:12:00Z",
     previewSrc: `${BASE}/site?v=proposed&preview=true`,
     ...(stale ? { staleReason: "harbordental.com changed since Maya made this." } : {}),
   };
@@ -68,7 +71,6 @@ export function harborWebsiteDetail(mode: "full" | "empty" | "waiting"): Website
     decisions: mode === "waiting" ? [{ id: "booking-top", title: "Put booking at the top of your home page", detail: "Maya at North Studio made this. It goes live when you say yes.", openedAt: "2026-10-13T16:12:00Z", openHref: null }] : [],
     draftSections: [], siteReview: null, serviceRequests: [], documentRevisions: [], linkedPublications: [], unavailable: [],
     changeRequests: mode === "empty" ? [] : [
-      { requestId: "sat-hours", title: "Saturday hours are now 9 to 1", kind: "custom_request", status: "shipped", createdAt: day("2026-10-12T19:00:00Z"), resolvedAt: day("2026-10-12T20:18:00Z"), actor: MAYA },
       { requestId: "team-photo", title: "New team photo on About", kind: "custom_request", status: "shipped", createdAt: day("2026-10-09T14:00:00Z"), resolvedAt: day("2026-10-09T15:30:00Z"), actor: MAYA },
       { requestId: "about-page", title: "Rewrote the About page", kind: "custom_request", status: "shipped", createdAt: day("2026-10-03T14:00:00Z"), resolvedAt: day("2026-10-03T16:40:00Z"), actor: MAYA },
       { requestId: "insurance-page", title: "Added an insurance page", kind: "custom_request", status: "shipped", createdAt: day("2026-09-30T14:00:00Z"), resolvedAt: day("2026-09-30T18:05:00Z"), actor: MAYA },
@@ -79,6 +81,8 @@ export function harborWebsiteDetail(mode: "full" | "empty" | "waiting"): Website
       { id: "cv-footer-phone", section: "footer", author: "user", timestamp: day("2026-09-29T15:20:00Z"), status: "live", actor: AMY },
     ],
     snapshots: mode === "empty" ? [] : [{ id: "snap-sep28", label: "The site as it came to Strelva", reason: "import", author: "system", createdAt: day("2026-09-28T09:00:00Z"), status: "available", actor: STRELVA }],
+    // The newest change was deployed and its live page read back, so S6 can say it was checked.
+    repoDeployments: mode === "empty" ? [] : [{ id: "dep-sat-hours", requestId: "sat-hours", title: "Saturday hours are now 9 to 1", commitSha: "fixture", deploymentUrl: "https://harbordental.com", readBack: "confirmed", recordedAt: day("2026-10-12T20:18:00Z"), actor: MAYA }],
   };
   return buildWebsiteSystemDetail(base);
 }
@@ -97,7 +101,7 @@ nav b{font:600 17px system-ui,sans-serif;margin-right:auto;color:#1e4b6e}nav a{c
 .book div{display:flex;flex-direction:column;margin-right:auto}.book span{color:#4b5b52;font-size:13px}.book a{background:#1e4b6e;color:#fff;border-radius:999px;padding:9px 14px;font-weight:600}
 .hero{display:grid;grid-template-columns:1.1fr 1fr;gap:28px;align-items:center;padding:26px 0 18px}
 h1{font-size:40px;line-height:1.08;margin:0 0 14px;letter-spacing:-.5px}p{font:16px/1.5 system-ui,sans-serif;color:#41505b;margin:0}
-.photo{aspect-ratio:4/5;border-radius:16px;background:#a9bfcc}
+.photo{aspect-ratio:4/5;border-radius:16px;background:#a9bfcc url(/xa/fixture-harbor-photo.webp) center/cover no-repeat}
 .facts{display:flex;gap:40px;margin-top:22px;font:15px/1.4 system-ui,sans-serif}.facts small{display:block;color:#7b8790;font-size:12px}
 .strip{border-top:1px solid #e5e8ea;margin-top:22px;padding-top:16px;font:14px system-ui,sans-serif;color:#41505b}
 @media (max-width:640px){.hero{grid-template-columns:1fr}h1{font-size:30px}nav a:not(.cta){display:none}}
@@ -109,6 +113,27 @@ ${book}
 <div class="photo" role="img" aria-label="Dr. Lin with a patient"></div></section>
 <div class="strip">Insurance we accept: Delta Dental · Cigna · MetLife</div>
 </div></body></html>`;
+}
+
+/** The business's inbox as its own System, so S1 can point at held messages. */
+export function harborInbox(): SystemView {
+  return {
+    id: XA4_INBOX, kind: "inquiries", name: "Inquiries", detail: "Everyone who wrote in", lifecycle: "live",
+    health: { state: "healthy", summary: "New messages arrive here." },
+    surface: { kind: "inquiries", tenantId: `workspace:${XA4_WORKSPACE}` },
+    connections: [], versions: [], possibilities: [],
+  } as SystemView;
+}
+
+/** A Needs you item for the one booking request, in the shape GET /api/workspace/needs-you returns. */
+export function harborBookingRequestDecision() {
+  return {
+    id: "4a000000-0000-4000-8000-0000000000d6", workspaceId: XA4_WORKSPACE, systemId: null, kind: "customer.commitment", route: "owner_decides",
+    title: "Booking request: Dana Reed, Thu Oct 15 2:30 PM", detail: "Checkup", approveEffect: "The booking is confirmed for this time.", notYetEffect: "The time is released and the booking is not confirmed.",
+    sourceLifecycle: "booking_request", sourceId: XA4_BOOKING_REQUEST, revisionHash: "a".repeat(64), urgent: true, signInRequired: false, adminMayDecide: false,
+    openHref: null, state: "open", outcome: null, outcomeReason: null, receiptRef: null, decidedByKind: null, decidedAt: null, deliveryState: "not_sent", operatorNote: null,
+    actor: { kind: "person", displayName: "Dana Reed" }, openedAt: "2026-10-15T12:00:00.000Z", expiresAt: "2026-10-18T12:00:00.000Z", reminded1At: null, reminded2At: null, deliveries: [],
+  };
 }
 
 /* ---------- S2 · Bookings ---------- */
@@ -124,7 +149,7 @@ export function harborBookings(state: "ready" | "waiting" | "done" | "empty"): W
     visit("b3", "2026-10-13", "09:15", "10:15", "Marcus Bell", "Cleaning", "completed"),
     visit("b4", "2026-10-14", "14:15", "14:45", "Rachel Kim", "Emergency visit", "no_show"),
     visit("b5", "2026-10-15", "08:30", "09:30", "Priya Shah", "Cleaning", state === "done" ? "completed" : "confirmed", { notes: "Daughter, age 9. First visit." }),
-    visit("b6", "2026-10-15", "14:30", "15:00", "Dana Reed", "Checkup", state === "waiting" ? "requested" : "confirmed", state === "waiting" ? { agentName: "Claude" } : {}),
+    visit(XA4_BOOKING_REQUEST, "2026-10-15", "14:30", "15:00", "Dana Reed", "Checkup", state === "waiting" ? "requested" : "confirmed"),
     visit("b7", "2026-10-17", "09:00", "10:00", "Sam Ortiz", "Cleaning"),
   ];
   return { view: "week", from: "2026-10-12", to: "2026-10-18", native: true, sites: [{ tenantId: `workspace:${XA4_WORKSPACE}`, siteName: "Harbor Dental", timezone: "America/New_York", today: "2026-10-15", bookings, unavailable: false, hours, evidence: { calendarHealth: "connected", truncated: false, paused: false } }] };

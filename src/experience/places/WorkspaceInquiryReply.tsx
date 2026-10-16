@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { z } from "zod";
 import { beginFocusRecovery, type FocusRecovery } from "@/experience/websites/focus-recovery";
-import { XaButton, XaField, XaLabel, XaTextArea } from "@/components/ui/strelva/Xa";
+import { XaButton, XaSays, XaTextArea } from "@/components/ui/strelva/Xa";
 import x from "@/experience/systems/xa/system-xa.module.css";
 import { InquiryBookingOfferComposer } from "./InquiryBookingOfferComposer";
 import type { WorkspaceReplyOutcome, WorkspaceReplyStatus } from "@/products/inquiries";
@@ -25,17 +25,25 @@ const replyOutcome = z.object({
   providerMessageId: z.string().nullable(), acceptedAt: z.string().nullable(), retryable: z.literal(false),
 });
 
-export function WorkspaceInquiryReply({ workspaceId, rowId, name, email, bookingOffers = false, member = false }: { workspaceId: string; rowId: string; name: string; email: string; bookingOffers?: boolean; member?: boolean }) {
-  const [open, setOpen] = useState(false);
-  const [subject, setSubject] = useState("Re: Your inquiry");
-  const [body, setBody] = useState("");
+const SUBJECT = "Re: Your inquiry";
+
+/**
+ * XA · S3: the reply sits under the message, open, with Pebble saying what
+ * happens and one ink "Send to <name>". "Write it myself" opens the owner's
+ * own email instead. The reply starts with a greeting only; Strelva never
+ * drafts an answer it has no record for. Sending approves these exact words;
+ * an attempt is kept immutable until its receipt is read back.
+ */
+export function WorkspaceInquiryReply({ workspaceId, rowId, name, email, siteName, bookingOffers = false, member = false }: { workspaceId: string; rowId: string; name: string; email: string; siteName?: string; bookingOffers?: boolean; member?: boolean }) {
+  const first = name.trim().split(/\s+/)[0] || name;
+  const greeting = `Hi ${first},\n\n`;
+  const [body, setBody] = useState(greeting);
   const [requestId, setRequestId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [outcome, setOutcome] = useState<WorkspaceReplyOutcome | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const openerRef = useRef<HTMLButtonElement>(null);
-  const subjectRef = useRef<HTMLInputElement>(null);
-  const wasOpen = useRef(false);
+  const [empty, setEmpty] = useState(false);
+  const bodyRef = useRef<HTMLTextAreaElement>(null);
   const sectionRef = useRef<HTMLDivElement>(null);
   const outcomeRef = useRef<HTMLParagraphElement>(null);
   const checkRef = useRef<HTMLButtonElement>(null);
@@ -46,21 +54,17 @@ export function WorkspaceInquiryReply({ workspaceId, rowId, name, email, booking
   useEffect(() => () => focusRecovery.current?.cancel(), []);
   useEffect(() => {
     if (saving || !focusRecovery.current) return;
-    focusRecovery.current.recover(outcome ? outcomeRef.current : requestId ? checkRef.current : subjectRef.current, true);
+    focusRecovery.current.recover(outcome ? outcomeRef.current : requestId ? checkRef.current : bodyRef.current, true);
     focusRecovery.current = null;
   }, [error, outcome, requestId, saving]);
-  useEffect(() => {
-    if (open && !wasOpen.current) subjectRef.current?.focus();
-    else if (!open && wasOpen.current) openerRef.current?.focus();
-    wasOpen.current = open;
-  }, [open]);
-  if (!open) return <div><XaButton ref={openerRef} onClick={() => setOpen(true)}>Reply to {name}</XaButton></div>;
+  const written = body.trim().length > 0 && body.trim() !== greeting.trim();
   async function send() {
-    if (inFlight.current || settled.current || (!attempt.current && (!subject.trim() || !body.trim()))) return;
+    if (inFlight.current || settled.current) return;
+    if (!attempt.current && !written) { setEmpty(true); bodyRef.current?.focus(); return; }
     inFlight.current = true;
     const checking = attempt.current !== null;
     const current = attempt.current ?? { id: crypto.randomUUID(), payload: "" };
-    if (!checking) current.payload = JSON.stringify({ workspaceId, rowId, requestId: current.id, subject, body });
+    if (!checking) current.payload = JSON.stringify({ workspaceId, rowId, requestId: current.id, subject: SUBJECT, body });
     attempt.current = current;
     focusRecovery.current?.cancel();
     focusRecovery.current = beginFocusRecovery(sectionRef.current);
@@ -80,26 +84,29 @@ export function WorkspaceInquiryReply({ workspaceId, rowId, name, email, booking
         const ownerApprovalRefusal = response.status === 409 && refusal.success && refusal.data.error === "Prices, dates and promises need the business owner’s approval.";
         if (!checking && ([401, 429].includes(response.status) || ownerApprovalRefusal)) {
           attempt.current = null; setRequestId(null);
-          setError(refusal.success ? refusal.data.error : "The reply was refused before sending. Your draft is still here.");
-        } else setError(`The reply couldn't be confirmed. Keep this exact draft and check this reply before sending anything else.${refusal.success && !/\bnothing (?:was )?(?:sent|changed)\b/i.test(refusal.data.error) ? ` ${refusal.data.error}` : ""}`);
+          setError(refusal.success ? refusal.data.error : "The reply was refused before sending. Your words are still here.");
+        } else setError(`The reply couldn't be confirmed. Keep these exact words and check this reply before sending anything else.${refusal.success && !/\bnothing (?:was )?(?:sent|changed)\b/i.test(refusal.data.error) ? ` ${refusal.data.error}` : ""}`);
       } else { settled.current = true; setOutcome(parsed.data.outcome); }
-    } catch { setError("The reply couldn't be confirmed. Keep this exact draft and check this reply before sending anything else."); }
+    } catch { setError("The reply couldn't be confirmed. Keep these exact words and check this reply before sending anything else."); }
     finally { inFlight.current = false; setSaving(false); }
   }
+  const mailto = `mailto:${encodeURIComponent(email).replace(/%40/g, "@")}?subject=${encodeURIComponent(SUBJECT)}`;
   return (
-    <section aria-label={`Reply to ${name}`}><div ref={sectionRef} className={x.replyForm}>
-      <XaLabel>{outcome ? "Reply receipt" : requestId ? "Your reply · checking receipt" : "Your reply · not sent"}</XaLabel>
-      <p className={x.note}>To {email}</p>
-      <XaField ref={subjectRef} label="Subject" value={subject} onChange={(event) => { if (!inFlight.current && !attempt.current) setSubject(event.target.value); }} maxLength={200} disabled={saving} readOnly={requestId !== null} />
-      <XaTextArea label={`Your reply to ${name}`} value={body} onChange={(event) => { if (!inFlight.current && !attempt.current) setBody(event.target.value); }} maxLength={5000} disabled={saving} readOnly={requestId !== null} />
-      {bookingOffers ? <InquiryBookingOfferComposer workspaceId={workspaceId} rowId={rowId} disabled={saving || requestId !== null} append={text => { if (inFlight.current || attempt.current) return false; const next = body ? `${body}\n\n${text}` : text; if (next.length > 5000) return false; setBody(next); return true; }} /> : null}
-      <p className={x.quiet}>{member ? "You can send an ordinary reply for inquiries assigned or routed to you. Prices, dates and promises need the owner’s approval. A sent reply cannot be undone." : "Sending approves this exact message, including any price, date or promise. A sent reply cannot be undone."}</p>
-      {outcome ? <p ref={outcomeRef} tabIndex={-1} role="status" className={x.sentence}>{REPLY_OUTCOME[outcome.status]}</p> : (
-        <div className={x.replyRow}>
-          <XaButton ref={checkRef} variant="primary" busy={saving} disabled={saving || (!requestId && (!subject.trim() || !body.trim()))} onClick={() => void send()}>{requestId ? "Check this reply" : member ? "Send reply" : "Approve and send reply"}</XaButton>
-          {!requestId ? <XaButton variant="quiet" disabled={saving} onClick={() => { if (!inFlight.current && !attempt.current) setOpen(false); }}>Close draft</XaButton> : null}
-        </div>
-      )}
+    <section aria-label={`Reply to ${name}`}><div ref={sectionRef} className={x.ask}>
+      {outcome ? <p ref={outcomeRef} tabIndex={-1} role="status" className={x.sentence}>{REPLY_OUTCOME[outcome.status]}</p>
+        : <XaSays>{member
+          ? <>Write your answer to {first} and I&apos;ll send it{siteName ? ` from ${siteName}` : ""}.</>
+          : <>{first} is waiting on your answer. Write it here and I&apos;ll send it{siteName ? ` from ${siteName}` : ""}. A sent reply can&apos;t be undone.</>}</XaSays>}
+        <XaTextArea ref={bodyRef} label={`Your reply to ${first}`} rows={5} value={body} maxLength={5000} disabled={saving} readOnly={requestId !== null}
+          error={empty && !written ? "Write a reply first." : undefined}
+          onChange={(event) => { if (!inFlight.current && !attempt.current) { setBody(event.target.value); setEmpty(false); } }} />
+        {bookingOffers ? <InquiryBookingOfferComposer workspaceId={workspaceId} rowId={rowId} disabled={saving || requestId !== null} append={text => { if (inFlight.current || attempt.current) return false; const next = written ? `${body.trimEnd()}\n\n${text}` : `${greeting}${text}`; if (next.length > 5000) return false; setBody(next); return true; }} /> : null}
+        {outcome ? null : <div className={x.askRow}>
+          <XaButton ref={checkRef} variant="primary" size="lg" busy={saving} disabled={saving} onClick={() => void send()}>{requestId ? "Check this reply" : `Send to ${first}`}</XaButton>
+          {!requestId ? <a className={x.linkButton} href={mailto}>Write it myself</a> : null}
+          {siteName ? <span className={x.quiet}>Replies go out as {siteName}</span> : null}
+        </div>}
+        {member ? <p className={x.quiet}>Prices, dates and promises need the owner’s approval.</p> : null}
       {error ? <p role="alert" className={x.sentence} data-tone="waits">{error}</p> : null}
     </div></section>
   );

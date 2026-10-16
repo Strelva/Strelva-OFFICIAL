@@ -47,7 +47,9 @@ describe("the Inquiries System's current form", () => {
     expect(html).toContain("Handled by Alex");
     expect(html).not.toContain("recorded-principal");
     const unknown = renderToStaticMarkup(<InquirySystemDetailView details={[projectInquirySystemDetail("Fixture", state())]} />);
-    expect(unknown).toContain("Actor not recorded");
+    // An unrecorded handler is left out for owners, never shown as a phrase.
+    expect(unknown).not.toContain("Actor not recorded");
+    expect(unknown).not.toContain("Handled by");
     expect(unknown).not.toContain("Handled by Strelva");
   });
   it("shows a viewing copy, lifecycle and honest health without private routing or customer builder words", () => {

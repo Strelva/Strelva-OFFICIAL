@@ -384,9 +384,9 @@ export function StComposerBar({ scope, placeholder, value, onChange, onSubmit, d
 
 /** The shell gives the composer its own row, outside the scrolling work.
  * Standalone use stays in normal flow, with no sticky or negative-margin overlap. */
-export function StComposerDock({ children }: { children: ReactNode }) {
+export function StComposerDock({ children, inset }: { children: ReactNode; /** Keeps the composer under one column of the screen (px from the main area's start and end). Reset to full width below 1100 px. */ inset?: { start: number; end: number } }) {
   const target = useContext(ComposerDockTarget);
-  const dock = <div className={styles.composerDock} data-st-composer-dock>{children}</div>;
+  const dock = <div className={styles.composerDock} data-st-composer-dock data-inset={inset ? true : undefined} style={inset ? { "--dock-start": `${inset.start}px`, "--dock-end": `${inset.end}px` } as CSSProperties : undefined}>{children}</div>;
   return target ? createPortal(dock, target) : dock;
 }
 

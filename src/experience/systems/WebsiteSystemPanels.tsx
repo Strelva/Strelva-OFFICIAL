@@ -1,6 +1,6 @@
 "use client";
 
-import { actorLabel } from "@/platform/presentation/actor";
+import { actorLabel, actorPresentation } from "@/platform/presentation/actor";
 
 import { useEffect, useState, type ReactNode } from "react";
 import { useWorkspaceRequest } from "@/experience/workspace/WorkspaceRequest";
@@ -212,7 +212,7 @@ function WebsiteHistoryRow({ item, workspaceId, systemId, canRestore, appBase, o
     setBusy(false);
   }
   return <StRow title={item.title} detail={<span className={styles.stack}>
-    <span>{SOURCE_LABEL[item.source]} · {actorLabel(item.actor)} · <StMono as="time" dateTime={item.at}>{when(item.at)}</StMono></span>
+    <span>{SOURCE_LABEL[item.source]} · {actorPresentation(item.actor).name ? <>{actorLabel(item.actor)} · </> : null}<StMono as="time" dateTime={item.at}>{when(item.at)}</StMono></span>
     {item.deployment ? <><span>Commit <StMono>{item.deployment.commitSha}</StMono> · <a href={item.deployment.url} target="_blank" rel="noopener noreferrer">Open deployment</a></span><StState kind={item.deployment.readBack === "confirmed" ? "live" : "need"}>{item.deployment.readBack === "confirmed" ? "Live page read back and confirmed" : item.deployment.readBack === "not_confirmed" ? "Published; live page not confirmed" : "Published; live page not checked"}</StState></> : null}
     <span>{item.undo ?? "No undo for this change."}</span>
     {notice ? <span role={notice.error ? "alert" : "status"}>{notice.text}</span> : null}
