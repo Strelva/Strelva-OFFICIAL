@@ -18,25 +18,32 @@ describe("business deposit presentation", () => {
   it.each([undefined, null, {}, { refundable: "yes" }])("holds a deposit when immutable policy is missing or invalid: %s", async cancellationPolicy => {
     const fetcher = vi.fn(); vi.stubGlobal("fetch", fetcher);
     await act(async () => root.render(createElement(BusinessPayment, { token, initialRequest: { ...request, cancellationPolicy, acceptedTerms: "Work description alone is not a deposit policy." } })));
-    expect(container.textContent).toContain("doesn't say what happens if you cancel");
+    expect(container.textContent).toContain("doesn’t say what happens if you cancel");
     expect(payButton()).toBeUndefined();
     expect(fetcher).not.toHaveBeenCalled();
   });
 
-  it.each([true, false])("shows the issued refundable=%s policy beside the amount", async refundable => {
+  it.each([true, false])("shows the issued refundable=%s policy with what was agreed, the amount beside it", async refundable => {
     await act(async () => root.render(createElement(BusinessPayment, { token, initialRequest: { ...request, cancellationPolicy: { refundable } } })));
-    const summary = container.querySelector('[aria-label="Payment amount and terms"]')!;
-    expect(summary.textContent).toContain("$120.00");
-    expect(summary.textContent).toContain(refundable ? "eligible for a refund" : "non-refundable");
-    expect(summary.textContent).not.toContain("until Nov");
+    expect(container.querySelector('[aria-label="Payment amount"]')!.textContent).toContain("$120.00");
+    const agreed = container.querySelector('[aria-label="What was agreed"]')!;
+    expect(agreed.textContent).toContain(refundable ? "eligible for a refund" : "non-refundable");
+    expect(agreed.textContent).toContain("Pay by");
     expect(payButton()).toBeDefined();
     expect(container.querySelector("main")?.textContent).not.toContain("Strelva");
   });
 
-  it("keeps immutable quote agreement text beside the amount", async () => {
+  it("keeps immutable quote agreement text with what was agreed", async () => {
     await act(async () => root.render(createElement(BusinessPayment, { token, initialRequest: { ...request, kind: "quote", cancellationPolicy: {}, acceptedTerms: "Agreed cancellation terms: refundable before work starts." } })));
-    expect(container.querySelector('[aria-label="Payment amount and terms"]')?.textContent).toContain("Agreed cancellation terms: refundable before work starts.");
+    expect(container.querySelector('[aria-label="What was agreed"]')?.textContent).toContain("Agreed cancellation terms: refundable before work starts.");
     expect(payButton()).toBeDefined();
+  });
+
+  it("wears the business's own accent when the payment read carries it, and drops a malformed one", async () => {
+    await act(async () => root.render(createElement(BusinessPayment, { token, initialRequest: { ...request, cancellationPolicy: { refundable: true }, brand: { accentColor: "#1f4e6b", logoUrl: null } } })));
+    expect(container.querySelector("main")!.getAttribute("style")).toContain("--visitor-accent: #1f4e6b");
+    const { publicPaymentRequestSchema } = await import("@/platform/connect/public-payment");
+    expect(publicPaymentRequestSchema.parse({ ...request, brand: { accentColor: "red" } }).brand).toBeNull();
   });
 
   it("holds a quote without either agreement text or a valid immutable refund policy", async () => {

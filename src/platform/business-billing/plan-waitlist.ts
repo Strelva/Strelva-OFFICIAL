@@ -6,7 +6,7 @@ import {
 import { selfServeBillingConfig } from "./workspace-checkout";
 
 /**
- * "Tell me when plans open" for a business that has no plan yet (October 16
+ * The plans list for a business that has no plan yet (October 16
  * money decision: no price anywhere, no Stripe switch-on). It follows the
  * strelva.com waitlist's Redis shape (`waitlist:{email}` + `waitlist:all` on
  * feat/waitlist-intake), keyed by business so an owner's choice never touches

@@ -7,6 +7,7 @@ import { readGovernedMoney } from "@/platform/connect/governed-operations";
 import { readNeutralVersionMoney } from "@/platform/connect/neutral-creator-money";
 import { VersionTerms } from "@/experience/workspace/money/VersionTerms";
 import { CollectionTerms } from "@/experience/workspace/money/CollectionTerms";
+import { MoneyYesTurns } from "@/experience/workspace/money/OfferRows";
 import { MoneyLoadFailure } from "@/experience/workspace/money/MoneyLoadFailure";
 import styles from "@/experience/workspace/money/money.module.css";
 export const dynamic = "force-dynamic";
@@ -31,7 +32,7 @@ export default async function RecordedMoneyTermsPage({
         title=""
         workspaceId={workspaceId}
         active="settings"
-        detailsPlace="plan"
+        detailsPlace="elsewhere"
       >
         <div className={styles.screen}>
           <MoneyLoadFailure
@@ -48,7 +49,7 @@ export default async function RecordedMoneyTermsPage({
       title=""
       workspaceId={workspaceId}
       active="settings"
-      detailsPlace="plan"
+      detailsPlace="elsewhere"
     >
       <div className={styles.screen}>
         <p className={styles.note}>
@@ -59,12 +60,14 @@ export default async function RecordedMoneyTermsPage({
         <XaHeadline quiet="Each one names the month it covers. Nothing here charges a card.">
           Prices you&rsquo;ve agreed to
         </XaHeadline>
-        <CollectionTerms
-          key={workspaceId}
-          graph={graph}
-          actorId={actor.userId}
-        />
-        <VersionTerms graph={versionGraph} actorId={actor.userId} />
+        <MoneyYesTurns order={["collection", "version"]}>
+          <CollectionTerms
+            key={workspaceId}
+            graph={graph}
+            actorId={actor.userId}
+          />
+          <VersionTerms graph={versionGraph} actorId={actor.userId} />
+        </MoneyYesTurns>
       </div>
     </StrelvaShell>
   );

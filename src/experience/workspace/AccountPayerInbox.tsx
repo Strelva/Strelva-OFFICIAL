@@ -6,12 +6,6 @@ import { proposerLabel } from "@/experience/workspace/billing/AgencyPayerRequest
 import styles from "@/experience/workspace/money/money.module.css";
 import type { PayerTransitionSnapshot } from "@/platform/work-economics/payer-transitions";
 
-const money = (cents: number) =>
-  new Intl.NumberFormat(undefined, {
-    style: "currency",
-    currency: "USD",
-  }).format(cents / 100);
-
 /** Asks to pay for Strelva work, addressed to this account, each with its one answer. `request` lets the preview supply fixtures. */
 export function AccountPayerInbox({
   request = fetch,
@@ -19,13 +13,15 @@ export function AccountPayerInbox({
   const [data, setData] = useState<PayerTransitionSnapshot | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState("");
+  // One yes at a time (October 16): the chosen ask holds the one XaYes; the rest wait their turn.
+  const [chosen, setChosen] = useState("");
   const load = useCallback(async () => {
     const response = await request("/api/work-economics/payer-transition", {
       cache: "no-store",
     });
     const body = await response.json().catch(() => null);
     if (!response.ok)
-      throw new Error(body?.error ?? "These asks couldn't be read just now.");
+      throw new Error(body?.error ?? "These asks couldn’t be read just now.");
     setData(body);
   }, [request]);
   useEffect(() => {
@@ -33,7 +29,7 @@ export function AccountPayerInbox({
       setError(
         cause instanceof Error
           ? cause.message
-          : "These asks couldn't be read just now.",
+          : "These asks couldn’t be read just now.",
       ),
     );
   }, [load]);
@@ -50,14 +46,14 @@ export function AccountPayerInbox({
       const body = await response.json().catch(() => null);
       if (!response.ok)
         throw new Error(
-          body?.error ?? "Your answer didn't go through. Nothing changed.",
+          body?.error ?? "Your answer didn’t go through. Nothing changed.",
         );
       await load();
     } catch (cause) {
       setError(
         cause instanceof Error
           ? cause.message
-          : "Your answer didn't go through. Nothing changed.",
+          : "Your answer didn’t go through. Nothing changed.",
       );
     } finally {
       setBusy("");
@@ -75,13 +71,13 @@ export function AccountPayerInbox({
       });
       const body = await response.json().catch(() => null);
       if (!response.ok)
-        throw new Error(body?.error ?? "Your answer didn't go through. Nothing changed.");
+        throw new Error(body?.error ?? "Your answer didn’t go through. Nothing changed.");
       setData(body);
     } catch (cause) {
       setError(
         cause instanceof Error
           ? cause.message
-          : "Your answer didn't go through. Nothing changed.",
+          : "Your answer didn’t go through. Nothing changed.",
       );
     } finally {
       setBusy("");
@@ -106,7 +102,9 @@ export function AccountPayerInbox({
     ...pending.map((item) => ({ kind: "payer" as const, id: item.id, item })),
   ];
   const settledJobs = jobs.filter((job) => job.status !== "draft");
-  const first = waiting[0]?.id;
+  const first = waiting.some((entry) => entry.id === chosen)
+    ? chosen
+    : waiting[0]?.id;
   const payerName = (item: (typeof pending)[number]) =>
     item.successorKind === "agency"
       ? (item.successorWorkspaceName ?? "your agency")
@@ -140,10 +138,11 @@ export function AccountPayerInbox({
               entry.kind === "job"
                 ? `One piece of Strelva work for ${entry.job.workspaceName}`
                 : `Strelva work for ${entry.item.workspaceName}, from now on`;
+            // No Strelva price figure while pricing is undecided (October 16): the limit is said, not priced.
             const detail =
               entry.kind === "job"
-                ? `It can cost up to ${money(entry.job.maxAuthorizedCents)}, and never more without asking you again. You don't see the business's records.`
-                : `${proposerLabel(entry.item)} asked ${payerName(entry.item)} to pay for Strelva work started after you say yes. You don't get into the business or its records, and each larger piece of work still asks you first.`;
+                ? "It has a set limit and never goes past it without asking you again. Nothing is charged for Strelva work until plans open. You don’t see the business’s records."
+                : `${proposerLabel(entry.item)} asked ${payerName(entry.item)} to pay for Strelva work started after you say yes. You don’t get into the business or its records, and each larger piece of work still asks you first.`;
             const accept = () =>
               entry.kind === "job"
                 ? void acceptJob(entry.job.id)
@@ -157,26 +156,13 @@ export function AccountPayerInbox({
                 <p className={styles.inboxTitle}>
                   <span>{title}</span>
                   {entry.id !== first ? (
-                    <span className={styles.links}>
-                      <XaTextLink
-                        disabled={Boolean(busy)}
-                        onClick={accept}
-                        aria-label={`Accept ${title}`}
-                      >
-                        Accept
-                      </XaTextLink>
-                      {decline ? (
-                        <>
-                          <span aria-hidden="true">·</span>
-                          <XaTextLink
-                            disabled={Boolean(busy)}
-                            onClick={decline}
-                          >
-                            Not yet
-                          </XaTextLink>
-                        </>
-                      ) : null}
-                    </span>
+                    <XaTextLink
+                      disabled={Boolean(busy)}
+                      onClick={() => setChosen(entry.id)}
+                      aria-label={`Answer: ${title}`}
+                    >
+                      Answer this one
+                    </XaTextLink>
                   ) : null}
                 </p>
                 <p className={styles.note}>{detail}</p>
@@ -185,10 +171,9 @@ export function AccountPayerInbox({
                     <XaYes
                       state={going ? "going" : "waiting"}
                       yesLabel={
-                        entry.kind === "job"
-                          ? `Pay up to ${money(entry.job.maxAuthorizedCents)}`
-                          : "Agree to pay"
+                        entry.kind === "job" ? "Agree to pay for it" : "Agree to pay"
                       }
+                      yesAriaLabel={`Agree to pay: ${title}`}
                       notYetLabel="Not yet"
                       onYes={accept}
                       onNotYet={decline}

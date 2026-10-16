@@ -45,7 +45,7 @@ export interface AskTurnResult {
   systemId: string | null;
   conversationId: string | null;
   saved: boolean;
-  /** "waitlist": plans aren't open and this business has no included work, so the reply offers "Tell me when plans open". */
+  /** "waitlist": plans aren't open and this business has no included work, so the reply offers the plans list. */
   budgetRecovery?: "plan" | "agency" | "waitlist";
   creationAction?: { kind: "website" | "booking"; label: string; href: string };
   /** One bounded question Strelva asks before it drafts (XA · AS2). Answering sends an ordinary message. */

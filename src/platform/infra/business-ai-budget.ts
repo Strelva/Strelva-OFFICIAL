@@ -13,7 +13,7 @@ export class ModelBudgetPausedError extends Error {
     const message = capUsd === 0
       ? open
         ? "Strelva can't take this on yet because this business has no plan. Nothing changed. Choose a plan on Plan and usage."
-        : "Strelva can't take on new work for this business until plans open. Nothing changed. Ask to hear when they open, or bring in an agency now."
+        : "Strelva can't take on new work for this business until plans open. Nothing changed. Put this business on the list for plans, or bring in an agency now."
       : `This month's Strelva work for this business is used up. Nothing changed. ${open ? "Choose a plan on Plan and usage." : "Bring in an agency to keep going."}`;
     super(message);
     this.name = "ModelBudgetPausedError";

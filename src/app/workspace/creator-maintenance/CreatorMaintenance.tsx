@@ -1,6 +1,8 @@
 "use client";
-import { XaButton, XaSelect } from "@/components/ui/strelva/Xa";
+import { XaButton, XaSelect, XaYes } from "@/components/ui/strelva/Xa";
 import { monthChoices } from "@/experience/workspace/money/period";
+import { useHeldYes } from "@/experience/workspace/money/held-yes";
+import { strelvaUndoWindowMs } from "@/platform/infra/motion";
 import xa from "@/experience/workspace/money/money.module.css";
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -48,16 +50,19 @@ const unknownMessage =
 export default function CreatorMaintenance({
   graph,
   listingNames = {},
+  undoWindowMs = strelvaUndoWindowMs,
 }: {
   graph: CreatorMaintenanceGraph;
-  /** "Dental intake, Release 2", by listing source revision id, from the creator's own sources. */
+  /** "Dental intake", by listing source revision id, from the creator's own sources. */
   listingNames?: Readonly<Record<string, string>>;
+  /** How long Undo stays up before the change is sent. 0 sends at once. */
+  undoWindowMs?: number;
 }) {
   const nameOf = (listing: { sourceRevisionId: string }, index: number) =>
     listingNames[listing.sourceRevisionId] ?? `App ${index + 1}`;
   const rateOf = (version: string | null | undefined) => {
     const agreement = graph.agreements.find((item) => item.version === version);
-    return agreement ? `${agreement.rateBps / 100}% of each payment` : null;
+    return agreement ? `you earn ${agreement.rateBps / 100}% of each payment` : null;
   };
   const router = useRouter();
   const active = useRef(true);
@@ -130,8 +135,8 @@ export default function CreatorMaintenance({
       focusRecovery.current = null;
     }
   }
-  async function save(event: React.FormEvent) {
-    event.preventDefault();
+  async function save(event?: React.FormEvent) {
+    event?.preventDefault();
     if (inFlight.current || blocked.current || !currentAuthority.current)
       return;
     focusRecovery.current?.cancel();
@@ -239,11 +244,13 @@ export default function CreatorMaintenance({
       if (pending.current === controller) pending.current = null;
     }
   }
+  // Undo first, then send: the server keeps no reversal for this change.
+  const held = useHeldYes(() => void save(), undoWindowMs);
   return (
     <div ref={sectionRef} className={xa.form}>
       <div className={xa.block}>
         <h2 ref={historyRef} tabIndex={-1} className={xa.heading}>
-          What you&apos;ve offered
+          What you’ve offered
         </h2>
         {graph.listings.length ? (
           <ul className={xa.section}>
@@ -253,7 +260,9 @@ export default function CreatorMaintenance({
                 <p className={xa.body}>
                   {STATE_WORDS[item.maintainerState]}
                   {item.agreementVersion
-                    ? `, under ${item.agreementVersion}${rateOf(item.agreementVersion) ? `, ${rateOf(item.agreementVersion)}` : ""}`
+                    ? rateOf(item.agreementVersion)
+                      ? `, and ${rateOf(item.agreementVersion)}`
+                      : ", under an agreement Strelva can’t read just now"
                     : ", with no agreement yet"}
                   .
                 </p>
@@ -266,8 +275,8 @@ export default function CreatorMaintenance({
                       <li key={entry.id} className={xa.body}>
                         {STATE_WORDS[entry.maintainer_state]} from{" "}
                         {recordedDay(entry.effective_from)}
-                        {entry.agreement_version
-                          ? `, under ${entry.agreement_version}`
+                        {entry.agreement_version && rateOf(entry.agreement_version)
+                          ? `, and ${rateOf(entry.agreement_version)}`
                           : ""}
                         .
                       </li>
@@ -283,7 +292,7 @@ export default function CreatorMaintenance({
           </ul>
         ) : (
           <p className={xa.body}>
-            You haven&apos;t offered an app to other businesses yet. Publish
+            You haven’t offered an app to other businesses yet. Publish
             one, then list it above with an agreement.
           </p>
         )}
@@ -298,7 +307,7 @@ export default function CreatorMaintenance({
           </p>
           {!draftGraph.agreements.length ? (
             <p className={xa.body} role="status">
-              There&apos;s no agreement yet, so the only choice is handing it
+              There’s no agreement yet, so the only choice is handing it
               over.
             </p>
           ) : null}
@@ -347,17 +356,18 @@ export default function CreatorMaintenance({
             />
             {state && state !== "takeover" ? (
               <XaSelect
-                label="Agreement"
+                label="What you earn"
                 disabled={busy || unconfirmed}
                 value={agreementIndex}
                 onChange={(event) =>
                   changeDraft(() => setAgreementIndex(event.target.value))
                 }
                 options={[
-                  { value: "", label: "Choose an agreement" },
+                  { value: "", label: "Choose what you earn" },
                   ...draftGraph.agreements.map((item, index) => ({
                     value: String(index),
-                    label: `${item.version}, ${item.rateBps / 100}% of each payment`,
+                    // Said as what they earn; the record's name only tells two equal rates apart.
+                    label: `You earn ${item.rateBps / 100}% of each payment${draftGraph.agreements.filter((other) => other.rateBps === item.rateBps).length > 1 ? `, under ${item.version}` : ""}`,
                   })),
                 ]}
               />
@@ -375,14 +385,23 @@ export default function CreatorMaintenance({
                 label: `${item.label.replace(/ (\d{4})$/, " 1, $1")}`,
               }))}
             />
-            <XaButton type="submit" busy={busy} disabled={busy || unconfirmed}>
-              Save this change
-            </XaButton>
+            <XaYes
+              state={held.held ? "live" : "waiting"}
+              yesLabel="Make this change"
+              notYetLabel="Not yet"
+              block={false}
+              disabled={busy || unconfirmed}
+              onYes={() => held.hold()}
+              onUndo={held.undo}
+              undoWindowMs={undoWindowMs}
+              onUndoExpired={held.send}
+              liveLabel="Changed who looks after it"
+            />
           </form>
         </div>
       ) : graph.listings.length ? (
         <p role="status">
-          Your agency has left Strelva, so this can&apos;t change any more.
+          Your agency has left Strelva, so this can’t change any more.
           What was saved stays here.
         </p>
       ) : null}

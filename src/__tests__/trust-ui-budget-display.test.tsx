@@ -5,12 +5,12 @@ import { BusinessAiBudgetSummary, StartWorkspacePlan, WorkspacePlanUnavailable }
 const budget = { spentUsd: "3.50", reservedUsd: "1.25", capCents: 1000, subscribed: true, since: "2026-10-01T00:00:00Z", resetsAt: "2026-11-01T00:00:00Z", unknownCostCalls: 0 };
 it("says this month's share used and its reset day, with no dollar figure or builder words", () => {
   const html = renderToStaticMarkup(<BusinessAiBudgetSummary budget={budget} capUsd={10} enforced />);
-  expect(html).toContain("48% of this month&#x27;s Strelva work is used. It resets November 1.");
+  expect(html).toContain("48% of this month’s Strelva work is used. It resets November 1.");
   for (const builder of ["$", "UTC", "calls", "held", "job", "Recorded spend"]) expect(html).not.toContain(builder);
 });
 it("unknown spend does not invent remaining budget or a reset date", () => {
   const html = renderToStaticMarkup(<BusinessAiBudgetSummary budget={null} capUsd={10} enforced />);
-  expect(html).toContain("couldn&#x27;t be read just now"); expect(html).toContain("holds new work");
+  expect(html).toContain("couldn’t be read just now"); expect(html).toContain("holds new work");
   expect(html).not.toContain("$"); expect(html).not.toContain("November");
 });
 it("flag-off plan copy promises no cap and shows no price", () => {
@@ -21,33 +21,38 @@ it("flag-off plan copy promises no cap and shows no price", () => {
 
 it("unpriced historical calls make remaining usage unavailable instead of suggesting spendable dollars", () => {
   const html = renderToStaticMarkup(<BusinessAiBudgetSummary budget={{ ...budget, unknownCostCalls: 1 }} capUsd={10} enforced />);
-  expect(html).not.toContain("%"); expect(html).toContain("hasn&#x27;t been tallied yet");
+  expect(html).not.toContain("%"); expect(html).toContain("hasn’t been tallied yet");
   expect(html).toContain("holds new work");
 });
 
 it("closed plans are an honest waitlist with an agency path, never checkout or a price", () => {
   const html = renderToStaticMarkup(<WorkspacePlanUnavailable workspaceId="business one" businessName="Harbor Dental" agencyHref="/workspace?view=help&workspaceId=business%20one" />);
   expect(html).toContain("Plans aren’t open yet.");
-  expect(html).toContain("Strelva can&#x27;t take on new work for Harbor Dental");
-  expect(html).toContain("Tell me when plans open");
+  expect(html).toContain("Strelva can’t take on new work for Harbor Dental");
+  expect(html).toContain("Put Harbor Dental on the list");
   expect(html).toContain("data-xa-primary");
+  // The headline's quiet line says what's new; it is not said again under it.
+  expect(html).toContain("Your website and inquiries keep running.");
+  expect(html.match(/website and inquiries keep running/g)).toHaveLength(1);
+  expect(html).not.toContain("hasn’t set a price");
   expect(html).toContain("/workspace?view=help&amp;workspaceId=business%20one");
   expect(html).not.toContain("Choose a plan");
   expect(html).not.toContain("$");
 });
-it("a business already on the list says where the note goes and offers to leave", () => {
+it("a business already on the list says what really happens (no sender yet) and offers to leave", () => {
   const html = renderToStaticMarkup(<WorkspacePlanUnavailable workspaceId="b" businessName="Harbor Dental" agencyHref="/help" joinedEmail="amy@harbordental.com" />);
-  expect(html).toContain("On the list"); expect(html).toContain("amy@harbordental.com");
-  expect(html).toContain("Take Harbor Dental off the list"); expect(html).not.toContain("Tell me when plans open");
+  expect(html).toContain("You’re on the list. Nothing is sent or charged until plans open.");
+  expect(html).not.toContain("will write to"); expect(html).not.toContain("amy@harbordental.com");
+  expect(html).toContain("Take Harbor Dental off the list"); expect(html).not.toContain("Put Harbor Dental on the list");
 });
 it("someone who isn't the owner reads why instead of a dead button", () => {
   const html = renderToStaticMarkup(<WorkspacePlanUnavailable workspaceId="b" businessName="Harbor Dental" agencyHref="/help" canJoin={false} />);
-  expect(html).toContain("The business owner can ask"); expect(html).not.toContain("<button");
+  expect(html).toContain("The business owner can put Harbor Dental on the list"); expect(html).not.toContain("<button");
 });
 
 it("unknown historical spend is disclosed without falsely pausing an uncapped paid business", () => {
   const html = renderToStaticMarkup(<BusinessAiBudgetSummary budget={{ ...budget, capCents: null, unknownCostCalls: 1 }} capUsd={null} enforced />);
-  expect(html).toContain("hasn&#x27;t been tallied yet");
+  expect(html).toContain("hasn’t been tallied yet");
   expect(html).toContain("nothing is held while");
   expect(html).not.toContain("holds new work");
 });

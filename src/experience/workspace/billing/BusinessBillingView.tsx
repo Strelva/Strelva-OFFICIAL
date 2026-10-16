@@ -150,7 +150,7 @@ export function BusinessBillingView({
             id="plan-heading"
             quiet="Your website and inquiries keep running while it moves."
           >
-            {name}&rsquo;s billing isn&rsquo;t set up here yet.
+            {name}’s billing isn’t set up here yet.
           </XaHeadline>
         </div>
         <XaSays
@@ -216,8 +216,8 @@ export function BusinessBillingView({
           }
         >
           {agencyPays
-            ? `Stripe couldn't take ${agencyName}'s payment for this plan.`
-            : "Stripe couldn't take the payment from your card."}
+            ? `Stripe couldn’t take ${agencyName}'s payment for this plan.`
+            : "Stripe couldn’t take the payment from your card."}
           {agencyPays && direct === "busy" ? " Asking…" : ""}
           {agencyPays && direct === "asked"
             ? " You asked to pay for it yourself from now on. It waits under Who pays."
@@ -301,7 +301,7 @@ function WorkspaceBillingControls({
       if (!response.ok || !body?.portalUrl)
         throw new Error(
           body?.error ||
-            "Stripe couldn't be opened. Nothing changed.",
+            "Stripe couldn’t be opened. Nothing changed.",
         );
       const url = new URL(body.portalUrl);
       if (
@@ -311,7 +311,7 @@ function WorkspaceBillingControls({
         url.password
       )
         throw new Error(
-          "Stripe sent back a link Strelva doesn't trust. Nothing changed.",
+          "Stripe sent back a link Strelva doesn’t trust. Nothing changed.",
         );
       navigate(body.portalUrl);
     } catch (cause) {
@@ -319,7 +319,7 @@ function WorkspaceBillingControls({
       setError(
         cause instanceof Error
           ? cause.message
-          : "Stripe couldn't be opened. Nothing changed.",
+          : "Stripe couldn’t be opened. Nothing changed.",
       );
     } finally {
       if (pending.current === controller) {
@@ -360,7 +360,7 @@ function WorkspaceBillingControls({
         >
           <p className={styles.body}>
             Stripe shows the day the plan would end, and you confirm it there.
-            Until you do, the plan keeps running. Leaving Strelva doesn&rsquo;t
+            Until you do, the plan keeps running. Leaving Strelva doesn’t
             end it on its own.
           </p>
           <div className={styles.actions}>

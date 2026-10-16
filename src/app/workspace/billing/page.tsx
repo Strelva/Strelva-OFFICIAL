@@ -325,6 +325,7 @@ export default async function BusinessBillingPage({
               agencyChoices={agencyChoices}
               agencyChoicesError={agencyChoicesError}
               providerChangeEnabled={handoff}
+              billedTo={billing?.payerParty ?? null}
             />
             {splits || connect || handoff ? (
               <nav

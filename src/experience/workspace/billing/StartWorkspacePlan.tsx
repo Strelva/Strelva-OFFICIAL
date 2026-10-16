@@ -86,21 +86,21 @@ export function BusinessAiBudgetSummary({
       : null;
   const resets = known ? ` It resets ${monthDay(budget.resetsAt)}.` : "";
   const sentence = !known
-    ? "This month's Strelva work couldn't be read just now."
+    ? "This month’s Strelva work couldn’t be read just now."
     : incomplete
-      ? "Some of this month's Strelva work hasn't been tallied yet."
+      ? "Some of this month’s Strelva work hasn’t been tallied yet."
       : share === null
-        ? "There's no monthly limit on Strelva work here."
+        ? "There’s no monthly limit on Strelva work here."
         : share >= 100
-          ? `This month's Strelva work is used up.${resets}`
+          ? `This month’s Strelva work is used up.${resets}`
           : share === 0
             ? `No Strelva work is used yet this month.${resets}`
-            : `${share}% of this month's Strelva work is used.${resets}`;
+            : `${share}% of this month’s Strelva work is used.${resets}`;
   const problem = !known
     ? "Strelva holds new work until it can read this month again. Nothing already running stops."
     : incomplete
       ? capUsd === null
-        ? "There's no monthly limit here, so nothing is held while it's tallied."
+        ? "There’s no monthly limit here, so nothing is held while it’s tallied."
         : "Strelva holds new work until the tally is done. Nothing already running stops."
       : null;
   return (
@@ -165,14 +165,14 @@ export function StartWorkspacePlan({
       };
       if (!response.ok || !body.checkoutUrl)
         throw new Error(
-          body.error || "Stripe couldn't be opened. Nothing was charged.",
+          body.error || "Stripe couldn’t be opened. Nothing was charged.",
         );
       navigate(body.checkoutUrl);
     } catch (cause) {
       setError(
         cause instanceof Error
           ? cause.message
-          : "Stripe couldn't be opened. Nothing was charged.",
+          : "Stripe couldn’t be opened. Nothing was charged.",
       );
       setBusy(false);
     }

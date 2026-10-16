@@ -77,7 +77,7 @@ describe("truthful budget pauses", () => {
     const environment = { ...on, STRELVA_FREE_MONTHLY_AI_CAP_USD: "0" };
     const reserve = vi.fn();
     await expect(assertBusinessAiBudget(context, { environment, read: async () => budget("0", null, false), reserve }))
-      .rejects.toThrow("Strelva can't take on new work for this business until plans open. Nothing changed. Ask to hear when they open, or bring in an agency now.");
+      .rejects.toThrow("Strelva can't take on new work for this business until plans open. Nothing changed. Put this business on the list for plans, or bring in an agency now.");
     expect(reserve).not.toHaveBeenCalled();
     expect(new ModelBudgetPausedError(0, 0, environment).message).not.toContain("used its available");
   });

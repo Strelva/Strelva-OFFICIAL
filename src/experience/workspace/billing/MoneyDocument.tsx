@@ -91,9 +91,9 @@ export function MoneyDocument({
           ) : null}
           {invoice && payUrl ? (
             <p className={styles.body}>
-              Pay by card at{" "}
+              Pay by card on{" "}
               <a href={payUrl} className={styles.detailsToggle}>
-                {payUrl.replace(/^https?:\/\//, "")}
+                {issuer}&rsquo;s payment page
               </a>
               .
             </p>

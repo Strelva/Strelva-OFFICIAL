@@ -362,7 +362,7 @@ export const businessMoney = {
       currency: "usd",
       purpose: "deposit",
       reference_id: "a7000000-0000-4000-8000-000000000901",
-      created_at: "2026-11-20T15:00:00Z",
+      created_at: "2026-10-09T15:00:00Z",
     },
     {
       id: "a7000000-0000-4000-8000-000000000702",
@@ -370,7 +370,7 @@ export const businessMoney = {
       currency: "usd",
       purpose: "quote",
       reference_id: "a7000000-0000-4000-8000-000000000903",
-      created_at: "2026-11-12T15:00:00Z",
+      created_at: "2026-10-05T15:00:00Z",
     },
     {
       id: "a7000000-0000-4000-8000-000000000703",
@@ -378,7 +378,7 @@ export const businessMoney = {
       currency: "usd",
       purpose: "deposit",
       reference_id: "a7000000-0000-4000-8000-000000000904",
-      created_at: "2026-11-24T15:00:00Z",
+      created_at: "2026-10-15T15:00:00Z",
     },
   ],
   events: [
@@ -386,19 +386,19 @@ export const businessMoney = {
       payment_id: "a7000000-0000-4000-8000-000000000701",
       kind: "paid",
       amount_cents: 12000,
-      created_at: "2026-11-21T14:10:00Z",
+      created_at: "2026-10-09T14:10:00Z",
     },
     {
       payment_id: "a7000000-0000-4000-8000-000000000702",
       kind: "paid",
       amount_cents: 45000,
-      created_at: "2026-11-13T18:40:00Z",
+      created_at: "2026-10-06T18:40:00Z",
     },
     {
       payment_id: "a7000000-0000-4000-8000-000000000702",
       kind: "refund",
       amount_cents: 5000,
-      created_at: "2026-11-15T10:00:00Z",
+      created_at: "2026-10-08T10:00:00Z",
     },
   ],
 };
@@ -427,8 +427,8 @@ export const paymentRequests = [
     status: "paid",
     refundRequired: false,
     lines: [{ name: "Ana R. · Nov 23 cleaning deposit" }],
-    issued_at: "2026-11-20T15:00:00Z",
-    expires_at: "2026-11-22T15:00:00Z",
+    issued_at: "2026-10-08T15:00:00Z",
+    expires_at: "2026-10-10T15:00:00Z",
   },
   {
     id: "a7000000-0000-4000-8000-000000000902",
@@ -438,8 +438,8 @@ export const paymentRequests = [
     status: "unpaid",
     refundRequired: false,
     lines: [{ name: "Marcus T. · crown and fitting" }],
-    issued_at: "2026-11-25T15:00:00Z",
-    expires_at: "2026-12-02T15:00:00Z",
+    issued_at: "2026-10-13T15:00:00Z",
+    expires_at: "2026-10-20T15:00:00Z",
   },
   {
     id: "a7000000-0000-4000-8000-000000000903",
@@ -449,8 +449,8 @@ export const paymentRequests = [
     status: "paid",
     refundRequired: false,
     lines: [{ name: "Joel P. · whitening" }],
-    issued_at: "2026-11-12T15:00:00Z",
-    expires_at: "2026-11-19T15:00:00Z",
+    issued_at: "2026-10-05T15:00:00Z",
+    expires_at: "2026-10-12T15:00:00Z",
   },
   {
     id: "a7000000-0000-4000-8000-000000000904",
@@ -460,8 +460,8 @@ export const paymentRequests = [
     status: "unpaid",
     refundRequired: false,
     lines: [{ name: "Priscilla N. · Dec 1 cleaning deposit" }],
-    issued_at: "2026-11-24T15:00:00Z",
-    expires_at: "2026-11-30T15:00:00Z",
+    issued_at: "2026-10-14T15:00:00Z",
+    expires_at: "2026-10-21T15:00:00Z",
   },
 ];
 
@@ -596,13 +596,17 @@ export const creatorMaintenance = (
   ],
 });
 
+// Its own Stripe ids: nothing here is the Fieldwork receipt's payment 4418.
 export const reconciliationIssues = [
   {
     account_id: "acct_north_studio",
-    event_id: "evt_4418",
+    event_id: "evt_4431",
     reason: "unmatched_payment",
     event_type: "payment_intent.succeeded",
-    object_id: "pi_4418",
+    object_id: "pi_4431",
+    created_at: "2026-10-14T16:05:00Z",
+    amount_cents: 30000,
+    currency: "usd",
     resolution: null,
   },
   {
@@ -611,12 +615,15 @@ export const reconciliationIssues = [
     reason: "late_refund",
     event_type: "charge.refunded",
     object_id: "ch_4402",
+    created_at: "2026-10-09T11:30:00Z",
+    amount_cents: 5000,
+    currency: "usd",
     resolution: {
       id: "a7000000-0000-4000-8000-000000000990",
       kind: "no_effect_after_review",
       reviewed_by: "a7000000-0000-4000-8000-000000000022",
       created_at: "2026-10-12T16:20:00Z",
-      note: "Refund matched the Oct 12 receipt for Fieldwork Studio. Nothing else moved.",
+      note: "North Studio refunded $50 straight from its Stripe dashboard on Oct 9. Nothing moved in Strelva.",
     },
   },
 ];

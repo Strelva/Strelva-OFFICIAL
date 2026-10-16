@@ -60,7 +60,7 @@ it("preserves cancellation review on provider failure and refuses foreign naviga
   expect(node.textContent).toContain("Billing is unavailable."); expect(button(node, "Continue to Stripe").disabled).toBe(false);
   transport.mockResolvedValue(Response.json({ portalUrl: "https://foreign.example" }));
   await act(async () => button(node, "Continue to Stripe").click());
-  expect(node.textContent).toContain("doesn't trust"); expect(navigate).not.toHaveBeenCalled();
+  expect(node.textContent).toContain("doesn’t trust"); expect(navigate).not.toHaveBeenCalled();
 });
 it("aborts a prior workspace's portal request and ignores its late capability", async () => {
   const { node, root } = host(); const navigate = vi.fn(); let resolve!: (value: Response) => void;

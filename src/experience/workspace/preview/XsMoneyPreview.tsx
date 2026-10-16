@@ -7,6 +7,7 @@
  */
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { StrelvaShell } from "@/experience/app-frame/StrelvaShell";
+import { OperatorFrame } from "@/experience/operations/OperatorFrame";
 import type { StrelvaClientLink } from "@/experience/app-frame/workspace-places";
 import { XaHeadline, XaTextLink } from "@/components/ui/strelva/Xa";
 import { BusinessBillingView } from "@/experience/workspace/billing/BusinessBillingView";
@@ -35,6 +36,7 @@ import { PublicMoneyPage } from "@/experience/workspace/money/PublicMoneyPage";
 import { SourceAttributionView } from "@/experience/workspace/money/SourceAttributionView";
 import { CollectionTerms } from "@/experience/workspace/money/CollectionTerms";
 import { VersionTerms } from "@/experience/workspace/money/VersionTerms";
+import { MoneyYesTurns } from "@/experience/workspace/money/OfferRows";
 import { SourceListing } from "@/experience/workspace/money/SourceListing";
 import styles from "@/experience/workspace/money/money.module.css";
 import { PaymentsScreen } from "@/app/workspace/payments/PaymentsScreen";
@@ -74,7 +76,7 @@ export { XS_MONEY_SCREENS, type XsMoneyScreen };
 const BASE = "/preview/strelva/xa/xs-money";
 const XA_OWNER_EMAIL = "amy@harbordental.com";
 const PAUSED_TEXT =
-  "Strelva can't take on new work for this business until plans open. Nothing changed. Ask to hear when they open, or bring in an agency now.";
+  "Strelva can't take on new work for this business until plans open. Nothing changed. Put this business on the list for plans, or bring in an agency now.";
 const json = (value: unknown, status = 200) =>
   new Response(JSON.stringify(value), {
     status,
@@ -191,17 +193,20 @@ export function XsMoneyPreview({
       color: CLIENT_COLORS.fieldwork,
     },
   ];
+  // "plan" highlights Plan and usage; "elsewhere" opens Business details with
+  // nothing current (a money page that isn't Plan and usage); "main" is the
+  // business's own rail (Ask, a System's page).
   const owner = (
     children: ReactNode,
-    detailsPlace: "plan" | undefined = "plan",
+    place: "plan" | "elsewhere" | "main" = "plan",
   ) => (
     <StrelvaShell
       {...shell}
       workspaceId={XS.harbor}
       workspaceName={XA_HARBOR.name}
       accountName={XA_HARBOR.owner}
-      active="settings"
-      detailsPlace={detailsPlace}
+      active={place === "main" ? "home" : "settings"}
+      detailsPlace={place === "main" ? undefined : place}
       agency={{
         name: XA_NORTH.name,
         person: XA_NORTH.first,
@@ -242,12 +247,14 @@ export function XsMoneyPreview({
 
   const requests = useMemo(
     () => ({
+      // One payer per screen: past due is North Studio's card, so who pays
+      // reads North Studio's agreed change, not a pending ask.
       payer: fixtureFetch(
         (url, init) =>
           init?.method === "POST"
             ? payerSnapshot("pending")
             : payerSnapshot(
-                state === "done"
+                state === "done" || state === "past-due"
                   ? "accepted"
                   : state === "empty"
                     ? "none"
@@ -408,6 +415,7 @@ export function XsMoneyPreview({
                 workspaceId={XS.harbor}
                 canPropose
                 agencyChoices={[{ id: XS.north, name: XA_NORTH.name }]}
+                billedTo={billing?.payerParty ?? null}
                 request={requests.payer}
               />
               <nav aria-label="More about money" className={styles.links}>
@@ -477,7 +485,7 @@ export function XsMoneyPreview({
             ]}
           />
         </WorkspaceRequestContext.Provider>,
-        undefined,
+        "main",
       );
     case "getting-started-plans":
       return (
@@ -520,12 +528,6 @@ export function XsMoneyPreview({
             "Only an owner or admin of the agency can open it.",
           ),
         );
-      const colors = {
-        [XS.harbor]: CLIENT_COLORS.harbor,
-        [XS.coast]: CLIENT_COLORS.coast,
-        [XS.lakeview]: CLIENT_COLORS.lakeview,
-        [XS.fieldwork]: CLIENT_COLORS.fieldwork,
-      };
       const billingRecord = agencyBilling(false);
       return agency(
         <AgencyPayerRequests
@@ -549,14 +551,13 @@ export function XsMoneyPreview({
                       className={styles.clientList}
                       aria-label="Owners asking your agency to pay"
                     >
-                      <AgencyPayerRequestLines listed={[]} colors={colors} />
+                      <AgencyPayerRequestLines listed={[]} />
                     </ul>
                   </section>
                 ) : (
                   <AgencyBillingView
                     billing={billingRecord}
                     checkoutAvailability={UNRELEASED_CHECKOUT}
-                    clientColors={colors}
                   />
                 )}
                 <nav
@@ -643,13 +644,14 @@ export function XsMoneyPreview({
       );
     case "payments":
       if (state === "loading")
-        return owner(loading("Reading deposits and payments"));
+        return owner(loading("Reading deposits and payments"), "elsewhere");
       if (state === "error")
         return owner(
           failure(
             "Payments couldn't be read just now.",
             "Payments already made are safe in Stripe. Try again in a moment.",
           ),
+          "elsewhere",
         );
       return owner(
         <PaymentsScreen
@@ -666,6 +668,7 @@ export function XsMoneyPreview({
             state === "empty" || state === "setup" ? [] : paymentRequests
           }
         />,
+        "elsewhere",
       );
     case "pay": {
       const base = {
@@ -690,7 +693,17 @@ export function XsMoneyPreview({
               maxCents: 40000,
             }
           : state === "paid"
-            ? { ...base, status: "paid" as const, receiptNumber: 3 }
+            ? // Paid is Fieldwork Studio's link (receipt 3, Oct 12), the same
+              // payment Payment links and the receipt show; Harbor Dental's stays open.
+              {
+                ...base,
+                slug: "fieldwork-studio-p2m7t",
+                clientName: "Fieldwork Studio",
+                description: "Intake form and print price list",
+                amountCents: 60000,
+                status: "paid" as const,
+                receiptNumber: 3,
+              }
             : state === "expired"
               ? { ...base, status: "expired" as const }
               : base;
@@ -736,18 +749,13 @@ export function XsMoneyPreview({
           brand={NORTH_BRAND}
           single
           lead={
+            // The one receipt in this fixture: Fieldwork Studio's, as its client sees it.
             <MoneyDocument
-              doc={{
-                ...receiptDoc,
-                number: 4,
-                snapshot: {
-                  ...receiptDoc.snapshot,
-                  billTo: XA_HARBOR.name,
-                  description: invoiceDoc.snapshot.description,
-                  amountPaidCents: 125050,
-                },
+              doc={receiptDoc}
+              back={{
+                label: "Back to the payment link",
+                href: `${BASE}/pay?state=paid`,
               }}
-              back={{ label: "Back to the payment link", href: `${BASE}/pay` }}
             />
           }
         />
@@ -765,12 +773,15 @@ export function XsMoneyPreview({
               ? {
                   ...businessDepositFixture,
                   businessName: XA_HARBOR.name,
+                  brand: { accentColor: "#1f4e6b", logoUrl: null },
                   paid: true,
                   status: "paid",
                 }
               : {
                   ...businessDepositFixture,
                   businessName: XA_HARBOR.name,
+                  // Harbor Dental's own look, the same as its booking page preview.
+                  brand: { accentColor: "#1f4e6b", logoUrl: null },
                   acceptedTerms:
                     "Deposit for Ana R.'s cleaning on Mon Nov 23 at 10:30, at 1180 Elmwood Ave.",
                 }
@@ -792,27 +803,26 @@ export function XsMoneyPreview({
             <XaHeadline quiet="Each one names the month it covers. Nothing here charges a card.">
               Prices you&rsquo;ve agreed to
             </XaHeadline>
-            <CollectionTerms
-              graph={governedGraph(state === "empty")}
-              actorId={XS.amy}
-              request={requests.money}
-            />
-            <VersionTerms
-              graph={versionGraph(state === "empty")}
-              actorId={XS.amy}
-              request={requests.money}
-            />
+            <MoneyYesTurns order={["collection", "version"]}>
+              <CollectionTerms
+                graph={governedGraph(state === "empty")}
+                actorId={XS.amy}
+                request={requests.money}
+              />
+              <VersionTerms
+                graph={versionGraph(state === "empty")}
+                actorId={XS.amy}
+                request={requests.money}
+              />
+            </MoneyYesTurns>
           </div>
         ),
+        "elsewhere",
       );
     case "reconciliation":
       // Operator console only (October 16): staff work, never in a workspace shell.
       return (
-        <main
-          data-workspace-theme="linen"
-          data-workspace-mode={mode}
-          style={{ minHeight: "100vh", background: "var(--st-canvas)" }}
-        >
+        <OperatorFrame preview operatorName="Priya" moneyEnabled>
           {state === "error" ? (
             failure(
               "Payments to check couldn't be read.",
@@ -829,10 +839,11 @@ export function XsMoneyPreview({
                 issues={state === "done" ? [] : reconciliationIssues}
                 actorId={XS.priya}
                 names={{ [XS.priya]: "Priya" }}
+                accountNames={{ acct_north_studio: XA_NORTH.name }}
               />
             </div>
           )}
-        </main>
+        </OperatorFrame>
       );
     case "creator-maintenance":
       return agency(
@@ -845,7 +856,7 @@ export function XsMoneyPreview({
           <div className={styles.screen}>
             <nav aria-label="Back" className={styles.links}>
               <XaTextLink href={`${BASE}/billing-agency`}>
-                Plan and usage
+                Clients you cover
               </XaTextLink>
             </nav>
             <XaHeadline quiet="Who looks after each one, and what you earn when a business pays for it.">
@@ -861,7 +872,7 @@ export function XsMoneyPreview({
               listingNames={Object.fromEntries(
                 creatorSources(state === "empty").sources.map((item) => [
                   item.sourceRevisionId,
-                  `${item.name}, Release ${item.revision}`,
+                  item.name,
                 ]),
               )}
             />
@@ -896,7 +907,7 @@ export function XsMoneyPreview({
                 }}
               />
             ),
-            undefined,
+            "main",
           );
     case "payer":
       return agency(

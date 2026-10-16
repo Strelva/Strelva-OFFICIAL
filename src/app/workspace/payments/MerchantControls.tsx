@@ -157,9 +157,6 @@ export default function MerchantControls({
           </XaTextLink>
           {ready ? (
             <>
-              <span className={styles.note} aria-hidden="true">
-                ·
-              </span>
               <XaTextLink
                 onClick={() => {
                   if (!busy) setStopping(true);

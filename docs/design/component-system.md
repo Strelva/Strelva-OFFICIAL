@@ -2505,6 +2505,11 @@ layouts. Unknown business identity shows neutral copy. The existing
 `--visitor-*` variables supply business colors; primary buttons use the business
 accent or neutral ink, with paired foreground, visible focus and 44px targets.
 The business is the only visible brand.
+October 16: `logoUrl` and `style` (the business's `--visitor-*` colors) let a
+page pass the business's own look; the name in the header wears
+`--visitor-accent`. `/pay/business` reads an optional `brand` on the public
+payment request (`publicPaymentBrandSchema`, malformed values dropped); no
+business-brand store feeds it yet, so live pages stay on neutral paper.
 
 Inquiry receipts distinguish customer email confirmation, waiting on the
 business, confirmed and ended states. Saved confirmation deadlines and readable
@@ -2922,3 +2927,27 @@ and `./global-error`.
   gated off), owner invitation and export ready. Paper emails use the ink pill,
   no monospace, and link DM Sans for clients that load web fonts (Gmail and
   Outlook for Windows use the fallback stack).
+
+### October 16 · money lane fixes (xa/fix-money)
+
+- `XaSegmented tone="action"`: the chosen option wears `--st-action`, so a
+  public page's choice (the pay link's amount) takes the charging agency's
+  accent like its Pay button. `/pay/[slug]` uses it in place of the native
+  range input (up to six $50 steps; wider ranges step Less and More).
+- `OfferRows` + `useHeldYes` + `MoneyYesTurns`
+  ([money](../../src/experience/workspace/money/)): a price waiting for a yes
+  is one sentence with the one `XaYes` beside it; the others wait behind
+  "Answer this one", across every list on the screen. Where the server keeps
+  no reversal (agreeing to a price or month, offering an app, changing who
+  looks after it), the yes waits out the Undo window and only then sends;
+  Undo inside the window means nothing was sent. Used by `CollectionTerms`,
+  `VersionTerms`, `SourceListing` and `CreatorMaintenance`.
+- Payer asks (`AgencyPayerRequests`, `AccountPayerInbox`, the owner's who-pays
+  section) answer through `XaYes`, one at a time. `WorkspacePayerTransition
+  billedTo` reads the billing record's payer so the section never contradicts
+  the headline; a disagreeing agreed change says it is the one that counts.
+- `StrelvaDetailsPlace "elsewhere"` opens Business details with nothing
+  current, for money pages reached from Plan and usage.
+- Money `.links` separators are the gap itself; the middle dots are hidden so
+  nothing dangles on wrap. Client lines on agency billing and payment links
+  carry no colored tile.

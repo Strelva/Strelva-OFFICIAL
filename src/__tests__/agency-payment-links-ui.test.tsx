@@ -399,7 +399,7 @@ it("sends a valid range as cents", async () => {
   expect(bodies[0]).toMatchObject({ minCents: 10000, maxCents: 30000 });
   expect(bodies[0]).not.toHaveProperty("amountCents");
 });
-it("lists connected links with their invoice number, status and actions", async () => {
+it("lists connected links with their status and actions, the invoice number left to the invoice", async () => {
   const node = await render(
     vi
       .fn<typeof fetch>()
@@ -429,8 +429,9 @@ it("lists connected links with their invoice number, status and actions", async 
         ),
       ),
   );
-  expect(node.textContent).toContain("INV-000001");
-  expect(node.textContent).toContain("INV-000002");
+  // Invoice numbers live on the invoice itself, never in the list rows (October 16).
+  expect(node.textContent).not.toContain("INV-000001");
+  expect(node.textContent).not.toContain("INV-000002");
   expect(node.textContent).toContain("Open");
   expect(node.textContent).toContain("Paid $500");
   expect(node.textContent).toContain("Stopped");

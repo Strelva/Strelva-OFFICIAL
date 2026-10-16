@@ -340,7 +340,7 @@ it("offers serving agencies without suggesting the owner join their team", async
       .click(),
   );
   expect(node.textContent).toContain("No agency works with this business yet");
-  expect(node.textContent).toContain("You don't join its team");
+  expect(node.textContent).toContain("You don’t join its team");
   expect(node.textContent).not.toContain("Ask its owner for an invitation");
 });
 it("filters the response inbox to the current business after accepting an agency payer", async () => {

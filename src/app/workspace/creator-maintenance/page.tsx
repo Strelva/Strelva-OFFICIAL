@@ -27,7 +27,7 @@ export default async function CreatorMaintenancePage({
     sourceGraph = await readNeutralCreatorSources(actor, workspaceId);
   } catch {
     return (
-      <StrelvaShell title="" workspaceId={workspaceId} detailsPlace="plan">
+      <StrelvaShell title="" workspaceId={workspaceId} agencyNavigation={{}} detailsPlace="elsewhere">
         <div className={styles.screen}>
           <MoneyLoadFailure
             title="Your apps couldn't be read just now."
@@ -39,11 +39,12 @@ export default async function CreatorMaintenancePage({
     );
   }
   return (
-    <StrelvaShell title="" workspaceId={workspaceId} detailsPlace="plan">
+    <StrelvaShell title="" workspaceId={workspaceId} agencyNavigation={{}} detailsPlace="elsewhere">
       <div className={styles.screen}>
         <nav aria-label="Back" className={styles.links}>
+          {/* Back to the agency's own billing page; agencies have no Plan and usage. */}
           <XaTextLink href={`/workspace/billing?workspaceId=${id}`}>
-            Plan and usage
+            Clients you cover
           </XaTextLink>
           <span aria-hidden="true">·</span>
           <XaTextLink
@@ -62,7 +63,7 @@ export default async function CreatorMaintenancePage({
           listingNames={Object.fromEntries(
             sourceGraph.sources.map((item) => [
               item.sourceRevisionId,
-              `${item.name}, Release ${item.revision}`,
+              item.name,
             ]),
           )}
         />

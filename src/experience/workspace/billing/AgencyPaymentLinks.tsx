@@ -5,9 +5,7 @@ import {
   XaButton,
   XaField,
   XaHeadline,
-  XaInitial,
   XaLabel,
-  XaPage,
   XaRow,
   XaRows,
   XaSays,
@@ -16,12 +14,8 @@ import {
   XaTextArea,
   XaTextLink,
 } from "@/components/ui/strelva/Xa";
-import {
-  formatDocumentNumber,
-  type AgencyPayLink,
-} from "@/platform/agency-pay-links/types";
+import type { AgencyPayLink } from "@/platform/agency-pay-links/types";
 import { AgencyMerchantSetup } from "./AgencyMerchantSetup";
-import { clientColor } from "@/platform/presentation/client-color";
 import type { PayLinkConfig } from "@/platform/infra/pay-links";
 import type { readAgencyPaymentLinks } from "./payment-links-server";
 import styles from "@/experience/workspace/money/money.module.css";
@@ -583,16 +577,13 @@ function ScopedPaymentLinks({
                 <XaLabel>
                   What {form.clientName.trim() || "your client"} sees
                 </XaLabel>
-                <XaPage
-                  address={`strelva.com/pay/${
-                    (form.clientName.trim() || "client")
-                      .toLowerCase()
-                      .replace(/[^a-z0-9]+/g, "-")
-                      .replace(/^-|-$/g, "") || "client"
-                  }`}
-                  title={`Pay ${agencyName}`}
-                  flat
+                {/* The client's page as they see it: the agency's name on top, no web address. */}
+                <figure
+                  className={styles.previewFrame}
+                  aria-label={`The payment page ${form.clientName.trim() || "your client"} sees`}
                 >
+                  <p className={styles.previewBrand}>{agencyName}</p>
+                  <p className={styles.previewTitle}>Pay {agencyName}</p>
                   <div className={styles.previewPay}>
                     <p className={styles.note}>
                       {form.clientName.trim() || "Client name"}
@@ -617,7 +608,7 @@ function ScopedPaymentLinks({
                       </p>
                     )}
                   </div>
-                </XaPage>
+                </figure>
               </div>
             </section>
           ) : null}
@@ -630,13 +621,6 @@ function ScopedPaymentLinks({
                 {snapshot.connectedLinks.map((link) => (
                   <XaRow
                     key={link.id}
-                    lead={
-                      <XaInitial
-                        name={link.clientName}
-                        color={clientColor(link.clientName)}
-                        size={32}
-                      />
-                    }
                     title={link.clientName}
                     meta={
                       <span className={styles.figure}>
@@ -646,12 +630,8 @@ function ScopedPaymentLinks({
                     wrapOnPhone
                     detail={
                       <>
-                        <span>
-                          {link.description}
-                          {link.invoiceNumber !== null
-                            ? ` · ${formatDocumentNumber("invoice", link.invoiceNumber)}`
-                            : ""}
-                        </span>
+                        {/* The invoice number lives on the invoice itself, not in the list. */}
+                        <span>{link.description}</span>
                         <br />
                         {link.status === "paid" ? (
                           <XaStatus kind="live" size="sm">
@@ -757,13 +737,6 @@ function ScopedPaymentLinks({
                     return (
                       <XaRow
                         key={link.slug}
-                        lead={
-                          <XaInitial
-                            name={link.clientName}
-                            color={clientColor(link.clientName)}
-                            size={32}
-                          />
-                        }
                         title={link.clientName}
                         meta={
                           <span className={styles.figure}>{price(link)}</span>

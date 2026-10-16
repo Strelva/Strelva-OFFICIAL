@@ -11,6 +11,7 @@ import {
   XaSelect,
   XaStatus,
   XaTextLink,
+  XaYes,
 } from "@/components/ui/strelva/Xa";
 import type {
   PayerTransition,
@@ -47,6 +48,31 @@ const STATUS_WORDS: Record<PayerTransition["status"], string> = {
   stale: "Lapsed",
 };
 type Kind = "business" | "agency" | "user";
+type BilledTo = { kind: "business" | "agency"; workspaceId: string; name: string | null };
+
+/** True when a payer change names the same party as the billing record. */
+function samePayer(item: PayerTransition, billed: BilledTo) {
+  if (billed.kind === "agency")
+    return item.successorKind === "agency" && item.successorWorkspaceId === billed.workspaceId;
+  return item.successorKind === "business";
+}
+
+/**
+ * Who pays today, in one sentence. The agreed change and the billing record
+ * usually say the same thing; when they don't, the agreed change counts for
+ * new work and the sentence says so.
+ */
+function payerSentence(current: PayerTransition | null, billed: BilledTo | null): string {
+  if (current) {
+    const agreed = `${successorLabel(current)} pays for work started after ${when(current.acceptedAt)}.`;
+    if (!billed || samePayer(current, billed)) return agreed;
+    const record = billed.kind === "agency" ? (billed.name ?? "an agency") : "this business";
+    return `${agreed} The billing record still names ${record}; the agreed change is the one that counts.`;
+  }
+  if (billed?.kind === "agency")
+    return `${billed.name ?? "Your agency"} pays for this business’s Strelva work.`;
+  return "This business pays for its own Strelva work.";
+}
 
 /** Who pays for future jobs (XA · R4 language): one sentence for today, the waiting change beside it, then the choice. */
 export function WorkspacePayerTransition({
@@ -55,6 +81,7 @@ export function WorkspacePayerTransition({
   agencyChoices = [],
   agencyChoicesError = "",
   providerChangeEnabled = false,
+  billedTo = null,
   request = fetch,
 }: {
   workspaceId: string;
@@ -62,6 +89,12 @@ export function WorkspacePayerTransition({
   agencyChoices?: { id: string; name: string }[];
   agencyChoicesError?: string;
   providerChangeEnabled?: boolean;
+  /**
+   * Who the billing record says pays for this plan (BusinessBilling.payerParty).
+   * The page's headline and Pebble read the same record, so this section says
+   * the same payer; when an agreed change disagrees, it says which one counts.
+   */
+  billedTo?: { kind: "business" | "agency"; workspaceId: string; name: string | null } | null;
   request?: typeof fetch;
 }) {
   const [data, setData] = useState<PayerTransitionSnapshot | null>(null);
@@ -72,6 +105,7 @@ export function WorkspacePayerTransition({
   const [successorAgencyWorkspaceId, setSuccessorAgencyWorkspaceId] =
     useState("");
   const [changing, setChanging] = useState(false);
+  const [answering, setAnswering] = useState<"accept" | "reject" | null>(null);
   const [formError, setFormError] = useState("");
   const [providerChange, setProviderChange] = useState<{
     id: string;
@@ -88,14 +122,14 @@ export function WorkspacePayerTransition({
         );
         const body = await response.json();
         if (!response.ok)
-          throw new Error(body.error ?? "Who pays couldn't be read just now.");
+          throw new Error(body.error ?? "Who pays couldn’t be read just now.");
         setData(body);
       } catch (cause) {
         if (!signal?.aborted)
           setError(
             cause instanceof Error
               ? cause.message
-              : "Who pays couldn't be read just now.",
+              : "Who pays couldn’t be read just now.",
           );
       }
     },
@@ -131,7 +165,7 @@ export function WorkspacePayerTransition({
       const result = await response.json();
       if (!response.ok)
         throw new Error(
-          result.error ?? "That didn't go through. Nothing changed.",
+          result.error ?? "That didn’t go through. Nothing changed.",
         );
       if (body.action === "accept") setProviderChange(null);
       const scoped = {
@@ -170,7 +204,7 @@ export function WorkspacePayerTransition({
       setError(
         cause instanceof Error
           ? cause.message
-          : "That didn't go through. Nothing changed.",
+          : "That didn’t go through. Nothing changed.",
       );
     } finally {
       setBusy(false);
@@ -212,7 +246,7 @@ export function WorkspacePayerTransition({
       const result = await response.json();
       if (!response.ok)
         throw new Error(
-          result.error ?? "The move to a new agency didn't go through.",
+          result.error ?? "The move to a new agency didn’t go through.",
         );
       setProviderChange(result);
       setNotice(
@@ -226,7 +260,7 @@ export function WorkspacePayerTransition({
       setError(
         cause instanceof Error
           ? cause.message
-          : "The move to a new agency didn't go through.",
+          : "The move to a new agency didn’t go through.",
       );
     } finally {
       setBusy(false);
@@ -260,15 +294,8 @@ export function WorkspacePayerTransition({
       ) : null}
       {data ? (
         <p className={styles.body}>
-          {data.current ? (
-            <>
-              {successorLabel(data.current)} pays for work started after{" "}
-              {when(data.current.acceptedAt)}.
-            </>
-          ) : (
-            "This business pays for its own Strelva work."
-          )}{" "}
-          A change only counts from the day it&rsquo;s agreed.
+          {payerSentence(data.current, billedTo)} A change only counts from the
+          day it&rsquo;s agreed.
         </p>
       ) : null}
       {error ? (
@@ -316,57 +343,16 @@ export function WorkspacePayerTransition({
           role="group"
           aria-label="A change to who pays, waiting for an answer"
         >
-          <p className={styles.line}>
-            <strong>{successorLabel(pending)} to pay from now on</strong>{" "}
-            <XaStatus kind="waits" size="sm">
-              Waiting for{" "}
-              {pending.successorKind === "business"
-                ? "a business owner"
-                : successorLabel(pending)}
-            </XaStatus>
-            <span className={styles.lineActions}>
-              {addressed ? (
-                <>
-                  <XaTextLink
-                    disabled={busy}
-                    onClick={() =>
-                      void command({
-                        action: "accept",
-                        transitionId: pending.id,
-                      })
-                    }
-                  >
-                    Agree to pay
-                  </XaTextLink>
-                  <span aria-hidden="true">·</span>
-                  <XaTextLink
-                    disabled={busy}
-                    onClick={() =>
-                      void command({
-                        action: "reject",
-                        transitionId: pending.id,
-                      })
-                    }
-                  >
-                    Decline
-                  </XaTextLink>
-                </>
-              ) : null}
-              {addressed && canPropose ? (
-                <span aria-hidden="true">·</span>
-              ) : null}
-              {canPropose ? (
-                <XaTextLink
-                  disabled={busy}
-                  onClick={() =>
-                    void command({ action: "revoke", transitionId: pending.id })
-                  }
-                >
-                  Take it back
-                </XaTextLink>
-              ) : null}
-            </span>
+          {/* The ask, then its state on its own line, then the answers: nothing orphans when it wraps. */}
+          <p className={styles.waitingTitle}>
+            {successorLabel(pending)} to pay from now on
           </p>
+          <XaStatus kind="waits" size="sm">
+            Waiting for{" "}
+            {pending.successorKind === "business"
+              ? "a business owner"
+              : successorLabel(pending)}
+          </XaStatus>
           <p className={styles.note}>
             {proposerLabel(pending)} asked on {when(pending.proposedAt)}.{" "}
             {pending.successorKind === "agency"
@@ -375,6 +361,39 @@ export function WorkspacePayerTransition({
                 ? "The business owner answers."
                 : "They answer after confirming their email."}
           </p>
+          {addressed ? (
+            <XaYes
+              state={busy && answering === "accept" ? "going" : error && answering === "accept" ? "failed" : "waiting"}
+              yesLabel="Agree to pay"
+              notYetLabel="Decline"
+              block={false}
+              onYes={() => {
+                setAnswering("accept");
+                void command({ action: "accept", transitionId: pending.id });
+              }}
+              onNotYet={busy ? undefined : () => {
+                setAnswering("reject");
+                void command({ action: "reject", transitionId: pending.id });
+              }}
+              working={{
+                title: "Saving your yes",
+                steps: [{ id: "accept", label: "Keeping your answer with your name", state: "active" }],
+              }}
+              failure={error || undefined}
+            />
+          ) : null}
+          {canPropose ? (
+            <p className={styles.links}>
+              <XaTextLink
+                disabled={busy}
+                onClick={() =>
+                  void command({ action: "revoke", transitionId: pending.id })
+                }
+              >
+                Take it back
+              </XaTextLink>
+            </p>
+          ) : null}
         </div>
       ) : canPropose && data && !changing ? (
         <p className={styles.note}>
@@ -445,7 +464,7 @@ export function WorkspacePayerTransition({
                 value: "agency",
                 label: "An agency serving you",
                 detail:
-                  "The agency says yes on its side. You don't join its team.",
+                  "The agency says yes on its side. You don’t join its team.",
               },
               {
                 value: "user",

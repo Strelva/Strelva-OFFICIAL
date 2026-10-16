@@ -11,8 +11,12 @@ import {
 } from "react";
 import { useRouter } from "next/navigation";
 import { z } from "zod";
-import { XaInitial, XaTextLink } from "@/components/ui/strelva/Xa";
-import { clientColor } from "@/platform/presentation/client-color";
+import {
+  XaHeadline,
+  XaPebbleAvatar,
+  XaTextLink,
+  XaYes,
+} from "@/components/ui/strelva/Xa";
 import styles from "@/experience/workspace/money/money.module.css";
 
 const inboxSchema = z
@@ -57,6 +61,9 @@ type Payer = {
   error: string;
   notice: string;
   busy: boolean;
+  /** The ask that holds the one yes on the screen; the others wait their turn. */
+  chosen: string | null;
+  choose: (transitionId: string) => void;
   respond: (action: "accept" | "reject", transitionId: string) => void;
   retry: () => void;
 };
@@ -125,6 +132,7 @@ function ScopedAgencyPayerRequests({
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
+  const [chosen, setChosen] = useState<string | null>(null);
   const inflight = useRef<AbortController | null>(null);
   const apply = useCallback(
     (body: Inbox) => {
@@ -251,6 +259,11 @@ function ScopedAgencyPayerRequests({
     error,
     notice,
     busy,
+    chosen:
+      requests?.find((item) => item.id === chosen)?.id ??
+      requests?.[0]?.id ??
+      null,
+    choose: (id) => setChosen(id),
     respond: (action, id) => void respond(action, id),
     retry: () => {
       if (!busy)
@@ -307,6 +320,7 @@ export function AgencyPayerRequestAsk({
 function Ask({ item, payer }: { item: Request; payer: Payer }) {
   const business = item.workspaceName ?? "this business";
   const disabled = payer.busy || Boolean(payer.error);
+  const current = payer.chosen === item.id;
   return (
     <span
       className={styles.ask}
@@ -317,23 +331,41 @@ function Ask({ item, payer }: { item: Request; payer: Payer }) {
         {proposerLabel(item)} asked {payer.agencyName} to cover Strelva for{" "}
         {business} from now on.
       </span>
-      <span className={styles.links}>
-        <XaTextLink
-          disabled={disabled}
-          onClick={() => payer.respond("accept", item.id)}
-          aria-label={`Cover Strelva for ${business}`}
-        >
-          Accept
-        </XaTextLink>
-        <span aria-hidden="true">·</span>
-        <XaTextLink
-          disabled={disabled}
-          onClick={() => payer.respond("reject", item.id)}
-          aria-label={`Not yet for ${business}`}
-        >
-          Not yet
-        </XaTextLink>
-      </span>
+      {current ? (
+        <span className={styles.yesSlot}>
+          <XaYes
+            state={payer.busy ? "going" : "waiting"}
+            yesLabel={`Cover ${business}`}
+            yesAriaLabel={`Cover Strelva for ${business}`}
+            notYetLabel="Not yet"
+            notYetAriaLabel={`Not yet for ${business}`}
+            block={false}
+            disabled={Boolean(payer.error)}
+            onYes={() => payer.respond("accept", item.id)}
+            onNotYet={disabled ? undefined : () => payer.respond("reject", item.id)}
+            working={{
+              title: "Saving your answer",
+              steps: [
+                {
+                  id: "accept",
+                  label: "Keeping your answer with your name",
+                  state: "active",
+                },
+              ],
+            }}
+          />
+        </span>
+      ) : (
+        <span className={styles.links}>
+          <XaTextLink
+            disabled={disabled}
+            onClick={() => payer.choose(item.id)}
+            aria-label={`Answer ${business}`}
+          >
+            Answer this one
+          </XaTextLink>
+        </span>
+      )}
     </span>
   );
 }
@@ -341,9 +373,9 @@ function Ask({ item, payer }: { item: Request; payer: Payer }) {
 /** Requests from businesses that are not on the list yet, as lines in the same list. */
 export function AgencyPayerRequestLines({
   listed,
-  colors,
 }: {
   listed: readonly string[];
+  /** Kept for callers; client lines carry no colored tile (October 16). */
   colors?: Readonly<Record<string, string>>;
 }) {
   const payer = useAgencyPayerRequests();
@@ -351,12 +383,14 @@ export function AgencyPayerRequestLines({
   const rest = payer.requests.filter(
     (item) => !listed.includes(item.workspaceId),
   );
+  // Nothing waits: Pebble says how an owner asks, once, instead of repeating the headline.
   if (!rest.length)
     return listed.length ? null : (
-      <li className={styles.clientLine}>
-        <span />
+      <li className={styles.pebbleNote}>
+        <XaPebbleAvatar size={32} />
         <p className={styles.body}>
-          No owner is waiting on {payer.agencyName}.
+          Owners ask from their own Plan and usage page, under Who pays for
+          Strelva work.
         </p>
       </li>
     );
@@ -364,11 +398,6 @@ export function AgencyPayerRequestLines({
     <>
       {rest.map((item) => (
         <li key={item.id} className={styles.clientLine}>
-          <XaInitial
-            name={item.workspaceName ?? "Business"}
-            color={colors?.[item.workspaceId] ?? clientColor(item.workspaceId)}
-            size={32}
-          />
           <div className={styles.clientText}>
             <span>{item.workspaceName ?? "A business"}</span>
             <Ask item={item} payer={payer} />
@@ -376,5 +405,36 @@ export function AgencyPayerRequestLines({
         </li>
       ))}
     </>
+  );
+}
+
+/**
+ * Agency billing's headline: only coverage the agency accepted counts. A
+ * client whose owner is still asking is counted as asking, never as covered.
+ */
+export function AgencyCoverHeadline({
+  agencyName,
+  clientIds,
+  quiet,
+  id,
+}: {
+  agencyName: string;
+  /** Active client lines on the billing record. */
+  clientIds: readonly string[];
+  quiet: string;
+  id?: string;
+}) {
+  const payer = useAgencyPayerRequests();
+  const asking = new Set((payer?.requests ?? []).map((item) => item.workspaceId));
+  const covered = clientIds.filter((clientId) => !asking.has(clientId)).length;
+  const count = (n: number) => (n === 1 ? "1 client" : `${n} clients`);
+  return (
+    <XaHeadline id={id} quiet={quiet}>
+      {covered
+        ? `${agencyName} covers Strelva for ${count(covered)}${asking.size ? `, ${asking.size} more asking` : ""}.`
+        : asking.size
+          ? `${count(asking.size)} ${asking.size === 1 ? "asks" : "ask"} ${agencyName} to cover Strelva.`
+          : `${agencyName} doesn’t cover Strelva for any client yet.`}
+    </XaHeadline>
   );
 }

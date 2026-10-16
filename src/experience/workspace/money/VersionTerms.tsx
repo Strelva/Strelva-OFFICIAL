@@ -1,9 +1,12 @@
 "use client";
-import { XaButton, XaSelect } from "@/components/ui/strelva/Xa";
+import { XaButton, XaYes, type XaYesState } from "@/components/ui/strelva/Xa";
 import xa from "@/experience/workspace/money/money.module.css";
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState } from "react";
 import { formatMoney } from "@/platform/connect/money-format";
+import { strelvaUndoWindowMs } from "@/platform/infra/motion";
 import { monthChoices, periodWords, shortLocalDay } from "./period";
+import { useHeldYes } from "./held-yes";
+import { OfferRows, useYesTurn } from "./OfferRows";
 import {
   neutralVersionMoneyGraphSchema,
   neutralVersionCollectionCommandSchema,
@@ -18,10 +21,55 @@ type Pending = {
   command: NeutralVersionCollectionCommand;
   reviewed: NeutralReviewedVersion;
 };
+type Installed = NeutralVersionMoneyGraph["installations"][number];
+type Price = NeutralVersionMoneyGraph["prices"][number];
+type Month = ReturnType<typeof monthChoices>[number];
+interface Offer {
+  key: string;
+  installed: Installed;
+  price: Price;
+  month: Month;
+}
+const amountWords = (cents: number, currency: string) =>
+  formatMoney(cents, currency).replace(/\.00$/, "");
+/** Each released app's prices, for the next month not already agreed. */
+function offersFor(graph: NeutralVersionMoneyGraph, now = new Date()): Offer[] {
+  const months = monthChoices(12, now);
+  const offers: Offer[] = [];
+  for (const installed of graph.installations.filter(
+    (item) => item.qualified && item.released,
+  ))
+    for (const price of graph.prices.filter(
+      (item) => item.definitionId === installed.definitionId,
+    )) {
+      const month = months.find(
+        (item) =>
+          Date.parse(item.end) > Date.parse(price.effectiveFrom) &&
+          (!price.effectiveUntil ||
+            Date.parse(item.start) < Date.parse(price.effectiveUntil)) &&
+          !graph.history.some(
+            (line) =>
+              line.version_id === installed.versionId &&
+              line.price_version === price.version &&
+              Date.parse(line.period_start) === Date.parse(item.start),
+          ),
+      );
+      if (month)
+        offers.push({
+          key: `${installed.versionId}:${price.version}`,
+          installed,
+          price,
+          month,
+        });
+    }
+  return offers;
+}
 export function VersionTerms(props: {
   graph: NeutralVersionMoneyGraph;
   actorId: string;
   request?: typeof fetch;
+  /** How long Undo stays up before the yes is sent. 0 sends at once. */
+  undoWindowMs?: number;
 }) {
   return (
     <ScopedVersionTerms
@@ -34,22 +82,20 @@ function ScopedVersionTerms({
   graph: initial,
   actorId,
   request = fetch,
+  undoWindowMs = strelvaUndoWindowMs,
 }: {
   graph: NeutralVersionMoneyGraph;
   actorId: string;
   request?: typeof fetch;
+  undoWindowMs?: number;
 }) {
   const [graph, setGraph] = useState(initial),
     [phase, setPhase] = useState<"ready" | "pending" | "uncertain" | "blocked">(
       "ready",
     ),
     [feedback, setFeedback] = useState("");
-  const [versionId, setVersionId] = useState(""),
-    [priceVersion, setPriceVersion] = useState(""),
-    [month, setMonth] = useState(() => monthChoices(1)[0]!.value),
-    [fieldError, setFieldError] = useState("");
-  const months = monthChoices();
-  const chosenMonth = months.find((item) => item.value === month);
+  const [chosen, setChosen] = useState<string | null>(null),
+    [later, setLater] = useState<readonly string[]>([]);
   const pending = useRef<Pending | null>(null),
     inflight = useRef<AbortController | null>(null),
     alive = useRef(true),
@@ -74,13 +120,17 @@ function ScopedVersionTerms({
       document.removeEventListener("visibilitychange", back);
     };
   }, []);
-  const installed = graph.installations.find(
-      (item) => item.versionId === versionId,
-    ),
-    prices = graph.prices.filter(
-      (item) => item.definitionId === installed?.definitionId,
-    ),
-    price = prices.find((item) => item.version === priceVersion);
+  const offers = offersFor(graph);
+  // One yes on the screen: another price list may hold it until "Answer this one" here.
+  // The yes waits out the Undo window, then sends exactly the offer it was given.
+  const holding = useRef<Offer | null>(null);
+  const held = useHeldYes(() => void accept(holding.current), undoWindowMs);
+  const turn = useYesTurn("version", offers.length > 0, held.held);
+  const current = turn.mine
+    ? (offers.find((item) => item.key === chosen) ??
+      offers.find((item) => !later.includes(item.key)) ??
+      null)
+    : null;
   const locked = phase !== "ready" || !!pending.current,
     admitted = graph.canPrepare && graph.customerConfigured;
   function focus(origin: Element | null) {
@@ -150,18 +200,10 @@ function ScopedVersionTerms({
     }
   }
   reloadRef.current = () => void reload(true);
-  async function accept(event: FormEvent) {
-    event.preventDefault();
-    if (inflight.current || locked || !admitted) return;
-    if (!installed?.qualified || !installed.released) {
-      setFieldError("Choose the app this price is for.");
-      return;
-    }
-    if (!price) {
-      setFieldError("Choose the price you're agreeing to.");
-      return;
-    }
-    setFieldError("");
+  async function accept(offer: Offer | null) {
+    if (inflight.current || locked || !admitted || !offer) return;
+    const { installed, price, month } = offer;
+    if (!installed.qualified || !installed.released) return;
     const origin = document.activeElement;
     try {
       pending.current = {
@@ -173,13 +215,13 @@ function ScopedVersionTerms({
           priceVersion: price.version,
           amountCents: price.amountCents,
           currency: price.currency,
-          periodStart: chosenMonth?.start,
-          periodEnd: chosenMonth?.end,
+          periodStart: month.start,
+          periodEnd: month.end,
         }),
         reviewed: { ...installed },
       };
     } catch {
-      setFeedback("Choose the month it covers.");
+      setFeedback("That month can’t be agreed here. Choose another price.");
       focus(origin);
       return;
     }
@@ -245,6 +287,16 @@ function ScopedVersionTerms({
       if (!controller.signal.aborted && alive.current) inflight.current = null;
     }
   }
+  const yesState: XaYesState = held.held
+    ? "live"
+    : phase === "pending" && !pending.current
+      ? "waiting"
+      : phase === "pending"
+        ? "going"
+        : "waiting";
+  const sentence = (offer: Offer) =>
+    `${offer.installed.name}: ${amountWords(offer.price.amountCents, offer.price.currency)} for ${periodWords(offer.month.start, offer.month.end) ?? offer.month.label}.`;
+  const canAnswer = admitted && (!locked || (phase === "pending" && !!pending.current));
   return (
     <section aria-labelledby="version-money-heading" className={xa.section}>
       <h2 id="version-money-heading" className={xa.heading}>
@@ -256,89 +308,67 @@ function ScopedVersionTerms({
           ? "Your agency pays it."
           : "This business pays it."}{" "}
         Saying yes keeps the price and month with your name; nothing is charged
-        here.
+        here. The agency that made the app stays credited.
       </p>
       {!admitted ? (
         <p className={xa.body}>
           What you agreed to stays here. The business owner can agree to another
           month once a card is set up.
         </p>
+      ) : !offers.length ? (
+        <p className={xa.body}>No app price is waiting for your yes.</p>
       ) : (
-        <div className={xa.block}>
-          <form
-            onSubmit={(event) => void accept(event)}
-            className={xa.form}
-            noValidate
-          >
-            <XaSelect
-              label="App"
-              value={versionId}
-              disabled={locked}
-              error={!installed && fieldError ? fieldError : undefined}
-              onChange={(event) => {
-                setFieldError("");
-                setVersionId(event.target.value);
-                setPriceVersion("");
-              }}
-              options={[
-                { value: "", label: "Choose an app" },
-                ...graph.installations
-                  .filter((item) => item.qualified && item.released)
-                  .map((item) => ({
-                    value: item.versionId,
-                    label: item.releaseNumber
-                      ? `${item.name}, Release ${item.releaseNumber}`
-                      : item.name,
-                  })),
-              ]}
-            />
-            <XaSelect
-              label="Price"
-              value={priceVersion}
-              disabled={locked}
-              error={installed && !price && fieldError ? fieldError : undefined}
-              onChange={(event) => {
-                setPriceVersion(event.target.value);
-                setFieldError("");
-              }}
-              options={[
-                { value: "", label: "Choose a price" },
-                ...prices.map((item) => ({
-                  value: item.version,
-                  label: `${item.version}, ${formatMoney(item.amountCents, item.currency)}`,
-                })),
-              ]}
-            />
-            {installed ? (
-              <p className={xa.note}>
-                {installed.name}
-                {installed.releaseNumber
-                  ? `, Release ${installed.releaseNumber}`
-                  : ""}
-                . The agency that made it stays credited.
-              </p>
-            ) : null}
-            <XaSelect
-              label="Which month it covers"
-              value={month}
-              disabled={locked}
-              onChange={(event) => setMonth(event.target.value)}
-              options={months.map((item) => ({
-                value: item.value,
-                label: item.label,
-              }))}
-            />
-            {price && chosenMonth ? (
-              <p className={xa.body}>
-                {formatMoney(price.amountCents, price.currency)} for{" "}
-                {chosenMonth.label}.
-              </p>
-            ) : null}
-            <XaButton type="submit" busy={phase === "pending"} disabled={locked}>
-              Agree to this price
-            </XaButton>
-          </form>
-        </div>
+        <OfferRows
+          label="App prices waiting for your yes"
+          offers={offers.map((offer) => ({
+            key: offer.key,
+            sentence: sentence(offer),
+          }))}
+          current={canAnswer || held.held ? (current?.key ?? null) : null}
+          locked={!canAnswer || held.held}
+          onChoose={(key) => {
+            turn.take();
+            setChosen(key);
+            setLater((items) => items.filter((item) => item !== key));
+          }}
+          yes={
+            current ? (
+              <XaYes
+                state={yesState}
+                yesLabel="Agree to this price"
+                yesAriaLabel={`Agree: ${sentence(current)}`}
+                notYetLabel="Not yet"
+                block={false}
+                onYes={() => {
+                  holding.current = current;
+                  held.hold();
+                }}
+                onNotYet={() => {
+                  setChosen(null);
+                  setLater((items) => [...items, current.key]);
+                }}
+                onUndo={held.undo}
+                undoWindowMs={undoWindowMs}
+                onUndoExpired={held.send}
+                liveLabel={`You agreed to ${amountWords(current.price.amountCents, current.price.currency)} for ${periodWords(current.month.start, current.month.end) ?? current.month.label}`}
+                working={
+                  yesState === "going"
+                    ? {
+                        title: "Saving your yes",
+                        steps: [
+                          {
+                            id: "save",
+                            label: "Keeping this exact price and month with your name",
+                            state: "active",
+                          },
+                        ],
+                      }
+                    : undefined
+                }
+              />
+            ) : null
+          }
+        />
       )}
       <p
         role="status"

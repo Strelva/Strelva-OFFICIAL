@@ -1,9 +1,12 @@
 "use client";
-import { XaButton, XaSelect } from "@/components/ui/strelva/Xa";
+import { XaButton, XaYes, type XaYesState } from "@/components/ui/strelva/Xa";
 import xa from "@/experience/workspace/money/money.module.css";
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState } from "react";
 import { formatMoney } from "@/platform/connect/money-format";
+import { strelvaUndoWindowMs } from "@/platform/infra/motion";
 import { monthChoices, periodWords, shortLocalDay } from "./period";
+import { useHeldYes } from "./held-yes";
+import { OfferRows, useYesTurn } from "./OfferRows";
 import {
   governedCollectionReceiptSchema,
   governedMoneyGraphSchema,
@@ -12,8 +15,58 @@ import {
 } from "@/platform/connect/governed-money-contract";
 
 /** Installed apps are listed by position; their internal ids never show. */
-const installedLabel = (_definitionId: string, index: number) =>
-  `App you added ${index + 1}`;
+const installedLabel = (index: number) => `the app you added ${index + 1}`;
+const amountWords = (cents: number, currency: string) =>
+  formatMoney(cents, currency).replace(/\.00$/, "");
+type Month = ReturnType<typeof monthChoices>[number];
+type Price = GovernedMoneyGraph["prices"][number];
+/** One price waiting for a yes: which price, for what, and the month it would cover. */
+interface Offer {
+  key: string;
+  price: Price;
+  installationId: string | null;
+  appLabel: string | null;
+  month: Month;
+}
+/**
+ * The next month each price can be agreed for: from this month on, inside the
+ * price's own dates, and not one the owner already agreed to.
+ */
+function offersFor(graph: GovernedMoneyGraph, now = new Date()): Offer[] {
+  const months = monthChoices(12, now);
+  const offers: Offer[] = [];
+  for (const price of graph.prices) {
+    const targets = price.definitionId
+      ? graph.installations
+          .map((item, index) => ({ item, index }))
+          .filter(({ item }) => item.definitionId === price.definitionId)
+          .map(({ item, index }) => ({ id: item.id, label: installedLabel(index) }))
+      : [{ id: null, label: null }];
+    for (const target of targets) {
+      const month = months.find(
+        (item) =>
+          Date.parse(item.end) > Date.parse(price.effectiveFrom) &&
+          (!price.effectiveUntil ||
+            Date.parse(item.start) < Date.parse(price.effectiveUntil)) &&
+          !graph.terms.some(
+            (term) =>
+              term.priceVersion === price.version &&
+              (term.installationId ?? null) === target.id &&
+              Date.parse(term.periodStart ?? "") === Date.parse(item.start),
+          ),
+      );
+      if (month)
+        offers.push({
+          key: `${price.version}:${target.id ?? "business"}`,
+          price,
+          installationId: target.id,
+          appLabel: target.label,
+          month,
+        });
+    }
+  }
+  return offers;
+}
 type Command = {
   action: "accept_collection_terms";
   workspaceId: string;
@@ -54,6 +107,8 @@ export function CollectionTerms(props: {
   graph: GovernedMoneyGraph;
   actorId: string;
   request?: typeof fetch;
+  /** How long Undo stays up before the yes is sent. 0 sends at once. */
+  undoWindowMs?: number;
 }) {
   return (
     <ScopedCollectionTerms
@@ -66,23 +121,19 @@ function ScopedCollectionTerms({
   graph: initial,
   actorId,
   request = fetch,
+  undoWindowMs = strelvaUndoWindowMs,
 }: {
   graph: GovernedMoneyGraph;
   actorId: string;
   request?: typeof fetch;
+  undoWindowMs?: number;
 }) {
   const [graph, setGraph] = useState(initial),
     [phase, setPhase] = useState<Phase>("ready"),
     [error, setError] = useState(""),
     [notice, setNotice] = useState("");
-  const [priceVersion, setPriceVersion] = useState(""),
-    [installationId, setInstallationId] = useState(""),
-    [month, setMonth] = useState(() => monthChoices(1)[0]!.value),
-    [fieldError, setFieldError] = useState("");
-  const months = monthChoices();
-  const chosenMonth = months.find((item) => item.value === month);
-  const start = chosenMonth?.start ?? "",
-    end = chosenMonth?.end ?? "";
+  const [chosen, setChosen] = useState<string | null>(null),
+    [later, setLater] = useState<readonly string[]>([]);
   const attempt = useRef<Command | null>(null),
     inflight = useRef<AbortController | null>(null),
     alive = useRef(true),
@@ -108,15 +159,21 @@ function ScopedCollectionTerms({
       document.removeEventListener("visibilitychange", back);
     };
   }, []);
-  const price = graph.prices.find((item) => item.version === priceVersion);
-  const options = graph.installations.filter(
-    (item) => !price?.definitionId || item.definitionId === price.definitionId,
-  );
+  const offers = offersFor(graph);
+  // One yes on the screen: another price list may hold it until "Answer this one" here.
+  // The yes waits out the Undo window, then sends exactly the offer it was given.
+  const holding = useRef<Offer | null>(null);
+  const held = useHeldYes(() => void accept(holding.current), undoWindowMs);
+  const turn = useYesTurn("collection", offers.length > 0, held.held);
+  const current = turn.mine
+    ? (offers.find((item) => item.key === chosen) ??
+      offers.find((item) => !later.includes(item.key)) ??
+      null)
+    : null;
   const admitted =
     graph.canPrepare &&
     !!graph.payer?.customerConfigured &&
     graph.prices.length > 0;
-  const locked = phase !== "ready" || !!attempt.current;
   function focusFeedback(origin: Element | null) {
     if (
       document.activeElement === origin ||
@@ -181,39 +238,21 @@ function ScopedCollectionTerms({
     }
   }
   reloadRef.current = () => void reload(true);
-  async function accept(event?: FormEvent) {
-    event?.preventDefault();
+  async function accept(offer?: Offer | null) {
     if (inflight.current || phase !== "ready" || !admitted) return;
     const origin = document.activeElement;
     if (!attempt.current) {
-      if (!price) {
-        setFieldError("Choose the price you're agreeing to.");
-        return;
-      }
-      if (
-        price.definitionId &&
-        !options.some((item) => item.id === installationId)
-      ) {
-        setFieldError("Choose which app this price is for.");
-        return;
-      }
-      if (!start || !end) {
-        setFieldError("Choose the month it covers.");
-        return;
-      }
-      setFieldError("");
-      const periodStart = start,
-        periodEnd = end;
+      if (!offer) return;
       attempt.current = {
         action: "accept_collection_terms",
         workspaceId: initial.workspaceId,
         lineId: crypto.randomUUID(),
-        priceVersion: price.version,
-        amountCents: price.amountCents,
-        currency: price.currency,
-        installationId: installationId || null,
-        periodStart,
-        periodEnd,
+        priceVersion: offer.price.version,
+        amountCents: offer.price.amountCents,
+        currency: offer.price.currency,
+        installationId: offer.installationId,
+        periodStart: offer.month.start,
+        periodEnd: offer.month.end,
       };
     }
     const command = attempt.current,
@@ -272,10 +311,18 @@ function ScopedCollectionTerms({
       if (!controller.signal.aborted && alive.current) inflight.current = null;
     }
   }
+  const yesState: XaYesState = held.held
+    ? "live"
+    : phase === "pending"
+      ? "going"
+      : "waiting";
+  const sentence = (offer: Offer) =>
+    `${offer.price.version}${offer.appLabel ? `, for ${offer.appLabel}` : ""}: ${amountWords(offer.price.amountCents, offer.price.currency)} for ${periodWords(offer.month.start, offer.month.end) ?? offer.month.label}.`;
+  const canAnswer = admitted && !attempt.current && (phase === "ready" || phase === "pending");
   return (
     <section className={xa.section} aria-labelledby="collection-terms-heading">
       <h2 id="collection-terms-heading" className={xa.heading}>
-        Agree to a price for a month
+        Prices waiting for your yes
       </h2>
       <p className={xa.note}>
         {graph.payer?.kind === "agency"
@@ -289,84 +336,73 @@ function ScopedCollectionTerms({
         </p>
       ) : !graph.payer?.customerConfigured ? (
         <p className={xa.body}>
-          A card isn&apos;t set up for this business yet, so there&apos;s
-          nothing to agree to.
+          A card isn’t set up for this business yet, so there’s nothing to
+          agree to.
         </p>
       ) : !graph.prices.length ? (
         <p className={xa.body}>No price is waiting for your yes.</p>
+      ) : !offers.length ? (
+        <p className={xa.body}>
+          Every price here is agreed for the months ahead.
+        </p>
       ) : null}
-      {admitted ? (
-        <div className={xa.block}>
-          <form
-            className={xa.form}
-            noValidate
-            onSubmit={(event) => void accept(event)}
-          >
-            <XaSelect
-              label="Price"
-              value={priceVersion}
-              disabled={locked}
-              error={!price && fieldError ? fieldError : undefined}
-              onChange={(event) => {
-                setPriceVersion(event.target.value);
-                setInstallationId("");
-                setFieldError("");
-              }}
-              options={[
-                { value: "", label: "Choose a price" },
-                ...graph.prices.map((item) => ({
-                  value: item.version,
-                  label: `${item.version}, ${formatMoney(item.amountCents, item.currency)}`,
-                })),
-              ]}
-            />
-            {price?.definitionId || options.length ? (
-              <XaSelect
-                label="What it covers"
-                value={installationId}
-                disabled={locked}
-                error={
-                  price && fieldError ? fieldError : undefined
-                }
-                onChange={(event) => {
-                  setInstallationId(event.target.value);
-                  setFieldError("");
+      {admitted && offers.length ? (
+        <OfferRows
+          label="Prices waiting for your yes"
+          offers={offers.map((offer) => ({
+            key: offer.key,
+            sentence: sentence(offer),
+          }))}
+          current={canAnswer || held.held ? (current?.key ?? null) : null}
+          locked={!canAnswer || held.held}
+          onChoose={(key) => {
+            turn.take();
+            setChosen(key);
+            setLater((items) => items.filter((item) => item !== key));
+          }}
+          yes={
+            current ? (
+              <XaYes
+                state={yesState}
+                yesLabel="Agree to this price"
+                yesAriaLabel={`Agree: ${sentence(current)}`}
+                notYetLabel="Not yet"
+                block={false}
+                onYes={() => {
+                  holding.current = current;
+                  held.hold();
                 }}
-                options={[
-                  {
-                    value: "",
-                    label: price?.definitionId
-                      ? "Choose the app"
-                      : "The whole business",
-                  },
-                  ...options.map((item, index) => ({
-                    value: item.id,
-                    label: installedLabel(item.definitionId, index),
-                  })),
-                ]}
+                onNotYet={() => {
+                  setChosen(null);
+                  setLater((items) => [...items, current.key]);
+                }}
+                onUndo={held.undo}
+                undoWindowMs={undoWindowMs}
+                onUndoExpired={held.send}
+                liveLabel={`You agreed to ${amountWords(current.price.amountCents, current.price.currency)} for ${periodWords(current.month.start, current.month.end) ?? current.month.label}`}
+                working={
+                  phase === "pending"
+                    ? {
+                        title: "Saving your yes",
+                        steps: [
+                          {
+                            id: "save",
+                            label: "Keeping this exact price and month with your name",
+                            state: "active",
+                          },
+                        ],
+                      }
+                    : undefined
+                }
               />
-            ) : null}
-            <XaSelect
-              label="Which month it covers"
-              value={month}
-              disabled={locked}
-              onChange={(event) => setMonth(event.target.value)}
-              options={months.map((item) => ({
-                value: item.value,
-                label: item.label,
-              }))}
-            />
-            {!attempt.current ? (
-              <XaButton type="submit" busy={phase === "pending"} disabled={locked}>
-                Agree to this price
-              </XaButton>
-            ) : phase === "ready" ? (
-              <XaButton type="button" onClick={() => void accept()}>
-                Send the same answer again
-              </XaButton>
-            ) : null}
-          </form>
-        </div>
+            ) : null
+          }
+        />
+      ) : null}
+      {attempt.current && phase === "ready" ? (
+        <XaButton type="button" onClick={() => void accept()}>
+          Send the same answer again
+        </XaButton>
       ) : null}
       {error || notice ? (
         <p

@@ -5,7 +5,6 @@ import {
   XaButton,
   XaHeadline,
   XaSays,
-  XaStatus,
   XaTextLink,
   XaUndo,
   XaUndoDock,
@@ -76,7 +75,7 @@ export function PlanWaitlist({
         error?: string;
       };
       if (!response.ok)
-        throw new Error(body.error || "That didn't go through. Nothing changed.");
+        throw new Error(body.error || "That didn’t go through. Nothing changed.");
       if (action === "join") {
         setEmail(body.email ?? "your email");
         setToast("joined");
@@ -88,25 +87,23 @@ export function PlanWaitlist({
       setError(
         cause instanceof Error
           ? cause.message
-          : "That didn't go through. Nothing changed.",
+          : "That didn’t go through. Nothing changed.",
       );
     } finally {
       setBusy(false);
     }
   }
 
+  // The headline's quiet line already says the website keeps running; Pebble says only what changes.
   const situation = noIncludedWork
-    ? `Until plans open, Strelva can't take on new work for ${businessName}. Your website and inquiries keep running.`
-    : `${businessName} has a little Strelva work each month while plans are closed. Your website and inquiries keep running.`;
+    ? `Until plans open, Strelva can’t take on new work for ${businessName}.`
+    : `${businessName} has a little Strelva work each month while plans are closed.`;
 
   const body = email ? (
     <div className={styles.section} aria-live="polite">
-      <XaStatus kind="live" size="sm">
-        On the list
-      </XaStatus>
+      {/* No sender exists yet (October 16): say what really happens, never promise an email. */}
       <p className={styles.body}>
-        Strelva will write to {email} when plans open. Nothing else is sent, and
-        nothing is charged.{" "}
+        You’re on the list. Nothing is sent or charged until plans open.{" "}
         <XaTextLink onClick={busy ? undefined : () => void send("leave")}>
           Take {businessName} off the list
         </XaTextLink>
@@ -120,21 +117,23 @@ export function PlanWaitlist({
         disabled={busy}
         onClick={() => void send("join")}
       >
-        Tell me when plans open
+        Put {businessName} on the list
       </XaButton>
       <XaTextLink href={agencyHref}>Bring in an agency instead</XaTextLink>
     </div>
   ) : (
     <p className={styles.note}>
-      The business owner can ask to hear when plans open.{" "}
+      The business owner can put {businessName} on the list for plans.{" "}
       <XaTextLink href={agencyHref}>Bring in an agency</XaTextLink>
     </p>
   );
 
+  // Joining and leaving are both live acts, so each gets its Undo: the other one.
   const toastLine =
     toast === "joined" ? (
       <XaUndoDock>
         <XaUndo
+          key="joined"
           onUndo={() => {
             setToast(null);
             void send("leave");
@@ -143,6 +142,20 @@ export function PlanWaitlist({
           onExpire={() => setToast(null)}
         >
           {businessName} is on the list
+        </XaUndo>
+      </XaUndoDock>
+    ) : toast === "left" ? (
+      <XaUndoDock>
+        <XaUndo
+          key="left"
+          onUndo={() => {
+            setToast(null);
+            void send("join");
+          }}
+          windowMs={strelvaUndoWindowMs}
+          onExpire={() => setToast(null)}
+        >
+          {businessName} is off the list
         </XaUndo>
       </XaUndoDock>
     ) : null;
@@ -171,9 +184,9 @@ export function PlanWaitlist({
       <div className={styles.brief}>
         <XaHeadline
           id="plan-heading"
-          quiet="Strelva hasn't set a price yet, so nothing is charged."
+          quiet="Your website and inquiries keep running."
         >
-          Plans aren&rsquo;t open yet.
+          Plans aren’t open yet.
         </XaHeadline>
       </div>
       <XaSays>{situation}</XaSays>

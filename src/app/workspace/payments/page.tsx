@@ -50,7 +50,7 @@ export default async function Payments({
       <StrelvaShell
         title=""
         workspaceId={workspaceId}
-        detailsPlace="plan"
+        detailsPlace="elsewhere"
         systemsReleased={process.env.STRELVA_SYSTEMS_RELEASE === "1"}
       >
         <div className={styles.screen}>
@@ -67,7 +67,7 @@ export default async function Payments({
     <StrelvaShell
       title=""
       workspaceId={workspaceId}
-      detailsPlace="plan"
+      detailsPlace="elsewhere"
       systemsReleased={process.env.STRELVA_SYSTEMS_RELEASE === "1"}
     >
       <PaymentsScreen

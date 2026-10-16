@@ -121,9 +121,13 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 4px 6px;
+  gap: 4px 16px;
   color: var(--st-text-3);
   font-size: 14px;
+}
+/* Separators are the gap itself: a middle dot would dangle when the row wraps. */
+.links > span[aria-hidden="true"] {
+  display: none;
 }
 .form {
   display: flex;
@@ -312,9 +316,17 @@
   font-size: 15px;
   font-weight: 500;
 }
-.inbox .yesSlot {
+.inbox .yesSlot,
+.ask .yesSlot {
   max-width: 360px;
   margin-top: 8px;
+}
+/* Pebble doing the job of an empty list: how the next thing arrives. */
+.pebbleNote {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 0;
 }
 .waitingHead {
   display: flex;
@@ -413,7 +425,8 @@
   }
 }
 
-/* AG6 lines: initial, name and its retail price inline, the number on the right. */
+/* AG6 lines: the client's name and what waits on it, its price on the right.
+   No colored tile (October 16): the name carries the line. */
 .clientList {
   margin: 0;
   padding: 0;
@@ -422,9 +435,9 @@
 .clientLine {
   position: relative;
   display: grid;
-  grid-template-columns: 32px minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: start;
-  gap: 14px;
+  gap: 6px 16px;
   padding: 16px 0;
 }
 .clientLine + .clientLine::before {
@@ -460,21 +473,16 @@
   text-align: right;
   white-space: nowrap;
 }
-/* Row placement when the retail price controls sit directly in the line:
-   the figure on the right of the name, the controls under the name. */
-.clientLine > :first-child {
-  grid-row: 1 / span 2;
-}
 .clientLine > .clientText {
-  grid-column: 2;
+  grid-column: 1;
   grid-row: 1;
 }
 .clientLine > .clientFigure {
-  grid-column: 3;
+  grid-column: 2;
   grid-row: 1;
 }
 .clientLine > details {
-  grid-column: 2 / 4;
+  grid-column: 1 / 3;
   grid-row: 2;
 }
 .clientDetail {
@@ -484,24 +492,14 @@
 }
 @media (max-width: 767px) {
   .clientLine {
-    grid-template-columns: 32px minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr);
   }
   .clientFigure,
-  .clientLine > .clientFigure {
-    grid-column: 2;
+  .clientLine > .clientFigure,
+  .clientLine > details {
+    grid-column: 1;
     grid-row: auto;
     text-align: left;
-    font-size: 20px;
-  }
-  .clientLine > details {
-    grid-column: 2;
-    grid-row: auto;
-  }
-  .clientLine {
-    row-gap: 6px;
-  }
-  .clientLine > :first-child {
-    grid-row: 1;
   }
 }
 
@@ -653,6 +651,32 @@
   flex-direction: column;
   gap: 10px;
 }
+/* The client's payment page in miniature: the agency's name, never a web address. */
+.previewFrame {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin: 0;
+  padding: 22px 24px 24px;
+  border: 1px solid var(--st-line);
+  border-radius: 16px;
+  background: var(--st-surface);
+  box-shadow: 0 1px 2px #0000000a;
+}
+.previewBrand {
+  margin: 0;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--st-line);
+  color: var(--st-text);
+  font-size: 15px;
+  font-weight: 600;
+}
+.previewTitle {
+  margin: 0;
+  color: var(--st-text);
+  font-size: 20px;
+  font-weight: 600;
+}
 .previewPay {
   display: flex;
   flex-direction: column;
@@ -799,26 +823,6 @@
   line-height: 1.5;
   text-align: center;
 }
-.range {
-  width: 100%;
-  height: 28px;
-  margin: 0;
-  accent-color: var(--st-text);
-  cursor: pointer;
-}
-.range:focus-visible {
-  outline: 2px solid var(--st-accent);
-  outline-offset: 4px;
-  border-radius: 6px;
-}
-.rangeEnds {
-  display: flex;
-  justify-content: space-between;
-  color: var(--st-text-3);
-  font-size: 13px;
-  font-variant-numeric: tabular-nums;
-}
-
 @media (max-width: 1180px) {
   .screen {
     padding: 48px 32px 112px 48px;
@@ -899,4 +903,40 @@
     box-shadow: none;
     padding: 0;
   }
+}
+
+/* Prices waiting for a yes: a sentence each, the yes beside the current one. */
+.offers {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.offer {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 16px 0;
+}
+.offer + .offer::before {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: var(--st-line);
+  content: "";
+}
+.offerSentence {
+  margin: 0;
+  color: var(--st-text);
+  font-size: 17px;
+  font-weight: 500;
+  line-height: 1.4;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+.offerYes {
+  max-width: 420px;
+  margin-top: 6px;
 }
