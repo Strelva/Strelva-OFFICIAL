@@ -1,9 +1,11 @@
 "use client";
 
-import { ArrowUpRight } from "lucide-react";
-import { StEmpty, StHead, StMono, StNotice, StPage, StPill, StRow, StRows, StSection, StSkeleton, StState, StTextButton } from "@/components/ui/strelva/Kit";
 import type { WorkspaceWork } from "./contracts";
-import { REQUEST_STAGE_LABELS, requestStageLabel, type BusinessDeliveryItem, type BusinessRequestStage } from "./business-delivery-summary";
+import type { HandledReceipt } from "@/platform/needs-you/contracts";
+import { actorPresentation } from "@/platform/presentation/actor";
+import type { NeedsYouState } from "./useNeedsYou";
+import type { BusinessDeliveryItem, BusinessRequestStage } from "./business-delivery-summary";
+import { RequestsView, type RequestsViewStatus } from "./today/OwnerRequests";
 import { useAgencyClientHome } from "./useAgencyClientHome";
 import { agencyClientDeliveries } from "./agency-client-home";
 import { useBusinessDeliveries } from "./useBusinessDeliveries";
@@ -13,20 +15,23 @@ export interface BusinessRequestRow {
   id: string;
   title: string;
   stage: BusinessRequestStage;
+  /** Who asked and who is doing it, in one line: "Maya at North Studio asked Oct 12 · North Studio is making it". */
   detail: string;
   href?: string;
   workId?: string;
   sortAt: string;
   agencyName?: string;
+  /** Who is doing it: an agency (Strelva Agency included, by name) or Strelva itself running a saved job. */
+  provider?: "agency" | "strelva-run";
+  /** The System the request is about, for its clay tile. */
+  systemId?: string | null;
+  /** The request and delivery ids, so a decision about this request can be found. */
+  requestId?: string;
+  deliveryId?: string | null;
+  /** XA · O5: the open decision this request waits on, and the receipt of the one it came from. */
+  decisionId?: string;
+  receipt?: HandledReceipt;
 }
-
-const GROUPS: readonly { stage: BusinessRequestStage; heading: string }[] = [
-  { stage: "needs_you", heading: "Needs you" },
-  { stage: "ready_for_review", heading: "Ready for your review" },
-  { stage: "in_progress", heading: "In progress" },
-  { stage: "asked", heading: "Asked" },
-  { stage: "done", heading: "Done" },
-];
 
 /** Finite responsibilities have an end, so they are requests; standing ones live in Running. */
 export function finiteJobStage(status: string | undefined): BusinessRequestStage {
@@ -37,38 +42,87 @@ export function finiteJobStage(status: string | undefined): BusinessRequestStage
 }
 
 function shortDate(value: string): string {
-  return new Date(value).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  return new Date(value).toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
-/** Who is doing a request, by name. */
+/**
+ * Who is doing a request, by the serving agency's recorded name. Unrecorded
+ * stays empty: never a stand-in like "your agency", and never one of the
+ * viewer's own agencies (`_agencyNames` is kept for callers, not read).
+ */
 export function deliveryProviderName(item: BusinessDeliveryItem, _agencyNames: ReadonlyMap<string, string>): string {
-  return item.provider?.kind === "agency" ? item.servingAgencyName?.trim() || "Agency identity unavailable" : item.provider?.kind === "strelva" ? "Strelva Agency" : "Actor not recorded";
+  if (item.provider?.kind === "agency") return item.servingAgencyName?.trim() || "";
+  return item.provider?.kind === "strelva" ? "Strelva Agency" : "";
 }
 
-export function businessRequestRows(deliveries: readonly BusinessDeliveryItem[], work: readonly WorkspaceWork[], providerName: (item: BusinessDeliveryItem) => string): BusinessRequestRow[] {
-  const fromDeliveries = deliveries.map(item => ({
-    id: `delivery-${item.id}`,
-    title: item.title,
-    stage: item.stage,
-    detail: item.stage === "asked" ? `Asked · waiting for ${providerName(item) || "your agency"} to agree scope and deadline`
-      : item.stage === "done" ? ["Done", providerName(item) ? `by ${providerName(item)}` : null].filter(Boolean).join(" · ")
-      : [item.detail, item.dueAt && item.stage !== "closed" ? `due ${shortDate(item.dueAt)}` : null, providerName(item) ? `by ${providerName(item)}` : null].filter(Boolean).join(" · "),
-    href: item.href,
-    sortAt: item.updatedAt || "",
-    agencyName: deliveryProviderName(item, new Map()),
-  }));
+/** "You asked Oct 9", "Maya at North Studio asked Oct 12", or nothing when the asker was not recorded. */
+function askedLine(item: BusinessDeliveryItem, viewerName: string | null | undefined): string | null {
+  if (!item.askedBy || !item.createdAt) return null;
+  const mine = item.askedBy.kind === "person" && viewerName && item.askedBy.displayName.trim() === viewerName.trim();
+  const who = mine ? "You" : actorPresentation(item.askedBy).name;
+  return who ? `${who} asked ${shortDate(item.createdAt)}` : null;
+}
+
+/** Where a request stands, said as who is doing what. A status word appears only for exceptions (RequestsView). */
+function doingLine(item: BusinessDeliveryItem, who: string): string {
+  switch (item.stage) {
+    case "asked": return who ? `${who} has not agreed scope and a deadline yet` : "Scope and a deadline are not agreed yet";
+    case "in_progress": return [who ? `${who} is making it` : "Being made", item.dueAt ? `due ${shortDate(item.dueAt)}` : null].filter(Boolean).join(", ");
+    case "ready_for_review": return who ? `${who} sent it for your review` : "Ready for your review";
+    case "done": return who ? `${who} finished it ${shortDate(item.updatedAt)}` : `Finished ${shortDate(item.updatedAt)}`;
+    default: return item.detail;
+  }
+}
+
+export function businessRequestRows(deliveries: readonly BusinessDeliveryItem[], work: readonly WorkspaceWork[], providerName: (item: BusinessDeliveryItem) => string, options: { viewerName?: string | null } = {}): BusinessRequestRow[] {
+  const fromDeliveries = deliveries.map(item => {
+    const who = providerName(item);
+    return {
+      id: `delivery-${item.id}`,
+      title: item.title,
+      stage: item.stage,
+      detail: [askedLine(item, options.viewerName), doingLine(item, who)].filter(Boolean).join(" · "),
+      href: item.href,
+      sortAt: item.updatedAt || "",
+      agencyName: who || undefined,
+      provider: item.provider?.kind === "agency" || item.provider?.kind === "strelva" ? "agency" as const : undefined,
+      systemId: item.systemId ?? null,
+      requestId: item.id,
+      deliveryId: item.deliveryId ?? null,
+    };
+  });
   const fromJobs = work.filter(item => item.productId === "operations" && item.resourceKind === "responsibility").map(item => {
     const stage = finiteJobStage(item.operation?.status);
     return {
       id: `work-${item.id}`,
       title: item.title,
       stage,
-      detail: stage === "needs_you" ? item.operation?.reason || "Needs your decision before it continues" : `${REQUEST_STAGE_LABELS[stage]} · started ${shortDate(item.createdAt)}`,
+      detail: stage === "needs_you" ? item.operation?.reason || "Needs your decision before it continues"
+        : stage === "done" ? `Strelva finished it · started ${shortDate(item.createdAt)}` : stage === "closed" ? `Stopped · started ${shortDate(item.createdAt)}` : `Strelva runs it · started ${shortDate(item.createdAt)}`,
       workId: item.id,
       sortAt: item.createdAt,
+      provider: "strelva-run" as const,
     };
   });
   return [...fromDeliveries, ...fromJobs].sort((a, b) => b.sortAt.localeCompare(a.sortAt));
+}
+
+/** A decision is about a request when its source is the request (scope, deadline) or the request's delivery. */
+function aboutRequest(source: { lifecycle: string; id: string }, row: BusinessRequestRow): boolean {
+  if (!row.requestId) return false;
+  if (source.lifecycle === "service_request") return source.id.startsWith(`${row.requestId}:`);
+  if (source.lifecycle === "provider_delivery") return Boolean(row.deliveryId) && source.id === row.deliveryId;
+  return false;
+}
+
+/** Attach the open decision a request waits on and the receipt of the decision it came from. */
+export function withDecisions(rows: readonly BusinessRequestRow[], decisions: NeedsYouState | undefined): BusinessRequestRow[] {
+  if (decisions?.status !== "ready") return [...rows];
+  return rows.map(row => {
+    const open = decisions.items.find(item => aboutRequest({ lifecycle: item.sourceLifecycle, id: item.sourceId }, row));
+    const receipt = decisions.handledAvailable ? decisions.handled.find(entry => entry.source && entry.store === "owner_decisions" && aboutRequest(entry.source, row)) : undefined;
+    return { ...row, ...(open ? { decisionId: open.id } : {}), ...(receipt ? { receipt } : {}) };
+  });
 }
 
 interface Props {
@@ -81,52 +135,28 @@ interface Props {
   agencySeat?: boolean;
   busy: boolean;
   onOpenWork: (id: string) => void;
-  onAsk: () => void;
+  /** Ask for something new; with words, they go straight to the ask. */
+  onAsk: (request?: string) => void;
+  /** The business's decisions (useNeedsYou), so a request that waits can open its decision and a done one can be undone. */
+  decisions?: NeedsYouState;
+  pendingDecision?: string | null;
+  onReview?: (decisionId: string) => void;
+  onUndo?: (receipt: HandledReceipt) => void;
+  systems?: readonly { id: string; kind: string }[];
+  viewerName?: string | null;
 }
 
-/** Things someone asked for that have an end: asked, agreed, in progress, ready for review, done. */
-export function WorkspaceRequests({ businessName, deliveryScope, work, agencyNames, agencySeat = false, readOnly, busy, onOpenWork, onAsk }: Props) {
+/** Things someone asked for that have an end: asked, agreed, in progress, ready for review, done (XA · O5). */
+export function WorkspaceRequests({ businessName, deliveryScope, work, agencyNames, agencySeat = false, readOnly, busy, onOpenWork, onAsk, decisions, pendingDecision, onReview, onUndo, systems, viewerName }: Props) {
   const ownerDeliveries = useBusinessDeliveries(agencySeat ? undefined : deliveryScope);
   const shared = useAgencyClientHome(agencySeat ? deliveryScope : undefined);
   const deliveries = agencySeat ? { state: shared.state.status === "ready" ? { status: "ready" as const, items: agencyClientDeliveries(shared.state.data) } : shared.state.status === "error" ? { status: "error" as const, message: "Shared Requests could not be checked." } : shared.state, refresh: shared.refresh } : ownerDeliveries;
   const items = deliveries.state.status === "ready" ? deliveries.state.items : [];
-  const providerName = (item: BusinessDeliveryItem) => deliveryProviderName(item, agencyNames);
-  const rows = businessRequestRows(items, work, providerName);
-  const closed = rows.filter(row => row.stage === "closed");
-  const loading = busy || deliveries.state.status === "loading";
-
-  function stageLabel(stage: BusinessRequestStage, agencyName?: string) {
-    return requestStageLabel(stage, { agencySeat, businessName, agencyName });
-  }
-  function row(entry: BusinessRequestRow) {
-    return <StRow key={entry.id}
-      title={entry.title}
-      detail={entry.detail}
-      href={entry.href}
-      onClick={!entry.href && entry.workId ? () => onOpenWork(entry.workId!) : undefined}
-      end={<><StState kind={entry.stage === "needs_you" || entry.stage === "ready_for_review" ? "need" : entry.stage === "done" ? "live" : "draft"}>{stageLabel(entry.stage, entry.agencyName)}</StState><ArrowUpRight size={16} aria-hidden="true" /></>}
-    />;
-  }
-
-  return <StPage>
-    <StHead title="Requests" titleId="requests-title"
-      meta={<>Things you asked for that have an end. A request becomes agreed work once its scope and deadline are accepted.{readOnly ? " Shared with you." : null}</>}
-      actions={!readOnly ? <StPill onClick={onAsk}>Ask Strelva for something</StPill> : undefined}
-    />
-    {deliveries.state.status === "disabled" ? <StNotice>Requests outside your current shared scope cannot be checked for {businessName}.</StNotice> : null}
-    {deliveries.state.status === "error" ? <StNotice tone="critical"><span role="alert">{deliveries.state.message}</span> <StTextButton onClick={deliveries.refresh}>Check again</StTextButton></StNotice> : null}
-    {loading ? <div role="status" aria-label="Checking your requests"><StSkeleton /><StSkeleton width="76%" /><StSkeleton width="88%" /></div> : rows.length === 0 && deliveries.state.status !== "error" ? <StEmpty>
-      <p>{readOnly || deliveries.state.status === "disabled" ? "No requests you can see." : "Nothing asked yet."}</p>
-      {readOnly || deliveries.state.status === "disabled" ? null : <p>Ask Strelva for something with an end: a new page, an intake form, a launch. It shows up here with its stage and due date.</p>}
-    </StEmpty> : <>
-      {GROUPS.map(group => {
-        const entries = rows.filter(entry => entry.stage === group.stage);
-        if (!entries.length) return null;
-        return <StSection key={group.stage} title={group.stage === "asked" ? REQUEST_STAGE_LABELS.asked : stageLabel(group.stage)} id={`requests-${group.stage}`} meta={<StMono>{entries.length}</StMono>}>
-          <StRows label={group.stage === "asked" ? REQUEST_STAGE_LABELS.asked : stageLabel(group.stage)}>{entries.map(row)}</StRows>
-        </StSection>;
-      })}
-      {closed.length ? <details><summary className="cursor-pointer py-3 text-sm text-gray-muted">Closed (<StMono>{closed.length}</StMono>)</summary><StRows label="Closed requests">{closed.map(row)}</StRows></details> : null}
-    </>}
-  </StPage>;
+  const rows = withDecisions(businessRequestRows(items, work, item => deliveryProviderName(item, agencyNames), { viewerName }), agencySeat ? undefined : decisions);
+  const state: RequestsViewStatus = busy || deliveries.state.status === "loading" ? { status: "loading" }
+    : deliveries.state.status === "error" ? { status: "error", message: deliveries.state.message }
+      : deliveries.state.status === "disabled" ? { status: "disabled" } : { status: "ready" };
+  const canUndo = decisions?.status === "ready" && decisions.authority !== "agency" && decisions.canDecide !== false && decisions.role !== "member";
+  return <RequestsView businessName={businessName} rows={rows} state={state} readOnly={readOnly} agencySeat={agencySeat} onRetry={deliveries.refresh} onAsk={onAsk} onOpenWork={onOpenWork}
+    systems={systems} onReview={onReview} onUndo={canUndo ? onUndo : undefined} pendingDecision={pendingDecision} />;
 }

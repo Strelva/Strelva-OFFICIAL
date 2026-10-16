@@ -1,0 +1,135 @@
+/* XA-3 · Owner Today, the yes and after. Measured from design/xa-2026-10-15/O1..O6 at 1440,
+   phone from E6. Tokens and parts come from the XA kit; this file only places them. */
+
+/* ---------- Today (O1 normal morning, O2 one thing waits) ---------- */
+.split { box-sizing: border-box; display: flex; width: 100%; min-height: 100%; align-items: center; gap: 96px; padding: 48px 72px 72px 96px; }
+.lead { display: flex; width: min(560px, 100%); flex-shrink: 0; flex-direction: column; gap: 28px; }
+.greeting { display: flex; flex-direction: column; gap: 12px; }
+.side { display: flex; min-width: 0; flex: 1; flex-direction: column; align-items: center; gap: 28px; }
+.since { display: flex; width: min(352px, 100%); flex-direction: column; gap: 12px; }
+/* O1 down: the bad news sits under Pebble at work, before what changed. */
+.badNews { display: flex; flex-direction: column; gap: 6px; margin-bottom: 16px; }
+.badNews > p { margin: 0; color: var(--st-text); font-size: 15px; line-height: 1.45; }
+.badNews .badNewsLinks { color: var(--st-text-3); font-size: 14px; }
+
+/* O2: the one deliberate centered composition in the product. */
+.centered { box-sizing: border-box; display: flex; width: 100%; min-height: 100%; flex-direction: column; align-items: center; justify-content: center; gap: 28px; padding: 48px 32px 96px; text-align: center; }
+.centered .greeting { align-items: center; }
+.centeredComposer { width: min(680px, 100%); text-align: left; }
+.centered .says { justify-content: center; text-align: left; }
+.says { display: flex; max-width: 680px; }
+.says > * { min-width: 0; }
+
+.mark { color: var(--st-text); }
+
+/* Phone (E6): the Systems the sidebar holds on desktop, as open rows. */
+.phoneSystems { display: none; }
+
+.skeletonLine { display: flex; flex-direction: column; gap: 10px; }
+
+/* ---------- The prepared change (O3) and right after (O4) ----------
+   Desktop: the brief (head, body, composer) in one column at the board's x, the decision beside it.
+   Phone: head, then the decision with its yes, then the answers, so the yes is on the first screen. */
+.decisionLayout { box-sizing: border-box; display: grid; width: 100%; min-height: calc(100dvh - 48px); grid-template-columns: minmax(0, 1fr) minmax(0, 540px); grid-template-rows: auto auto 1fr;
+  grid-template-areas: "head panel" "body panel" "dock panel"; align-items: start; column-gap: 48px; row-gap: 24px; padding: 24px 24px 24px 72px; }
+.briefHead { grid-area: head; display: flex; max-width: 520px; flex-direction: column; gap: 24px; padding-top: 96px; }
+.briefTile { display: inline-flex; }
+.briefBody { grid-area: body; display: flex; max-width: 520px; flex-direction: column; gap: 24px; }
+.briefDock { grid-area: dock; position: sticky; bottom: calc(24px + var(--st-workspace-safe-area, 0px)); z-index: 2; align-self: end; width: min(484px, 100%); }
+.panel { grid-area: panel; grid-row: 1 / -1; min-width: 0; }
+.decisionBody { display: flex; flex-direction: column; gap: 12px; }
+/* Change lines sit flat in the decision panel: no second box. */
+.changeLines { display: flex; flex-direction: column; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.changeLines li, .changeLine { margin: 0; color: var(--st-text); font-size: 15px; line-height: 1.45; overflow-wrap: anywhere; }
+.changeLines[data-quiet] li { color: var(--st-text-2); font-size: 13px; line-height: 18px; }
+.amount { margin: 0; color: var(--st-text); font-size: 34px; font-weight: 600; font-variant-numeric: tabular-nums; letter-spacing: -0.9px; line-height: 1.15; }
+.quote { margin: 0; padding-left: 14px; border-left: 2px solid var(--st-line); color: var(--st-text-body); font-size: 15px; line-height: 1.5; }
+.recordNote { margin: 0; color: var(--st-text-2); font-size: 14px; line-height: 1.45; }
+/* What is true now (O4): present-tense facts under the Live dot, not a process trail. */
+.truths { display: flex; flex-direction: column; gap: 10px; }
+.truths ul { display: flex; flex-direction: column; gap: 8px; margin: 0; padding: 0 0 0 20px; list-style: none; }
+.truths li { display: flex; align-items: flex-start; gap: 10px; color: var(--st-text-2); font-size: 15px; line-height: 20px; }
+.truths li svg { flex-shrink: 0; margin-top: 3px; color: var(--st-faint); }
+
+/* The booking page week (O3/O4 preview). */
+.week { display: flex; flex-direction: column; gap: 4px; }
+.weekTitle { margin: 0; color: var(--st-text); font-size: 20px; font-weight: 600; letter-spacing: -0.3px; line-height: 26px; }
+.weekNote { margin: 0 0 12px; color: var(--st-text-2); font-size: 13px; line-height: 18px; }
+.weekDays { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.weekDay { display: flex; min-width: 0; flex-direction: column; align-items: stretch; gap: 2px; text-align: center; }
+.weekday { color: var(--st-text-3); font-size: 12px; line-height: 16px; }
+.weekDate { margin-bottom: 8px; color: var(--st-text); font-size: 17px; font-weight: 600; font-variant-numeric: tabular-nums; line-height: 22px; }
+.weekDay[data-closed] .weekDate { color: var(--st-faint); }
+.slots { display: grid; gap: 8px; }
+.slot { display: flex; height: 30px; min-width: 0; align-items: center; justify-content: center; border-radius: var(--st-r-sm); background: var(--st-tint); color: var(--st-text); font-size: 12px; font-variant-numeric: tabular-nums; }
+.slot[data-closed] { background: var(--st-inset); color: var(--st-text-2); }
+.slot[data-changed] { background: var(--st-need-tint); color: var(--st-need); }
+
+/* ---------- Requests (O5) ---------- */
+.page { box-sizing: border-box; display: flex; width: 100%; max-width: 1064px; min-height: calc(100dvh - 48px); flex-direction: column; gap: 28px; padding: 72px 64px 24px 96px; }
+/* O5: the composer docks at the bottom of the list column, not centered on the whole content area. */
+.pageDock { position: sticky; bottom: calc(24px + var(--st-workspace-safe-area, 0px)); z-index: 2; width: min(680px, 100%); margin-top: auto; padding-top: 16px; }
+.pageHead { display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; }
+.group { display: flex; flex-direction: column; gap: 4px; }
+.group + .group { margin-top: 12px; }
+.lead36 { display: inline-flex; flex-shrink: 0; }
+
+/* ---------- Running (O6) ---------- */
+.running { box-sizing: border-box; display: flex; width: 100%; align-items: flex-start; gap: 64px; padding: 56px 64px 96px 96px; }
+.runningMain { display: flex; width: min(612px, 100%); flex-shrink: 0; flex-direction: column; gap: 22px; }
+.runningSide { display: flex; min-width: 0; flex: 1; flex-direction: column; align-items: center; gap: 20px; padding-top: 120px; }
+.runningCaption { width: min(320px, 100%); }
+.runningCaption h2 { margin: 0; color: var(--st-text); font-size: 16px; font-weight: 500; line-height: 22px; }
+.runningCaption p { margin: 6px 0 0; color: var(--st-text-2); font-size: 14px; line-height: 1.45; }
+/* The thirty-day strip (O6): the page's one memorable element. */
+.strip { display: flex; flex-direction: column; gap: 6px; margin: 4px 0 0; }
+.stripDays { display: grid; height: 34px; gap: 4px; margin: 0; padding: 0; list-style: none; }
+.stripDays li { border-radius: 4px; background: color-mix(in srgb, var(--st-live) 32%, var(--st-canvas)); }
+.stripDays li[data-state="slipped"] { background: var(--st-need-dot); }
+.stripDays li[data-state="none"] { background: transparent; box-shadow: inset 0 0 0 1px var(--st-line); }
+.stripEnds { display: flex; justify-content: space-between; color: var(--st-text-3); font-size: 12px; font-variant-numeric: tabular-nums; line-height: 16px; }
+.strip figcaption { color: var(--st-text-2); font-size: 14px; line-height: 20px; }
+/* Each check: value, then time, in two right-hand columns. */
+.checkCols { display: inline-grid; grid-template-columns: auto 52px; align-items: baseline; gap: 16px; }
+.checkValue { color: var(--st-text); font-size: 15px; font-weight: 500; font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
+.checkValue[data-tone="waits"] { color: var(--st-need); }
+.checkTime { color: var(--st-text-3); font-size: 13px; font-variant-numeric: tabular-nums; text-align: right; }
+.srOnly { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.controls { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 18px; }
+.controls > p { margin: 0; color: var(--st-text-2); font-size: 14px; }
+
+@media (max-width: 1180px) {
+  .split { gap: 48px; padding: 40px 32px 56px 48px; }
+  .decisionLayout { padding-left: 40px; column-gap: 32px; }
+  .page, .running { padding-left: 48px; padding-right: 32px; }
+  .running { gap: 40px; }
+}
+
+/* Phone and narrow tablet (E6): one column, no felt circle, Systems as rows, composer floats. */
+@media (max-width: 1023px) {
+  .split { flex-direction: column; align-items: stretch; gap: 24px; padding: 20px 16px 120px; }
+  .lead { width: 100%; gap: 20px; }
+  .mark { display: none; }
+  .side { align-items: stretch; gap: 0; }
+  .side > :first-child { display: none; }
+  .since { width: 100%; }
+  .centered { align-items: stretch; justify-content: flex-start; gap: 20px; padding: 20px 16px 120px; text-align: left; }
+  .centered .greeting { align-items: flex-start; }
+  .centered .says { justify-content: flex-start; }
+  .phoneSystems { display: flex; flex-direction: column; gap: 8px; }
+  .decisionLayout { min-height: 0; grid-template-columns: minmax(0, 1fr); grid-template-rows: none; grid-template-areas: "head" "panel" "body" "dock"; row-gap: 20px; padding: 16px 16px calc(96px + var(--st-phone-navigation-height, 0px)); }
+  .panel { grid-row: auto; }
+  .briefHead { gap: 12px; padding-top: 0; }
+  .briefTile { display: none; }
+  /* Phone: the composer follows the answers in flow, so it never covers the yes. The week already shows each change. */
+  .briefDock { position: static; width: 100%; }
+  .changeLines[data-quiet] { display: none; }
+  .weekDays { gap: 4px; }
+  .slot { height: 28px; font-size: 11px; }
+  .page { min-height: 0; gap: 20px; padding: 24px 16px calc(24px + var(--st-phone-navigation-height, 0px)); }
+  .pageDock { bottom: calc(12px + var(--st-phone-navigation-height, 0px) + var(--st-workspace-safe-area, 0px)); width: 100%; }
+  .pageHead { flex-direction: column; gap: 16px; }
+  .running { flex-direction: column; gap: 24px; padding: 24px 16px 96px; }
+  .runningMain { width: 100%; }
+  .runningSide { display: none; }
+}

@@ -144,7 +144,8 @@ export interface WorkspaceSnapshot {
   /** Current server-resolved maker authority; writes independently recheck it. */
   canMakeSystems?: boolean;
   ownerBrand?: OwnerBrand;
-  actor: { email: string; localPreview: boolean };
+  /** `displayName`: the account's own recorded name (full_name or name), for greetings. Absent or null: no name, never the email. */
+  actor: { email: string; localPreview: boolean; displayName?: string | null };
   workspaces: WorkspaceSummary[];
   workspaceId: string;
   /** Completed owner exit state, when the current actor can read it. */

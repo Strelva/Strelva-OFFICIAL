@@ -83,6 +83,7 @@ describe("decided Needs you items in What changed", () => {
       sentence: "Strelva confirmed the booking you approved: Dana Reed, Tue, Oct 15 3:00 PM",
       changed: "The booking is confirmed for this time.",
       undo: { state: "not_undoable", reason: "A confirmed booking isn't undone in one tap. Move or cancel it in Bookings, and the customer is told." },
+      source: { lifecycle: "booking_request", id: "33333333-3333-4333-8333-333333333333" },
     });
   });
 

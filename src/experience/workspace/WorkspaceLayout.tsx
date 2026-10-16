@@ -565,7 +565,10 @@ export function WorkspaceLayout({ rebuildEnabled, appBase, signOut, snapshot, ma
           <div className={styles.invitation}><h2>Website health</h2><p>Check SEO, speed, security, and accessibility, then export the report.</p><Link className={styles.textAction} href="/audit">Open website audit<ArrowRight size={16} /></Link></div>
           <div className={styles.invitation}><h2>Something missing?</h2><p>Tell us what you want to do, what you use today, and where it falls short.</p><button type="button" className={styles.textAction} onClick={() => navigate("help")}>Tell us what you need<ArrowRight size={16} /></button></div>
         </>}
-      </div> : section === "requests" ? <WorkspaceRequests businessName={current?.name || "this business"} deliveryScope={deliveryScope} work={snapshot.work} agencyNames={agencyNames} agencySeat={readEligibility.agency} readOnly={workspaceMutationReadOnly} busy={busy} onOpenWork={openWork} onAsk={() => openStart()} />
+      </div> : section === "requests" ? <WorkspaceRequests businessName={current?.name || "this business"} deliveryScope={deliveryScope} work={snapshot.work} agencyNames={agencyNames} agencySeat={readEligibility.agency} readOnly={workspaceMutationReadOnly} busy={busy} onOpenWork={openWork}
+        onAsk={text => text ? askReleased ? openAsk(null, text) : openRequest(text) : openStart()}
+        decisions={needs.state} pendingDecision={needs.pending} onUndo={needs.undo} systems={systems} viewerName={snapshot.actor.displayName}
+        onReview={id => { navigate("needs-you"); try { navigateWorkspace({ workspaceId: workspaceIdForNavigation(), view: "needs-you", decision: id }, "replace"); } catch { /* The section change above still opens Needs you. */ } }} />
       : section === "work" || section === "apps" ? <StPage>
         <StHead title={systemsReleased ? section === "work" ? "Files and results" : "Systems" : appsLabel} meta={readOnly ? "Shared with you" : "Everything this business runs, and what it has made."} />
         {appsTabs("yours")}

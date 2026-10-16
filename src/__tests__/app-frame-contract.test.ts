@@ -77,9 +77,9 @@ describe("shared app frame accessibility contract", () => {
     expect(before).not.toContain('href="/workspace?view=customers"');
     expect(before).not.toContain("All systems and files");
     const html = renderToStaticMarkup(createElement(StrelvaShell, { ...shellProps, systemsReleased: true, theme: "paper" }));
-    // October 15 (XA, the default): Today, Requests and Minutes; details sit behind the business details control.
+    // October 15 (XA, the default): Today, Requests and Running; details sit behind the business details control.
     const xa = renderToStaticMarkup(createElement(StrelvaShell, { ...shellProps, systemsReleased: true }));
-    for (const label of ['aria-label="Workspace utilities"', 'aria-label="Main"', ">Today<", ">Requests<", ">Minutes<", 'aria-label="Business details"', ">New request<", ">Search<", "All systems and files", "Sign out"]) expect(xa).toContain(label);
+    for (const label of ['aria-label="Workspace utilities"', 'aria-label="Main"', ">Today<", ">Requests<", ">Running<", 'aria-label="Business details"', ">New request<", ">Search<", "All systems and files", "Sign out"]) expect(xa).toContain(label);
     for (const href of ['href="/workspace?view=requests"', 'href="/workspace?view=ongoing"', 'href="/workspace?view=apps"', 'href="/workspace?view=settings"', 'href="/workspace/account"']) expect(xa).toContain(href);
     expect(xa).not.toContain(">Customers<");
 

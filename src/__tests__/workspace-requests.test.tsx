@@ -28,9 +28,12 @@ describe("requests", () => {
       () => "Strelva",
     );
     expect(rows.map(row => [row.title, row.stage])).toEqual([["Rebuild attymooney.com", "in_progress"], ["Draft intake questions", "needs_you"]]);
-    expect(rows[0]!.detail).toMatch(/^Delivery in progress · due .+ · by Strelva$/);
+    // XA · O5: who is doing it, in one line; the stage word is left to the exceptions.
+    expect(rows[0]!.detail).toMatch(/^Strelva is making it, due [A-Z][a-z]{2} \d+$/);
     expect(businessRequestRows([delivery("Holiday hours", "done"), delivery("Spanish pages", "asked")], [], () => "Strelva").map(row => row.detail))
-      .toEqual(["Done · by Strelva", "Asked · waiting for Strelva to agree scope and deadline"]);
+      .toEqual([expect.stringMatching(/^Strelva finished it [A-Z][a-z]{2} \d+$/), "Strelva has not agreed scope and a deadline yet"]);
+    // An unrecorded agency name is left out, never replaced with a stand-in.
+    expect(businessRequestRows([delivery("Spanish pages", "asked")], [], () => "").map(row => row.detail)).toEqual(["Scope and a deadline are not agreed yet"]);
     expect(rows[0]!.href).toBe("/workspace/delivery/Rebuild attymooney.com");
     expect(rows[1]).toMatchObject({ workId: "Draft intake questions", detail: "Approve the question order." });
   });
@@ -39,9 +42,9 @@ describe("requests", () => {
     const html = renderToStaticMarkup(createElement(WorkspaceRequests, { businessName: "The Mooney Firm", work: [job("Draft intake questions", "running")], agencyNames: new Map(), readOnly: false, busy: false, onOpenWork: noop, onAsk: noop }));
     expect(html).toContain("Requests");
     expect(html).toContain("outside your current shared scope cannot be checked for The Mooney Firm");
-    expect(html).toContain("In progress");
+    expect(html).toContain("Strelva runs it");
     expect(html).toContain("Draft intake questions");
-    expect(html).toContain("Ask Strelva for something</button>");
+    expect(html).toContain('placeholder="Ask for something new"');
   });
 
   it("does not invite asking or claim nothing was asked when the business is read-only", () => {

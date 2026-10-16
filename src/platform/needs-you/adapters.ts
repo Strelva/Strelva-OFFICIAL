@@ -17,7 +17,7 @@ import { recordedActor } from "@/platform/presentation/actor";
 import type { UnifiedEvent } from "@/lib/types";
 import type { WorkspaceActor } from "@/platform/workspaces/types";
 import type { ServiceRequest } from "@/platform/service-requests/types";
-import { AUTO_REPLY_POLICY_ACTOR, KIND_RULES, OWNER_ONLY_KINDS, isConfigurableKind, type ChangeKind, type Decision, type OwnerDecision, type PolicyItem, type ProposedItem, type SourceLifecycle } from "./contracts";
+import { AUTO_REPLY_POLICY_ACTOR, KIND_RULES, OWNER_ONLY_KINDS, isConfigurableKind, type ChangeKind, type Decision, type DecisionPreview, type OwnerDecision, type PolicyItem, type ProposedItem, type SourceLifecycle } from "./contracts";
 import { classifyTenantEvent, observedTenantRoute, tenantEventRevision } from "./tenant-classify";
 import type { ServiceSession } from "./service-actor";
 
@@ -76,6 +76,11 @@ export interface SourceAdapter {
    * item's revision: nothing may be approved from it.
    */
   review?(ctx: AdapterContext, item: OwnerDecision): Promise<string[] | null>;
+  /**
+   * The changed thing as its audience will see it, from the same revision as
+   * the review (XA · O3). Null when it cannot be shown; the review lines stand.
+   */
+  preview?(ctx: AdapterContext, item: OwnerDecision): Promise<DecisionPreview | null>;
   /** Pending asks for this business. `complete: false` means some sources could not be read. */
   propose(ctx: AdapterContext): Promise<{ items: ProposedItem[]; complete: boolean }>;
   /** The source's current revision, or null when it is no longer waiting on anyone. */

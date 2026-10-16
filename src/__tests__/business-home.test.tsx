@@ -96,21 +96,17 @@ describe("business home", () => {
       systems: [{ id: "work:Mediation intake", kind: "app", name: "Mediation intake", detail: "Used by your team", lifecycle: "live", health: { state: "unknown", summary: "Nothing has checked this yet." }, surface: { kind: "work", workId: "Mediation intake", productId: "applications" }, connections: [], possibilities: [], versions: [] }],
       files: [items[1]!], systemsReleased: true,
     }));
-    // October 9 A1: the business and open sections replace the dusk hero.
-    expect(html).toMatch(/<h1 id="business-start-title"[^>]*>Alder Workshop<\/h1>/);
-    expect(html).toContain("1 live");
-    expect(html).not.toContain("Welcome back.");
-    expect(html.indexOf("Needs you")).toBeLessThan(html.indexOf("id=\"home-systems\""));
-    expect(html).toContain("Mediation intake");
-    expect(html).toContain("Unknown");
-    expect(html).toContain("Ask Strelva to change or make something");
-    expect(html).toContain("All systems and files");
+    // XA · O1: Today greets (no clock on the server, so no time-of-day claim) and the composer leads.
+    expect(html).toMatch(/<h1 id="business-start-title"[^>]*>Welcome back\.<\/h1>/);
+    expect(html).toContain("Ask Strelva for anything");
+    // The business's actual Systems: in the sidebar, and as "Running for you" rows on the phone.
     const main = html.slice(html.indexOf('<main id="business-home-main"'));
-    const positions = ['id="home-attention"', 'id="home-systems"', 'id="home-handled"', '>In progress<', '>Files and results<'].map(marker => main.indexOf(marker));
-    expect(positions.every(position => position >= 0)).toBe(true);
-    expect(positions).toEqual([...positions].sort((a, b) => a - b));
-    expect(html).not.toContain("Open Mediation intake\"");
-    expect(html).toContain("AI check");
+    expect(main).toContain("Running for you");
+    expect(main).toContain("Mediation intake");
+    // Unknown health is not an exception, so Today does not label it; files live in the full list, not Today.
+    expect(main).not.toContain("Unknown");
+    expect(main).not.toContain("Files and results");
+    // Saved files stay one search away (⌘K lists them) and in the full list from the sidebar.
   });
 
   it("orders not-working Systems before off and live, then by name within each group", () => {
@@ -128,7 +124,7 @@ describe("business home", () => {
     expect(positions.every(position => position >= 0)).toBe(true);
     expect(positions).toEqual([...positions].sort((a, b) => a - b));
     expect(main).toContain("Paused");
-    expect(main).toContain("Unknown");
+    expect(main).not.toContain("Unknown");
   });
 
   it("tells an empty business it can ask or bring in an agency (ADR 0015)", () => {
@@ -137,7 +133,8 @@ describe("business home", () => {
       onOpen: noop, onStart: noop, onRequest: noop, onNavigate: noop, onWorkspace: noop, onOfferings: noop, accountHref: "/workspace/account", systems: [], files: [], systemsReleased: true,
     }));
     expect(html).toContain("Nothing is running yet.");
-    expect(html).toContain("Ask for what you need below, or bring in an agency from Help");
+    expect(html).toContain("Or bring in an agency to make it for you.");
+    expect(html).toContain("Bring in an agency</button>");
     expect(html).not.toContain("Get or build");
   });
 
@@ -190,14 +187,12 @@ describe("business home", () => {
     expect(renderHome()).toContain("Recent");
     const html = renderHome(undefined, true);
 
-    expect(html).toContain("Needs you");
+    // XA · O2: saved work that needs the owner docks on the composer as the one waiting item.
     expect(html).toContain("Review urgency field");
-    expect(html).toContain("What changed");
-    expect(html).toContain("In progress");
-    expect(html).toContain("All requests");
-    expect(html).toContain("Files and results");
-    expect(html).toContain("Opening checklist");
-    for (const retired of ["Waiting on you", "id=\"home-work\"", "Strelva is handling"]) expect(html).not.toContain(retired);
+    expect(html).toContain("Waits for you · Review the proposed change.");
+    expect(html).toContain('aria-label="Open Review urgency field"');
+    expect(html).toContain("Ask Strelva for anything");
+    for (const retired of ["Waiting on you", "id=\"home-work\"", "Strelva is handling", "Files and results"]) expect(html).not.toContain(retired);
     expect(html).not.toMatch(/>Applications<|>Documents</);
   });
 
@@ -227,7 +222,9 @@ describe("business home", () => {
     expect(html).toContain("Making consult booking live: 2 of 4 done");
     expect(html).toContain("Rebuilt site: Partly live");
     const quiet = renderToStaticMarkup(createElement(BusinessHome, { ...props, snapshot: base }));
-    expect(quiet).toContain("Nothing this week.");
+    // A business with nothing running yet: Pebble's first-run job, not an empty receipts list.
+    expect(quiet).toContain("Nothing is running yet.");
+    expect(quiet).not.toContain("Strelva: Publish the booking page");
   });
 
   it("keeps a personal workspace to what it can use: no business request lists, saved work still one click away", () => {

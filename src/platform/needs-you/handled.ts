@@ -130,8 +130,9 @@ function decider(kind: string | null): string {
 function decisionReceipt(row: Record<string, unknown>, id: string, at: string, actor: RecordedActor | null): HandledReceipt | null {
   const title = str(row.title) ?? "an ask";
   const systemId = str(row.systemId);
-  const base = { ...(actor ? { actor } : {}), id: `decision:${id}`, store: "owner_decisions", systemId, at, evidence: null };
   const lifecycle = str(row.sourceLifecycle);
+  const sourceId = str(row.sourceId);
+  const base = { ...(actor ? { actor } : {}), id: `decision:${id}`, store: "owner_decisions", systemId, at, evidence: null, ...(lifecycle && sourceId ? { source: { lifecycle, id: sourceId } } : {}) };
   if (row.state === "expired") {
     return { ...base, sentence: actorSentence(actor, `let "${title}" lapse after 14 days. Nothing changed.`, `"${title}" lapsed after 14 days. Nothing changed.`), changed: null, undo: { state: "not_undoable", reason: NOTHING_CHANGED } };
   }

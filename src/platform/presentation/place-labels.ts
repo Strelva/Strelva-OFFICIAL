@@ -36,13 +36,14 @@ export const STRELVA_HANDLED_LABEL = PLACE_LABELS.whatChanged;
 
 /**
  * October 15, 2026 (XA). Words the XA board uses for places and the yes. They
- * live here so a GLOSSARY decision is one edit: "Today" is the owner's and the
- * agency's Home, "Minutes" the dated record of what happened and what is kept
- * true, and the yes button reads "Put it live" (GLOSSARY still lists "Make it
- * live"; pending Jacob's call, see design-notes/XA-FOUNDATION.md).
+ * live here so a GLOSSARY decision is one edit. "Today" is the owner's and
+ * the agency's Home. October 16 (XA-3 review): GLOSSARY.md is the word
+ * authority, so the board's "Minutes" reads **Running** (the place for what is
+ * kept true) and the yes reads **Make it live**; the board's "Put it live" and
+ * "Minutes" are recorded as drift against GLOSSARY, not adopted.
  */
 export const XA_PLACE_LABELS = {
-  today: "Today", requests: PLACE_LABELS.requests, minutes: "Minutes", newRequest: "New request", search: "Search",
+  today: "Today", requests: PLACE_LABELS.requests, minutes: "Running", newRequest: "New request", search: "Search",
   yourBusiness: "Your business", yourAgency: "Your agency", addToBusiness: "Add to your business",
   queue: "Queue", library: "Library", clients: "Clients", addClient: "Add a client", team: "Team", verification: "Verification",
   leads: "Leads", paymentLinks: "Payment links",
@@ -50,4 +51,4 @@ export const XA_PLACE_LABELS = {
   connections: "Connections", help: PLACE_LABELS.help, account: PLACE_LABELS.account, details: PLACE_LABELS.businessDetails, agencyDetails: "Agency details",
 } as const;
 
-export const XA_YES_LABELS = { yes: "Put it live", notYet: "Not yet", undo: "Undo", tryAgain: "Try again" } as const;
+export const XA_YES_LABELS = { yes: "Make it live", notYet: "Not yet", undo: "Undo", tryAgain: "Try again" } as const;

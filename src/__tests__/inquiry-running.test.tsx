@@ -37,17 +37,20 @@ describe("Running inquiry policy read", () => {
       creatingStanding: false, readOnly: false, onCreatingStandingChange: vi.fn(), onOpenStanding: vi.fn(), onSaved: vi.fn() };
     const draw = async (overrides: Partial<typeof props> & { newWorkBlocked?: boolean } = {}) => act(async () => root.render(createElement(WorkspaceRequestContext.Provider, { value: request }, createElement(WorkspaceOngoing, { ...props, ...overrides }))));
     await draw();
-    const link = Array.from(node.querySelectorAll("a")).find(item => item.textContent === "Request an ongoing result");
+    const link = Array.from(node.querySelectorAll("a")).find(item => item.textContent === "Ask for it");
     expect(link).toBeDefined();
     const route = new URL(link!.href);
     expect(route.pathname).toBe("/workspace");
     expect(route.searchParams.get("workspaceId")).toBe(props.workspaceId);
     expect(route.searchParams.get("view")).toBe("help");
-    expect(node.textContent).toContain("scope, limits and deadline before the request becomes accepted work");
+    expect(node.textContent).toContain("Your agency agrees the scope, limits and deadline before it starts.");
     const setup = node.querySelector("details");
     expect(setup?.open).toBe(false);
-    expect(setup?.querySelector("summary")?.textContent).toBe("Configure a supported saved check");
-    expect(Array.from(node.querySelectorAll("h2")).map(item => item.textContent).indexOf("What should stay true?")).toBeLessThan(Array.from(node.querySelectorAll("h2")).map(item => item.textContent).indexOf("Saved checks that can run again"));
+    expect(setup?.querySelector("summary")?.textContent).toBe("Set up a saved check");
+    // XA · O6: what Strelva keeps true leads the page; saved-check setup stays below it.
+    const headings = Array.from(node.querySelectorAll("h1, h2")).map(item => item.textContent);
+    expect(headings.indexOf("What Strelva keeps true.")).toBeGreaterThanOrEqual(0);
+    expect(headings.indexOf("What Strelva keeps true.")).toBeLessThan(headings.indexOf("Saved checks that can run again"));
     expect(request.mock.calls.every(([, init]) => !init?.method || init.method === "GET")).toBe(true);
     expect(props.onSaved).not.toHaveBeenCalled();
     await draw({ readOnly: true });

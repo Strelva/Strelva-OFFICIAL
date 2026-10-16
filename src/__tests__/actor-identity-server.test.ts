@@ -32,15 +32,26 @@ describe("recording the actor at the action", () => {
     ] });
     mocks.from.mockReturnValueOnce(query({ kind: "agency" })).mockReturnValueOnce(query({ name: "North Studio", agency_brand: null }));
     mocks.rpc.mockResolvedValue({ data: [{ customerWorkspaceId: workspaceId, staff: [{ userId: actor.userId }] }], error: null });
+    mocks.user.mockResolvedValue({ data: { user: { id: actor.userId, user_metadata: { full_name: "Maya Okafor" } } }, error: null });
     const snapshot = await captureActionActor(actor, workspaceId);
-    expect(snapshot).toEqual({ kind: "agency", displayName: "North Studio" });
+    // XA-3: the acting member's own recorded name rides with the agency ("Maya at North Studio").
+    expect(snapshot).toEqual({ kind: "agency", displayName: "North Studio", personName: "Maya Okafor" });
     expect(mocks.rpc).toHaveBeenCalledWith("read_agency_provider_seats", {
       p_user_id: actor.userId, p_verified_email: actor.verifiedEmail, p_agency_workspace_id: "north-studio",
     });
     expect(mocks.from).not.toHaveBeenCalledWith("agency_client_staff");
-    expect(mocks.user).not.toHaveBeenCalled();
+    // Only the acting principal's own account is read, never another member's.
+    expect(mocks.user.mock.calls).toEqual([[actor.userId]]);
     mocks.from.mockReturnValue(query({ name: "Another agency" }));
-    expect(snapshot).toEqual({ kind: "agency", displayName: "North Studio" });
+    expect(snapshot).toEqual({ kind: "agency", displayName: "North Studio", personName: "Maya Okafor" });
+    // Without a recorded name the agency stands alone; never the email.
+    mocks.scope.mockResolvedValue({ userId: actor.userId, memberships: [
+      { businessId: workspaceId, role: "admin", via: "provider_seat" },
+      { businessId: "north-studio", role: "member", via: "membership" },
+    ] });
+    mocks.from.mockReturnValueOnce(query({ kind: "agency" })).mockReturnValueOnce(query({ name: "North Studio", agency_brand: null }));
+    mocks.user.mockResolvedValue({ data: { user: { id: actor.userId, email: actor.verifiedEmail, user_metadata: {} } }, error: null });
+    expect(await captureActionActor(actor, workspaceId)).toEqual({ kind: "agency", displayName: "North Studio" });
   });
   it("keeps a direct business member a person rather than guessing their agency", async () => {
     mocks.from.mockReturnValue(query({ kind: "customer" }));

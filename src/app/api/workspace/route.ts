@@ -1,3 +1,4 @@
+import { accountDisplayName } from "@/platform/presentation/actor-server";
 import { appReleaseLabelsEnabled } from "@/platform/app-releases/release";
 import { appReleasesForSnapshot, readBuiltInAppReleases } from "@/platform/app-releases/server";
 import { recordFunnelEvent } from "@/platform/infra/funnel";
@@ -234,6 +235,8 @@ export async function GET(request: Request) {
     const current = await actor();
     if (!current) return json({ error: "Sign in with a confirmed email to open your work." }, 401);
     const query = new URL(request.url).searchParams;
+    // The account's own recorded name, for the greeting and the account row. Never the email.
+    const displayNameRead = accountDisplayName(current.userId);
     const personal = await ensurePersonalWorkspace(current);
     const workspaces = await listWorkspaces(current);
     const selectedId = query.get("workspaceId") || personal.id;
@@ -322,7 +325,7 @@ export async function GET(request: Request) {
       canMakeSystems: makerAuthority === "provider" || makerAuthority === "agency" || makerAuthority === "owner",
       ...(gettingStarted ? { gettingStarted } : {}),
       ownerBrand,
-      actor: { email: current.verifiedEmail, localPreview: false },
+      actor: { email: current.verifiedEmail, localPreview: false, displayName: await displayNameRead },
       workspaces: workspaces.map(({ id, kind, name, access, role }) => ({ id, kind, name, access, role })), workspaceId: selected.id,
       workspaceExitState: exit.state,
       workspaceExitReadStatus: exit.status,
