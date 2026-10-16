@@ -13,6 +13,9 @@ import { WorkspaceGoogle } from "@/experience/places/WorkspaceGoogle";
 import { GoogleConnect, type GoogleConnectViewer } from "@/experience/places/GoogleConnect";
 import { GoogleReadGrant } from "@/experience/places/GoogleReadGrant";
 import { readWorkspaceReviews } from "@/products/google-listing/server";
+import { WorkspaceSurfaceShell } from "@/experience/workspace/WorkspaceSurfaceShell";
+import { listWorkspaces } from "@/platform/workspaces";
+import { systemsReleasedFor } from "@/platform/systems-release";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Google listing", robots: { index: false, follow: false }, referrer: "no-referrer" };
@@ -40,5 +43,6 @@ export default async function GooglePage({ searchParams }: { searchParams: Promi
   const connect = <><GoogleConnect workspaceId={workspaceId} viewer={viewer} enabled={enabled} hasListing={state.kind === "ready" && state.data.length > 0}
     params={{ connect: one(params.connect), read: one(params.read), fact: one(params.fact) }} returnTo={safeReturnTo(params.returnTo)} choices={choices} foundFacts={foundFacts}
     actions={{ start: startGoogleConnect, choose: chooseGoogleListing, reread: rereadGoogleFoundFacts, decide: decideGoogleFoundFact }} />{readGrant}</>;
-  return <WorkspaceGoogle workspaceId={workspaceId} state={state} reviews={reviews} action={googleListingAction} connect={connect} reviewId={typeof params.reviewId === "string" ? params.reviewId : undefined} replyText={typeof params.replyText === "string" ? params.replyText : undefined} result={typeof params.result === "string" ? params.result : undefined} />;
+  const [workspaces, systemsReleased] = await Promise.all([listWorkspaces(actor).catch(() => []), systemsReleasedFor(actor, workspaceId).catch(() => false)]);
+  return <WorkspaceSurfaceShell workspaceId={workspaceId} businessName={workspaces.find(workspace => workspace.id === workspaceId)?.name} systemsReleased={systemsReleased}><WorkspaceGoogle workspaceId={workspaceId} state={state} reviews={reviews} action={googleListingAction} connect={connect} reviewId={typeof params.reviewId === "string" ? params.reviewId : undefined} replyText={typeof params.replyText === "string" ? params.replyText : undefined} result={typeof params.result === "string" ? params.result : undefined} /></WorkspaceSurfaceShell>;
 }

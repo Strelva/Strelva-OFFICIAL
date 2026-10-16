@@ -1,7 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { StMono, StNotice, StPill, StSection, StSegmented, StSkeleton, StTextButton } from "@/components/ui/strelva/Kit";
+import { StSkeleton } from "@/components/ui/strelva/Kit";
+import { XaButton, XaSays, XaStatus, XaTextLink, XaWorking } from "@/components/ui/strelva/Xa";
+import { CopyButton } from "@/experience/connections/CopyButton";
+import styles from "@/experience/connections/xa-connections.module.css";
 import type { ForwardingView } from "@/products/inquiry-forwarding/contracts";
 import { FORWARDING_HOSTS, hostSteps, type ForwardingHostId } from "@/products/inquiry-forwarding/contracts";
 import { whenLabel } from "./WorkspacePlace";
@@ -41,7 +44,6 @@ export function ForwardInquiries({ workspaceId, fixture }: { workspaceId: string
   const [testSince, setTestSince] = useState<{ at: number; latestId: string | null; hadConfirmation: boolean } | null>(null);
   const [confirmRotate, setConfirmRotate] = useState(false);
   const [confirmStop, setConfirmStop] = useState(false);
-  const [copied, setCopied] = useState(false);
   const mounted = useRef(true);
 
   const read = useCallback(async (): Promise<ForwardingView | null> => {
@@ -105,58 +107,53 @@ export function ForwardInquiries({ workspaceId, fixture }: { workspaceId: string
     }
   }
 
-  async function copy(text: string) {
-    try {
-      await navigator.clipboard.writeText(text);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2_000);
-    } catch {
-      setCopied(false);
-    }
-  }
-
   const guide = FORWARDING_HOSTS.find((item) => item.id === host)!;
   const email = view?.address?.email ?? null;
 
-  return <StSection title="Forward your inquiries" id="forward-inquiries">
-    <p className="text-sm leading-6 text-gray-muted">Keep your inbox and your forms. Forward inquiry email to your Strelva address and each one shows up here, with nothing to log in to. Strelva never replies on its own.</p>
-    {load.kind === "loading" ? <div role="status" className="grid gap-2"><span className="sr-only">Loading your forwarding address</span><StSkeleton /><StSkeleton width="60%" /></div> : null}
-    {load.kind === "error" ? <StNotice tone="critical" action={<StTextButton onClick={() => { setLoad({ kind: "loading" }); void read(); }}>Try again</StTextButton>}>{load.message}</StNotice> : null}
-    {error ? <StNotice tone="critical">{error}</StNotice> : null}
+  const added = view?.address ? Boolean(view.latest || view.address.firstReceivedAt) : false;
+  const waitingOnGmail = guide.confirmsAddress && !view?.address?.providerConfirmation && !view?.address?.firstReceivedAt;
+  return <section className={styles.section} id="forward-inquiries" aria-labelledby="forward-inquiries-heading">
+    <h2 id="forward-inquiries-heading" className={styles.sectionTitle}>Forward your inquiries</h2>
+    <p className={styles.quiet}>Keep your inbox and your forms. Forward inquiry email to your Strelva address and each one shows up here, with nothing to log in to. Strelva never replies on its own.</p>
+    {load.kind === "loading" ? <div role="status" className={styles.stack}><span className={styles.srOnly}>Loading your forwarding address</span><StSkeleton /><StSkeleton width="60%" /></div> : null}
+    {load.kind === "error" ? <div role="alert"><XaSays links={[<XaTextLink key="retry" onClick={() => { setLoad({ kind: "loading" }); void read(); }}>Try again</XaTextLink>]}>{load.message}</XaSays></div> : null}
+    {error ? <div role="alert"><XaSays>{error}</XaSays></div> : null}
     {view && !view.address ? (view.canManage
-      ? <div className="mt-2"><StPill busy={busy === "issue"} disabled={Boolean(busy)} onClick={() => void change("issue")}>Get my forwarding address</StPill></div>
-      : <p className="text-sm">The owner hasn&apos;t set up forwarding yet.</p>) : null}
-    {view?.address && email ? <div className="mt-2 grid gap-4">
-      <div className="flex flex-wrap items-center gap-3">
-        <span className="min-w-0 break-all tabular-nums text-base">{email}</span>
-        <StTextButton onClick={() => void copy(email)} aria-label={`Copy ${email}`}>{copied ? "Copied" : "Copy"}</StTextButton>
+      ? <div className={styles.actions}><XaButton busy={busy === "issue"} disabled={Boolean(busy)} onClick={() => void change("issue")}>Get my forwarding address</XaButton></div>
+      : <p className={styles.quiet}>The owner hasn&apos;t set up forwarding yet.</p>) : null}
+    {view?.address && email ? <div className={styles.section}>
+      <ul className={styles.group}>
+        <li className={styles.groupRow}>
+          <span className={styles.groupText}><span className={styles.groupDetail}>Your forwarding address</span><span className={styles.addressValue}>{email}</span></span>
+          <span className={styles.groupEnd}><CopyButton value={email} label="your forwarding address" /></span>
+        </li>
+        <li className={styles.groupRow}><span className={styles.groupText}><span className={styles.groupDetail} role="status">{testArrived ? `Your test arrived. Forwarding works. ${arrivedLabel(view)}` : arrivedLabel(view)}</span></span>
+          <span className={styles.groupEnd}>{testArrived || added ? <XaStatus kind="live" size="sm">Receiving</XaStatus> : view.address.providerConfirmation ? <XaStatus kind="waits" size="sm">Gmail waits for you</XaStatus> : <XaStatus kind="draft" size="sm">Nothing yet</XaStatus>}</span></li>
+      </ul>
+      {view.address.providerConfirmation ? <XaSays links={view.address.providerConfirmation.url ? [<a key="gmail" className={styles.textButton} href={view.address.providerConfirmation.url} target="_blank" rel="noreferrer noopener">Open Gmail&apos;s confirmation</a>] : undefined}>
+        Gmail asked to confirm forwarding{view.address.providerConfirmation.requestedBy ? ` from ${view.address.providerConfirmation.requestedBy}` : ""}. The confirmation code is <span className={styles.figure}><strong>{view.address.providerConfirmation.code}</strong></span>.
+      </XaSays> : null}
+      <div className={styles.section}>
+        <label className={styles.fieldLabel}>Where your email is<select className={styles.select} value={host} onChange={event => setHost(event.target.value as ForwardingHostId)}>{FORWARDING_HOSTS.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}</select></label>
+        <p className={styles.quiet}>{guide.summary}</p>
+        <ol className={styles.steps}>{hostSteps(guide, email).map(step => <li key={step} className={styles.step}><span>{step}</span></li>)}</ol>
+        {guide.notes.length ? <ul className={styles.plainList}>{guide.notes.map(note => <li key={note} className={styles.small}>{note}</li>)}</ul> : null}
+        {waitingOnGmail && !view.address.providerConfirmation ? <p className={styles.small}>After you add the address in Gmail, choose I added it in Gmail and the confirmation code shows here.</p> : null}
       </div>
-      <p role="status" className="text-sm">{testArrived ? `Your test arrived. Forwarding works. ${arrivedLabel(view)}` : arrivedLabel(view)}</p>
-      {view.address.providerConfirmation ? <StNotice tone="need" action={view.address.providerConfirmation.url ? <StTextButton href={view.address.providerConfirmation.url} target="_blank" rel="noreferrer noopener">Open Gmail&apos;s confirmation</StTextButton> : undefined}>
-        Gmail asked to confirm forwarding{view.address.providerConfirmation.requestedBy ? ` from ${view.address.providerConfirmation.requestedBy}` : ""}. Confirmation code: <StMono>{view.address.providerConfirmation.code}</StMono>
-      </StNotice> : null}
-      <div className="grid gap-3">
-        <StSegmented label="Where your email is" value={host} options={FORWARDING_HOSTS.map((item) => ({ value: item.id, label: item.label }))} onChange={setHost} />
-        <p className="text-sm text-gray-muted">{guide.summary}</p>
-        <ol className="grid list-decimal gap-2 pl-5 text-sm leading-6">{hostSteps(guide, email).map((step) => <li key={step} className="break-words">{step}</li>)}</ol>
-        {guide.notes.length ? <ul className="grid gap-1 text-sm text-gray-muted">{guide.notes.map((note) => <li key={note}>{note}</li>)}</ul> : null}
-        {guide.confirmsAddress && !view.address.providerConfirmation && !view.address.firstReceivedAt ? <p className="text-sm text-gray-muted">After you add the address in Gmail, choose I added it in Gmail and the confirmation code shows here.</p> : null}
-      </div>
-      <div className="flex flex-wrap items-center gap-3">
-        <StPill variant="soft" disabled={polling} onClick={() => setTestSince({ at: Date.now(), latestId: view.latest?.id ?? null, hadConfirmation: Boolean(view.address?.providerConfirmation) })}>{polling ? "Watching for it…" : guide.confirmsAddress && !view.address.providerConfirmation && !view.address.firstReceivedAt ? `I added it in ${guide.label.split(" ")[0]}` : "I sent a test"}</StPill>
-        {polling ? <span className="text-sm text-gray-muted">This checks every few seconds for 10 minutes.</span> : watching ? <span className="text-sm text-gray-muted">Nothing arrived in 10 minutes. Check the rule or forward one email by hand, then try again.</span> : null}
-      </div>
-      {view.canManage ? <div className="grid gap-2 text-sm">
-        {confirmRotate ? <StNotice tone="need" action={<span className="flex gap-3"><StTextButton onClick={() => void change("rotate")} disabled={Boolean(busy)}>Make a new address</StTextButton><StTextButton onClick={() => setConfirmRotate(false)}>Keep this one</StTextButton></span>}>
-          The current address stops working at once. Update every forwarding rule and form to the new one.
-        </StNotice> : confirmStop ? <StNotice tone="critical" action={<span className="flex gap-3"><StTextButton tone="danger" onClick={() => void change("revoke")} disabled={Boolean(busy)}>Stop forwarding</StTextButton><StTextButton onClick={() => setConfirmStop(false)}>Keep forwarding</StTextButton></span>}>
-          Email sent to this address after you stop is dropped, not kept. Inquiries already here stay.
-        </StNotice> : <div className="flex flex-wrap gap-4">
-          <StTextButton onClick={() => setConfirmRotate(true)} disabled={Boolean(busy)}>Make a new address</StTextButton>
-          <StTextButton tone="danger" onClick={() => setConfirmStop(true)} disabled={Boolean(busy)}>Stop forwarding</StTextButton>
+      {polling ? <XaWorking title={waitingOnGmail ? "Watching for Gmail's confirmation" : "Watching for your test"} steps={[{ id: "watch", label: "Checking every few seconds for 10 minutes", state: "active" }]} />
+        : <div className={styles.actions}>
+          <XaButton onClick={() => setTestSince({ at: Date.now(), latestId: view.latest?.id ?? null, hadConfirmation: Boolean(view.address?.providerConfirmation) })}>{waitingOnGmail ? `I added it in ${guide.label.split(" ")[0]}` : "I sent a test"}</XaButton>
+          {watching ? <span className={styles.quiet}>Nothing arrived in 10 minutes. Check the rule or forward one email by hand, then try again.</span> : null}
         </div>}
-      </div> : null}
-      <p className="text-xs leading-5 text-gray-muted">Strelva keeps each forwarded message&apos;s sender, subject and words as an inquiry for this business, never attachments. Inquiries stay with the business and go when it is deleted. Email to a stopped address is dropped.</p>
+      {view.canManage ? confirmRotate ? <div className={styles.section}><XaSays>The current address stops working at once. Update every forwarding rule and form to the new one.</XaSays>
+        <div className={styles.actions}><XaButton size="sm" onClick={() => void change("rotate")} disabled={Boolean(busy)} busy={busy === "rotate"}>Make a new address</XaButton><button type="button" className={styles.textButton} onClick={() => setConfirmRotate(false)}>Keep this one</button></div></div>
+        : confirmStop ? <div className={styles.section}><XaSays>Email sent to this address after you stop is dropped, not kept. Inquiries already here stay.</XaSays>
+          <div className={styles.actions}><button type="button" className={styles.danger} onClick={() => void change("revoke")} disabled={Boolean(busy)}>Stop forwarding</button><button type="button" className={styles.textButton} onClick={() => setConfirmStop(false)}>Keep forwarding</button></div></div>
+          : <div className={styles.actions}>
+            <button type="button" className={styles.textButton} onClick={() => setConfirmRotate(true)} disabled={Boolean(busy)}>Make a new address</button>
+            <button type="button" className={styles.danger} onClick={() => setConfirmStop(true)} disabled={Boolean(busy)}>Stop forwarding</button>
+          </div> : null}
+      <p className={styles.small}>Strelva keeps each forwarded message&apos;s sender, subject and words as an inquiry for this business, never attachments. Inquiries stay with the business and go when it is deleted. Email to a stopped address is dropped.</p>
     </div> : null}
-  </StSection>;
+  </section>;
 }

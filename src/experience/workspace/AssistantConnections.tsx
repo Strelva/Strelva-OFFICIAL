@@ -1,8 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { ChevronDown, Lock } from "lucide-react";
 import { z } from "zod";
-import { StEmpty, StMono, StNotice, StPill, StRow, StRows, StSection, StSkeleton, StState } from "@/components/ui/strelva/Kit";
+import { StSkeleton } from "@/components/ui/strelva/Kit";
+import { XaAnswers, XaButton, XaEmpty, XaSays, XaSheet, XaStatus, XaTextLink } from "@/components/ui/strelva/Xa";
+import { ASSISTANT_NEVER, assistantScope } from "@/experience/connections/assistant-scopes";
+import styles from "@/experience/connections/xa-connections.module.css";
 import { useWorkspaceRequest } from "./WorkspaceRequest";
 
 const connectionSchema = z.object({
@@ -11,27 +15,35 @@ const connectionSchema = z.object({
   revokedAt: z.string().nullable(), agencyId: z.uuid().nullable(),
   status: z.enum(["active", "expired", "revoked", "authority_removed"]),
 });
+type Connection = z.infer<typeof connectionSchema>;
 const responseSchema = z.object({ connections: z.array(connectionSchema) });
-const permissionLabels: Record<string, string> = {
-  "business:read": "Business facts and services", "website:read": "Read saved websites",
-  "website:propose": "Prepare website changes for your review", "website:code": "Pick up website changes and report previews and deploys from a coding agent", "inquiries:read": "Customer inquiries",
-  "quotes:approve": "Approve quote terms", "offline_access": "Renew this connection",
+/** Status shows exceptions only: a connected assistant shows its facts, not "Connected". */
+const EXCEPTION: Record<Connection["status"], { kind: "waits" | "draft" | "down"; text: string } | null> = {
+  active: null, expired: { kind: "waits", text: "Expired · connect again from the assistant" }, revoked: { kind: "draft", text: "Disconnected" }, authority_removed: { kind: "down", text: "Business access ended" },
 };
-const statusLabels = { active: "Connected", expired: "Expired — connect again in your assistant", revoked: "Disconnected", authority_removed: "Business access ended" };
-function date(value: string) { return new Date(value).toLocaleDateString(undefined, { dateStyle: "medium" }); }
+function date(value: string) { return new Date(value).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }); }
+function host(clientId: string) { try { return new URL(clientId).host; } catch { return null; } }
 
 /** The workspace key remounts the panel so another business cannot inherit its records. */
-export function AssistantConnections({ workspaceId, canManage = true }: { workspaceId: string; canManage?: boolean }) {
-  return <AssistantConnectionsForWorkspace key={workspaceId} workspaceId={workspaceId} canManage={canManage} />;
+export function AssistantConnections({ workspaceId, canManage = true, businessName }: { workspaceId: string; canManage?: boolean; businessName?: string }) {
+  return <AssistantConnectionsForWorkspace key={workspaceId} workspaceId={workspaceId} canManage={canManage} businessName={businessName ?? "this business"} />;
 }
-function AssistantConnectionsForWorkspace({ workspaceId, canManage }: { workspaceId: string; canManage: boolean }) {
+
+/**
+ * Connected assistants (XA · R4 group, R5 sheet). One white group, one row
+ * per assistant; opening a row shows what it can do and what it never does.
+ * Disconnect is a confirmation with its own moment, then the list re-reads
+ * from the server so nothing is shown as gone before it is.
+ */
+function AssistantConnectionsForWorkspace({ workspaceId, canManage, businessName }: { workspaceId: string; canManage: boolean; businessName: string }) {
   const request = useWorkspaceRequest();
   const generation = useRef(0);
-  const [connections, setConnections] = useState<z.infer<typeof connectionSchema>[]>([]);
+  const [connections, setConnections] = useState<Connection[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
-  const [confirm, setConfirm] = useState<string | null>(null);
+  const [open, setOpen] = useState<string | null>(null);
+  const [confirm, setConfirm] = useState<Connection | null>(null);
   const [pending, setPending] = useState<string | null>(null);
   const load = useCallback(async () => {
     const current = ++generation.current;
@@ -46,7 +58,7 @@ function AssistantConnectionsForWorkspace({ workspaceId, canManage }: { workspac
     } finally { if (current === generation.current) setLoading(false); }
   }, [workspaceId, request]);
   useEffect(() => { const guard = generation; if (canManage) void load(); return () => { guard.current++; }; }, [load, canManage]);
-  async function disconnect(connection: z.infer<typeof connectionSchema>) {
+  async function disconnect(connection: Connection) {
     const current = generation.current;
     setPending(connection.id); setError(""); setNotice("");
     try {
@@ -55,22 +67,58 @@ function AssistantConnectionsForWorkspace({ workspaceId, canManage }: { workspac
       });
       if (!response.ok || (await response.json()).disconnected !== true) throw new Error("unconfirmed");
       if (current !== generation.current) return;
-      setNotice(`${connection.clientName} disconnected. Its access and renewal tokens have been revoked.`);
+      setNotice(`${connection.clientName} is disconnected. Its access and renewal ended at once.`);
       await load();
     } catch {
-      if (current === generation.current) { setConnections([]); setError("Disconnect could not be confirmed. Reload to check current access before trying again."); }
+      if (current === generation.current) { setConfirm(null); setConnections([]); setError("Disconnect could not be confirmed. Reload to check current access before trying again."); }
     } finally { if (current <= generation.current) setPending(null); }
   }
-  return <StSection id="assistant-connections-heading" title="Connected assistants">
-    <p className="text-sm leading-relaxed text-gray-muted">Assistants use only the permissions you grant for this business. Website changes stay in Strelva for owner review.</p>
-    {!canManage ? <StNotice>Only a business owner can manage assistant connections.</StNotice> : <>
-      {notice && <p role="status" className="text-sm text-warm-black">{notice}</p>}
-      {loading ? <div className="space-y-3"><p role="status" className="text-sm text-gray-muted">Loading assistant access…</p><StSkeleton /><StSkeleton width="70%" /></div> : error ? <div className="space-y-3"><StNotice tone="critical">{error}</StNotice><StPill variant="soft" onClick={() => void load()}>Reload connections</StPill></div> : !connections.length ? <StEmpty>No assistants are connected to this business. Add Strelva from Claude or Codex to get started.</StEmpty> : <div className="space-y-8">{connections.map(connection => <StSection key={connection.id} title={connection.clientName} meta={<StState kind={connection.status === "active" ? "live" : "draft"}>{statusLabels[connection.status]}</StState>}>
-        <p className="break-all text-xs text-gray-muted">Client identity: <StMono>{connection.clientId}</StMono></p>
-        <StRows label={`Permissions for ${connection.clientName}`}>{connection.scopes.map(scope => <StRow key={scope} title={permissionLabels[scope] || scope} />)}</StRows>
-        <p className="text-xs text-gray-muted">Connected <StMono>{date(connection.createdAt)}</StMono> · Connection ends <StMono>{date(connection.expiresAt)}</StMono>{connection.lastUsedAt ? <> · Last renewed <StMono>{date(connection.lastUsedAt)}</StMono></> : null}</p>
-        {connection.revokedAt === null && (confirm === connection.id ? <div className="space-y-3"><p className="text-sm text-warm-black">Disconnect {connection.clientName}? It will need your approval to connect again. Saved website proposals stay in Strelva.</p><div className="flex flex-wrap gap-3"><StPill disabled={pending !== null} busy={pending === connection.id} onClick={() => void disconnect(connection)}>Confirm disconnect</StPill><StPill variant="soft" disabled={pending !== null} onClick={() => setConfirm(null)}>Keep connected</StPill></div></div> : <div><StPill variant="soft" disabled={pending !== null} onClick={() => setConfirm(connection.id)}>Disconnect {connection.clientName}</StPill></div>)}
-      </StSection>)}</div>}
-    </>}
-  </StSection>;
+
+  if (!canManage) return <section className={styles.section} aria-labelledby="assistant-connections-heading">
+    <h2 id="assistant-connections-heading" className={styles.sectionTitle}>Connected assistants</h2>
+    <XaSays>Only a business owner can see and manage assistant connections.</XaSays>
+  </section>;
+
+  return <section className={styles.section} aria-labelledby="assistant-connections-heading" aria-busy={loading || undefined}>
+    <div className={styles.sectionHead}><h2 id="assistant-connections-heading" className={styles.sectionTitle}>Connected assistants</h2>{!loading && !error && connections.length ? <span className={styles.sectionMeta}><span className={styles.figure}>{connections.filter(item => item.status === "active").length}</span> connected</span> : null}</div>
+    {notice ? <div role="status"><XaSays>{notice}</XaSays></div> : null}
+    {loading ? <div className={styles.stack}><p role="status" className={styles.small}>Loading assistant access…</p><StSkeleton /><StSkeleton width="70%" /></div>
+      : error ? <div role="alert" className={styles.section}><XaSays links={[<XaTextLink key="reload" onClick={() => void load()}>Reload connections</XaTextLink>]}>{error}</XaSays></div>
+        : !connections.length ? <XaEmpty pose="alone" size="sm" title="No assistant is connected." job={`Pebble checks every request an assistant makes against what ${businessName} allows`}>
+          Add Strelva from Claude or Codex with the address above. You choose this business and see every permission before anything connects.
+        </XaEmpty>
+          : <ul className={styles.group} aria-label="Assistants connected to this business">{connections.map(connection => {
+            const exception = EXCEPTION[connection.status];
+            const expanded = open === connection.id;
+            const panelId = `assistant-${connection.id}`;
+            return <li key={connection.id} className={styles.groupRow} data-stack>
+              <button type="button" className={styles.expand} aria-expanded={expanded} aria-controls={panelId} onClick={() => setOpen(expanded ? null : connection.id)}>
+                <span className={styles.groupText}><span className={styles.groupTitle}>{connection.clientName}</span>
+                  <span className={styles.groupDetail}>Connected {date(connection.createdAt)}{connection.lastUsedAt ? ` · last renewed ${date(connection.lastUsedAt)}` : ""}{connection.status === "active" ? ` · ends ${date(connection.expiresAt)}` : ""}</span></span>
+                {exception ? <XaStatus kind={exception.kind} size="sm">{exception.text}</XaStatus> : null}
+                <ChevronDown className={styles.chevron} size={18} aria-hidden="true" />
+              </button>
+              {expanded ? <div id={panelId} className={styles.detailPanel}>
+                <p className={styles.groupLabel}>It can</p>
+                <ul className={styles.plainList} aria-label={`Permissions for ${connection.clientName}`}>
+                  {connection.scopes.map(scope => { const item = assistantScope(scope); return <li key={scope} className={styles.groupText}><span className={styles.groupTitle}>{item.title}</span><span className={styles.groupDetail}>{item.detail}</span></li>; })}
+                </ul>
+                <p className={styles.groupLabel}>Never, without you</p>
+                <ul className={styles.plainList}>
+                  {ASSISTANT_NEVER.map(item => <li key={item.title} className={styles.actions}><Lock className={styles.lock} size={14} aria-hidden="true" /><span className={styles.groupTitle}>{item.title}</span><span className={styles.sectionMeta}>{item.end}</span></li>)}
+                </ul>
+                {host(connection.clientId) ? <p className={styles.small}>Strelva checked this assistant’s identity at {host(connection.clientId)}. The name comes from that assistant.</p> : null}
+                {connection.revokedAt === null ? <div><button type="button" className={styles.danger} disabled={pending !== null} onClick={() => setConfirm(connection)}>Disconnect {connection.clientName}</button></div> : null}
+              </div> : null}
+            </li>;
+          })}</ul>}
+    <XaSheet open={confirm !== null} onClose={() => { if (!pending) setConfirm(null); }} title={confirm ? `Disconnect ${confirm.clientName}?` : "Disconnect?"}
+      actions={confirm ? <><XaButton variant="primary" size="lg" block busy={pending === confirm.id} onClick={() => void disconnect(confirm)}>Disconnect {confirm.clientName}</XaButton><XaButton variant="quiet" size="lg" disabled={pending !== null} onClick={() => setConfirm(null)}>Keep it connected</XaButton></> : null}>
+      {confirm ? <XaAnswers labelWidth={96} rows={[
+        ["Stops", `Reading ${businessName}, at once. Its renewal ends too.`],
+        ["Stays", "Website changes it prepared stay in Strelva for your review."],
+        ["Again", "It needs your approval to connect again."],
+      ]} /> : null}
+    </XaSheet>
+  </section>;
 }

@@ -21,7 +21,8 @@ function draftLine(review: ReviewView, mode: SiteReviews["replyMode"]): string {
 }
 
 /** Used by both the listing System and its complete reviews place. */
-export function ReviewRows({ workspaceId, site, publishing = false, readOnly = false, request }: { workspaceId: string; site: SiteReviews; publishing?: boolean; readOnly?: boolean; request?: typeof fetch }) {
+/** `quiet` keeps every reply action secondary, for a screen whose one primary is elsewhere (the Google listing's yes). */
+export function ReviewRows({ workspaceId, site, publishing = false, readOnly = false, request, quiet = false }: { workspaceId: string; site: SiteReviews; publishing?: boolean; readOnly?: boolean; request?: typeof fetch; quiet?: boolean }) {
   if (site.unavailable) return <StNotice tone="critical">Reviews for {site.siteName} couldn&apos;t be read right now. Nothing changed on your listing.</StNotice>;
   if (!site.reviews.length) return <StEmpty>No reviews yet. {site.googleConnected ? "New Google reviews appear here after Strelva reads them." : "Once your Google listing is connected, reviews show up here with a drafted reply. The business owner connects it on the Google page."}</StEmpty>;
   const firstPending = site.reviews.find(review => !review.reply)?.id;
@@ -31,7 +32,7 @@ export function ReviewRows({ workspaceId, site, publishing = false, readOnly = f
       <p className={styles.copy}>{review.text || "A rating with no written review."}</p>
       {review.reply ? <div className={styles.draft}><StLabel>Your reply{review.repliedAt ? ` · ${whenLabel(review.repliedAt)}` : ""}</StLabel><p className={styles.copy}>{review.reply}</p>{publishing && review.source === "google" && review.externalId ? <StTextButton href={`/workspace/google?${new URLSearchParams({ workspaceId, reviewId: review.externalId, replyText: review.reply })}`}>Edit or withdraw on Google</StTextButton> : null}</div> : <>
         {review.draft?.autoPostAt && site.replyMode === "auto" ? <p className={styles.copy}>{draftLine(review, site.replyMode)}</p> : null}
-        <ReviewReplyForm workspaceId={workspaceId} tenantId={site.tenantId} reviewId={review.id} author={review.author} initial={review.draft?.reply ?? ""} postsToGoogle={review.source === "google" && site.googleConnected} readOnly={readOnly} primary={review.id === firstPending} request={request} />
+        <ReviewReplyForm workspaceId={workspaceId} tenantId={site.tenantId} reviewId={review.id} author={review.author} initial={review.draft?.reply ?? ""} postsToGoogle={review.source === "google" && site.googleConnected} readOnly={readOnly} primary={!quiet && review.id === firstPending} request={request} />
       </>}
     </article>
   </StRow>)}</StRows></>;
