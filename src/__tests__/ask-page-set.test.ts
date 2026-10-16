@@ -152,10 +152,10 @@ describe("real Ask page-set candidates", () => {
     const read = vi.fn(async (scope: { businessId: string; possibilityId: string; candidateRevision: number }) => scope.businessId === workspaceId && scope.possibilityId === id && scope.candidateRevision === p.candidateRevision ? p : null);
     const state = await possibilityTryState(signPossibilityPreviewToken(claims), { enabled: async () => true, read });
     expect(state).toMatchObject({ kind: "ready", view: { takesSubmissions: false, websiteDocument: p.introduces[0]!.candidate.content.document } });
-    expect(await possibilityTryState(signPossibilityPreviewToken({ ...claims, workspaceId: workId }), { enabled: async () => true, read })).toEqual({ kind: "changed" });
-    expect(await possibilityTryState(signPossibilityPreviewToken({ ...claims, candidateRevision: p.candidateRevision + 1 }), { enabled: async () => true, read })).toEqual({ kind: "changed" });
+    expect(await possibilityTryState(signPossibilityPreviewToken({ ...claims, workspaceId: workId }), { enabled: async () => true, read })).toMatchObject({ kind: "changed" });
+    expect(await possibilityTryState(signPossibilityPreviewToken({ ...claims, candidateRevision: p.candidateRevision + 1 }), { enabled: async () => true, read })).toMatchObject({ kind: "changed" });
     const damaged = structuredClone(p);
     damaged.introduces[0]!.candidate.content.document = {};
-    expect(await possibilityTryState(signPossibilityPreviewToken(claims), { enabled: async () => true, read: async () => damaged })).toEqual({ kind: "changed" });
+    expect(await possibilityTryState(signPossibilityPreviewToken(claims), { enabled: async () => true, read: async () => damaged })).toMatchObject({ kind: "changed" });
   });
 });

@@ -8,7 +8,7 @@
  * a confirmation. Lists are open rows with a hairline between, never cards.
  */
 import Link from "next/link";
-import { useEffect, useId, useRef, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useId, useRef, type CSSProperties, type ReactNode, type Ref } from "react";
 import { Lock } from "lucide-react";
 import { XaPebbleAvatar, XaPebbleScene, type XaPose } from "./characters";
 import styles from "./xa.module.css";
@@ -35,8 +35,8 @@ export function XaPageChange({ children }: { children: ReactNode }) {
 /* ---------- Words ---------- */
 
 /** What happened, then what it means for the reader in a quieter tone. Never the same sentence twice. */
-export function XaHeadline({ children, quiet, size = "md", as: Heading = "h1", id }: { children: ReactNode; quiet?: ReactNode; size?: "sm" | "md" | "lg"; as?: "h1" | "h2"; id?: string }) {
-  return <Heading id={id} className={styles.headline} data-size={size}>{children}{quiet ? <span className={styles.headlineQuiet}> {quiet}</span> : null}</Heading>;
+export function XaHeadline({ children, quiet, size = "md", as: Heading = "h1", id, ref }: { children: ReactNode; quiet?: ReactNode; size?: "sm" | "md" | "lg"; as?: "h1" | "h2"; id?: string; /** A focus destination when a state swap replaces the controls above it. */ ref?: Ref<HTMLHeadingElement> }) {
+  return <Heading id={id} ref={ref} tabIndex={ref ? -1 : undefined} className={styles.headline} data-size={size}>{children}{quiet ? <span className={styles.headlineQuiet}> {quiet}</span> : null}</Heading>;
 }
 
 export function XaLede({ children }: { children: ReactNode }) {

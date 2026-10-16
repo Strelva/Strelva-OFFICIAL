@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import { actorLabel } from "@/platform/presentation/actor";
 import { buildWebsiteSystemDetail, mergeWebsiteHistory } from "@/experience/systems/website-detail";
 import { PossibilityTry } from "@/experience/systems/PossibilityTry";
+import { XA_YES_LABELS } from "@/platform/presentation/place-labels";
 import { changeDocument, createDocument, documentHistoryPageSchema } from "@/products/documents/engine";
 import { applicationSchema } from "@/products/applications/contracts";
 
@@ -51,14 +52,19 @@ describe("actor coherence across receipts and public previews", () => {
     expect(html).toContain("North Studio");
     expect(html).toContain("Proposed by Alex");
     expect(html).toContain("Runs on Strelva");
-    expect(html).toContain("disabled");
-    expect(html).toContain("Make it live");
+    // The yes happens from the approval email: no dead button stands in for it here.
+    expect(html).toContain("You make it live from the approval email.");
+    expect(html).not.toContain(XA_YES_LABELS.yes);
+    expect(html).not.toMatch(/<button[^>]*disabled/);
   });
   it("does not invent a refresh or a platform actor on unavailable previews", () => {
     const changed = renderToStaticMarkup(createElement(PossibilityTry, { state: { kind: "changed" } }));
     expect(changed).not.toContain("is refreshing");
     const ready = renderToStaticMarkup(createElement(PossibilityTry, { state: { kind: "ready", view: { title: "Preview", intent: "", changes: [], introduces: [], takesSubmissions: false } } }));
-    expect(ready).toContain("Business identity unavailable");
-    expect(ready).toContain("Actor not recorded");
+    expect(ready).toContain("A change for your business");
+    expect(ready).not.toContain("identity unavailable");
+    // Owners read a plain sentence, never the builder phrase, and never a guessed actor.
+    expect(ready).toContain("Who proposed this wasn’t recorded");
+    expect(ready).not.toContain("Proposed by Strelva");
   });
 });

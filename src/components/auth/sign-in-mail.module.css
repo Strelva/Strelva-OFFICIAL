@@ -1,0 +1,13 @@
+/* The sign-in email on the felt. Tokens only; the Page is the kit's. */
+.felt { display: flex; width: 100%; flex-direction: column; gap: 20px; text-align: left; }
+.meta { display: flex; flex-direction: column; gap: 4px; margin: 0; font-size: 14px; line-height: 20px; }
+.meta div { display: flex; gap: 10px; }
+.meta dt { width: 40px; flex-shrink: 0; color: var(--st-text-3); }
+.meta dd { min-width: 0; margin: 0; overflow: hidden; color: var(--st-text); text-overflow: ellipsis; white-space: nowrap; }
+.meta dd[data-empty="true"] { color: var(--st-text-3); }
+.body { margin: 4px 0 0; color: var(--st-text-2); font-size: 15px; line-height: 22px; transition: color var(--motion-base) var(--ease-settle); }
+.body[data-sent="true"] { color: var(--st-text); }
+.code { font-variant-numeric: tabular-nums; font-weight: 600; letter-spacing: 0.08em; }
+.state { margin: 0; color: var(--st-text-3); font-size: 13px; line-height: 18px; }
+.state[data-sent="true"] { color: var(--st-live); }
+@media (prefers-reduced-motion: reduce) { .body { transition: none; } }

@@ -2,7 +2,8 @@ import { BRAND_CREDIT, type OwnerBrand } from "@/platform/infra/agency-brand";
 import { escapeEmailHtml } from "./escape";
 import { PAPER_EMAIL as t } from "./paper-tokens";
 
-export interface PaperAction { label: string; url: string; style?: "primary" | "soft" | "text" | "date" }
+/** "ink" is the XA one primary: the ink pill, used where an email has exactly one action. */
+export interface PaperAction { label: string; url: string; style?: "primary" | "ink" | "soft" | "text" | "date" }
 export type PaperBlock =
   | { kind: "paragraph"; text: string; muted?: boolean }
   | { kind: "label"; text: string }
@@ -47,10 +48,11 @@ const label = (value: string) => `<p style="margin:0 0 8px;font-size:13px;line-h
 
 function actions(items: readonly PaperAction[], full = false): string {
   return table(`<tr>${items.map((a, i) => {
-    const primary = a.style === "primary";
+    const ink = a.style === "ink";
+    const primary = a.style === "primary" || ink;
     const quiet = a.style === "text";
     const date = a.style === "date";
-    const bg = primary ? t.accent : quiet ? "transparent" : date ? t.surface : t.inset;
+    const bg = ink ? t.text : primary ? t.accent : quiet ? "transparent" : date ? t.surface : t.inset;
     return `<td ${full ? `width="${100 / items.length}%"` : ""} style="${i ? "padding-left:10px;" : ""}vertical-align:middle;">${table(`<tr><td align="center" bgcolor="${bg}" style="background:${bg};border-radius:${date ? "8px" : "999px"};${date ? `border:1px solid ${t.line};` : ""}"><a href="${url(a.url)}" style="display:block;padding:${quiet ? "8px 4px" : "12px 16px"};font-size:${quiet ? "14px" : "15px"};line-height:24px;font-weight:${quiet ? "400" : "600"};color:${primary ? t.onAccent : quiet ? t.muted : t.text};text-decoration:none;border-radius:999px;">${e(a.label)}</a></td></tr>`, "", full ? "100%" : "")}</td>`;
   }).join("")}</tr>`, "", full ? "100%" : "");
 }

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { AccessRequestPage } from "@/components/marketing/AccessRequestPage";
 import { businessSignupReleaseEnabled } from "@/platform/business-signup-release";
+import { agencySignupReleaseEnabled } from "@/platform/agency-signup-release";
 import { CHECK_RESULT_ID } from "@/products/getting-started/contracts";
 import { gettingStarted } from "@/products/getting-started/server";
 
@@ -15,5 +16,6 @@ export default async function Page({ searchParams }: { searchParams: Promise<Rec
   // Owner door: the check that sent the person here already has their name and website.
   const scan = businessSignupReleaseEnabled() && typeof params.scan === "string" && CHECK_RESULT_ID.test(params.scan) ? params.scan : null;
   const check = scan ? await gettingStarted.readCheck(scan).catch(() => null) : null;
-  return <AccessRequestPage carried={check ? { businessName: check.name ?? undefined, currentWebsite: check.website ?? undefined } : undefined} />;
+  return <AccessRequestPage businessOpen={businessSignupReleaseEnabled()} agencyOpen={agencySignupReleaseEnabled()}
+    carried={check ? { businessName: check.name ?? undefined, currentWebsite: check.website ?? undefined, scan: scan ?? undefined } : undefined} />;
 }

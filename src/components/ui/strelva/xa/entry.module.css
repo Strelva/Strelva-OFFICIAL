@@ -29,6 +29,10 @@
 
 .column { display: flex; width: min(460px, 100%); flex-direction: column; gap: 22px; margin-block: auto; padding-block: 48px; }
 .column[data-width="wide"] { width: min(520px, 100%); }
+/* Results (the free check): 640 beside the felt, 1040 on paper alone. */
+.column[data-width="results"] { width: min(640px, 100%); }
+.entry:not([data-staged="true"]) .column[data-width="results"] { width: min(1040px, 100%); }
+.phoneObject { display: none; }
 .foot { color: var(--st-text-3); font-size: 13px; line-height: 17px; }
 /* The stage on a phone: Pebble and one line, above the heading. Hidden while the stage shows. */
 .phoneStage { display: none; margin: 0; align-items: center; gap: 12px; color: var(--st-text-2); font-size: 14px; line-height: 20px; }
@@ -60,7 +64,32 @@
 
 /* The stack inside the column (XA-2): headline, facts, actions. */
 .stack { display: flex; flex-direction: column; gap: 24px; }
-.stack[data-gap="sm"] { gap: 16px; }
+.stack[data-gap="sm"] { gap: 12px; }
+.stack[data-gap="lg"] { gap: 32px; }
+
+/* ---------- XS-entry parts: brand, Pebble's line, the felt's content, a broken link, a note ---------- */
+.entryBrand { display: inline-flex; min-width: 0; flex-shrink: 1; align-items: center; gap: 10px; color: var(--st-text); text-decoration: none; border-radius: 8px; }
+.entryBrand:focus-visible { outline: 2px solid var(--st-accent); outline-offset: 4px; }
+.wordmark { font-size: 24px; font-weight: 500; letter-spacing: -0.6px; line-height: 1; }
+.brandLogo { width: 28px; height: 28px; flex-shrink: 0; border-radius: 8px; object-fit: contain; background: #ffffff; }
+.brandText { display: flex; min-width: 0; flex-direction: column; gap: 1px; font-size: 16px; font-weight: 500; line-height: 20px; }
+.brandText span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.brandText small { color: var(--st-text-3); font-size: 12px; font-weight: 400; line-height: 16px; }
+.pebbleLine { display: flex; margin: 0; align-items: center; gap: 10px; color: var(--st-text); font-size: 15px; line-height: 21px; text-align: left; }
+.pebbleLine > span:last-child { min-width: 0; }
+.feltInner { display: flex; width: 100%; max-width: 440px; flex-direction: column; align-items: center; text-align: center; }
+.feltInner[data-object="true"] { max-width: 472px; }
+.feltObject { width: 100%; margin-top: 8px; text-align: left; animation: var(--kf-enter) var(--motion-slow) var(--ease-settle) both; }
+.feltTitle { margin: 24px 0 0; color: var(--st-text); font-size: 17px; font-weight: 600; letter-spacing: -0.2px; line-height: 24px; }
+.feltBody { margin: 6px 0 0; max-width: 380px; color: var(--st-text-2); font-size: 15px; line-height: 22px; }
+.broken { display: flex; width: 100%; flex-direction: column; align-items: center; gap: 16px; text-align: left; }
+.broken > figure { opacity: 0.92; }
+.brokenTitle { margin: 0; color: var(--st-text-2); font-size: 17px; font-weight: 500; line-height: 24px; }
+.brokenLine { display: block; width: 100%; height: 10px; border-radius: 5px; background: repeating-linear-gradient(90deg, var(--st-line) 0 14px, transparent 14px 22px); }
+.brokenLine[data-short="true"] { width: 62%; }
+.note { margin: 0; color: var(--st-text-2); font-size: 14px; line-height: 1.5; }
+.note a { color: var(--st-accent); font-weight: 500; text-decoration: none; }
+.note a:hover { text-decoration: underline; text-underline-offset: 3px; }
 
 /* ---------- Steps (B2–B4 "Progress") ---------- */
 .steps { display: grid; grid-template-columns: repeat(var(--xa-steps, 3), minmax(0, 1fr)); gap: 6px; margin: 0; padding: 0; list-style: none; }
@@ -96,6 +125,7 @@
   .entry[data-staged="true"] { grid-template-columns: minmax(0, 1fr); }
   .stage:not([data-free]) { display: none; }
   .phoneStage { display: flex; }
+  .phoneObject { display: block; }
   /* A free panel (XA-2) stacks under the task, smaller, so the task stays first. */
   .stage[data-free] { position: static; height: auto; min-height: 0; padding: 28px 20px; border-radius: 20px; gap: 16px; }
   .stage[data-free][data-phone="hidden"] { display: none; }

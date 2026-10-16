@@ -1,28 +1,22 @@
 "use client";
 
-import { StPill } from "@/components/ui/strelva/Kit";
-import type { CSSProperties } from "react";
+import { XaButton, type XaButtonVariant } from "@/components/ui/strelva/Xa";
+import type { ReactNode } from "react";
 import { createBrowserSupabase } from "@/platform/infra/db/browser-client";
 
 interface UseInvitedEmailButtonProps {
-  className?: string;
   redirectUrl?: string;
-  style?: CSSProperties;
+  variant?: XaButtonVariant;
+  block?: boolean;
+  children?: ReactNode;
 }
 
-export function UseInvitedEmailButton({
-  className,
-  redirectUrl = "/sign-in",
-  style,
-}: UseInvitedEmailButtonProps) {
+/** Signs out, then opens sign-in so the person can choose the address their invitation went to. */
+export function UseInvitedEmailButton({ redirectUrl = "/sign-in", variant = "primary", block = true, children = "Use my invited email" }: UseInvitedEmailButtonProps) {
   async function signOut() {
     const supabase = createBrowserSupabase();
     if (supabase) await supabase.auth.signOut();
     window.location.href = redirectUrl;
   }
-  return (
-    <StPill type="button" className={className} style={style} onClick={signOut}>
-      Use invited email
-    </StPill>
-  );
+  return <XaButton type="button" variant={variant} size="lg" block={block} onClick={signOut}>{children}</XaButton>;
 }

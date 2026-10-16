@@ -9,3 +9,11 @@ export function signInErrorCopy(error: { code?: string; status?: number }, metho
   }
   return "Google sign-in is temporarily unavailable. Try again.";
 }
+
+/** What a refused code means to the person holding it. Never says whether the email has an account. */
+export function signInCodeErrorCopy(reason: string | undefined): string {
+  if (reason === "rate_limited") return "Too many tries. Wait a few minutes, then send a new code.";
+  if (reason === "expired") return "That code has expired. Send a new one and use the newest email.";
+  if (reason === "unavailable") return "Sign-in is unavailable just now. Try again in a minute.";
+  return "That code didn’t work. Check the newest email from Strelva, or send a new code.";
+}

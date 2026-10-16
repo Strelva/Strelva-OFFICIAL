@@ -1,0 +1,22 @@
+/* The check's page: marks in place. Tokens only; the Page frame is the kit's. */
+.source { margin: -4px 0 4px; color: var(--st-text-3); font-size: 13px; line-height: 18px; }
+.marks { display: flex; flex-direction: column; gap: 12px; margin: 0; padding: 0; list-style: none; }
+.marks[data-fixes="true"] { margin-top: 6px; padding-top: 16px; border-top: 1px solid var(--st-line); }
+.mark { display: grid; grid-template-columns: 22px minmax(0, 1fr); gap: 10px; align-items: start; animation: var(--kf-enter) var(--motion-base) var(--ease-settle) both; }
+.dot { display: grid; width: 22px; height: 22px; place-items: center; border-radius: 999px; font-size: 12px; font-variant-numeric: tabular-nums; font-weight: 600; line-height: 1; }
+.mark[data-state="found"] .dot { background: var(--st-tint); color: var(--st-accent); }
+.mark[data-state="missing"] .dot::after { width: 8px; height: 8px; border-radius: 999px; background: var(--st-need); content: ""; }
+.mark[data-state="fix"] .dot { background: var(--st-need); color: #ffffff; }
+.text { display: flex; min-width: 0; flex-direction: column; gap: 1px; padding-top: 1px; }
+.label { color: var(--st-text); font-size: 15px; font-weight: 500; line-height: 21px; }
+.mark[data-state="found"] .label { color: var(--st-text-2); font-weight: 400; }
+.mark[data-state="reading"] .label { color: var(--st-text-3); font-weight: 400; }
+.word { color: var(--st-text-3); font-weight: 400; }
+.mark[data-state="missing"] .word { color: var(--st-need); }
+.detail { color: var(--st-text-2); font-size: 13px; line-height: 19px; }
+.mark[data-state="found"] .detail { color: var(--st-text-3); }
+.note { margin: 4px 0 0; color: var(--st-text-3); font-size: 13px; line-height: 18px; }
+.spin { width: 12px; height: 12px; border: 1.5px solid var(--st-line-strong); border-top-color: var(--st-text-2); border-radius: 999px; animation: spin 900ms linear infinite; }
+.srOnly { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .mark { animation: none; } .spin { animation: none; } }

@@ -25,7 +25,8 @@ async function fill(label: string, value: string) {
 }
 it("does not invent an answer or wrong-claim count from a saved citation boolean", () => {
   const html = renderToStaticMarkup(createElement(AiVisibilityResultView, { result: { ...answerCheckFixture, verdict: "Gemini named this business in one answer." }, scanId: "scan_ab123", shareUrl: null, workspaceEnabled: true, onReset() {} }));
-  expect(html).toContain("Its full answer and claim-by-claim accuracy were not saved.");
+  expect(html).toContain("Fictional Gemini answer.");
+  expect(html).not.toContain("claim-by-claim");
   expect(html).not.toContain("things wrong");
   expect(html).toContain("/workspace?save=scan_ab123");
 });

@@ -25,7 +25,7 @@ export function SiteDocumentTry({ document: raw, bookingSchedule, bookingPath }:
     if (document.pages.some(page => page.path === next)) setPath(next!);
   }
   return <section aria-label="Working website candidate" onClick={navigate} style={siteThemeVariables(document) as CSSProperties}>
-    <p className="mb-3 text-xs text-gray-muted" role="status">Preview page: {path}. Links stay inside this test.</p>
+    <p className="mb-3 text-xs text-gray-muted" role="status">{path === "/" ? "Your home page" : `Your ${document.pages.find(page => page.path === path)?.title || "new"} page`}, as it would look. Links stay inside this preview.</p>
     <style>{SITE_CATALOG_CSS}</style>
     {render(sitePageTree(document, path, { preview: !bookingSchedule }), path)}
   </section>;

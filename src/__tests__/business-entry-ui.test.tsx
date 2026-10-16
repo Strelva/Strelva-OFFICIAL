@@ -37,11 +37,36 @@ describe("business entry preserves auth and acceptance boundaries", () => {
     const node = await render(createElement(SupabaseSignIn, { emailReady: true, next: "/workspace?workspaceId=business", prefillEmail: "owner@example.test", heading: createElement(StHead, { title: "Sign in" }) }));
     await act(async () => node.querySelector("form")!.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })));
     expect(node.querySelectorAll("h1")).toHaveLength(1);
-    expect(node.querySelector("h1")?.textContent).toBe("Check your email");
+    expect(node.querySelector("h1")?.textContent).toBe("Check your email. We sent a sign-in link to owner@example.test.");
     expect(node.textContent).toContain("owner@example.test");
     expect(mocks.otp).toHaveBeenCalledWith({ email: "owner@example.test", options: { emailRedirectTo: `${window.location.origin}/auth/callback?next=%2Fworkspace%3FworkspaceId%3Dbusiness` } });
-    await click(node, "Send again");
+    await click(node, "send a new link");
     expect(mocks.otp).toHaveBeenCalledTimes(2);
+    expect(node.textContent).toContain("Sent again. Use the newest email.");
+  });
+  it("takes the emailed code when the email carries one, and keeps a refused code inline", async () => {
+    const fetch = vi.fn().mockResolvedValue(new Response(JSON.stringify({ ok: false, reason: "expired" }), { status: 400 }));
+    vi.stubGlobal("fetch", fetch);
+    const node = await render(createElement(SupabaseSignIn, { emailReady: true, codeReady: true, next: "/workspace?save=scan_public123", prefillEmail: "owner@example.test" }));
+    expect(node.querySelector('button[type="submit"]')?.textContent).toBe("Email me a code");
+    await act(async () => node.querySelector("form")!.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })));
+    const code = node.querySelector<HTMLInputElement>('input[autocomplete="one-time-code"]')!;
+    expect(code).not.toBeNull();
+    expect(document.activeElement).toBe(code);
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(code, "48 29 13");
+      code.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    expect(fetch).toHaveBeenCalledWith("/auth/code", expect.objectContaining({ method: "POST", body: JSON.stringify({ email: "owner@example.test", code: "482913", next: "/workspace?save=scan_public123" }) }));
+    expect(node.querySelector('[role="alert"]')?.textContent).toBe("That code has expired. Send a new one and use the newest email.");
+    expect(code.getAttribute("aria-invalid")).toBe("true");
+  });
+  it("says a link is on its way when the email carries no code", async () => {
+    const node = await render(createElement(SupabaseSignIn, { emailReady: true, codeReady: false, prefillEmail: "owner@example.test", resume: "your saved check" }));
+    expect(node.textContent).toContain("After you sign in, you go straight to your saved check.");
+    await act(async () => node.querySelector("form")!.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })));
+    expect(node.querySelector('input[autocomplete="one-time-code"]')).toBeNull();
+    expect(node.textContent).toContain("Open the link in that email on this device. It signs you in and takes you to your saved check.");
   });
   it("turns a thrown auth failure into a retryable form instead of a stuck spinner", async () => {
     mocks.otp.mockRejectedValue(new Error("provider unreachable"));

@@ -155,6 +155,16 @@ XA-4 Systems up close (October 16, branch xa/lane-xa4-systems):
   Thanksgiving") from the booking context, and offer the office phone as a
   tap-to-call link. `XaEmpty` takes `bare` to put Pebble straight on the canvas.
 
+XA entry frame (`XaEntryFrame`, lane xs-entry, October 16): paper column plus
+the felt, which always holds the page's object (the sign-in email as it is
+typed and sent, the check's read page with fixes marked in place, the broken
+link via `XaEntryBrokenLink`). `XaEntryBrand` shows a resolved agency's logo or
+name in text, never a letter in a coloured square; with no agency it shows the
+business name with "Runs on Strelva", or Strelva's wordmark, and never the
+"Agency identity unavailable" fallback. On a phone the felt is gone: Pebble says
+one sentence (`phoneSays`, `XaEntryPebbleLine`) and any object the page depends
+on moves into the column. Previews: `/preview/strelva/xa/xs-entry`.
+
 ## October 11 coherence amendment
 
 [GLOSSARY.md](../../GLOSSARY.md) and

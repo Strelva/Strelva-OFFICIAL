@@ -162,7 +162,7 @@ describe("Ask existing-native website alternatives", () => {
       const state = await possibilityTryState(signPossibilityPreviewToken(claims), { enabled: async () => true, read: async () => ready });
       expect(state).toMatchObject({ kind: "ready", view: { websiteDocument: document, takesSubmissions: false } });
       const tampered = structuredClone(ready); tampered.changes[0]!.candidate.content.candidateContentHash = "0".repeat(64);
-      expect(await possibilityTryState(signPossibilityPreviewToken(claims), { enabled: async () => true, read: async () => tampered })).toEqual({ kind: "changed" });
+      expect(await possibilityTryState(signPossibilityPreviewToken(claims), { enabled: async () => true, read: async () => tampered })).toMatchObject({ kind: "changed" });
     } finally { vi.unstubAllEnvs(); }
   });
 });

@@ -1,8 +1,48 @@
-/* Composition only; fields, rows, states and actions are owned by the kit. */
-.entry { padding-top: 120px; }
-.form, .stack { display: flex; flex-direction: column; gap: 24px; min-width: 0; }
-.form { max-width: 640px; }
-.address { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 12px; }
-.summary, .actions { display: flex; align-items: center; flex-wrap: wrap; gap: 16px; }
-.split { display: grid; grid-template-columns: minmax(0, 2fr) minmax(260px, 1fr); gap: 48px; align-items: start; }
-@media (max-width: 767px) { .entry { padding-top: 48px; } .split, .address { grid-template-columns: minmax(0, 1fr); } .split { gap: 28px; } }
+/* Composition only; fields, rows, states and actions are owned by the XA kit. */
+.form, .section { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.form { gap: 18px; }
+.pair { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; }
+.actions { display: flex; align-items: center; flex-wrap: wrap; gap: 12px 20px; }
+.error { margin: 0; color: var(--st-critical); font-size: 14px; line-height: 1.45; }
+.quiet { margin: 0; color: var(--st-text-2); font-size: 15px; line-height: 1.5; }
+.pageNote { margin: 0; color: var(--st-text-2); font-size: 15px; line-height: 1.5; }
+
+.first { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.firstTitle { margin: 0; color: var(--st-text); font-size: 19px; font-weight: 600; letter-spacing: -0.2px; line-height: 26px; }
+.answer { display: flex; flex-direction: column; gap: 6px; min-width: 0; padding-top: 20px; border-top: 1px solid var(--st-line); }
+.links { display: flex; flex-wrap: wrap; gap: 8px 20px; margin: 0; font-size: 15px; line-height: 22px; }
+.feltLine { margin-top: 20px; }
+
+.phoneOnly { display: none; }
+@media (max-width: 1023px) { .phoneOnly { display: block; } }
+
+/* Every check: open rows that disclose their checks, hairline between. */
+.categories, .checks { margin: 0; padding: 0; list-style: none; }
+.category + .category { border-top: 1px solid var(--st-line); }
+.categoryRow { position: relative; box-sizing: border-box; display: flex; width: 100%; min-height: 56px; align-items: center; gap: 16px; padding: 12px 0; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.categoryRow::after { position: absolute; inset: 2px -12px; z-index: -1; border-radius: var(--st-r-nav); content: ""; transition: background-color var(--motion-fast) var(--ease-settle); }
+.categoryRow:hover::after { background: var(--st-hover); }
+.categoryRow:focus-visible { outline: 2px solid var(--st-accent); outline-offset: 2px; border-radius: var(--st-r-nav); }
+.categories { position: relative; z-index: 0; }
+.categoryText { display: flex; min-width: 0; flex: 1; flex-direction: column; gap: 2px; }
+.categoryName { color: var(--st-text); font-size: 15px; font-weight: 500; line-height: 21px; }
+.categoryDetail { color: var(--st-text-2); font-size: 13px; line-height: 19px; }
+.categoryDetail[data-tone="waits"] { color: var(--st-need); }
+.categoryAction { flex-shrink: 0; color: var(--st-accent); font-size: 14px; font-weight: 500; }
+.checks { display: flex; flex-direction: column; gap: 14px; padding: 4px 0 18px 16px; border-left: 2px solid var(--st-line); animation: var(--kf-enter) var(--motion-base) var(--ease-settle) both; }
+.checks > li { display: flex; flex-direction: column; gap: 3px; }
+.checkHead { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 12px; }
+.checkName { color: var(--st-text); font-size: 14px; font-weight: 500; line-height: 20px; }
+.passed { color: var(--st-text-3); font-size: 13px; }
+.checkBody { color: var(--st-text-body); font-size: 14px; line-height: 1.5; }
+.checkMuted { color: var(--st-text-2); font-size: 13px; line-height: 1.5; }
+
+/* Embedded on an agency's own site: no frame, no felt. */
+.embed { box-sizing: border-box; min-height: 100%; padding: 28px 24px 40px; background: var(--st-canvas); color: var(--st-text); font-family: var(--font-workspace), system-ui, sans-serif; }
+.embedBrand { display: flex; align-items: center; gap: 12px; margin: 0 0 20px; color: var(--st-text-2); font-size: 13px; line-height: 18px; }
+.embedColumn { display: flex; max-width: 640px; flex-direction: column; gap: 24px; }
+
+@media (max-width: 767px) {
+  .pair { grid-template-columns: minmax(0, 1fr); }
+  .embed { padding: 20px 16px 32px; }
+}

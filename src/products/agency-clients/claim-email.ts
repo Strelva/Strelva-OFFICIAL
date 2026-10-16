@@ -14,6 +14,37 @@ export interface ClaimEmailDeps {
   rpc(name: string, args: Record<string, unknown>): PromiseLike<{ data: unknown; error: unknown }>;
   send(input: SendEmailInput): Promise<SendEmailResult>;
   released(): boolean;
+  /** The agency's display name, re-read at send. Without it nothing is sent: the email always names who set the business up. */
+  agencyName?: string | null;
+}
+
+/**
+ * The claim email's words (XA · C1 in an inbox): what is ready, who set it
+ * up, that the site keeps running, and that the link alone grants nothing.
+ * One ink button, on the paper email layout the sign-in email shares.
+ * Template only while client email stays off during the rollout.
+ */
+export function claimEmailOptions(claim: Pick<OwnerClaim, "workspaceName">, claimUrl: string, agencyName: string) {
+  const agency = agencyName.trim();
+  if (!agency) throw new Error("The claim email names the agency that set the business up");
+  const subject = `${claim.workspaceName} is ready for its owner.`;
+  const paragraphs = [
+    `${agency} set up ${claim.workspaceName} on Strelva for you. Review what they prepared, then choose what ${agency} can do.`,
+    "Your site keeps running whether or not you claim it. Claiming does not publish your website or accept a price.",
+  ];
+  const footer = "Sign in with the email this was sent to. The link alone grants nothing and shows nothing private.";
+  const button = { label: `Claim ${claim.workspaceName}`, url: claimUrl };
+  return {
+    preheader: `${agency} set up ${claim.workspaceName} on Strelva. Claim it to own the workspace and its data.`,
+    heading: subject,
+    paragraphs,
+    button,
+    footerNote: footer,
+    paper: {
+      subject, sender: agency, senderDetail: "Runs on Strelva", preheader: `${agency} set up ${claim.workspaceName} on Strelva.`, footer,
+      blocks: [...paragraphs.map(text => ({ kind: "paragraph" as const, text })), { kind: "actions" as const, actions: [{ ...button, style: "ink" as const }] }],
+    },
+  };
 }
 
 /** The persisted reservation prevents a lost response from becoming a fresh send.
@@ -22,6 +53,9 @@ export async function emailOwnerClaim(actor: WorkspaceActor, agencyWorkspaceId: 
   deps: ClaimEmailDeps): Promise<OwnerClaimDelivery> {
   if (!deps.released()) return claim.delivery;
   const held: OwnerClaimDelivery = { ...claim.delivery, status: "not_sent", reason: "permission_or_email_gate" };
+  // Every claim email names who set the business up; an unknown agency holds the send.
+  const agencyName = deps.agencyName?.trim();
+  if (!agencyName) return { ...held, reason: "agency_identity_unavailable" };
   const args = { p_user_id: actor.userId, p_verified_email: actor.verifiedEmail.trim().toLowerCase(),
     p_agency_workspace_id: agencyWorkspaceId, p_claim_id: claim.claimId,
     p_token_hash: createHash("sha256").update(claim.claimPath.split("/").at(-1) ?? "").digest("hex") };
@@ -35,9 +69,7 @@ export async function emailOwnerClaim(actor: WorkspaceActor, agencyWorkspaceId: 
     const result = await deps.send({ audience: "client", authorship: "platform", workspaceId: claim.customerWorkspaceId,
       fromAddress: "hello@updates.strelva.com", to: claim.recipientEmail,
       subject: `Claim ${claim.workspaceName} on Strelva`, idempotencyKey: `agency-owner-claim:${claim.claimId}`,
-      options: { heading: `Your business workspace is ready to claim`,
-        paragraphs: [`Review the details prepared for ${claim.workspaceName}, then choose what your agency can do. Sign in with the email this link was addressed to.`, "Claiming does not publish your website or accept a price."],
-        button: { label: "Review and claim your business", url: new URL(claim.claimPath, origin.origin).toString() } } });
+      options: claimEmailOptions(claim, new URL(claim.claimPath, origin.origin).toString(), agencyName) });
     delivery = result.status === "accepted"
       ? { ...claim.delivery, status: "accepted", reason: "provider_accepted", providerMessageId: result.providerMessageId, acceptedAt: result.acceptedAt }
       : { ...held, reason: "email_suppressed" };

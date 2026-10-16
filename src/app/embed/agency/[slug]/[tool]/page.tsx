@@ -20,7 +20,7 @@ export default async function AgencyEmbed({ params, searchParams }: {
     const website = normalizedWebsite(stored.result.url);
     if (!website || website !== normalizedWebsite(report.url)) notFound();
   }
-  return <WebsiteAuditPage agency={agency} initialResult={report ?? undefined} initialReportId={typeof query.report === "string" ? query.report : undefined} initialAiResult={stored?.result} initialScanId={stored?.id} />;
+  return <WebsiteAuditPage frame="embed" agency={agency} initialResult={report ?? undefined} initialReportId={typeof query.report === "string" ? query.report : undefined} initialAiResult={stored?.result} initialScanId={stored?.id} />;
 }
 
 function normalizedWebsite(value: string | undefined) {

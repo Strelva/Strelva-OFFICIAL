@@ -40,7 +40,8 @@ describe("one website, typed once", () => {
     expectNeutralAgencyEntry(html);
     expect(mocks.readCheck).toHaveBeenCalledWith("scan_abc");
     expect(html).toContain("Northside Bakery");
-    expect(html).toContain("https://northside.example/");
+    expect(html).toContain("northside.example");
+    expect(html).toContain(`href="/sign-up?next=${encodeURIComponent("/workspace?save=scan_abc")}"`);
   });
 
   it("does not read or carry the check when the owner door is off (negative control)", async () => {

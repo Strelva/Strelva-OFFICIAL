@@ -67,6 +67,7 @@ import type { SavedWork } from "@/platform/workspaces/types";
 import type { ClientAiCheck } from "./contracts";
 import { claimReviewReleaseEnabled } from "./index";
 import { agencyClaimEmailReleased, claimEmailTransport, emailOwnerClaim } from "./claim-email";
+import { resolveAgencyEmailIdentity } from "@/platform/agency-brand/server";
 
 export * from "./index";
 
@@ -86,6 +87,8 @@ export interface AgencyClientDeps {
   assess: typeof runPrivateAiVisibilityAssessment;
   /** STRELVA_CLAIM_REVIEW_RELEASE. Absent means off. */
   claimReview?: () => boolean;
+  /** The agency's sending identity, re-read at send. Absent or null holds the claim email. */
+  agencyIdentity?: (agencyWorkspaceId: string) => Promise<{ name: string } | null>;
 }
 
 function defaultDeps(): AgencyClientDeps {
@@ -99,6 +102,7 @@ function defaultDeps(): AgencyClientDeps {
     now: () => new Date(),
     assess: runPrivateAiVisibilityAssessment,
     claimReview: () => claimReviewReleaseEnabled(),
+    agencyIdentity: (agencyWorkspaceId) => resolveAgencyEmailIdentity(agencyWorkspaceId),
   };
 }
 
@@ -310,9 +314,12 @@ export async function issueAgencyClientOwnerClaim(actor: WorkspaceActor, input: 
     p_expires_at: expiresAt.toISOString(),
   }, ownerClaimSchema, "The owner link couldn't be created. Try again.");
   const issued = { ...claim, claimPath: `${OWNER_CLAIM_PATH}${token}` };
-  return { ...issued, delivery: input.sendEmail ? await emailOwnerClaim(actor, input.agencyWorkspaceId, issued, {
-    rpc: deps.rpc, send: claimEmailTransport, released: agencyClaimEmailReleased,
-  }) : deliverOwnerClaim(issued) };
+  if (!input.sendEmail) return { ...issued, delivery: deliverOwnerClaim(issued) };
+  // The email names the agency that set the business up; it is re-read here, never taken from the request.
+  const identity = agencyClaimEmailReleased() ? await deps.agencyIdentity?.(input.agencyWorkspaceId).catch(() => null) : null;
+  return { ...issued, delivery: await emailOwnerClaim(actor, input.agencyWorkspaceId, issued, {
+    rpc: deps.rpc, send: claimEmailTransport, released: agencyClaimEmailReleased, agencyName: identity?.name ?? null,
+  }) };
 }
 
 export async function listAgencyClientAdditions(actor: WorkspaceActor, agencyWorkspaceId: string, deps: AgencyClientDeps = defaultDeps()): Promise<AgencyClientListItem[]> {
