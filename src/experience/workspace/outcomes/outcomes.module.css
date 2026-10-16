@@ -39,11 +39,9 @@
 .eyebrow {
   margin: 0;
   color: var(--oc-eyebrow);
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 0.14em;
+  font-size: 13px;
+  font-weight: 500;
   line-height: 16px;
-  text-transform: uppercase;
 }
 
 .headline {
@@ -605,8 +603,6 @@ a.citation:hover {
   color: var(--oc-moss);
   font-size: 14px;
   font-weight: 600;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
 }
 
 .trend[data-word="Slipping"] {

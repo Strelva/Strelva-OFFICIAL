@@ -9,7 +9,6 @@ import {
   Link2,
   Loader2,
   LockKeyhole,
-  UserRound,
 } from "lucide-react";
 import { useEffect, useId, useLayoutEffect, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 import { useWorkspaceRequest } from "./WorkspaceRequest";
@@ -154,7 +153,7 @@ function AgencyHandoff({ snapshot, currentRole, selectedWork, postAction, isActi
 
   return (
     <div className="mx-auto max-w-3xl">
-      <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-accent-text">Agency handoff</p>
+      <p className="text-[13px] font-medium text-accent-text">Agency handoff</p>
       <h1 className="mt-4 font-display text-[36px] font-medium leading-tight text-warm-black">Put finished work in the client’s hands.</h1>
       <p className="mt-4 max-w-2xl text-[14px] leading-relaxed text-gray-muted">The link is bound to the recipient’s signed-in email. Acceptance creates an independent, client-owned copy. Agency access is never assumed.</p>
       {currentRole === "owner" ? <div className="mt-5 flex flex-wrap gap-3"><a href={`/workspace/invitations?workspaceId=${encodeURIComponent(snapshot.workspaceId)}`} className="inline-flex min-h-10 items-center rounded-xl border border-gray-border px-4 text-[13px] font-medium text-warm-black hover:bg-gray-bg">Manage workspace invitations</a><a href={`/workspace/export?workspaceId=${encodeURIComponent(snapshot.workspaceId)}`} className="inline-flex min-h-10 items-center rounded-xl border border-gray-border px-4 text-[13px] font-medium text-warm-black hover:bg-gray-bg">Export workspace data</a></div> : null}
@@ -165,7 +164,7 @@ function AgencyHandoff({ snapshot, currentRole, selectedWork, postAction, isActi
           {createdLink ? <div className="mt-4 flex flex-col gap-2 rounded-xl bg-gray-bg px-4 py-3 sm:flex-row sm:items-center"><code className="min-w-0 flex-1 truncate text-[11px] text-gray-muted">{createdLink}</code><Button type="button" size="sm" variant="secondary" icon={<Copy className="h-3.5 w-3.5" />} onClick={() => void copyLink()}>Copy link</Button>{copyState === "copied" ? <span role="status" className="text-[11px] text-positive">Copied</span> : copyState === "error" ? <span role="status" className="text-[11px] text-critical">Copy unavailable</span> : null}</div> : null}
         </form>
       ) : <p className="mt-8 border-y border-gray-border py-6 text-[14px] text-gray-muted">{isDelegatedCustomerWork ? "This is a client-owned copy shared with your agency as read-only. It cannot be handed to someone else." : isUnsupportedWork ? "This product cannot be handed off in this release. Its saved record remains available." : "Create or select an assessment before preparing a handoff."}</p>}
-      <section className="mt-8"><h2 className="text-[11px] font-medium uppercase tracking-[0.14em] text-gray-muted">Handoff history</h2>{snapshot.handoffs.length ? <ul className="mt-3 divide-y divide-gray-border border-y border-gray-border">{snapshot.handoffs.map((handoff) => <li key={handoff.id} className="flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between"><div><p className="text-[13px] font-medium text-warm-black">{handoff.recipientEmail}</p><p className="mt-1 text-[11px] capitalize text-gray-muted">{handoff.status} · created {formatDate(handoff.createdAt)}</p></div>{handoff.status === "pending" ? <Button type="button" size="sm" variant="danger" disabled={submitting} onClick={() => void revoke(handoff.id)}>Revoke</Button> : null}</li>)}</ul> : <p className="mt-3 text-[13px] text-gray-muted">No handoffs from this workspace yet.</p>}</section>
+      <section className="mt-8"><h2 className="text-[13px] font-medium text-gray-muted">Handoff history</h2>{snapshot.handoffs.length ? <ul className="mt-3 divide-y divide-gray-border border-y border-gray-border">{snapshot.handoffs.map((handoff) => <li key={handoff.id} className="flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between"><div><p className="text-[13px] font-medium text-warm-black">{handoff.recipientEmail}</p><p className="mt-1 text-[11px] capitalize text-gray-muted">{handoff.status} · created {formatDate(handoff.createdAt)}</p></div>{handoff.status === "pending" ? <Button type="button" size="sm" variant="danger" disabled={submitting} onClick={() => void revoke(handoff.id)}>Revoke</Button> : null}</li>)}</ul> : <p className="mt-3 text-[13px] text-gray-muted">No handoffs from this workspace yet.</p>}</section>
     </div>
   );
 }
@@ -264,7 +263,7 @@ export function AccessHandoffOverlay({ loading, token, preview, postAction, onAc
         {loading || !preview ? <div role="status" className="flex min-h-[60vh] items-center justify-center gap-3 text-[14px] text-gray-muted"><Loader2 className="h-4 w-4 animate-spin" />Opening private handoff…</div> : (
           <>
             <button type="button" autoFocus onClick={onClose} className="inline-flex items-center gap-1.5 text-[12px] text-gray-muted hover:text-warm-black"><ArrowLeft className="h-3.5 w-3.5" />Back to workspace</button>
-            <div className="mt-8 flex items-start gap-3"><div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-accent-dim text-accent-text"><UserRound className="h-4.5 w-4.5" /></div><div><p className="text-[11px] uppercase tracking-[0.14em] text-gray-muted">Prepared for {preview.recipientEmail}</p><h1 id="handoff-title" className="mt-2 font-display text-[32px] font-medium leading-tight text-warm-black">{preview.agencyName} prepared this for you.</h1></div></div>
+            <div className="mt-8"><div><p className="text-[13px] font-medium text-gray-muted">Prepared for {preview.recipientEmail}</p><h1 id="handoff-title" className="mt-2 font-display text-[32px] font-medium leading-tight text-warm-black">{preview.agencyName} prepared this for you.</h1></div></div>
             <div className="mt-8 border-y border-gray-border py-7">{isAiVisibilityPreview ? <AiVisibilityAssessmentResult work={preview.work} accessLabel="Prepared handoff preview" /> : isTrackerPreview ? <TrackerHandoffPreview preview={isTrackerPreview} /> : <p className="text-[14px] text-gray-muted">This handoff preview is unavailable. The saved work remains unchanged.</p>}</div>
             {preview.accepted ? <p className="mt-7 flex items-center gap-2 text-[14px] text-positive"><Check className="h-4 w-4" />This handoff has already been accepted.</p> : (
               <div className="mt-7">

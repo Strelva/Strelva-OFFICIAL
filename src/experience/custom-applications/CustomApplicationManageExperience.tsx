@@ -139,7 +139,7 @@ export function CustomApplicationManageExperience({ workId, readOnly = false }: 
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-8 px-4 py-8 text-warm-black sm:px-6 sm:py-12">
       <header className="space-y-2">
-        <p className="text-xs uppercase tracking-[0.16em] text-gray-muted">Internal tool delivery</p>
+        <p className="text-[13px] font-medium text-gray-muted">Internal tool delivery</p>
         <h1 className="font-display text-3xl font-medium sm:text-4xl">{application.title}</h1>
         <p className="max-w-2xl text-sm leading-6 text-gray-fg">{readOnly ? "Inspect the exact reviewed artifact and release history. Existing access stays on its granted release." : "Build a bounded candidate, inspect the exact artifact, then release it to named recipients. Existing access stays on its granted release."}</p>
       </header>

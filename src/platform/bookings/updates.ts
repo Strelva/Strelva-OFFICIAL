@@ -35,7 +35,7 @@ function calendarFile(booking: StoreBooking, businessName: string, address: stri
   const stamp = (s: string) => new Date(s).toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
   const lines = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Strelva//Bookings//EN", "METHOD:PUBLISH", "BEGIN:VEVENT",
     `UID:${booking.id}@strelva.com`, `DTSTAMP:${stamp(booking.createdAt)}`, `DTSTART:${stamp(booking.start)}`, `DTEND:${stamp(booking.end)}`,
-    `SUMMARY:${escape(`${booking.serviceName} — ${businessName}`)}`, ...(address ? [`LOCATION:${escape(address)}`] : []), "END:VEVENT", "END:VCALENDAR"];
+    `SUMMARY:${escape(`${booking.serviceName} · ${businessName}`)}`, ...(address ? [`LOCATION:${escape(address)}`] : []), "END:VEVENT", "END:VCALENDAR"];
   // Fold UTF-8 safely at <=75 octets (RFC 5545). Avoid header/line injection.
   return lines.flatMap(line => {
     const out: string[] = []; let part = "";

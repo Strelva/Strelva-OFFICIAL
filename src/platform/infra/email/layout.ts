@@ -297,11 +297,11 @@ export function renderEmailText(opts: EmailOptions): string {
   const parts: string[] = [opts.heading, ""];
   for (const p of opts.paragraphs ?? []) parts.push(p, "");
   if (opts.highlight) {
-    parts.push(`${opts.highlight.value} — ${opts.highlight.label}`);
+    parts.push(`${opts.highlight.value} · ${opts.highlight.label}`);
     if (opts.highlight.note) parts.push(opts.highlight.note);
     parts.push("");
   }
-  for (const b of opts.bullets ?? []) parts.push(`- ${b.title}${b.text ? ` — ${b.text}` : ""}`);
+  for (const b of opts.bullets ?? []) parts.push(`- ${b.title}${b.text ? `: ${b.text}` : ""}`);
   if (opts.bullets && opts.bullets.length) parts.push("");
   for (const d of opts.decisions ?? []) {
     parts.push(d.title);

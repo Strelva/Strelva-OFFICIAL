@@ -101,7 +101,7 @@
 .startPartCopy { display:flex; min-width:0; flex:1; flex-direction:column; gap:4px; }
 .startPartCopy strong { color:var(--warm-black); font-size:14px; font-weight:500; }
 .startPartCopy small { max-width:560px; font-size:12px; line-height:1.6; }
-.startPartMeta { flex:0 0 auto; color:var(--accent-text); font-size:10px; letter-spacing:.08em; text-transform:uppercase; }
+.startPartMeta { flex:0 0 auto; color:var(--accent-text); font-size:13px; font-weight:500; }
 .startSelect { display:flex; align-items:center; justify-content:space-between; gap:20px; margin-top:18px; color:var(--warm-black); font-size:13px; }
 .startSelect > span { min-width:0; }
 .startSelect > span small { margin-left:5px; color:var(--gray-muted); font-size:11px; }
