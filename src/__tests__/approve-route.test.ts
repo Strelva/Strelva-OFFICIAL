@@ -123,7 +123,8 @@ describe("POST /api/approve (the real resolve)", () => {
     mockGetEventRaw.mockResolvedValueOnce(null).mockRejectedValueOnce(new Error("read failed"));
     const html = await (await postReq(signApproveToken(claims))).text();
     expect(html).toContain("Approved");
-    expect(html).toContain("Actor not recorded");
+    expect(html).toContain("Strelva didn&#39;t record who made this change.");
+    expect(html).not.toContain("Actor not recorded");
     expect(html).not.toContain('method="POST"');
     expect(mockResolveEventAction).toHaveBeenCalledTimes(1);
   });

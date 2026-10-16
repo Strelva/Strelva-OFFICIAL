@@ -21,6 +21,18 @@ import { AUTO_REPLY_POLICY_ACTOR, KIND_RULES, OWNER_ONLY_KINDS, isConfigurableKi
 import { classifyTenantEvent, observedTenantRoute, tenantEventRevision } from "./tenant-classify";
 import type { ServiceSession } from "./service-actor";
 
+/**
+ * A read-only booking week for the phone yes (XA · E2): days, times and
+ * closures in place. Not an adapter method: the service derives it from the
+ * one decision preview (`preview`, kind bookings_week), so Today and the
+ * phone yes show the same week.
+ */
+export interface ReviewWeek {
+  address: string;
+  days: { key: string; weekday: string; date: string; times: string[]; closed: string | null }[];
+  notes?: string[];
+}
+
 export interface AdapterContext {
   workspaceId: string;
   /** Present when a signed-in member is looking; some sources can only be read as a member. */

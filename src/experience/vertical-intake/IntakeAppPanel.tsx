@@ -7,6 +7,8 @@ import { SelectInput, TextInput } from "@/components/ui/TextInput";
 import { useWorkspaceRequest } from "@/experience/workspace/WorkspaceRequest";
 import type { IntakeAppView, IntakeLiveCheck, IntakeSubmissionView } from "@/products/vertical-intake/client";
 import styles from "./intake-app.module.css";
+import visitor from "@/experience/bookings/visitor.module.css";
+import { VisitorIntakeForm } from "./VisitorIntakeForm";
 
 const HIPAA_NOTE = "Strelva isn't set up to hold patient health information yet (it isn't a HIPAA-covered system). This form asks only for contact details, insurance plan, a reason from a short list and preferred times, and asks patients not to include medical details.";
 const MEMBER_ID_OFF = "Off. Asking for member IDs waits until Strelva can hold them under a business associate agreement.";
@@ -107,6 +109,10 @@ export function IntakeAppPanel({ workspaceId, initial }: { workspaceId: string; 
       <StRows label="Readiness">{view.readiness.map(row => <StRow key={row.id} lead={<span aria-hidden="true">{row.state === "done" ? "✓" : row.state === "note" ? "•" : "○"}</span>} title={row.label} detail={`${row.state === "done" ? "Done. " : row.state === "missing" ? (row.blocking ? "Needed. " : "Optional. ") : ""}${row.detail}`}
         end={row.state !== "done" && (row.id === "phone" || row.id === "insurance" || row.id === "hours") ? <StTextButton href={`/workspace/business-details?${new URLSearchParams({ workspaceId })}`}>Open Business details</StTextButton> : row.state !== "done" && row.id === "site" ? <StTextButton href={`/workspace/site?${new URLSearchParams({ workspaceId })}`}>Connect your website</StTextButton> : undefined} />)}</StRows>
     </StSection>
+
+    {view.previewForm?.fields ? <StSection title="What patients see on your website">
+      <div className={visitor.frame}><VisitorIntakeForm form={view.previewForm} /></div>
+    </StSection> : null}
 
     {canEdit ? <StSection title="Settings">
       <form className={styles.stack} onSubmit={event => { event.preventDefault(); void save(); }} aria-label="Dental intake settings">

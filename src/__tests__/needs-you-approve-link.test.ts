@@ -104,12 +104,35 @@ describe("GET with a workspace link (scanner-safe)", () => {
     const res = await get(token);
     const html = await res.text();
     expect(res.status).toBe(200);
-    expect(html).toContain("Approve: Reply to a new inquiry");
+    expect(html).toContain("<h1>Reply to a new inquiry");
+    expect(html).toContain(">Approve</button>");
     expect(html).toContain("The reply sends.");
     expect(html).toContain('method="POST"');
     expect(mockDecide).not.toHaveBeenCalled();
     expect(mockResolveEventAction).not.toHaveBeenCalled();
     expect(mockRead).toHaveBeenCalledWith(WS, ITEM);
+  });
+
+  it("puts Not now on the same page as its own not-yet token, expiring with the emailed link", async () => {
+    const { signWorkspaceApproveToken, verifyWorkspaceApproveToken } = await import("@/lib/approve-link");
+    const now = Date.now();
+    const token = signWorkspaceApproveToken(claims, now - 60_000);
+    const html = await (await get(token)).text();
+    const sibling = html.match(/name="token" value="([^"]+)"><button type="submit" class="text" data-xa-decline>Not now<\/button>/)?.[1];
+    expect(sibling).toBeTruthy();
+    expect(verifyWorkspaceApproveToken(sibling!)).toEqual({ ...claims, action: "not-yet", recipient: "owner@example.test" });
+    const exp = (t: string) => JSON.parse(Buffer.from(t.split(".")[0]!, "base64url").toString("utf8")).exp;
+    expect(exp(sibling!)).toBe(exp(token));
+    expect(mockDecide).not.toHaveBeenCalled();
+  });
+
+  it("a not-yet link never offers a yes: the decision is one text button beside the item", async () => {
+    const { signWorkspaceApproveToken } = await import("@/lib/approve-link");
+    const html = await (await get(signWorkspaceApproveToken({ ...claims, action: "not-yet" }))).text();
+    expect(html).not.toContain("data-xa-primary");
+    expect(html.match(/method="POST"/g)).toHaveLength(1);
+    expect(html).toContain('class="text left" data-xa-decline>Not now</button>');
+    expect(html).toContain("Nothing sends.");
   });
 
   it("shows agent attribution in a booking decision and resolves without a login", async () => {
@@ -194,7 +217,7 @@ describe("POST with a workspace link", () => {
     ["sign_in", 200, "Sign in to decide this"],
     ["not_owner", 403, "This link isn't for this account"],
     ["failed", 200, "Could not finish this"],
-    ["done_unverified", 200, "Confirmation is still pending"],
+    ["done_unverified", 200, "Strelva is still checking"],
   ])("maps %s to an honest page", async (status, code, text) => {
     const { signWorkspaceApproveToken } = await import("@/lib/approve-link");
     mockDecide.mockResolvedValueOnce({ status, item: item() });
@@ -212,9 +235,10 @@ describe("POST with a workspace link", () => {
     const html = await (await post(signWorkspaceApproveToken(claims))).text();
     expect(html).toContain("North Studio published the contact form");
     expect(html).toContain("Runs on Strelva");
-    expect(html).toContain("Contact form: shorter intake");
-    expect(html).toContain("Confirmation is still pending");
-    expect(html).toContain("Open System");
+    expect(html).toContain("Strelva is still checking that Contact form: shorter intake shows.");
+    expect(html).toContain("<h1>Your yes went through</h1>");
+    expect(html).toContain(">See it</a>");
+    expect(html).not.toContain(">Undo</a>");
     expect(html).not.toContain("Confirmed live");
     expect(html).not.toContain('method="POST"');
   });

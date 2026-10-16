@@ -1,4 +1,5 @@
 import { issuePublicInquiryConfirmation, requirePublicBookingEmail } from "@/platform/bookings/public-confirmation";
+import { visitorClosures, type VisitorClosure } from "@/platform/bookings/visitor-week";
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { z } from "zod";
 import { inquiryRecordsRpc, inquiryRecordsEnabled } from "@/platform/infra/inquiry-records";
@@ -131,16 +132,24 @@ export async function prepareWorkspaceInquiryBooking(actor: WorkspaceActor, raw:
   const record = await deps.rpc("resolve_workspace_inquiry_booking_lead", { p_workspace_id: selection.workspaceId, p_row_id: selection.rowId, p_user_id: actor.userId, p_verified_email: actor.verifiedEmail }, () => new WorkspaceAccessError()) as { tenantId: string | null; inquiryId: string; workspaceId: string };
   return prepareInquiryBookingOffer({ ...record, actor, selection }, deps);
 }
-export type InquiryBookingChoice = { businessName?: string; offer: InquiryBookingOffer; booking: StoreBooking | null };
+export type InquiryBookingChoice = {
+  businessName?: string; offer: InquiryBookingOffer; booking: StoreBooking | null;
+  /** The office phone from the booking context, for a tap-to-call way forward. */
+  businessPhone?: string | null;
+  /** Closed days from the hours record, shown in place on the week. */
+  closures?: VisitorClosure[];
+};
 export async function loadInquiryBookingChoice(token: string, deps: InquiryBookingDependencies = defaults): Promise<InquiryBookingChoice | null> {
   if (!deps.enabled()) return null;
   const id = verifyInquiryBookingOffer(token, deps.secret(), deps.now());
   if (!id) return null;
-  const data = await deps.rpc("read_inquiry_booking_offer", { p_offer_id: id }) as { tenantId: string | null; workspaceId: string; offer: unknown; booking: unknown } | null;
+  const data = await deps.rpc("read_inquiry_booking_offer", { p_offer_id: id }) as { tenantId: string | null; workspaceId: string; offer: unknown; booking: unknown; context?: unknown } | null;
   if (!data || !(data.tenantId ? await deps.released(data.tenantId) : await deps.workspaceReleased?.(data.workspaceId))) return null;
   const business = await deps.rpc("read_booking_business_details", { p_tenant_id: data.tenantId ?? `workspace:${data.workspaceId}` }) as { name?: string } | null;
   if (!business?.name?.trim()) throw new Error("The business identity could not be verified.");
-  return { businessName: business.name, offer: project(data.offer, deps), booking: parseStoreBooking(data.booking) };
+  const context = data.context && typeof data.context === "object" ? data.context as { phone?: unknown } : null;
+  return { businessName: business.name, offer: project(data.offer, deps), booking: parseStoreBooking(data.booking),
+    businessPhone: typeof context?.phone === "string" && context.phone.trim() ? context.phone.trim() : null, closures: visitorClosures(context) };
 }
 export async function chooseInquiryBookingSlot(token: string, index: number, deps: InquiryBookingDependencies = defaults): Promise<StoreBooking> {
   if (!deps.enabled() || !Number.isInteger(index) || index < 0 || index > 2) throw new WorkspaceConflictError("Choose an offered time.");

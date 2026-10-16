@@ -12,7 +12,7 @@ import type { EmailDecision, EmailOptions } from "@/platform/infra/email/layout"
 import { buildWorkspaceApproveUrl, type WorkspaceApproveLinkClaims } from "@/lib/approve-link";
 import type { WorkspaceActor } from "@/platform/workspaces/types";
 import { decisionPreviewSchema, nextChaseStep, type Decision, type DecisionPreview, type OwnerDecision, type PolicyItem } from "./contracts";
-import type { AdapterContext, ResolveBy, SourceAdapter } from "./adapters";
+import type { AdapterContext, ResolveBy, ReviewWeek, SourceAdapter } from "./adapters";
 import { ServiceSessionRefusedError, type ServiceSession } from "./service-actor";
 import { NeedsYouRefusedError, type DeliveryRow, type NeedsYouStore } from "./repository";
 
@@ -188,6 +188,21 @@ export function createNeedsYouService(deps: NeedsYouDeps) {
     const adapter = adapterFor(item.sourceLifecycle);
     if (!adapter?.preview || ctx.workspaceId !== item.workspaceId) return null;
     return adapter.preview(ctx, item).then(value => decisionPreviewSchema.nullable().catch(null).parse(value)).catch(() => null);
+  }
+
+  /**
+   * The visitor page the yes changes, for the phone yes (XA · E2). The same
+   * preview Today shows, drawn as a week; null when there is none.
+   */
+  async function reviewWeek(item: OwnerDecision): Promise<ReviewWeek | null> {
+    const shown = await preview(item, { workspaceId: item.workspaceId });
+    if (!shown || shown.kind !== "bookings_week") return null;
+    const day = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
+    return {
+      address: shown.address,
+      days: shown.days.map(entry => ({ key: entry.date, weekday: entry.weekday, date: day.format(new Date(`${entry.date}T00:00:00Z`)), times: entry.times, closed: entry.closed ? "Closed" : null })),
+      ...(shown.note ? { notes: [shown.note] } : {}),
+    };
   }
 
   async function decide(input: {
@@ -604,7 +619,7 @@ export function createNeedsYouService(deps: NeedsYouDeps) {
     return summary;
   }
 
-  return { sync, list, review, decide, openForSource, recordPolicyDecision, chase, notifyBookingRequest, deliverUrgentSource };
+  return { sync, list, review, reviewWeek, decide, openForSource, recordPolicyDecision, chase, notifyBookingRequest, deliverUrgentSource };
 }
 
 export type NeedsYouService = ReturnType<typeof createNeedsYouService>;

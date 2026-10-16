@@ -41,7 +41,7 @@ describe("visitor presentation preserves explicit booking actions", () => {
     vi.useFakeTimers(); vi.setSystemTime(new Date("2026-11-06T13:55:00Z"));
     const offer = { serviceId: "service", serviceName: "Consultation", services: [], timeZone: "America/New_York", chooseUrl: "/fictional", expiresAt: "2026-11-07T00:00:00Z", slots: [] };
     const render = (status: "held" | "requested" | "confirmed") => renderToStaticMarkup(createElement(InquiryBookingChoice, { now: Date.now(), businessName: "Lakeview Yoga", choice: { offer, booking: parseStoreBooking({ id: "fictional", status, serviceName: "Consultation", start: "2026-11-06T15:00:00Z", end: "2026-11-06T15:30:00Z", timeZone: "America/New_York", createdAt: "2026-11-06T13:50:00Z" }) }, actionUrl: "/fictional/action" }));
-    expect(render("held")).toContain("Check your email to confirm"); expect(render("held")).toContain("9:05 AM Eastern Time"); expect(render("held")).not.toContain("<form");
+    expect(render("held")).toContain("Check your email to confirm"); expect(render("held")).toContain("Confirm by Friday, Nov 6 at 9:05 AM."); expect(render("held")).toContain("10:00 AM Eastern."); expect(render("held")).not.toContain("<form");
     expect(render("requested")).toContain("Waiting on Lakeview Yoga"); expect(render("requested")).not.toContain("Confirm by");
     expect(render("confirmed")).toContain("Confirmed"); expect(render("confirmed")).toContain("change or cancel");
     vi.setSystemTime(new Date("2026-11-06T14:06:00Z")); expect(render("held")).toContain("Confirmation time expired");

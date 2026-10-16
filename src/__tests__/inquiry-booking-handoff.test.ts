@@ -53,6 +53,17 @@ describe("inquiry to requested booking", () => {
     expect(d.rpc).toHaveBeenLastCalledWith("read_booking_business_details", { p_tenant_id: "site" });
     expect(d.rpc).toHaveBeenCalledTimes(2);
   });
+  it("carries the office phone and closed days from the offer's booking context, and nothing when it has none", async () => {
+    const token = signInquiryBookingOffer(id, saved.expiresAt, "fictional-secret");
+    const d = deps();
+    const withHours = { ...context, phone: "(716) 555-0142", hours: { timezone: "America/New_York", weekly: [], overrides: [{ date: "2026-11-26", closed: true, label: "Thanksgiving" }, { date: "2026-11-28", closed: false, opens: "09:00", closes: "13:00" }] } };
+    d.rpc = vi.fn(async (name) => name === "read_booking_business_details" ? { name: "The Mooney Firm" } : { tenantId: "site", workspaceId: id, context: withHours, offer: saved, booking: null });
+    const choice = await loadInquiryBookingChoice(token, d);
+    expect(choice?.businessPhone).toBe("(716) 555-0142");
+    expect(choice?.closures).toEqual([{ date: "2026-11-26", label: "Thanksgiving" }]);
+    d.rpc = vi.fn(async (name) => name === "read_booking_business_details" ? { name: "The Mooney Firm" } : { tenantId: "site", workspaceId: id, offer: saved, booking: null });
+    expect(await loadInquiryBookingChoice(token, d)).toMatchObject({ businessPhone: null, closures: [] });
+  });
   it("reads public business identity from the signed offer scope and fails closed when it is missing", async () => {
     const token = signInquiryBookingOffer(id, saved.expiresAt, "fictional-secret");
     const d = deps();
