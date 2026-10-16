@@ -2,27 +2,32 @@
 
 import { useEffect, useState, useRef, useCallback, type ReactNode } from "react";
 import Link from "next/link";
-import { AlertTriangle, Code2, ExternalLink, Plus, Trash2 } from "lucide-react";
 
 import { useDashboardOptional } from "@/components/dashboard/DashboardContext";
 import { getCurrentPlanDisplay } from "@/components/dashboard/billing-display";
+import { BillingBanner } from "@/components/dashboard/BillingBanner";
 import { ConfirmDialog } from "@/components/dashboard/ConfirmDialog";
 import { OwnershipSection } from "@/components/dashboard/OwnershipSection";
 import { ContentAutonomyPanel } from "@/components/dashboard/ContentAutonomyPanel";
-import { SkeletonLine } from "@/components/ui/Skeleton";
 import { DomainsClient } from "./DomainsClient";
-import { DashSelect, FormRow } from "@/components/dashboard/ui";
 import { StSkeleton } from "@/components/ui/strelva/Kit";
-import { XaButton, XaHeadline, XaSegmented, XaStatus } from "@/components/ui/strelva/Xa";
-import { DashEmpty, dashStyles as dash } from "@/components/dashboard/xa/DashboardXa";
+import { XaButton, XaField, XaHeadline, XaInitial, XaRow, XaRows, XaSegmented, XaStatus, XaTextArea, XaTextLink } from "@/components/ui/strelva/Xa";
+import { DashEmpty, DashNote, dashStyles as dash } from "@/components/dashboard/xa/DashboardXa";
 import type { CustomRepoExternalDependency } from "@/lib/types";
+
+/*
+ * Business details (/dashboard/settings) in XA. Every field says what it is
+ * once: a helper appears only when it adds something the label does not.
+ * Facts about the business live here; how the site sounds and looks (tagline,
+ * description, voice, logo, colors, fonts) lives in Website > Brand, so each
+ * field has one home. Status shows only as an exception.
+ */
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
 type SettingsData = Record<string, string>;
-type ThemeData = Record<string, unknown>;
 type NavigationData = {
   menuItems: { label: string; href: string }[];
   ctaLabel: string;
@@ -44,7 +49,6 @@ type SiteCapabilitiesData = {
   customOnlyFeatures?: string[];
   customComponents?: { id: string; label: string; description?: string; adminOnly: boolean; supportedProps?: string[] }[];
 };
-type SubscriptionStatus = "active" | "trialing" | "past_due" | "cancelled" | "none";
 type DependencyHealthData = {
   deliveryModel: string;
   dependencies: CustomRepoExternalDependency[];
@@ -65,117 +69,41 @@ function useDashboardApiPath() {
 }
 
 // ---------------------------------------------------------------------------
-// Identity field definitions
+// Business facts
 // ---------------------------------------------------------------------------
 
 type IdentityField = {
   key: string;
   label: string;
-  description: string;
-  multiline?: boolean;
-  mono?: boolean;
-  /** When set, the field renders as a dropdown instead of a text input. */
+  /** Only when it says something the label does not. */
+  hint?: string;
+  placeholder?: string;
   options?: { value: string; label: string }[];
 };
 
-/** Business — the public-facing identity of the business this account manages.
- *  (The personal greeting comes from the login, shown read-only in Account.) */
+/** The business's facts. Tagline and description are words on the site: they live in Brand. */
 const BUSINESS_FIELDS: readonly IdentityField[] = [
-  { key: "siteName", label: "Business name", description: "Your business name" },
-  { key: "ownerName", label: "Owner name", description: "Primary contact for the business" },
+  { key: "siteName", label: "Business name" },
+  { key: "ownerName", label: "Owner name", hint: "Who Strelva and your agency write to about the business." },
   {
     key: "businessModel",
-    label: "Business type",
-    description: "Sets whether Google Business & Reviews apply to you",
+    label: "How customers reach you",
+    hint: "Your Google listing and reviews show here only for a local business.",
     options: [
-      { value: "", label: "Auto (based on your site)" },
-      { value: "local", label: "Local: customers visit or I serve an area" },
-      { value: "online", label: "Online only: no physical/local presence" },
-      { value: "hybrid", label: "Both online and local" },
+      { value: "", label: "Let Strelva decide from your site" },
+      { value: "local", label: "They visit you, or you serve an area" },
+      { value: "online", label: "Online only" },
+      { value: "hybrid", label: "Both" },
     ],
   },
-  { key: "siteTagline", label: "Tagline", description: "Search results & header" },
-  { key: "siteDescription", label: "Description", description: "How you show up in search results", multiline: true },
-  { key: "bookingUrl", label: "Main button link", description: "Where your site's main button sends people", mono: true },
-  { key: "footerTagline", label: "Footer tagline", description: "Bottom of your site" },
-  { key: "copyrightText", label: "Copyright", description: "Legal text in footer" },
+  { key: "bookingUrl", label: "Where your main button goes", hint: "The page or booking link your site's main button opens.", placeholder: "https://" },
 ];
 
 // ---------------------------------------------------------------------------
-// Theme fields
+// Settings sections
 // ---------------------------------------------------------------------------
 
-const FONT_OPTIONS: { value: string; label: string }[] = [
-  { value: "Fraunces", label: "Fraunces" },
-  { value: "Instrument_Serif", label: "Instrument Serif" },
-  { value: "Playfair_Display", label: "Playfair Display" },
-  { value: "DM_Serif_Display", label: "DM Serif Display" },
-  { value: "Inter", label: "Inter" },
-  { value: "DM_Sans", label: "DM Sans" },
-  { value: "Manrope", label: "Manrope" },
-  { value: "Work_Sans", label: "Work Sans" },
-];
-
-const THEME_FONT_FIELDS: { key: string; label: string }[] = [
-  { key: "fontDisplay", label: "Display font" },
-  { key: "fontBody", label: "Body font" },
-];
-
-const THEME_COLOR_FIELDS: { key: string; label: string }[] = [
-  { key: "colors.cream", label: "Background" },
-  { key: "colors.sage", label: "Primary" },
-  { key: "colors.bark", label: "Text" },
-  { key: "colors.terra", label: "Accent" },
-  { key: "colors.wheat", label: "Secondary" },
-];
-
-// ---------------------------------------------------------------------------
-// Nested value helpers
-// ---------------------------------------------------------------------------
-
-function getNestedValue(obj: unknown, path: string): unknown {
-  if (!obj || typeof obj !== "object") return undefined;
-  const parts = path.split(".");
-  let cur: unknown = obj;
-  for (const p of parts) {
-    if (cur && typeof cur === "object" && p in (cur as Record<string, unknown>)) {
-      cur = (cur as Record<string, unknown>)[p];
-    } else {
-      return undefined;
-    }
-  }
-  return cur;
-}
-
-function setNestedValue(
-  obj: Record<string, unknown>,
-  path: string,
-  value: unknown,
-): Record<string, unknown> {
-  const parts = path.split(".");
-  const next: Record<string, unknown> = { ...obj };
-  let cursor: Record<string, unknown> = next;
-  for (let i = 0; i < parts.length - 1; i++) {
-    const k = parts[i]!;
-    const existing = cursor[k];
-    const cloned: Record<string, unknown> =
-      existing && typeof existing === "object" && !Array.isArray(existing)
-        ? { ...(existing as Record<string, unknown>) }
-        : {};
-    cursor[k] = cloned;
-    cursor = cloned;
-  }
-  cursor[parts[parts.length - 1]!] = value;
-  return next;
-}
-
-// ---------------------------------------------------------------------------
-// Settings nav items
-// ---------------------------------------------------------------------------
-
-// Four top-level groups. The five previously-thin business/site sections
-// (Business info, Branding, Site config, Connected services, Shortcuts) — plus
-// Ownership — now live as labeled in-page sections inside "Business".
+// Four top-level groups (labels pending Jacob: "You", "Web addresses").
 const SETTINGS_SECTIONS = [
   { id: "business", label: "Business" },
   { id: "account", label: "You" },
@@ -209,8 +137,8 @@ const LEGACY_HASH_TO_SECTION: Record<string, string> = {
 
 type SaveStatus = "idle" | "dirty" | "saving" | "saved" | "error";
 
-function SaveStatusPill({ status }: { status: SaveStatus }) {
-  // Nothing has happened yet at rest, so no "Saved" before the owner edits anything.
+/** Said only when something happened: nothing at rest. */
+function SaveStatusWord({ status }: { status: SaveStatus }) {
   if (status === "idle") return null;
   if (status === "dirty") return <XaStatus kind="waits" size="sm">Not saved yet</XaStatus>;
   if (status === "saving") return <XaStatus kind="working" size="sm">Saving</XaStatus>;
@@ -218,19 +146,25 @@ function SaveStatusPill({ status }: { status: SaveStatus }) {
   return <XaStatus kind="down" size="sm">Didn&apos;t save</XaStatus>;
 }
 
-// ---------------------------------------------------------------------------
-// Profile section
-// ---------------------------------------------------------------------------
+const selectClass = "min-h-[44px] w-full rounded-[var(--st-r-md)] border border-[var(--st-line)] bg-[var(--st-surface)] px-3 text-[15px] text-[var(--st-text)] outline-none focus-visible:border-[var(--st-accent)] disabled:opacity-60";
+
+function XaSelectField({ label, hint, value, onChange, options, disabled }: { label: string; hint?: string; value: string; onChange: (value: string) => void; options: { value: string; label: string }[]; disabled?: boolean }) {
+  return <label className="flex flex-col gap-2">
+    <span className="text-[13px] font-medium text-[var(--st-text-body)]">{label}</span>
+    <select className={selectClass} value={value} disabled={disabled} onChange={(event) => onChange(event.target.value)}>
+      {options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+    </select>
+    {hint ? <span className="text-[13px] leading-[18px] text-[var(--st-text-3)]">{hint}</span> : null}
+  </label>;
+}
 
 function ProfileSection({
   settings,
   setSettings,
-  fields,
   readOnly = false,
 }: {
   settings: SettingsData;
   setSettings: (s: SettingsData) => void;
-  fields: readonly IdentityField[];
   readOnly?: boolean;
 }) {
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
@@ -261,25 +195,17 @@ function ProfileSection({
     }
   }, [apiPath]);
 
-  const handleChange = useCallback(
-    (key: string, value: string) => {
-      const updated = { ...latestRef.current, [key]: value };
-      setSettings(updated);
-      latestRef.current = updated;
-      setSaveStatus("dirty");
-    },
-    [setSettings],
-  );
+  const handleChange = useCallback((key: string, value: string) => {
+    const updated = { ...latestRef.current, [key]: value };
+    setSettings(updated);
+    latestRef.current = updated;
+    setSaveStatus("dirty");
+  }, [setSettings]);
 
-  // Lightweight per-field validation. Returns an error string, or "" if valid.
   const validateField = useCallback((key: string, value: string): string => {
     const trimmed = value.trim();
-    if (key === "siteName" && !trimmed) {
-      return "Site Name is required.";
-    }
-    if (key === "bookingUrl" && trimmed && !/^https?:\/\/\S+/i.test(trimmed)) {
-      return "Enter a full URL starting with http:// or https://";
-    }
+    if (key === "siteName" && !trimmed) return "Your business needs a name.";
+    if (key === "bookingUrl" && trimmed && !/^https?:\/\/\S+/i.test(trimmed)) return "Enter the full address, starting with https://";
     return "";
   }, []);
 
@@ -292,80 +218,29 @@ function ProfileSection({
       else delete next[key];
       return next;
     });
-    if (message) {
-      // Don't persist an invalid field; surface the problem inline instead.
-      return;
-    }
+    if (message) return; // Don't persist an invalid field; say what is wrong beside it.
     saveSettings(latestRef.current);
   }, [saveSettings, validateField]);
 
   return (
-    <>
-      <div className="mb-4 flex items-center justify-end gap-3">
-        {readOnly && (
-          <span className="text-[12px] text-gray-muted">Editing is disabled in the demo</span>
-        )}
-        <SaveStatusPill status={saveStatus} />
-      </div>
-
-      <div className="border-y border-[var(--st-line)]">
-        {fields.map((field, i) => (
-          <FormRow
-            key={field.key}
-            label={field.label}
-            description={field.description}
-            last={i === fields.length - 1}
-          >
-            {field.options ? (
-              <DashSelect
-                value={settings[field.key] || ""}
-                onChange={(e) => {
-                  handleChange(field.key, e.target.value);
-                  saveSettings(latestRef.current);
-                }}
-                disabled={readOnly}
-                options={field.options}
-              />
-            ) : field.multiline ? (
-              <textarea
-                value={settings[field.key] || ""}
-                onChange={(e) => handleChange(field.key, e.target.value)}
-                onBlur={() => handleBlurSave(field.key)}
-                disabled={readOnly}
-                rows={3}
-                className="w-full bg-[var(--st-surface)] border border-[var(--st-line)] rounded-[12px] px-3 py-2.5 text-[15px] text-warm-black outline-none resize-y min-h-[64px] focus-visible:border-[var(--st-accent)] transition-colors disabled:opacity-60"
-              />
-            ) : (
-              <input
-                type="text"
-                value={settings[field.key] || ""}
-                onChange={(e) => handleChange(field.key, e.target.value)}
-                onBlur={() => handleBlurSave(field.key)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") (e.target as HTMLElement).blur();
-                }}
-                disabled={readOnly}
-                className={`w-full bg-[var(--st-surface)] border border-[var(--st-line)] rounded-[12px] px-3 py-2.5 text-[15px] outline-none focus-visible:border-[var(--st-accent)] transition-colors disabled:opacity-60 ${
-                  fieldErrors[field.key] ? "border-critical/50" : "border-glass-border"
-                } ${
-                  field.mono
-                    ? "text-accent text-[12px]"
-                    : "text-warm-black"
-                }`}
-              />
-            )}
-            {fieldErrors[field.key] && (
-              <p className="mt-1.5 text-[12px] text-critical">{fieldErrors[field.key]}</p>
-            )}
-          </FormRow>
-        ))}
-      </div>
-    </>
+    <div className="flex max-w-[560px] flex-col gap-6">
+      {readOnly || saveStatus !== "idle" ? <p className="m-0 flex items-center gap-3 text-[13px] text-[var(--st-text-3)]">{readOnly ? "Editing is off in the demo." : null}<SaveStatusWord status={saveStatus} /></p> : null}
+      {BUSINESS_FIELDS.map((field) => field.options ? (
+        <XaSelectField key={field.key} label={field.label} hint={field.hint} value={settings[field.key] || ""} disabled={readOnly} options={field.options}
+          onChange={(value) => { handleChange(field.key, value); saveSettings(latestRef.current); }} />
+      ) : (
+        <XaField key={field.key} label={field.label} hint={field.hint} error={fieldErrors[field.key]} placeholder={field.placeholder}
+          value={settings[field.key] || ""} disabled={readOnly}
+          onChange={(event) => handleChange(field.key, event.target.value)}
+          onBlur={() => handleBlurSave(field.key)}
+          onKeyDown={(event) => { if (event.key === "Enter") (event.target as HTMLElement).blur(); }} />
+      ))}
+    </div>
   );
 }
 
 // ---------------------------------------------------------------------------
-// Account section — read-only login identity (who you are, not the business)
+// You: the login, separate from the business
 // ---------------------------------------------------------------------------
 
 function AccountSection() {
@@ -373,310 +248,19 @@ function AccountSection() {
   const name = dashboard?.impersonation.actorName?.trim() || "You";
   const email = dashboard?.impersonation.actorEmail || null;
   const isAdmin = dashboard?.impersonation.isSuperAdmin ?? false;
-
   return (
-    <div className="border-t border-[var(--st-line)] pt-4">
-      <div className="flex items-center gap-3">
-        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-[15px] font-semibold text-accent">
-          {(name[0] || "U").toUpperCase()}
-        </div>
-        <div className="min-w-0">
-          <div className="flex items-center gap-2">
-            <p className="truncate text-[14px] font-semibold tracking-[-0.01em] text-warm-black">{name}</p>
-            {isAdmin && (
-              <span className="shrink-0 rounded-full bg-accent-dim px-1.5 py-0.5 text-[13px] font-semibold text-accent">
-                Strelva Admin
-              </span>
-            )}
-          </div>
-          {email && <p className="truncate text-[12px] text-gray-muted">{email}</p>}
-        </div>
-      </div>
-      <p className="mt-4 text-[12px] leading-relaxed text-gray-muted">
-        This is the account you&apos;re signed in with. It stays the same across every
-        business you can access. Your business&apos;s public details live in{" "}
-        <span className="text-warm-black">Business info</span>.
-      </p>
+    <div className="flex flex-col gap-4">
+      <XaRows label="Your sign-in">
+        <XaRow lead={<XaInitial name={name} shape="round" size={36} />} title={name} detail={[email, isAdmin ? "Strelva admin" : null].filter(Boolean).join(" · ") || undefined} />
+      </XaRows>
+      <p className="m-0 max-w-[560px] text-[15px] leading-[1.5] text-[var(--st-text-2)]">You sign in with this on every business you can open. The business&apos;s own details are under Business.</p>
     </div>
   );
 }
 
 // ---------------------------------------------------------------------------
-// Brand section
+// Menu and footer
 // ---------------------------------------------------------------------------
-
-function BrandSection({ readOnly = false }: { readOnly?: boolean }) {
-  const [theme, setTheme] = useState<ThemeData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
-  const latestRef = useRef<ThemeData | null>(null);
-  const apiPath = useDashboardApiPath();
-
-  useEffect(() => {
-    fetch(apiPath("/api/content/theme"), { credentials: "same-origin" })
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data) => {
-        setTheme(data);
-        latestRef.current = data;
-      })
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, [apiPath]);
-
-  const saveTheme = useCallback(async (data: ThemeData) => {
-    setSaveStatus("saving");
-    try {
-      const res = await fetch(apiPath("/api/content/theme"), {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        credentials: "same-origin",
-        body: JSON.stringify(data),
-      });
-      if (res.ok) {
-        setSaveStatus("saved");
-        setTimeout(() => setSaveStatus("idle"), 2000);
-      } else {
-        setSaveStatus("error");
-      }
-    } catch {
-      setSaveStatus("error");
-    }
-  }, [apiPath]);
-
-  const handleFieldChange = useCallback(
-    (key: string, value: unknown) => {
-      setTheme((prev) => {
-        if (!prev) return prev;
-        const updated = key.includes(".")
-          ? setNestedValue(prev, key, value)
-          : { ...prev, [key]: value };
-        latestRef.current = updated;
-        setSaveStatus("dirty");
-        return updated;
-      });
-    },
-    [],
-  );
-
-  const handleBlurSave = useCallback(() => {
-    if (latestRef.current) saveTheme(latestRef.current);
-  }, [saveTheme]);
-
-  if (loading) {
-    return (
-      <div className="space-y-4">
-        <SkeletonLine width="w-1/3" height="h-4" />
-        <SkeletonLine width="w-full" height="h-8" />
-      </div>
-    );
-  }
-
-  if (!theme) {
-    return (
-      <div className="bg-critical0/10 border border-critical0/20 rounded-lg p-6 text-center">
-        <p className="text-sm text-critical">Couldn&apos;t load theme data</p>
-      </div>
-    );
-  }
-
-  const swatches = THEME_COLOR_FIELDS.map((f) => ({
-    label: f.label,
-    hex: (getNestedValue(theme, f.key) as string) || "#000000",
-  }));
-  const displayFont = ((getNestedValue(theme, "fontDisplay") as string) || "").replace(/_/g, " ");
-
-  return (
-    <>
-      <div className="mb-4 flex items-center justify-between gap-3">
-        {readOnly ? (
-          <span className="text-[12px] text-gray-muted">Editing is disabled in the demo</span>
-        ) : (
-          <p className="text-[12px] text-gray-muted">Changes save as you go and apply to your live site.</p>
-        )}
-        <SaveStatusPill status={saveStatus} />
-      </div>
-
-      {/* Brand at a glance — the display face over the color set, so the brand
-          reads as a whole before you edit any single token. */}
-      <div className="mb-6 border-t border-[var(--st-line)] pt-4">
-        <p className="text-[13px] font-medium text-gray-muted">Brand at a glance</p>
-        <p
-          className="mt-2 text-[24px] leading-tight text-warm-black"
-          style={displayFont ? { fontFamily: `"${displayFont}", serif` } : undefined}
-        >
-          {displayFont || "Your display font"}
-        </p>
-        <div className="mt-4 flex flex-wrap gap-2">
-          {swatches.map((s) => (
-            <div
-              key={s.label}
-              className="flex items-center gap-2 rounded-lg border border-glass-border bg-surface-base px-2.5 py-1.5"
-            >
-              <span className="h-4 w-4 rounded-full border border-glass-border" style={{ backgroundColor: s.hex }} />
-              <span className="text-[12px] text-gray-muted">{s.label}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Typography */}
-      <h2 className="mb-2 text-[13px] font-medium text-warm-black">Typography</h2>
-      <div className="border-y border-[var(--st-line)] mb-6">
-        {THEME_FONT_FIELDS.map((field, i) => {
-          const current = (getNestedValue(theme, field.key) as string) || "";
-          return (
-            <FormRow
-              key={field.key}
-              label={field.label}
-              description="Font family"
-              last={i === THEME_FONT_FIELDS.length - 1}
-            >
-              <DashSelect
-                value={current}
-                onChange={(e) => {
-                  handleFieldChange(field.key, e.target.value);
-                  const updated = { ...latestRef.current!, [field.key]: e.target.value };
-                  latestRef.current = updated;
-                  setTheme(updated);
-                  saveTheme(updated);
-                }}
-                disabled={readOnly}
-                options={[
-                  ...(current && !FONT_OPTIONS.some((o) => o.value === current)
-                    ? [{ value: current, label: current }]
-                    : []),
-                  ...FONT_OPTIONS,
-                ]}
-              />
-            </FormRow>
-          );
-        })}
-      </div>
-
-      {/* Brand colors */}
-      <h2 className="mb-2 text-[13px] font-medium text-warm-black">Brand colors</h2>
-      <div className="border-y border-[var(--st-line)]">
-        {THEME_COLOR_FIELDS.map((field, i) => {
-          const hex = (getNestedValue(theme, field.key) as string) || "#000000";
-          return (
-            <FormRow
-              key={field.key}
-              label={field.label}
-              description="Color value"
-              last={i === THEME_COLOR_FIELDS.length - 1}
-            >
-              <div className="flex items-center gap-3">
-                <input
-                  type="color"
-                  value={hex}
-                  onChange={(e) => handleFieldChange(field.key, e.target.value)}
-                  onBlur={handleBlurSave}
-                  disabled={readOnly}
-                  className="h-8 w-8 rounded-lg border border-glass-border bg-surface-base p-0.5 cursor-pointer shrink-0 disabled:opacity-60 disabled:cursor-default"
-                />
-                <input
-                  type="text"
-                  value={hex}
-                  onChange={(e) => handleFieldChange(field.key, e.target.value)}
-                  onBlur={handleBlurSave}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") (e.target as HTMLElement).blur();
-                  }}
-                  disabled={readOnly}
-                  className="w-28 bg-surface-base border border-glass-border rounded-lg px-3 py-2 text-[12px] text-warm-black outline-none focus-visible:border-[var(--st-accent)] transition-colors disabled:opacity-60"
-                />
-              </div>
-            </FormRow>
-          );
-        })}
-      </div>
-
-    </>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// AI Agent section
-// ---------------------------------------------------------------------------
-
-
-
-
-// ---------------------------------------------------------------------------
-// Domains section
-// ---------------------------------------------------------------------------
-
-function DomainsSection() {
-  return <DomainsClient initialDomains={[]} />;
-}
-
-// ---------------------------------------------------------------------------
-// Utilities section
-// ---------------------------------------------------------------------------
-
-function UtilitiesSection() {
-  const dashboard = useDashboardOptional();
-  const dashboardHref = dashboard?.dashboardHref ?? ((path: string) => path);
-  const links = [
-    { title: "Your website's voice", href: "/dashboard/brand-kit" },
-    { title: "Connections", href: "/dashboard/integrations" },
-    { title: "Photos", href: "/dashboard/assets" },
-    { title: "What you own, and leaving", href: "/dashboard/settings#ownership" },
-  ];
-  // One sentence with places to go, not a stack of icon cards.
-  return (
-    <p className="m-0 text-[15px] leading-[1.6] text-[var(--st-text-body)]">
-      Also yours to change:{" "}
-      {links.map((item, index) => (
-        <span key={item.href}>
-          {index ? " · " : ""}
-          <Link href={dashboardHref(item.href)} className="font-medium text-[var(--st-accent)] hover:underline">{item.title}</Link>
-        </span>
-      ))}
-    </p>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Site config section
-// ---------------------------------------------------------------------------
-
-type SiteConfigTab = "navigation" | "capabilities" | "components";
-
-function SiteConfigSection({ readOnly = false }: { readOnly?: boolean }) {
-  const dashboard = useDashboardOptional();
-  const isAdmin = dashboard?.impersonation.isSuperAdmin ?? false;
-
-  const tabs: SiteConfigTab[] = isAdmin
-    ? ["navigation", "capabilities", "components"]
-    : ["navigation"];
-
-  const [tab, setTab] = useState<SiteConfigTab>("navigation");
-
-  return (
-    <div className="space-y-5">
-      <div className="flex flex-wrap gap-2">
-        {tabs.map((item) => (
-          <button
-            key={item}
-            type="button"
-            onClick={() => setTab(item)}
-            className={`h-8 rounded-lg border px-3 text-[12px] capitalize transition-colors ${
-              tab === item
-                ? "border-accent/40 bg-accent/15 text-warm-black"
-                : "border-glass-border text-gray-muted hover:text-warm-black"
-            }`}
-          >
-            {item}
-          </button>
-        ))}
-      </div>
-      {tab === "navigation" && <NavigationFooterSection readOnly={readOnly} />}
-      {isAdmin && tab === "capabilities" && <CapabilitiesSection />}
-      {isAdmin && tab === "components" && <CustomComponentsSection />}
-    </div>
-  );
-}
 
 function NavigationFooterSection({ readOnly = false }: { readOnly?: boolean }) {
   const apiPath = useDashboardApiPath();
@@ -711,147 +295,49 @@ function NavigationFooterSection({ readOnly = false }: { readOnly?: boolean }) {
     }
   }, [apiPath]);
 
-  if (loading) {
-    return <SkeletonLine width="w-full" height="h-20" />;
-  }
+  if (loading) return <div className="flex flex-col gap-3" aria-busy="true"><StSkeleton width="60%" label="Loading your menu" /><StSkeleton width="45%" label="Loading your menu" /></div>;
 
   if (!navigation || !footer) {
-    return (
-      <div className="py-2 text-left">
-        <p className="text-[13px] font-medium text-warm-black">Navigation &amp; footer aren&apos;t editable here</p>
-        <p className="mx-auto mt-1 max-w-md text-[12px] leading-relaxed text-gray-muted">
-          This site&apos;s menu and footer are managed in its code. Ask Strelva in chat to change a
-          link or label and we&apos;ll handle it.
-        </p>
-      </div>
-    );
+    return <p className="m-0 max-w-[560px] text-[15px] leading-[1.5] text-[var(--st-text-2)]">Your site&apos;s menu and footer are part of its code. Ask Strelva to change a link or a word and it handles it.</p>;
   }
 
   const updateNavItem = (index: number, key: "label" | "href", value: string) => {
-    const next = {
-      ...navigation,
-      menuItems: navigation.menuItems.map((item, i) => i === index ? { ...item, [key]: value } : item),
-    };
-    setNavigation(next);
+    setNavigation({ ...navigation, menuItems: navigation.menuItems.map((item, i) => i === index ? { ...item, [key]: value } : item) });
     setSaveStatus("dirty");
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-end gap-3">
-        {readOnly && (
-          <span className="text-[12px] text-gray-muted">Editing is disabled in the demo</span>
-        )}
-        <SaveStatusPill status={saveStatus} />
-      </div>
-      <div className="border-y border-[var(--st-line)]">
-        <div className="border-b border-glass-border px-5 py-3">
-          <p className="text-[13px] font-medium text-gray-muted">Navigation</p>
-        </div>
+    <div className="flex max-w-[640px] flex-col gap-6">
+      {saveStatus !== "idle" ? <p className="m-0 text-[13px]"><SaveStatusWord status={saveStatus} /></p> : null}
+      <ul className={dash.list} aria-label="Menu links">
         {navigation.menuItems.map((item, index) => (
-          <div key={`${item.label}-${index}`} className="grid grid-cols-1 gap-2 border-b border-glass-border/50 px-5 py-3 sm:grid-cols-[1fr_1fr_auto]">
-            <input
-              value={item.label}
-              onChange={(event) => updateNavItem(index, "label", event.target.value)}
-              onBlur={() => saveContent("navigation", navigation)}
-              disabled={readOnly}
-              className="min-h-[40px] rounded-[12px] border border-[var(--st-line)] bg-[var(--st-surface)] px-3 py-2 text-[15px] text-warm-black outline-none disabled:opacity-60"
-            />
-            <input
-              value={item.href}
-              onChange={(event) => updateNavItem(index, "href", event.target.value)}
-              onBlur={() => saveContent("navigation", navigation)}
-              disabled={readOnly}
-              className="min-h-[40px] rounded-[12px] border border-[var(--st-line)] bg-[var(--st-surface)] px-3 py-2 text-[15px] text-accent outline-none disabled:opacity-60"
-            />
-            <button
-              type="button"
-              onClick={() => {
-                const next = { ...navigation, menuItems: navigation.menuItems.filter((_, i) => i !== index) };
-                setNavigation(next);
-                saveContent("navigation", next);
-              }}
-              disabled={readOnly}
-              className="flex h-9 w-9 items-center justify-center rounded-lg border border-glass-border text-gray-muted hover:text-critical disabled:opacity-60 disabled:cursor-not-allowed"
-              aria-label="Remove navigation item"
-            >
-              <Trash2 className="h-3.5 w-3.5" strokeWidth={1.5} />
-            </button>
-          </div>
+          <li key={index} className="!flex-wrap">
+            <div className="grid min-w-0 flex-1 grid-cols-1 gap-3 sm:grid-cols-2">
+              <XaField label="Link words" value={item.label} disabled={readOnly} onChange={(event) => updateNavItem(index, "label", event.target.value)} onBlur={() => saveContent("navigation", navigation)} />
+              <XaField label="Opens" value={item.href} disabled={readOnly} onChange={(event) => updateNavItem(index, "href", event.target.value)} onBlur={() => saveContent("navigation", navigation)} />
+            </div>
+            {!readOnly ? <div className={dash.listEnd}><XaTextLink onClick={() => { const next = { ...navigation, menuItems: navigation.menuItems.filter((_, i) => i !== index) }; setNavigation(next); saveContent("navigation", next); }} aria-label={`Remove ${item.label || "this link"} from the menu`}>Remove</XaTextLink></div> : null}
+          </li>
         ))}
-        <div className="flex flex-col gap-3 px-5 py-3 sm:flex-row sm:items-center sm:justify-between">
-          <button
-            type="button"
-            onClick={() => {
-              const next = { ...navigation, menuItems: [...navigation.menuItems, { label: "New link", href: "/" }] };
-              setNavigation(next);
-              saveContent("navigation", next);
-            }}
-            disabled={readOnly}
-            className="inline-flex min-h-[40px] items-center gap-2 rounded-full bg-[var(--st-surface)] px-4 text-[14px] font-medium text-warm-black shadow-[0_1px_2px_#0000000f] hover:bg-[var(--st-hover)] disabled:opacity-60 disabled:cursor-not-allowed"
-          >
-            <Plus className="h-3.5 w-3.5" strokeWidth={1.5} />
-            Add link
-          </button>
-          <div className="grid w-full flex-1 grid-cols-1 gap-2 sm:grid-cols-2">
-            <input
-              value={navigation.ctaLabel}
-              onChange={(event) => {
-                const next = { ...navigation, ctaLabel: event.target.value };
-                setNavigation(next);
-                setSaveStatus("dirty");
-              }}
-              onBlur={() => saveContent("navigation", navigation)}
-              disabled={readOnly}
-              placeholder="CTA label"
-              className="min-h-[40px] rounded-[12px] border border-[var(--st-line)] bg-[var(--st-surface)] px-3 py-2 text-[15px] text-warm-black outline-none disabled:opacity-60"
-            />
-            <input
-              value={navigation.ctaHref}
-              onChange={(event) => {
-                const next = { ...navigation, ctaHref: event.target.value };
-                setNavigation(next);
-                setSaveStatus("dirty");
-              }}
-              onBlur={() => saveContent("navigation", navigation)}
-              disabled={readOnly}
-              placeholder="CTA href"
-              className="min-h-[40px] rounded-[12px] border border-[var(--st-line)] bg-[var(--st-surface)] px-3 py-2 text-[15px] text-accent outline-none disabled:opacity-60"
-            />
-          </div>
-        </div>
+      </ul>
+      {!readOnly ? <p className="m-0 text-[14px]"><XaTextLink onClick={() => { const next = { ...navigation, menuItems: [...navigation.menuItems, { label: "New link", href: "/" }] }; setNavigation(next); saveContent("navigation", next); }}>Add a link to the menu</XaTextLink></p> : null}
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <XaField label="Main button words" value={navigation.ctaLabel} disabled={readOnly} placeholder="Book a visit"
+          onChange={(event) => { setNavigation({ ...navigation, ctaLabel: event.target.value }); setSaveStatus("dirty"); }} onBlur={() => saveContent("navigation", navigation)} />
+        <XaField label="Main button opens" value={navigation.ctaHref} disabled={readOnly} placeholder="/book"
+          onChange={(event) => { setNavigation({ ...navigation, ctaHref: event.target.value }); setSaveStatus("dirty"); }} onBlur={() => saveContent("navigation", navigation)} />
       </div>
-
-      <div className="border-y border-[var(--st-line)]">
-        <FormRow label="Footer tagline" description="Short footer copy">
-          <textarea
-            value={footer.tagline}
-            onChange={(event) => {
-              setFooter({ ...footer, tagline: event.target.value });
-              setSaveStatus("dirty");
-            }}
-            onBlur={() => saveContent("footer", footer)}
-            disabled={readOnly}
-            rows={2}
-            className="w-full resize-none min-h-[40px] rounded-[12px] border border-[var(--st-line)] bg-[var(--st-surface)] px-3 py-2 text-[15px] text-warm-black outline-none disabled:opacity-60"
-          />
-        </FormRow>
-        <FormRow label="Copyright" description="Bottom legal line" last>
-          <input
-            value={footer.copyrightText}
-            onChange={(event) => {
-              setFooter({ ...footer, copyrightText: event.target.value });
-              setSaveStatus("dirty");
-            }}
-            onBlur={() => saveContent("footer", footer)}
-            disabled={readOnly}
-            className="w-full min-h-[40px] rounded-[12px] border border-[var(--st-line)] bg-[var(--st-surface)] px-3 py-2 text-[15px] text-warm-black outline-none disabled:opacity-60"
-          />
-        </FormRow>
-      </div>
+      <XaTextArea label="Footer line" rows={2} value={footer.tagline} disabled={readOnly}
+        onChange={(event) => { setFooter({ ...footer, tagline: event.target.value }); setSaveStatus("dirty"); }} onBlur={() => saveContent("footer", footer)} />
+      <XaField label="Copyright line" value={footer.copyrightText} disabled={readOnly}
+        onChange={(event) => { setFooter({ ...footer, copyrightText: event.target.value }); setSaveStatus("dirty"); }} onBlur={() => saveContent("footer", footer)} />
     </div>
   );
 }
+
+// ---------------------------------------------------------------------------
+// Strelva-only: what this site's code supports (admins only)
+// ---------------------------------------------------------------------------
 
 function CapabilitiesSection() {
   const apiPath = useDashboardApiPath();
@@ -892,70 +378,34 @@ function CapabilitiesSection() {
     }
   }, [apiPath]);
 
-  if (loading) return <SkeletonLine width="w-full" height="h-20" />;
-  if (!capabilities) {
-    return (
-      <div className="py-2 text-left">
-        <p className="text-[13px] font-medium text-warm-black">Couldn&apos;t load site capabilities</p>
-        <p className="mx-auto mt-1 max-w-md text-[12px] leading-relaxed text-gray-muted">
-          Refresh the page to try again.
-        </p>
-      </div>
-    );
-  }
+  if (loading) return <StSkeleton width="50%" label="Loading what the site supports" />;
+  if (!capabilities) return <DashNote tone="down">What this site supports didn&apos;t load. Reload to try again.</DashNote>;
 
   const toggles: Array<[keyof SiteCapabilitiesData, string]> = [
-    ["supportsPageConfig", "Page structure"],
-    ["supportsNavigationConfig", "Navigation"],
-    ["supportsFooterConfig", "Footer"],
-    ["supportsDraftPreview", "Draft preview"],
-    ["supportsInlineEditing", "Inline editing"],
+    ["supportsPageConfig", "Pages can be rearranged here"],
+    ["supportsNavigationConfig", "The menu can be changed here"],
+    ["supportsFooterConfig", "The footer can be changed here"],
+    ["supportsDraftPreview", "Changes can be previewed before they go live"],
+    ["supportsInlineEditing", "Words can be changed in place on the page"],
   ];
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-end gap-3">
-        {readOnly && (
-          <span className="text-[12px] text-gray-muted">Editing is disabled in the demo</span>
-        )}
-        <SaveStatusPill status={saveStatus} />
-      </div>
-      <div className="grid gap-3 sm:grid-cols-2">
+    <div className="flex max-w-[640px] flex-col gap-3">
+      {saveStatus !== "idle" ? <p className="m-0 text-[13px]"><SaveStatusWord status={saveStatus} /></p> : null}
+      <ul className={dash.list} aria-label="What this site supports">
         {toggles.map(([key, label]) => (
-          <label key={key} className="flex items-center justify-between border-b border-[var(--st-line)] py-3">
-            <span className="text-[13px] text-warm-black">{label}</span>
-            <input
-              type="checkbox"
-              checked={Boolean(capabilities[key])}
-              disabled={readOnly}
-              onChange={(event) => {
-                const next = { ...capabilities, [key]: event.target.checked };
-                setCapabilities(next);
-                saveCapabilities(next);
-              }}
-              className="h-4 w-4 accent-accent disabled:opacity-60"
-            />
-          </label>
+          <li key={key}>
+            <label className="flex min-h-[28px] flex-1 cursor-pointer items-center justify-between gap-4 text-[15px] text-[var(--st-text)]">
+              <span>{label}</span>
+              <input type="checkbox" checked={Boolean(capabilities[key])} disabled={readOnly} className="h-4 w-4 accent-[var(--st-accent)]"
+                onChange={(event) => { const next = { ...capabilities, [key]: event.target.checked }; setCapabilities(next); saveCapabilities(next); }} />
+            </label>
+          </li>
         ))}
-      </div>
-      <div className="border-t border-[var(--st-line)] pt-4">
-        <label className="text-[13px] text-gray-muted">Custom-only features</label>
-        <input
-          value={(capabilities.customOnlyFeatures || []).join(", ")}
-          disabled={readOnly}
-          onChange={(event) => {
-            const next = {
-              ...capabilities,
-              customOnlyFeatures: event.target.value.split(",").map((item) => item.trim()).filter(Boolean),
-            };
-            setCapabilities(next);
-            setSaveStatus("dirty");
-          }}
-          onBlur={() => saveCapabilities(capabilities)}
-          placeholder="cart, rewards, booking-flow"
-          className="mt-2 w-full min-h-[40px] rounded-[12px] border border-[var(--st-line)] bg-[var(--st-surface)] px-3 py-2 text-[15px] text-warm-black outline-none disabled:opacity-60"
-        />
-      </div>
+      </ul>
+      <XaField label="Things only this site's code does" hint="Separate with commas, for example: cart, rewards, booking flow." value={(capabilities.customOnlyFeatures || []).join(", ")} disabled={readOnly}
+        onChange={(event) => { setCapabilities({ ...capabilities, customOnlyFeatures: event.target.value.split(",").map((item) => item.trim()).filter(Boolean) }); setSaveStatus("dirty"); }}
+        onBlur={() => saveCapabilities(capabilities)} />
     </div>
   );
 }
@@ -972,9 +422,9 @@ function CustomComponentsSection() {
   useEffect(() => {
     if (!tenantId) return;
     fetch(apiPath(`/api/admin/component-registry?tenant=${tenantId}`), { credentials: "same-origin" })
-      .then((res) => res.ok ? res.json() : Promise.reject(new Error("Admin access required")))
+      .then((res) => res.ok ? res.json() : Promise.reject(new Error("Only Strelva admins can see these.")))
       .then((data) => setComponents(data.components || []))
-      .catch((err) => setError(err instanceof Error ? err.message : "Could not load custom components"));
+      .catch((err) => setError(err instanceof Error ? err.message : "The site's own parts didn't load."));
   }, [apiPath, tenantId]);
 
   const saveComponents = useCallback(async (next: NonNullable<SiteCapabilitiesData["customComponents"]>) => {
@@ -987,122 +437,55 @@ function CustomComponentsSection() {
         credentials: "same-origin",
         body: JSON.stringify({ tenant: tenantId, components: next }),
       });
-      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || "Could not save components");
+      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || "That didn't save.");
       setSaveStatus("saved");
       setTimeout(() => setSaveStatus("idle"), 2000);
     } catch (err) {
       setSaveStatus("error");
-      setError(err instanceof Error ? err.message : "Could not save components");
+      setError(err instanceof Error ? err.message : "That didn't save.");
     }
   }, [apiPath, tenantId]);
 
-  const removeComponent = useCallback((index: number) => {
-    const next = components.filter((_, i) => i !== index);
-    setComponents(next);
-    saveComponents(next);
-    setConfirmRemoveIndex(null);
-  }, [components, saveComponents]);
+  const update = (index: number, key: "id" | "label", value: string) => {
+    setComponents(components.map((item, i) => i === index ? { ...item, [key]: value } : item));
+    setSaveStatus("dirty");
+  };
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <p className="text-[12px] text-gray-muted">Admin-only custom components exposed to this site manifest.</p>
-        <SaveStatusPill status={saveStatus} />
-      </div>
-      {error && <p className="rounded-lg border border-warning/20 bg-warning/10 px-3 py-2 text-[12px] text-warning">{error}</p>}
-      <div className="space-y-3">
+    <div className="flex max-w-[640px] flex-col gap-3">
+      {saveStatus !== "idle" ? <p className="m-0 text-[13px]"><SaveStatusWord status={saveStatus} /></p> : null}
+      {error ? <DashNote tone="down" role="alert">{error}</DashNote> : null}
+      {components.length ? <ul className={dash.list} aria-label="Parts made only for this site">
         {components.map((component, index) => (
-          <div key={`${component.id}-${index}`} className="border-t border-[var(--st-line)] pt-4">
-            <div className="mb-3 flex items-center justify-between gap-2 text-[12px] text-gray-faint">
-              <span className="flex items-center gap-2">
-                <Code2 className="h-3.5 w-3.5" strokeWidth={1.5} />
-                Admin component
-              </span>
-              <button
-                type="button"
-                onClick={() => setConfirmRemoveIndex(index)}
-                className="flex h-7 w-7 items-center justify-center rounded-lg border border-glass-border text-gray-muted hover:text-critical"
-                aria-label="Remove component"
-              >
-                <Trash2 className="h-3.5 w-3.5" strokeWidth={1.5} />
-              </button>
+          <li key={index} className="!flex-wrap">
+            <div className="grid min-w-0 flex-1 grid-cols-1 gap-3 sm:grid-cols-2">
+              <XaField label="Name in the code" value={component.id} onChange={(event) => update(index, "id", event.target.value)} onBlur={() => saveComponents(components)} />
+              <XaField label="Name people see" value={component.label} onChange={(event) => update(index, "label", event.target.value)} onBlur={() => saveComponents(components)} />
             </div>
-            <div className="grid gap-2 sm:grid-cols-2">
-              <input
-                value={component.id}
-                onChange={(event) => {
-                  const next = components.map((item, i) => i === index ? { ...item, id: event.target.value } : item);
-                  setComponents(next);
-                  setSaveStatus("dirty");
-                }}
-                onBlur={() => saveComponents(components)}
-                placeholder="component-id"
-                className="min-h-[40px] rounded-[12px] border border-[var(--st-line)] bg-[var(--st-surface)] px-3 py-2 text-[15px] text-accent outline-none"
-              />
-              <input
-                value={component.label}
-                onChange={(event) => {
-                  const next = components.map((item, i) => i === index ? { ...item, label: event.target.value } : item);
-                  setComponents(next);
-                  setSaveStatus("dirty");
-                }}
-                onBlur={() => saveComponents(components)}
-                placeholder="Display label"
-                className="min-h-[40px] rounded-[12px] border border-[var(--st-line)] bg-[var(--st-surface)] px-3 py-2 text-[15px] text-warm-black outline-none"
-              />
-            </div>
-          </div>
+            <div className={dash.listEnd}><XaTextLink onClick={() => setConfirmRemoveIndex(index)} aria-label={`Remove ${component.label}`}>Remove</XaTextLink></div>
+          </li>
         ))}
-      </div>
-      <button
-        type="button"
-        onClick={() => {
-          const next = [...components, { id: "custom-component", label: "Custom component", adminOnly: true }];
-          setComponents(next);
-          saveComponents(next);
-        }}
-        className="inline-flex min-h-[40px] items-center gap-2 rounded-full bg-[var(--st-surface)] px-4 text-[14px] font-medium text-warm-black shadow-[0_1px_2px_#0000000f] hover:bg-[var(--st-hover)]"
-      >
-        <Plus className="h-3.5 w-3.5" strokeWidth={1.5} />
-        Add component
-      </button>
-
-      <ConfirmDialog
-        open={confirmRemoveIndex !== null}
-        title="Remove this component?"
-        message="This admin component will be removed from the site manifest."
-        confirmLabel="Remove"
-        destructive
-        busy={saveStatus === "saving"}
-        onConfirm={() => {
-          if (confirmRemoveIndex !== null) removeComponent(confirmRemoveIndex);
-        }}
-        onCancel={() => setConfirmRemoveIndex(null)}
-      />
+      </ul> : !error ? <p className="m-0 text-[15px] text-[var(--st-text-2)]">No parts made only for this site yet.</p> : null}
+      <p className="m-0 text-[14px]"><XaTextLink onClick={() => { const next = [...components, { id: "custom-component", label: "Custom part", adminOnly: true }]; setComponents(next); saveComponents(next); }}>Add a part</XaTextLink></p>
+      <ConfirmDialog open={confirmRemoveIndex !== null} title={`Remove ${confirmRemoveIndex !== null ? components[confirmRemoveIndex]?.label ?? "this part" : "this part"}?`}
+        message="The site stops offering it to Strelva. The code that draws it stays in the site's repo." confirmLabel="Remove it" cancelLabel="Keep it" destructive busy={saveStatus === "saving"}
+        onConfirm={() => { if (confirmRemoveIndex !== null) { const next = components.filter((_, i) => i !== confirmRemoveIndex); setComponents(next); saveComponents(next); setConfirmRemoveIndex(null); } }}
+        onCancel={() => setConfirmRemoveIndex(null)} />
     </div>
   );
 }
 
 // ---------------------------------------------------------------------------
-// Dependency health section
+// Outside services the site depends on: exceptions first
 // ---------------------------------------------------------------------------
 
-const DEPENDENCY_STATUS_COPY: Record<string, { label: string; className: string }> = {
-  healthy: { label: "Healthy", className: "border-positive/30 bg-positive/10 text-positive" },
-  degraded: { label: "Degraded", className: "border-warning/30 bg-warning/10 text-warning" },
-  paused: { label: "Paused", className: "border-critical/30 bg-critical/10 text-critical" },
-  failing: { label: "Failing", className: "border-critical/30 bg-critical/10 text-critical" },
-  unknown: { label: "Unknown", className: "border-glass-border text-gray-faint" },
+const DEPENDENCY_WORDS: Record<string, { kind: "waits" | "down" | null; word: string }> = {
+  healthy: { kind: null, word: "Working" },
+  degraded: { kind: "waits", word: "Slow or partly working" },
+  paused: { kind: "down", word: "Paused" },
+  failing: { kind: "down", word: "Not working" },
+  unknown: { kind: "waits", word: "Not checked yet" },
 };
-
-function DependencyStatusPill({ status }: { status: string }) {
-  const copy = DEPENDENCY_STATUS_COPY[status] ?? DEPENDENCY_STATUS_COPY["unknown"]!;
-  return (
-    <span className={`inline-flex items-center gap-1.5 text-[13px] font-medium before:inline-block before:h-[7px] before:w-[7px] before:rounded-full before:content-[''] ${copy.className}`}>
-      {copy.label}
-    </span>
-  );
-}
 
 function DependencyHealthSection() {
   const apiPath = useDashboardApiPath();
@@ -1111,15 +494,9 @@ function DependencyHealthSection() {
 
   const load = useCallback(() => {
     fetch(apiPath("/api/custom-repo/dependencies"), { credentials: "same-origin" })
-      .then((res) => {
-        if (!res.ok) throw new Error("Could not load dependency health");
-        return res.json();
-      })
-      .then((next) => {
-        setError("");
-        setData(next);
-      })
-      .catch(() => setError("Could not load dependency health."));
+      .then((res) => { if (!res.ok) throw new Error(); return res.json(); })
+      .then((next) => { setError(""); setData(next); })
+      .catch(() => setError("Strelva couldn't check the outside services just now."));
   }, [apiPath]);
 
   useEffect(() => {
@@ -1127,129 +504,33 @@ function DependencyHealthSection() {
     return () => window.clearTimeout(timeout);
   }, [load]);
 
-  if (error) {
-    return (
-      <div className="rounded-lg border border-critical/20 bg-critical/10 p-4 text-[12px] text-critical">
-        {error}
-      </div>
-    );
+  if (error) return <DashNote tone="down" links={[<XaTextLink key="again" onClick={load}>Check again</XaTextLink>]}>{error}</DashNote>;
+  if (!data) return <StSkeleton width="50%" label="Checking outside services" />;
+  if (data.deliveryModel !== "custom_repo" || data.dependencies.length === 0) {
+    return <p className="m-0 max-w-[560px] text-[15px] leading-[1.5] text-[var(--st-text-2)]">Your site doesn&apos;t rely on any outside service Strelva needs to watch.</p>;
   }
-
-  if (!data) return <SkeletonLine width="w-full" height="h-24" />;
-
-  if (data.deliveryModel !== "custom_repo") {
-    return (
-      <div className="border-t border-[var(--st-line)] pt-4">
-        <p className="text-[13px] text-warm-black">No connected services to monitor</p>
-        <p className="mt-1 text-[12px] leading-relaxed text-gray-muted">
-          This site doesn&apos;t rely on any outside services we need to keep an eye on.
-        </p>
-      </div>
-    );
-  }
-
-  const hasDependencies = data.dependencies.length > 0;
-
+  const trouble = data.dependencies.filter((dependency) => (DEPENDENCY_WORDS[dependency.status] ?? DEPENDENCY_WORDS.unknown!).kind);
+  const fine = data.dependencies.length - trouble.length;
   return (
-    <div className="space-y-4">
-      {data.hasBlockingDependency && (
-        <div className="rounded-lg border border-warning/25 bg-warning/10 p-4">
-          <div className="flex items-start gap-3">
-            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-warning" strokeWidth={1.7} />
-            <div>
-              <p className="text-[13px] font-medium text-warning">
-                One of the outside services your site uses needs attention.
-              </p>
-              <p className="mt-1 text-[12px] leading-relaxed text-warning/80">
-                Strelva is showing this here so paused services are caught before they look like a storefront or AI issue.
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {!hasDependencies && (
-        <div className="border-t border-[var(--st-line)] pt-4">
-          <p className="text-[13px] text-warm-black">No external dependencies recorded</p>
-          <p className="mt-1 text-[12px] leading-relaxed text-gray-muted">
-            No outside services are being tracked for your site yet.
-          </p>
-        </div>
-      )}
-
-      <div className="space-y-3">
-        {data.dependencies.map((dependency) => (
-          <div key={dependency.id} className="border-t border-[var(--st-line)] pt-4">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div className="min-w-0">
-                <p className="text-[14px] font-medium text-warm-black">{dependency.name}</p>
-                <p className="mt-1 text-[12px] text-gray-muted">{dependency.provider} · {dependency.purpose}</p>
-              </div>
-              <DependencyStatusPill status={dependency.status} />
-            </div>
-            {(dependency.source || dependency.detectedAt) && (
-              <p className="mt-3 text-[13px] text-gray-faint">
-                {dependency.source || "Recorded dependency"}{dependency.detectedAt ? ` · ${dependency.detectedAt}` : ""}
-              </p>
-            )}
-            {dependency.notes && (
-              <p className="mt-2 text-[12px] leading-relaxed text-gray-muted">{dependency.notes}</p>
-            )}
-            {dependency.actionUrl && (
-              <a
-                href={dependency.actionUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="mt-3 inline-flex items-center gap-1.5 text-[12px] font-medium text-accent hover:text-accent/80"
-              >
-                Open dependency
-                <ExternalLink className="h-3.5 w-3.5" strokeWidth={1.5} />
-              </a>
-            )}
-          </div>
-        ))}
-      </div>
+    <div className="flex max-w-[640px] flex-col gap-3">
+      <p className="m-0 text-[15px] leading-[1.5] text-[var(--st-text-body)]">
+        {trouble.length === 0 ? `All ${data.dependencies.length} outside services your site uses are working.`
+          : `${trouble.length === 1 ? "One outside service needs" : `${trouble.length} outside services need`} a look${fine ? `; the other ${fine} ${fine === 1 ? "is" : "are"} working` : ""}. Strelva flags it here so it isn't mistaken for a problem with your site.`}
+      </p>
+      {trouble.length ? <XaRows label="Outside services that need a look">
+        {trouble.map((dependency) => {
+          const words = DEPENDENCY_WORDS[dependency.status] ?? DEPENDENCY_WORDS.unknown!;
+          return <XaRow key={dependency.id} title={dependency.name} detail={`${words.word}. ${dependency.purpose}${dependency.notes ? ` ${dependency.notes}` : ""}`} tone="waits"
+            action={dependency.actionUrl ? <a className="text-[14px] font-medium text-[var(--st-accent)] hover:underline" href={dependency.actionUrl} target="_blank" rel="noreferrer">Open {dependency.provider}</a> : undefined} />;
+        })}
+      </XaRows> : null}
     </div>
   );
 }
 
 // ---------------------------------------------------------------------------
-// Billing section
+// Plan: no price until ADR 0017's numbers are decided; status only as an exception
 // ---------------------------------------------------------------------------
-
-const BILLING_STATUS_COPY: Record<SubscriptionStatus, { label: string; className: string; note: string }> = {
-  active: {
-    label: "Active",
-    className: "text-[var(--st-text-2)] before:bg-[var(--st-live)]",
-    note: "Everything included. Cancel anytime.",
-  },
-  trialing: {
-    label: "Trialing",
-    className: "text-[var(--st-text-2)] before:bg-[var(--st-live)]",
-    note: "Trial access is active.",
-  },
-  past_due: {
-    label: "Past due",
-    className: "text-[var(--st-need)] before:bg-[var(--st-need-dot)]",
-    note: "Payment needs attention to keep the dashboard fully available.",
-  },
-  cancelled: {
-    label: "Canceled",
-    className: "text-[var(--st-critical)] before:bg-[var(--st-critical)]",
-    note: "This subscription is canceled.",
-  },
-  none: {
-    label: "Not set up",
-    className: "text-[var(--st-text-3)] before:bg-[var(--st-draft-dot)]",
-    note: "No subscription is connected yet.",
-  },
-};
-
-const FOUNDER_COMP_COPY = {
-  label: "Founder comp",
-  className: "text-[var(--st-need)] before:bg-[var(--st-need-dot)]",
-  note: "Full access is comped for this founder account. No billing is due.",
-};
 
 function BillingSection() {
   const dashboard = useDashboardOptional();
@@ -1258,222 +539,125 @@ function BillingSection() {
   const [openingPortal, setOpeningPortal] = useState(false);
   const status = dashboard?.subscriptionStatus ?? "none";
   const isFounderComp = dashboard?.planOverride === "founder_comp";
-  const copy = isFounderComp ? FOUNDER_COMP_COPY : BILLING_STATUS_COPY[status];
+  // ADR 0017 (live Systems + jar) has its numbers pending Jacob's 14-day test,
+  // so the plan shows by name only: monthly cents 0 drops the price line.
   const currentPlan = getCurrentPlanDisplay({
     status,
     isFounderComp,
-    commercialPlanLabel: dashboard?.commercialPlanLabel ?? "Growth",
-    commercialPlanMonthlyCents: dashboard?.commercialPlanMonthlyCents ?? 19_900,
+    commercialPlanLabel: dashboard?.commercialPlanLabel ?? "Managed plan",
+    commercialPlanMonthlyCents: 0,
   });
+  const canPortal = !isFounderComp && status !== "none";
+
+  async function openPortal() {
+    setBillingError("");
+    setOpeningPortal(true);
+    try {
+      const res = await fetch(apiPath("/api/billing/portal"), { method: "POST", credentials: "same-origin" });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setBillingError(res.status === 404 || !dashboard?.hasStripeCustomer
+          ? "Your plan is managed by Strelva, so there's no billing page to open. Write to Strelva about it any time."
+          : body?.error || "The billing page didn't open. Try again.");
+        return;
+      }
+      if (body.portalUrl) window.open(body.portalUrl, "_blank");
+    } catch {
+      setBillingError("The billing page didn't open. Check your connection and try again.");
+    } finally {
+      setOpeningPortal(false);
+    }
+  }
 
   return (
-    <div className="border-y border-[var(--st-line)]">
-      <div className="flex flex-col gap-4 px-5 py-5 sm:flex-row sm:items-center sm:justify-between">
-        <div className="min-w-0">
-          <div className="text-[13px] font-medium text-gray-muted mb-2">
-            Current plan
-          </div>
-          <div className="flex items-center gap-2 mb-1">
-            <span className="text-[20px] font-medium text-warm-black">
-              {currentPlan}
-            </span>
-            <span className={`inline-flex items-center gap-1.5 text-[13px] font-medium before:inline-block before:h-[7px] before:w-[7px] before:rounded-full before:content-[''] ${copy.className}`}>
-              {copy.label}
-            </span>
-          </div>
-          <p className="text-[12px] text-gray-faint">
-            {copy.note}
-          </p>
-          {!isFounderComp && dashboard?.hasStripeCustomer && (
-            <p className="mt-1 text-[12px] text-gray-faint">
-              Manage billing opens your secure Stripe portal to update payment, change plan, or cancel.
-            </p>
-          )}
-          {billingError && (
-            <p className="mt-3 text-[12px] text-warning">{billingError}</p>
-          )}
-        </div>
-        <button
-          onClick={async () => {
-            setBillingError("");
-            setOpeningPortal(true);
-            try {
-              const res = await fetch(apiPath("/api/billing/portal"), {
-                method: "POST",
-                credentials: "same-origin",
-              });
-              const body = await res.json().catch(() => ({}));
-              if (!res.ok) {
-                setBillingError(
-                  res.status === 404 || !dashboard?.hasStripeCustomer
-                    ? "You're on a managed plan. There's no billing portal to open. Message Strelva anytime about your plan."
-                    : body?.error || "Couldn't open the billing portal. Try again.",
-                );
-                return;
-              }
-              const { portalUrl } = body;
-              if (portalUrl) window.open(portalUrl, "_blank");
-            } catch {
-              setBillingError("Couldn't open the billing portal. Check your connection and try again.");
-            } finally {
-              setOpeningPortal(false);
-            }
-          }}
-          disabled={openingPortal || isFounderComp}
-          className="min-h-[40px] w-full rounded-full bg-[var(--st-surface)] px-4 text-[14px] font-medium text-warm-black shadow-[0_1px_2px_#0000000f] transition-colors hover:bg-[var(--st-hover)] disabled:opacity-60 sm:w-auto"
-        >
-          {isFounderComp ? "No billing action" : openingPortal ? "Opening..." : "Manage billing"}
-        </button>
-      </div>
+    <div className="flex max-w-[560px] flex-col gap-5">
+      <XaRows label="Your plan">
+        <XaRow title={currentPlan}
+          detail={isFounderComp ? "Comped for this founding business. Nothing is due." : status === "trialing" ? "On a trial." : status === "cancelled" ? "Your plan has ended." : status === "none" ? "No plan is connected yet." : "Your website and Google listing, kept up by Strelva."}
+          tone={status === "past_due" || status === "cancelled" ? "waits" : undefined}
+          action={canPortal ? <XaButton busy={openingPortal} onClick={() => void openPortal()}>Manage billing</XaButton> : undefined} />
+      </XaRows>
+      {/* The payment decision sits beside the plan it changes. */}
+      <BillingBanner />
+      {canPortal && dashboard?.hasStripeCustomer ? <p className="m-0 text-[14px] leading-[1.5] text-[var(--st-text-2)]">Manage billing opens Stripe, where you see what you pay, change your card, or cancel.</p> : null}
+      {billingError ? <p className="m-0 text-[14px] text-[var(--st-need)]" role="alert">{billingError}</p> : null}
     </div>
   );
 }
 
 // ---------------------------------------------------------------------------
-// ---------------------------------------------------------------------------
-// Section headers
+// Page
 // ---------------------------------------------------------------------------
 
-const SECTION_META: Record<string, { title: string; description: string }> = {
-  business: {
-    title: "Said once, here.",
-    description: "Your site, your listing and Strelva all read these details, so nothing drifts.",
-  },
-  account: {
-    title: "You.",
-    description: "Your own sign-in on this dashboard, separate from the business.",
-  },
-  domains: {
-    title: "Your web addresses.",
-    description: "Where your site and this dashboard live, and how to fix either if something looks off.",
-  },
-  plan: {
-    title: "Your plan.",
-    description: "One plan, one monthly cost, no upsells for upkeep.",
-  },
+function DomainsSection() {
+  return <DomainsClient initialDomains={[]} />;
+}
+
+const SECTION_META: Record<string, { title: string; quiet?: string }> = {
+  business: { title: "Said once, here.", quiet: "Your site, your Google listing and Strelva all read these." },
+  account: { title: "You." },
+  domains: { title: "Your web addresses." },
+  plan: { title: "Your plan." },
 };
 
-// ---------------------------------------------------------------------------
-// In-page section eyebrow — labels each consolidated group inside Business.
-// ---------------------------------------------------------------------------
-
-const BUSINESS_SECTION_META: { id: (typeof BUSINESS_ANCHORS)[number]; eyebrow: string; description: string }[] = [
-  {
-    id: "profile",
-    eyebrow: "Business info",
-    description: "Your business name, tagline, and the primary action visitors should take.",
-  },
-  {
-    id: "branding",
-    eyebrow: "Branding",
-    description: "The fonts and colors that define how your site looks.",
-  },
-  {
-    id: "site-config",
-    eyebrow: "Site basics",
-    description: "Your site's colors and fonts, menu, footer, and the features it supports.",
-  },
-  {
-    id: "dependencies",
-    eyebrow: "Connected services",
-    description: "Outside services your site relies on. Anything paused or failing is flagged before it can affect your site.",
-  },
-  {
-    id: "utilities",
-    eyebrow: "Also here",
-    description: "Useful tools that support Strelva, exports, and connection setup.",
-  },
-  {
-    id: "ownership",
-    eyebrow: "What you own, and leaving",
-    description: "Know what the business owns, what Strelva manages, and how to leave cleanly.",
-  },
+/** Parts of Business, each a label and its fields: no description restating the label. */
+const BUSINESS_PARTS: { id: (typeof BUSINESS_ANCHORS)[number]; label: string; adminOnly?: boolean }[] = [
+  { id: "profile", label: "About the business" },
+  { id: "branding", label: "Who can change your site" },
+  { id: "site-config", label: "Menu and footer" },
+  { id: "dependencies", label: "Outside services" },
+  { id: "utilities", label: "Also yours to change" },
+  { id: "ownership", label: "What you own, and leaving" },
 ];
 
-function SettingsGroup({
-  id,
-  eyebrow,
-  description,
-  children,
-}: {
-  id: string;
-  eyebrow: string;
-  description: string;
-  children: ReactNode;
-}) {
+function SettingsGroup({ id, label, children }: { id: string; label: string; children: ReactNode }) {
   return (
     <section id={id} className="flex scroll-mt-8 flex-col gap-4" aria-labelledby={`${id}-label`}>
-      <div className="flex flex-col gap-1">
-        <h2 id={`${id}-label`} className="m-0 text-[13px] font-medium text-[var(--st-text-3)]">{eyebrow}</h2>
-        <p className="m-0 text-[15px] leading-[1.5] text-[var(--st-text-2)]">{description}</p>
-      </div>
+      <h2 id={`${id}-label`} className="m-0 text-[13px] font-medium text-[var(--st-text-3)]">{label}</h2>
       {children}
     </section>
   );
 }
 
-function BusinessSettings({
-  settings,
-  setSettings,
-  readOnly,
-}: {
-  settings: SettingsData | null;
-  setSettings: (s: SettingsData) => void;
-  readOnly: boolean;
-}) {
-  const profileMeta = BUSINESS_SECTION_META.find((s) => s.id === "profile")!;
-  const brandingMeta = BUSINESS_SECTION_META.find((s) => s.id === "branding")!;
-  const siteConfigMeta = BUSINESS_SECTION_META.find((s) => s.id === "site-config")!;
-  const dependenciesMeta = BUSINESS_SECTION_META.find((s) => s.id === "dependencies")!;
-  const utilitiesMeta = BUSINESS_SECTION_META.find((s) => s.id === "utilities")!;
-  const ownershipMeta = BUSINESS_SECTION_META.find((s) => s.id === "ownership")!;
-
+function UtilitiesSection() {
+  const dashboard = useDashboardOptional();
+  const dashboardHref = dashboard?.dashboardHref ?? ((path: string) => path);
+  const links = [
+    { title: "How your site sounds and looks", href: "/dashboard/brand-kit" },
+    { title: "Connections", href: "/dashboard/integrations" },
+    { title: "Photos", href: "/dashboard/assets" },
+    { title: "What you own, and leaving", href: "/dashboard/settings#ownership" },
+  ];
   return (
-    <div className="space-y-14">
-      <SettingsGroup id={profileMeta.id} eyebrow={profileMeta.eyebrow} description={profileMeta.description}>
-        {settings ? (
-          <ProfileSection
-            settings={settings}
-            setSettings={setSettings}
-            fields={BUSINESS_FIELDS}
-            readOnly={readOnly}
-          />
-        ) : (
-          <div className="flex flex-col gap-3" aria-busy="true">
-            {[72, 64, 80, 56].map((w) => <StSkeleton key={w} width={`${w}%`} label="Loading business details" />)}
-          </div>
-        )}
-      </SettingsGroup>
-
-      <SettingsGroup id={brandingMeta.id} eyebrow={brandingMeta.eyebrow} description={brandingMeta.description}>
-        <BrandSection readOnly={readOnly} />
-      </SettingsGroup>
-
-      {/* AI content autonomy control follows branding so clients see business info + branding first */}
-      <ContentAutonomyPanel />
-
-      <SettingsGroup id={siteConfigMeta.id} eyebrow={siteConfigMeta.eyebrow} description={siteConfigMeta.description}>
-        <SiteConfigSection readOnly={readOnly} />
-      </SettingsGroup>
-
-      <SettingsGroup id={dependenciesMeta.id} eyebrow={dependenciesMeta.eyebrow} description={dependenciesMeta.description}>
-        <DependencyHealthSection />
-      </SettingsGroup>
-
-      <SettingsGroup id={utilitiesMeta.id} eyebrow={utilitiesMeta.eyebrow} description={utilitiesMeta.description}>
-        <UtilitiesSection />
-      </SettingsGroup>
-
-      <SettingsGroup id={ownershipMeta.id} eyebrow={ownershipMeta.eyebrow} description={ownershipMeta.description}>
-        <OwnershipSection />
-      </SettingsGroup>
-    </div>
+    <p className="m-0 text-[15px] leading-[1.6] text-[var(--st-text-body)]">
+      {links.map((item, index) => (
+        <span key={item.href}>
+          {index ? " · " : ""}
+          <Link href={dashboardHref(item.href)} className="font-medium text-[var(--st-accent)] hover:underline">{item.title}</Link>
+        </span>
+      ))}
+    </p>
   );
 }
 
-// ---------------------------------------------------------------------------
-// Main page
-// ---------------------------------------------------------------------------
+function BusinessSettings({ settings, setSettings, readOnly }: { settings: SettingsData | null; setSettings: (s: SettingsData) => void; readOnly: boolean }) {
+  const isAdmin = useDashboardOptional()?.impersonation.isSuperAdmin ?? false;
+  const label = (id: (typeof BUSINESS_ANCHORS)[number]) => BUSINESS_PARTS.find((part) => part.id === id)!.label;
+  return (
+    <div className="flex flex-col gap-14">
+      <SettingsGroup id="profile" label={label("profile")}>
+        {settings ? <ProfileSection settings={settings} setSettings={setSettings} readOnly={readOnly} />
+          : <div className="flex flex-col gap-3" aria-busy="true">{[72, 64, 80, 56].map((w) => <StSkeleton key={w} width={`${w}%`} label="Loading business details" />)}</div>}
+      </SettingsGroup>
+      <SettingsGroup id="branding" label={label("branding")}><ContentAutonomyPanel /></SettingsGroup>
+      <SettingsGroup id="site-config" label={label("site-config")}><NavigationFooterSection readOnly={readOnly} /></SettingsGroup>
+      {isAdmin ? <SettingsGroup id="site-code" label="What this site's code supports (Strelva only)"><CapabilitiesSection /><CustomComponentsSection /></SettingsGroup> : null}
+      <SettingsGroup id="dependencies" label={label("dependencies")}><DependencyHealthSection /></SettingsGroup>
+      <SettingsGroup id="utilities" label={label("utilities")}><UtilitiesSection /></SettingsGroup>
+      <SettingsGroup id="ownership" label={label("ownership")}><OwnershipSection /></SettingsGroup>
+    </div>
+  );
+}
 
 export default function SettingsPage() {
   const [activeSection, setActiveSection] = useState("business");
@@ -1553,15 +737,7 @@ export default function SettingsPage() {
           <header className="flex flex-col gap-6">
             <div className="self-start"><XaSegmented label="Business details" value={activeSection as (typeof SETTINGS_SECTIONS)[number]["id"]} onChange={setSection}
               options={SETTINGS_SECTIONS.map((item) => ({ value: item.id, label: item.label }))} /></div>
-            {meta ? <XaHeadline size="sm" quiet={meta.description}>{meta.title}</XaHeadline> : null}
-            {activeSection === "business" ? (
-              <nav aria-label="Parts of your business details" className="flex flex-wrap gap-x-4 gap-y-2 text-[14px]">
-                {BUSINESS_SECTION_META.map((sub) => (
-                  <button key={sub.id} type="button" className="border-0 bg-transparent p-0 font-medium text-[var(--st-accent)] hover:underline"
-                    onClick={() => document.getElementById(sub.id)?.scrollIntoView({ behavior: "smooth", block: "start" })}>{sub.eyebrow}</button>
-                ))}
-              </nav>
-            ) : null}
+            {meta ? <XaHeadline size="sm" quiet={meta.quiet}>{meta.title}</XaHeadline> : null}
           </header>
 
           {activeSection === "business" && (

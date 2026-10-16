@@ -4,7 +4,6 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { headers } from "next/headers";
 import { DashboardProvider } from "@/components/dashboard/DashboardContext";
-import { BillingBanner } from "@/components/dashboard/BillingBanner";
 import { DashNote } from "@/components/dashboard/xa/DashboardXa";
 import { XaButtonLink, XaHeadline, XaLede, XaMark } from "@/components/ui/strelva/Xa";
 import { SessionKeeper } from "@/components/dashboard/SessionKeeper";
@@ -221,7 +220,6 @@ export default async function DashboardLayout({
           notes={<>
             {isDemo && !devAccessBypass ? <DashNote tone="quiet" links={[<Link key="own" href="/access-request" className="font-medium text-[var(--st-accent)] hover:underline">Get your own site</Link>]}>This is a live demo you can look around. Editing is off.</DashNote> : null}
             {ownerEntry.kind === "render-with-back" ? <DashboardBackBar businessName={siteName} homeHref={ownerEntry.homeHref} route={ownerEntry.route} /> : null}
-            <BillingBanner subscriptionStatus={subscriptionStatus} />
           </>}
         >
           {children}

@@ -50,8 +50,11 @@ export function legacyPending(state: LegacyState): UnifiedEvent[] {
   if (state === "empty" || state === "done") return [];
   return [
     event({
-      id: "evt-hours", title: "Thanksgiving hours on your homepage", body: "Closed Thursday and Friday, Nov 26 and 27. Saturday stays 9 to 1.", createdAt: ago(3),
-      metadata: { diffs: [{ field: "Hours note", type: "added", before: "", after: "Closed Thu and Fri, Nov 26 and 27, for Thanksgiving." }, { field: "Saturday", type: "changed", before: "9 to 1", after: "9 to 1 (open)" }] },
+      id: "evt-hours", title: "Thanksgiving hours on your homepage", body: "", createdAt: ago(3),
+      metadata: { section: "hero", diffs: [
+        { field: "Hours note", type: "added", before: "", after: "We're closed Thursday and Friday, Nov 26 and 27, for Thanksgiving. Saturday the 28th we're open 9 to 1 as usual." },
+        { field: "Booking line", type: "changed", before: "Book any weekday online, same-week visits.", after: "Book online any day but Nov 26 and 27, same-week visits." },
+      ] },
     }),
     event({
       id: "evt-gbp", title: "Google post: new-patient cleanings", createdAt: ago(20),

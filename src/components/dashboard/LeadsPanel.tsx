@@ -24,6 +24,12 @@ function sourceLabel(source: string): string {
  * who wrote, what they asked, when, and a reply that opens the owner's own
  * email. Nothing is sent from here.
  */
+/** A phone number someone typed into their message, so a lead with no email still has a next step. */
+function phoneIn(message?: string | null): string | null {
+  const match = message?.match(/(\+?1[\s.-]?)?\(?\d{3}\)?[\s.-]?\d{3}[\s.-]?\d{4}/);
+  return match ? match[0].trim() : null;
+}
+
 export function LeadsPanel({ leads }: LeadsPanelProps) {
   if (leads.length === 0) {
     return (
@@ -52,12 +58,13 @@ export function LeadsPanel({ leads }: LeadsPanelProps) {
               {lead.message ? <p className={styles.listBody}>{lead.message}</p> : null}
               <span className={styles.listDetail}>
                 {lead.source ? `${sourceLabel(lead.source)} · ` : ""}
-                {lead.email ? lead.email : "No email left"}
+                {lead.email ? lead.email : phoneIn(lead.message) ? "Left a phone number, no email" : "No email or phone left"}
               </span>
             </div>
             <div className={styles.listEnd}>
               <time dateTime={lead.createdAt}>{formatWhen(lead.createdAt)}</time>
-              {lead.email ? <XaTextLink href={`mailto:${lead.email}`}>Reply</XaTextLink> : null}
+              {lead.email ? <XaTextLink href={`mailto:${lead.email}`}>Reply</XaTextLink>
+                : phoneIn(lead.message) ? <XaTextLink href={`tel:${phoneIn(lead.message)!.replace(/[^\d+]/g, "")}`}>Call {phoneIn(lead.message)}</XaTextLink> : null}
             </div>
           </li>
         ))}

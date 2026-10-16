@@ -26,10 +26,9 @@ export function LegacyDashboardShell({ children, mode, pendingCount, hasStore = 
     impersonation={{ isActive: false, actorEmail: LEGACY_EMAIL, actorName: LEGACY_OWNER, isSuperAdmin: false, tenantId: LEGACY_TENANT }}>
     <DashboardSurfacesProvider surfaces={LEGACY_SURFACES}>
       <ConversationShell businessName={LEGACY_BUSINESS} accountName={LEGACY_OWNER} accountEmail={LEGACY_EMAIL} pendingCount={pendingCount} hasStore={hasStore}
-        signOut={null} appBase="/preview/strelva" mode={mode} inspect={inspect} inspectTenantName={LEGACY_BUSINESS} inspectExitHref={LEGACY_BASE}
+        signOut={null} appBase={LEGACY_BASE} mode={mode} inspect={inspect} inspectTenantName={LEGACY_BUSINESS} inspectExitHref={LEGACY_BASE}
         notes={<>
           <DashNote tone="quiet">Fictional preview. Nothing here reaches a real business.</DashNote>
-          {billing === "past_due" ? <DashNote tone="down" role="alert" links={[<span key="card" className="font-medium text-[var(--st-accent)]">Update your card</span>]}>Your last payment didn&apos;t go through. Update your card to keep your site running.</DashNote> : null}
         </>}>
         {children}
       </ConversationShell>

@@ -2,13 +2,12 @@
 
 import type { ReactNode } from "react";
 import { XaAnswers, XaEmpty, XaRow, XaRows, XaSays, XaTextLink } from "@/components/ui/strelva/Xa";
-import { DashNote, DashPage, DashSection } from "./xa/DashboardXa";
+import { DashPage, DashSection } from "./xa/DashboardXa";
 import type { WeeklyBrief, SearchData } from "@/lib/types";
 import { buildVerdict } from "@/lib/weekly-verdict";
 import { TrendChart } from "@/components/dashboard/TrendChart";
 import type { DailyMetric } from "@/lib/storage";
 import type { ProofCard } from "@/lib/proof";
-import { metricVerdicts } from "@/lib/proof";
 import type { Goal } from "@/lib/goals";
 import type { TrafficAnomaly } from "@/lib/anomaly";
 import type { CompetitorBenchmark } from "@/lib/competitor-benchmark";
@@ -63,11 +62,6 @@ function formatWeekRange(start: string, end: string): string {
   return `${startDate.toLocaleDateString("en-US", options)} to ${endDate.toLocaleDateString("en-US", options)}`;
 }
 
-function delta(n: number | undefined, prior: string): string {
-  if (!n) return "";
-  return n > 0 ? `, up ${n.toLocaleString()} ${prior}` : `, down ${Math.abs(n).toLocaleString()} ${prior}`;
-}
-
 export function WeeklyBriefClient({ brief, history = [], dailyMetrics = [], proofCards = [], goal = null, anomaly = null, benchmark = null, aiVisibility = null, searchData = null, searchPerf = null, gaPerf = null, analyticsConnectHref, footerSlot, periodLabel = "this week", chartLabel, viewToggle }: WeeklyBriefClientProps) {
   const dashboard = useDashboardOptional();
   const connectHref =
@@ -97,10 +91,6 @@ export function WeeklyBriefClient({ brief, history = [], dailyMetrics = [], proo
   const topServices = brief.topServices ?? [];
   const topSearchQueries = brief.topSearchQueries ?? [];
   const staleSections = brief.staleSections ?? [];
-  const verdicts = metricVerdicts(brief.stats);
-  const prior = periodLabel === "this month" ? "on last month" : "on last week";
-  const actions = brief.stats.bookingClicks + (brief.stats.phoneClicks ?? 0);
-  const actionsDelta = (brief.stats.bookingClicksDelta ?? 0) + (brief.stats.phoneClicksDelta ?? 0);
 
   // Full Search Console query list, sorted by clicks, capped so it stays scannable.
   const searchRows = [...(searchData?.queries ?? [])]
@@ -115,29 +105,14 @@ export function WeeklyBriefClient({ brief, history = [], dailyMetrics = [], proo
       label="Report"
     >
       {anomaly ? (
-        <DashNote tone={anomaly.type === "drop" ? "waits" : "live"} links={[<XaTextLink key="ask" href={chatHref}>Ask Strelva to handle it</XaTextLink>]}>
+        <XaSays links={[<XaTextLink key="ask" href={chatHref}>Ask Strelva to do it</XaTextLink>]}>
           {anomaly.headline} {anomaly.why} {anomaly.suggestion}
-        </DashNote>
+        </XaSays>
       ) : null}
 
       <p className="m-0 max-w-[680px] text-[17px] leading-[1.6] text-[var(--st-text-body)]">{brief.summary}</p>
 
       {dailyMetrics.length >= 2 ? <TrendChart metrics={dailyMetrics} label={chartLabel} /> : null}
-
-      <DashSection label={`The numbers, ${periodLabel}`}>
-        <XaAnswers labelWidth={180} rows={[
-          ["People found you", `${brief.stats.pageViews.toLocaleString()}${delta(brief.stats.pageViewsDelta, prior)}`],
-          ["Booked or called", `${actions.toLocaleString()}${delta(actionsDelta, prior)}`],
-          ["New reviews", brief.stats.reviewsReceived.toLocaleString()],
-          ["Changes to your site", brief.stats.contentUpdates.toLocaleString()],
-        ]} />
-      </DashSection>
-
-      {verdicts.length ? (
-        <DashSection label="What this means">
-          <XaAnswers labelWidth={180} rows={verdicts.map((v) => [v.label, v.verdict] as const)} />
-        </DashSection>
-      ) : null}
 
       {brief.nextAction ? (
         <XaSays links={[<XaTextLink key="ask" href={chatHref}>Ask Strelva to do it</XaTextLink>]}>This week I&apos;d suggest: {brief.nextAction.title.replace(/\.$/, "")}. {brief.nextAction.description}</XaSays>

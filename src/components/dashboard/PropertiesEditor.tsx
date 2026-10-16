@@ -1,17 +1,14 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
-import { Check, RotateCcw, AlertCircle, MessageCircle, History } from "lucide-react";
 import { useDashboard } from "./DashboardContext";
 import { ArrayItemEditor } from "./ArrayItemEditor";
 import { StringArrayEditor } from "./StringArrayEditor";
 import { ARRAY_CONFIGS } from "./arrayFieldConfigs";
 import { getSiteModelSchema, type SimpleFieldDef, type SectionArrayConfig } from "./templateFieldConfigs";
 import { SECTION_LABELS } from "@/components/ui/section-labels";
-import { TextInput, TextArea } from "@/components/ui/TextInput";
-import { Button } from "@/components/ui/Button";
-import { EmptyState } from "@/components/ui/EmptyState";
-import { SkeletonLine } from "@/components/ui/Skeleton";
+import { StSkeleton } from "@/components/ui/strelva/Kit";
+import { XaField, XaSays, XaStatus, XaTextArea, XaTextLink } from "@/components/ui/strelva/Xa";
 import { ImageField } from "./ImageField";
 import { ContentHistory } from "./ContentHistory";
 
@@ -480,94 +477,51 @@ export function PropertiesEditor({ activeSection }: PropertiesEditorProps) {
   // No section selected
   if (!activeSection) {
     return (
-      <EmptyState
-        icon={
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#999" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M12 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-            <path d="M18.375 2.625a1 1 0 0 1 3 3l-9.013 9.014a2 2 0 0 1-.853.505l-2.873.84a.5.5 0 0 1-.62-.62l.84-2.873a2 2 0 0 1 .506-.852z" />
-          </svg>
-        }
-        title="Click anything on your site to edit it"
-        description="Select text, an image, or a button in the preview"
-        className="h-full"
-      />
+      <div className="flex h-full flex-col justify-center gap-3 px-5">
+        <XaSays>Click anything in the preview to change it: words, a photo or a button. Changes save as a draft until you make them live.</XaSays>
+      </div>
     );
   }
 
   // Loading
   if (loading) {
     return (
-      <div className="p-4 space-y-4">
-        <SkeletonLine width="w-1/3" height="h-4" />
-        <SkeletonLine width="w-full" height="h-8" />
-        <SkeletonLine width="w-full" height="h-8" />
-        <SkeletonLine width="w-2/3" height="h-8" />
+      <div className="flex flex-col gap-3 p-5" aria-busy="true">
+        <StSkeleton width="40%" label="Loading this part" />
+        <StSkeleton width="100%" label="Loading this part" />
+        <StSkeleton width="70%" label="Loading this part" />
       </div>
     );
   }
 
-  // Composite sections — not directly editable, point to chat
+  // Composite sections: not directly editable, point to Ask Strelva
   if (activeSection && isComposite) {
     const info = COMPOSITE_SECTION_INFO[activeSection];
-    // isComposite is derived from `activeSection in COMPOSITE_SECTION_INFO`,
-    // so info is always present here — guard for the type system.
+    // isComposite is derived from `activeSection in COMPOSITE_SECTION_INFO`.
     if (!info) return null;
     return (
-      <div className="flex flex-col h-full bg-surface">
-        <div className="px-4 py-2.5 border-b border-gray-border bg-gray-bg-alt shrink-0">
-          <span className="text-[13px] text-gray-muted">Viewing</span>
-          <h3 className="text-[13px] font-medium text-warm-black mt-0.5">{info.label}</h3>
-        </div>
-        <div className="flex flex-col items-center justify-center flex-1 px-6 text-center">
-          <p className="text-[12px] text-gray-fg mb-1">This section pulls from <span className="font-medium">{info.sources}</span></p>
-          <p className="text-[12px] text-gray-muted mb-4">Ask Strelva to make changes</p>
-          <Button
-            variant="secondary"
-            size="sm"
-            icon={<MessageCircle className="w-3 h-3" strokeWidth={1.5} />}
-            onClick={() => {
-              setChatPrompt(
-                `${info.chatPrompt}. Keep the current business facts and save the change as a draft before anything goes live.`
-              );
-            }}
-          >
-            Ask Strelva
-          </Button>
-        </div>
+      <div className="flex h-full flex-col gap-4 p-5">
+        <h3 className="m-0 text-[15px] font-medium text-[var(--st-text)]">{info.label}</h3>
+        <XaSays links={[<XaTextLink key="ask" onClick={() => setChatPrompt(`${info.chatPrompt}. Keep the current business facts and save the change as a draft before anything goes live.`)}>Ask Strelva to change it</XaTextLink>]}>
+          This part is filled from your {info.sources}, so it changes when they do.
+        </XaSays>
       </div>
     );
   }
 
   if (!data) {
-    return (
-      <div className="flex items-center justify-center h-full px-6 text-center">
-        <p className="text-[12px] text-gray-muted">Could not load section data</p>
-      </div>
-    );
+    return <div className="p-5"><XaSays>This part didn&apos;t load. Pick it again in the preview to retry.</XaSays></div>;
   }
 
+  const sectionLabel = SECTION_LABELS[activeSection] || toSentenceLabel(activeSection);
+  const selectClass = "min-h-[44px] w-full rounded-[var(--st-r-md)] border border-[var(--st-line)] bg-[var(--st-surface)] px-3 text-[15px] text-[var(--st-text)] outline-none focus-visible:border-[var(--st-accent)]";
+
   return (
-    <div className="flex flex-col h-full bg-surface">
-      {/* Section header */}
-      <div className="px-4 py-3 border-b border-gray-border bg-surface shrink-0">
-        <div className="flex items-center justify-between gap-2">
-          <div className="min-w-0">
-            <h3 className="truncate text-[15px] font-semibold text-warm-black">
-              {SECTION_LABELS[activeSection] || activeSection}
-            </h3>
-          </div>
-          <button
-            onClick={() => setTab(tab === "versions" ? "edit" : "versions")}
-            className={`flex shrink-0 items-center gap-1 rounded-md px-2 h-7 text-[12px] font-medium transition-colors ${
-              tab === "versions"
-                ? "bg-surface-raised text-warm-black"
-                : "text-gray-faint hover:text-warm-black"
-            }`}
-          >
-            <History className="w-3 h-3" strokeWidth={1.5} />
-            History
-          </button>
-        </div>
+    <div className="flex h-full flex-col bg-[var(--st-surface)]">
+      {/* The part you picked, and its history one link away */}
+      <div className="flex shrink-0 items-center justify-between gap-3 border-b border-[var(--st-line)] px-5 py-3">
+        <h3 className="m-0 min-w-0 truncate text-[15px] font-medium text-[var(--st-text)]">{sectionLabel}</h3>
+        <XaTextLink onClick={() => setTab(tab === "versions" ? "edit" : "versions")}>{tab === "versions" ? "Back to editing" : "Earlier versions"}</XaTextLink>
       </div>
 
       {tab === "versions" ? (
@@ -591,127 +545,38 @@ export function PropertiesEditor({ activeSection }: PropertiesEditorProps) {
         />
       ) : (
         <>
-      {/* Auto-save status — edits commit to the draft on their own */}
-      {hasChanges && (
-        <div className="flex items-center justify-between px-4 py-2 border-b border-gray-border bg-surface shrink-0 animate-fade-in-up">
-          <span className="flex items-center gap-1.5 text-[12px] font-medium text-gray-muted">
-            <span className="h-1.5 w-1.5 rounded-full bg-accent animate-pulse" />
-            Saving changes…
-          </span>
-          <Button
-            variant="ghost"
-            size="sm"
-            icon={<RotateCcw className="w-3 h-3" strokeWidth={1.5} />}
-            onClick={handleReset}
-          >
-            Undo
-          </Button>
-        </div>
-      )}
-
-      {/* Saved confirmation */}
-      {saved && (
-        <div className="flex items-center gap-2 px-4 py-2 border-b border-gray-border bg-accent/[0.07] shrink-0">
-          <Check className="w-4 h-4 text-accent animate-check-settle" strokeWidth={2} />
-          <span className="text-[12px] font-medium text-accent-text">
-            {editMode === "draft"
-              ? "Draft saved - preview updated"
-              : liveSyncEnabled
-                ? "Saved - live refresh requested"
-                : "Saved"}
-          </span>
-        </div>
-      )}
-
-      {/* Save error */}
-      {saveError && (
-        <div className="flex items-center justify-between px-4 py-2 border-b border-gray-border bg-critical0/[0.04] shrink-0 animate-fade-in-up">
-          <div className="flex items-center gap-2">
-            <AlertCircle className="w-3 h-3 text-critical0" strokeWidth={1.5} />
-            <span className="text-[12px] text-critical">Couldn&apos;t save. Try again</span>
-          </div>
-          <button
-            onClick={handleSave}
-            className="text-[12px] font-medium text-critical hover:text-critical transition-colors"
-          >
-            Retry
-          </button>
-        </div>
-      )}
+      {/* What happened to your edit, said once, in place */}
+      {hasChanges || saved || saveError ? (
+        <p className="m-0 flex shrink-0 items-center gap-3 border-b border-[var(--st-line)] px-5 py-2 text-[13px]" role={saveError ? "alert" : "status"}>
+          {saveError ? <><XaStatus kind="down" size="sm">Couldn&apos;t save</XaStatus><XaTextLink onClick={handleSave}>Try again</XaTextLink></>
+            : hasChanges ? <><XaStatus kind="working" size="sm">Saving your change</XaStatus><XaTextLink onClick={handleReset}>Undo</XaTextLink></>
+              : <XaStatus kind="live" size="sm">{editMode === "draft" ? "Draft saved - preview updated" : liveSyncEnabled ? "Saved. Your live site is refreshing." : "Saved"}</XaStatus>}
+        </p>
+      ) : null}
 
       {/* Fields */}
-      <div className="flex-1 overflow-y-auto pb-20">
-        <div className="pt-3" />
+      <div className="flex flex-1 flex-col gap-5 overflow-y-auto px-5 pb-20 pt-5">
         {selectedNode?.section === activeSection && selectedNode.field && (
-          <div className="mx-4 mt-3 rounded-lg border border-accent/25 bg-accent/5 px-3 py-2">
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <p className="text-[12px] font-medium text-accent">
-                  Selected {selectedNode.nodeType === "image" ? "image" : selectedNode.nodeType === "link" ? "link" : "field"}
-                </p>
-                <p className="mt-0.5 break-all text-[12px] text-gray-muted">
-                  {selectedNode.label || selectedNode.field}
-                </p>
-              </div>
-              <Button
-                variant="secondary"
-                size="sm"
-                icon={<MessageCircle className="w-3 h-3" strokeWidth={1.5} />}
-                onClick={() =>
-                  openAskAIForSection(
-                    activeSection,
-                    SECTION_LABELS[activeSection] || toSentenceLabel(activeSection),
-                    selectedNode.label || toSentenceLabel(selectedNode.field || "selected field"),
-                  )
-                }
-              >
-                Ask Strelva
-              </Button>
-            </div>
-          </div>
+          <p className="m-0 flex flex-wrap items-baseline gap-x-2 text-[14px] text-[var(--st-text-2)]">
+            <span>You picked <span className="font-medium text-[var(--st-text)]">{selectedNode.label || toSentenceLabel(selectedNode.field)}</span>.</span>
+            <XaTextLink onClick={() => openAskAIForSection(activeSection, sectionLabel, selectedNode.label || toSentenceLabel(selectedNode.field || "selected field"))}>Ask Strelva to change it</XaTextLink>
+          </p>
         )}
 
-        {/* Simple fields */}
         {fields && fields.map((field) => (
-          <div key={field.key} className="px-4 py-2">
+          <div key={field.key}>
             {field.type === "image" ? (
-              <ImageField
-                label={field.label}
-                value={getNestedValue(data, field.key)}
-                onChange={(val) => handleFieldChange(field.key, val)}
-                size="lg"
-              />
+              <ImageField label={field.label} value={getNestedValue(data, field.key)} onChange={(val) => handleFieldChange(field.key, val)} size="lg" />
             ) : field.type === "textarea" ? (
-              <TextArea
-                label={field.label}
-                value={(getNestedValue(data, field.key) as string) || ""}
-                onChange={(e) => handleFieldChange(field.key, e.target.value)}
-                placeholder={field.placeholder}
-                rows={2}
-              />
+              <XaTextArea label={field.label} value={(getNestedValue(data, field.key) as string) || ""} onChange={(e) => handleFieldChange(field.key, e.target.value)} placeholder={field.placeholder} rows={3} />
             ) : field.type === "color" ? (
               (() => {
                 const hex = (getNestedValue(data, field.key) as string) || "#000000";
                 return (
-                  <div>
-                    <label className="block text-[12px] text-gray-muted mb-0.5">
-                      {field.label}
-                    </label>
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="color"
-                        value={hex}
-                        onChange={(e) => handleFieldChange(field.key, e.target.value)}
-                        className="h-9 w-12 rounded-lg border-0 bg-surface-inset p-1 cursor-pointer"
-                      />
-                      <input
-                        type="text"
-                        value={hex}
-                        onChange={(e) => handleFieldChange(field.key, e.target.value)}
-                        placeholder="#000000"
-                        className="w-28 rounded-lg border-0 bg-surface-inset px-3 py-2 text-[13px] text-warm-black"
-                      />
-                    </div>
+                  <div className="flex items-center gap-3">
+                    <input type="color" aria-label={field.label} value={hex} onChange={(e) => handleFieldChange(field.key, e.target.value)} className="h-8 w-8 shrink-0 cursor-pointer rounded-full border border-[var(--st-line)] bg-transparent p-0" />
+                    <span className="flex-1 text-[15px] text-[var(--st-text)]">{field.label}</span>
+                    <input aria-label={`${field.label} color code`} value={hex} onChange={(e) => handleFieldChange(field.key, e.target.value)} className="w-[104px] rounded-[var(--st-r-sm)] border border-[var(--st-line)] bg-[var(--st-surface)] px-2 py-1.5 text-[14px] tabular-nums text-[var(--st-text-2)] outline-none focus-visible:border-[var(--st-accent)]" />
                   </div>
                 );
               })()
@@ -720,53 +585,24 @@ export function PropertiesEditor({ activeSection }: PropertiesEditorProps) {
                 const current = (getNestedValue(data, field.key) as string) || "";
                 const opts = field.options ?? [];
                 return (
-                  <div>
-                    <label className="block text-[12px] text-gray-muted mb-0.5">
-                      {field.label}
-                    </label>
-                    <select
-                      value={current}
-                      onChange={(e) => handleFieldChange(field.key, e.target.value)}
-                      className="w-full rounded-lg border-0 bg-surface-inset px-3.5 py-2 text-[13px] text-warm-black"
-                    >
-                      {current && !opts.some((o) => o.value === current) && (
-                        <option value={current}>{current}</option>
-                      )}
-                      {opts.map((o) => (
-                        <option key={o.value} value={o.value}>
-                          {o.label}
-                        </option>
-                      ))}
+                  <label className="flex flex-col gap-2">
+                    <span className="text-[13px] font-medium text-[var(--st-text-body)]">{field.label}</span>
+                    <select value={current} onChange={(e) => handleFieldChange(field.key, e.target.value)} className={selectClass}>
+                      {current && !opts.some((o) => o.value === current) && <option value={current}>{current}</option>}
+                      {opts.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
                     </select>
-                  </div>
+                  </label>
                 );
               })()
             ) : field.type === "number" ? (
               (() => {
                 const raw = getNestedValue(data, field.key);
-                const displayValue =
-                  typeof raw === "number" ? String(raw) : typeof raw === "string" ? raw : "";
-                return (
-                  <TextInput
-                    label={field.label}
-                    type="number"
-                    value={displayValue}
-                    onChange={(e) => {
-                      const v = e.target.value;
-                      handleFieldChange(field.key, v === "" ? "" : Number(v));
-                    }}
-                    placeholder={field.placeholder}
-                  />
-                );
+                const displayValue = typeof raw === "number" ? String(raw) : typeof raw === "string" ? raw : "";
+                return <XaField label={field.label} type="number" value={displayValue} placeholder={field.placeholder}
+                  onChange={(e) => { const v = e.target.value; handleFieldChange(field.key, v === "" ? "" : Number(v)); }} />;
               })()
             ) : (
-              <TextInput
-                label={field.label}
-                type={field.type}
-                value={(getNestedValue(data, field.key) as string) || ""}
-                onChange={(e) => handleFieldChange(field.key, e.target.value)}
-                placeholder={field.placeholder}
-              />
+              <XaField label={field.label} type={field.type} value={(getNestedValue(data, field.key) as string) || ""} onChange={(e) => handleFieldChange(field.key, e.target.value)} placeholder={field.placeholder} />
             )}
           </div>
         ))}

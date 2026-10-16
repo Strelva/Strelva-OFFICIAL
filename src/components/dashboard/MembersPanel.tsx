@@ -1,5 +1,6 @@
 import type { Member } from "@/lib/rewards/types";
-import { XaInitial } from "@/components/ui/strelva/Xa";
+import { XaInitial, XaSays } from "@/components/ui/strelva/Xa";
+import { StoreChatButton } from "./StoreChatButton";
 import { DashEmpty, DashPage } from "./xa/DashboardXa";
 import styles from "./xa/dashboard-xa.module.css";
 
@@ -42,32 +43,38 @@ export function MembersPanel(props: MembersPanelProps) {
     );
   }
 
-  const pointsAwarded = members.reduce((sum, m) => sum + m.starsLifetime, 0);
+  // Who to thank next: the member with the most points waiting to be spent.
+  const next = [...members].sort((a, b) => b.starsAvailable - a.starsAvailable)[0]!;
+  const nextName = next.displayName?.trim() || next.email;
+  const first = nextName.split(/\s+/)[0] || nextName;
+  const others = members.length - 1;
 
   return (
     <DashPage
-      title="Members."
-      quiet={`${members.length} ${members.length === 1 ? "member has" : "members have"} earned ${pointsAwarded.toLocaleString()} points.`}
+      title={`${nextName} has ${next.starsAvailable.toLocaleString()} points to spend.`}
+      quiet={`Thank ${first} next.`}
       label="Members"
     >
-      <ul className={styles.list} aria-label="Members">
-        {members.map((member) => {
-          const name = member.displayName?.trim() || member.email;
-          return (
-            <li key={member.email}>
-              <XaInitial name={name} shape="round" size={30} />
-              <div className={styles.listText}>
-                <span className={styles.listTitle}>{name}</span>
-                {member.displayName?.trim() ? <span className={styles.listDetail}>{member.email}</span> : null}
-              </div>
-              <div className={styles.listEnd}>
-                <span>{member.starsAvailable.toLocaleString()} points</span>
-                {member.tier === "super-snapper" ? <span>{TIER_LABEL[member.tier]}</span> : null}
-              </div>
-            </li>
-          );
-        })}
-      </ul>
+      <XaSays links={[<StoreChatButton key="thank" label={`Ask Strelva to write ${first} a thank-you`} prompt={`Write a short, warm thank-you I can send ${nextName}, a ${next.tier === "super-snapper" ? "top member" : "member"} with ${next.starsAvailable} points to spend. Suggest one reward they could use them on.`} />]}>
+        {first} has earned {next.starsLifetime.toLocaleString()} points in all{next.tier === "super-snapper" ? " and is one of your top members" : ""}. A note from you brings people back.
+      </XaSays>
+      {others > 0 ? <section className="flex flex-col gap-2" aria-label="Every member">
+        <h2 className="m-0 text-[13px] font-medium text-[var(--st-text-3)]">{members.length} members</h2>
+        <ul className={styles.list} aria-label="Members">
+          {members.map((member) => {
+            const name = member.displayName?.trim() || member.email;
+            return (
+              <li key={member.email}>
+                <XaInitial name={name} shape="round" size={30} />
+                <div className={styles.listText}>
+                  <span className={styles.listTitle}>{name}</span>
+                  <span className={styles.listDetail}>{member.starsAvailable.toLocaleString()} points to spend{member.tier === "super-snapper" ? ` · ${TIER_LABEL[member.tier]}` : ""}</span>
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      </section> : null}
     </DashPage>
   );
 }

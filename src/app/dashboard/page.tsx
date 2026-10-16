@@ -67,7 +67,6 @@ async function DashboardHome() {
     getClickCounts("phone-click", tenant).catch(() => ({ thisWeek: 0, total: 0 })),
   ]);
   const pendingCount = needsYou.pendingCount;
-  // Kept for the owner-journey contract: day one renders the getting-started list (OnboardingChecklist, defaultOpen={isFresh}); otherwise {!isFresh ? <RetentionPanel signals={retentionSignals} /> : null} sits under Needs you.
   // Customer actions = booking clicks + phone taps (booking's per-service
   // breakdown stays booking-only elsewhere; this is just the top-line total).
   const customerActionsTotal = customerActions.total + phoneActions.total;

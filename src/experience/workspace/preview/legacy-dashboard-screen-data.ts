@@ -25,6 +25,13 @@ import type { UnifiedEvent } from "@/lib/types";
 import type { LegacyState } from "./legacy-dashboard-fixtures";
 import { LEGACY_TENANT, ago } from "./legacy-dashboard-fixtures";
 
+/**
+ * The one week every screen reads from, so Today, Visitors and Reports agree:
+ * 412 people this week (358 the week before, up 15%), 29 clicked to book,
+ * 12 called, 5,820 since the site went up.
+ */
+export const WEEK = { people: 412, peoplePrior: 358, booked: 29, bookedPrior: 25, called: 12, calledPrior: 9, sinceLaunch: 5820 } as const;
+
 const day = (offset: number) => { const d = new Date(); d.setDate(d.getDate() + offset); return d.toISOString().slice(0, 10); };
 export const LEGACY_TODAY = day(0);
 
@@ -35,14 +42,30 @@ export function series(days: number, base = 40): DailyMetric[] {
   });
 }
 
-export function periodStats(state: LegacyState): PeriodStats {
-  const range = resolveRange("live");
-  const rows = state === "empty" ? series(7, 0).map((m) => ({ ...m, pageViews: 0, bookingClicks: 0, phoneClicks: 0 })) : series(7, 46);
-  const pageViews = rows.reduce((s, r) => s + r.pageViews, 0);
+/** This week's seven days, scaled so they add up to WEEK.people exactly. */
+export function weekSeries(): DailyMetric[] {
+  const raw = series(7, 46);
+  const total = raw.reduce((s, r) => s + r.pageViews, 0);
+  const rows = raw.map((r) => ({ ...r, pageViews: Math.round((r.pageViews * WEEK.people) / total) }));
+  rows[rows.length - 1]!.pageViews += WEEK.people - rows.reduce((s, r) => s + r.pageViews, 0);
+  const share = (n: number, key: "bookingClicks" | "phoneClicks") => {
+    rows.forEach((r) => { r[key] = Math.floor((r.pageViews * n) / WEEK.people); });
+    const last = rows[rows.length - 1]!;
+    last[key] = (last[key] ?? 0) + n - rows.reduce((sum, r) => sum + (r[key] ?? 0), 0);
+  };
+  share(WEEK.booked, "bookingClicks"); share(WEEK.called, "phoneClicks");
+  return rows;
+}
+
+export function periodStats(state: LegacyState, rangeKey: string = "live"): PeriodStats {
+  const range = resolveRange(rangeKey);
+  const empty = state === "empty";
+  const rows = empty ? series(7, 0).map((m) => ({ ...m, pageViews: 0, bookingClicks: 0, phoneClicks: 0 })) : weekSeries();
   return {
-    range, pageViews, pageViewsPrior: Math.round(pageViews * 0.85), pageViewsDelta: state === "empty" ? 0 : Math.round(pageViews * 0.15),
-    actions: state === "empty" ? 0 : 41, actionsPrior: 34, actionsDelta: state === "empty" ? 0 : 7, bookingClicks: state === "empty" ? 0 : 29, bookingClicksPrior: 25,
-    phoneClicks: state === "empty" ? 0 : 12, phoneClicksPrior: 9, series: rows, hasData: state !== "empty",
+    range, pageViews: empty ? 0 : WEEK.people, pageViewsPrior: WEEK.peoplePrior, pageViewsDelta: empty ? 0 : WEEK.people - WEEK.peoplePrior,
+    actions: empty ? 0 : WEEK.booked + WEEK.called, actionsPrior: WEEK.bookedPrior + WEEK.calledPrior, actionsDelta: empty ? 0 : WEEK.booked + WEEK.called - WEEK.bookedPrior - WEEK.calledPrior,
+    bookingClicks: empty ? 0 : WEEK.booked, bookingClicksPrior: WEEK.bookedPrior,
+    phoneClicks: empty ? 0 : WEEK.called, phoneClicksPrior: WEEK.calledPrior, series: rows, hasData: !empty,
   };
 }
 
@@ -58,7 +81,7 @@ export const GA_PERF: GaPerf = { status: "ok", users: 1540, sessions: 2010, page
 export const UNCONNECTED_SEARCH: SearchPerf = { status: "unconfigured", clicks: 0, impressions: 0, ctr: 0, position: 0, topQueries: [] };
 export const UNCONNECTED_GA: GaPerf = { status: "unconfigured", users: 0, sessions: 0, pageviews: 0, topPages: [], topSources: [] };
 
-export const ANOMALY: TrafficAnomaly = { type: "spike", deltaPct: 38, recentAvg: 62, baselineAvg: 45, headline: "Visits jumped 38% this week.", why: "Most of the new visits came from Google Maps after your hours changed.", suggestion: "Keep Saturday hours on your listing through December." } as TrafficAnomaly;
+export const ANOMALY: TrafficAnomaly = { type: "spike", deltaPct: 15, recentAvg: 59, baselineAvg: 51, headline: "Visits are up 15% this week.", why: "Most of the new visits came from Google Maps after your hours changed.", suggestion: "Keep Saturday hours on your listing through December." } as TrafficAnomaly;
 
 export const MILESTONE: Milestone = {
   state: "ready", startDate: day(-120), daysSinceStart: 120, periodLabel: "first 90 days",
@@ -77,7 +100,7 @@ export function weeklyBrief(): WeeklyBrief {
   return {
     id: "brief-1", tenantId: LEGACY_TENANT, period: "week", weekStart: day(-7), weekEnd: day(-1),
     summary: "A strong week. 412 people found Harbor Dental, mostly from Google Maps after the new Saturday hours went up, and 29 of them clicked to book. Strelva refreshed the homepage and added Delta Dental to the insurance list. Two new five-star reviews mention how gentle Dr. Lin is with kids.",
-    stats: { pageViews: 412, bookingClicks: 29, reviewsReceived: 2, contentUpdates: 3, pageViewsDelta: 54, bookingClicksDelta: 6, phoneClicks: 12, phoneClicksDelta: 2 },
+    stats: { pageViews: WEEK.people, bookingClicks: WEEK.booked, reviewsReceived: 2, contentUpdates: 3, pageViewsDelta: WEEK.people - WEEK.peoplePrior, bookingClicksDelta: WEEK.booked - WEEK.bookedPrior, phoneClicks: WEEK.called, phoneClicksDelta: WEEK.called - WEEK.calledPrior },
     highlights: ["Saturday hours are now on your site and your Google listing.", "Two new five-star reviews this week.", "The new-patients page is your second most visited page."],
     nextAction: { title: "Add a page for same-week emergency visits", description: "People search for it on Sundays and you already offer it." },
     topServices: [{ name: "Cleanings", clicks: 14 } as WeeklyBrief["topServices"][number]],
@@ -88,7 +111,7 @@ export function weeklyBrief(): WeeklyBrief {
 }
 export function briefHistory(): WeeklyBrief[] {
   const first = weeklyBrief();
-  return [first, { ...first, id: "brief-0", weekStart: day(-14), weekEnd: day(-8), summary: "A steady week. 358 people found you and 23 clicked to book. Strelva replied to a review and refreshed your FAQ." }];
+  return [first, { ...first, id: "brief-0", weekStart: day(-14), weekEnd: day(-8), summary: "A steady week. 358 people found you and 25 clicked to book. Strelva replied to a review and refreshed your FAQ." }];
 }
 export const PROOF_CARDS: ProofCard[] = [{ change: "refreshed your homepage", changedAt: day(-12), beforeAvg: 41, afterAvg: 56, deltaPct: 37, headline: "Visits up 37% after the homepage refresh" } as ProofCard];
 export const GOAL: Goal = { metric: "bookings", target: 30, setAt: ago(400) } as unknown as Goal;
@@ -114,7 +137,8 @@ export const PRE_DRAFTS = { "g-r1": { reply: "Thank you, Ana. It was a pleasure 
 
 export function bookings(state: LegacyState): Booking[] {
   if (state === "empty") return [];
-  const b = (id: string, offset: number, start: string, end: string, name: string, service: string, status: Booking["status"] = "confirmed"): Booking => ({ id, serviceId: service.toLowerCase(), serviceName: service, date: day(offset), startTime: start, endTime: end, clientName: name, clientEmail: `${name.split(" ")[0]!.toLowerCase()}@example.com`, clientPhone: "(716) 555-0187", status, createdAt: ago(48) });
+  const phones: Record<string, string> = { "Ana Ruiz": "(716) 555-0123", "Jordan Pierce": "(716) 555-0164", "Mia Chen": "(716) 555-0139", "Sam Ortiz": "(716) 555-0110", "Priya Nair": "(716) 555-0172", "Leo Grant": "(716) 555-0148", "Dana Wills": "(716) 555-0191" };
+  const b = (id: string, offset: number, start: string, end: string, name: string, service: string, status: Booking["status"] = "confirmed"): Booking => ({ id, serviceId: service.toLowerCase(), serviceName: service, date: day(offset), startTime: start, endTime: end, clientName: name, clientEmail: `${name.split(" ")[0]!.toLowerCase()}@example.com`, clientPhone: phones[name] ?? "(716) 555-0100", status, createdAt: ago(48) });
   return [
     b("b1", 0, "08:30", "09:15", "Ana Ruiz", "Cleaning", state === "done" ? "completed" : "completed"),
     b("b2", 0, "10:30", "11:15", "Jordan Pierce", "Checkup", state === "done" ? "completed" : "confirmed"),

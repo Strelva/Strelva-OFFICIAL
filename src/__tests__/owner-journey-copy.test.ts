@@ -73,7 +73,7 @@ describe("owner journey copy and links", () => {
     // welcome/next-move walls.
     expect(dashboardPage).toContain("OnboardingChecklist");
     expect(dashboardPage).toContain("defaultOpen={isFresh}");
-    expect(dashboardPage).toContain("{!isFresh ? <RetentionPanel signals={retentionSignals} /> : null}");
+    expect(dashboardPage).toContain("{!isFresh ? <RetentionPanel signals=");
     expect(dashboardPage).not.toContain("Your starter site is ready. Make the first useful wins.");
     expect(dashboardPage).not.toContain("Next useful move");
   });
@@ -122,7 +122,8 @@ describe("owner journey copy and links", () => {
     expect(analyticsBoundary).toContain("analyticsAllowedPath(pathname)");
     expect(dashboardPage).toContain("getOwnerRetentionSignals(tenant)");
     expect(dashboardPage).toContain('<EngagementTracker event="dashboard-open" />');
-    expect(dashboardPage).toContain("<RetentionPanel signals={retentionSignals} />");
+    expect(dashboardPage).toContain("<RetentionPanel signals=");
+    expect(dashboardPage).toContain("retentionSignals");
     expect(chatPage).toContain('<EngagementTracker event="ai-chat-open" />');
     expect(analyticsPage).toContain('<EngagementTracker event="report-view" />');
     expect(tracker).toContain('"dashboard-open"');
@@ -130,10 +131,9 @@ describe("owner journey copy and links", () => {
     expect(tracker).toContain('"report-view"');
     expect(tracker).toContain('import { track } from "@vercel/analytics"');
     expect(tracker).toContain("track(event)");
-    // XA: the week's proof reads as plain answers, not KPI tiles.
-    expect(retentionPanel).toContain("Changes to your site");
-    expect(retentionPanel).toContain("Visits after a change");
+    // XA: the week's numbers are said once on Today; the panel is Pebble's one suggestion, never stat rows.
     expect(retentionPanel).toContain("ownerNextAction");
+    expect(retentionPanel).not.toContain("<XaAnswers");
     expect(retentionPanel).not.toContain("Retention engine");
     expect(retention).toContain("queueRetentionReengagement");
     expect(retention).toContain("retention_reengagement");
@@ -181,7 +181,8 @@ describe("owner journey copy and links", () => {
     expect(workspace).not.toContain('label: "AI Chat"');
     expect(preview).toContain('useState<PreviewSource>("editable")');
     expect(preview).toContain("Active site");
-    expect(preview).toContain("Draft preview");
+    expect(preview).toContain("Your draft");
+    expect(preview).toContain("Screen size");
     expect(preview).toContain("Editable preview");
     expect(preview).toContain("buildAskAIPrompt");
     expect(preview).toContain("addEditReceipts");

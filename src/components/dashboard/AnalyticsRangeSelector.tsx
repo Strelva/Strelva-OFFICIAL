@@ -5,7 +5,7 @@ import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { XaButton, XaField, XaSegmented } from "@/components/ui/strelva/Xa";
 
 const PRESETS = [
-  { key: "live", label: "Live" },
+  { key: "live", label: "Last 7 days" },
   { key: "week", label: "This week" },
   { key: "month", label: "This month" },
 ] as const;

@@ -273,7 +273,7 @@ export function DomainsClient({ initialDomains }: Props) {
       {/* Add form */}
       <form
         onSubmit={handleAdd}
-        className="mb-4 flex items-center gap-2 rounded-full bg-[var(--st-surface)] py-1.5 pl-4 pr-1.5 shadow-[0_1px_2px_#0000000f]"
+        className="mb-4 flex items-center gap-2 rounded-full bg-[var(--st-surface)] py-1.5 pl-4 pr-1.5 shadow-[var(--st-shadow-sm)]"
       >
         <Globe className="w-4 h-4 text-gray-muted shrink-0" strokeWidth={1.5} />
         <input

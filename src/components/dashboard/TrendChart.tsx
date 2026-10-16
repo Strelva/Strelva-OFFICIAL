@@ -29,7 +29,7 @@ export function TrendChart({ metrics, label = "Last 30 days" }: { metrics: Daily
   // Below a handful of visitors a chart is one spike on a flat line; say so instead.
   if (total < 5) {
     return (
-      <figure className="m-0 flex flex-col gap-4 rounded-[24px] bg-[var(--st-surface)] p-6 shadow-[var(--st-shadow-lg)]">
+      <figure className="m-0 flex flex-col gap-4 rounded-[var(--st-r-lg)] bg-[var(--st-surface)] p-6 shadow-[var(--st-shadow-sm)]">
         {head}
         <div className="h-[1px] w-full bg-[var(--st-line)]" aria-hidden="true" />
         <figcaption className="text-[14px] text-[var(--st-text-2)]">Not enough visits yet to draw. This fills in as more people find you.</figcaption>
@@ -46,7 +46,7 @@ export function TrendChart({ metrics, label = "Last 30 days" }: { metrics: Daily
   const area = `${line} L ${w},${h} L 0,${h} Z`;
   const top = pts[peak]!;
   return (
-    <figure className="m-0 flex flex-col gap-4 rounded-[24px] bg-[var(--st-surface)] p-6 shadow-[var(--st-shadow-lg)]" aria-label={`${label}: ${total} visitors, most on ${day(metrics[peak]!.date)}`}>
+    <figure className="m-0 flex flex-col gap-4 rounded-[var(--st-r-lg)] bg-[var(--st-surface)] p-6 shadow-[var(--st-shadow-sm)]" aria-label={`${label}: ${total} visitors, most on ${day(metrics[peak]!.date)}`}>
       {head}
       <svg viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" className="h-40 w-full text-[var(--st-accent)]" aria-hidden="true">
         <path d={area} fill="currentColor" opacity={0.07} />

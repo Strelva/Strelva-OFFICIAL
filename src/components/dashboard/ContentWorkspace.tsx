@@ -1,6 +1,6 @@
 "use client";
 
-import { XaButtonLink, XaSegmented } from "@/components/ui/strelva/Xa";
+import { XaButtonLink, XaIconButton, XaSegmented } from "@/components/ui/strelva/Xa";
 import { DashEmpty } from "./xa/DashboardXa";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -229,8 +229,8 @@ export function ContentWorkspace({
     <div className="flex h-full min-w-0 flex-1 flex-col">
       <div className="flex min-h-0 flex-1 flex-col">
       {viewportMode === null && (
-        <div className="flex flex-1 items-center justify-center text-[12px] text-gray-muted">
-          Loading editor...
+        <div className="flex flex-1 items-center justify-center text-[14px] text-[var(--st-text-2)]" role="status">
+          Opening your site
         </div>
       )}
 
@@ -258,7 +258,7 @@ export function ContentWorkspace({
             </main>
 
             <aside
-              className={`border-l border-gray-border flex flex-col shrink-0 transition-[width] duration-200 ease-out ${
+              className={`border-l border-[var(--st-line)] flex flex-col shrink-0 transition-[width] duration-200 ease-out ${
                 rightCollapsed ? "w-[44px]" : "w-[360px] xl:w-[380px]"
               }`}
             >
@@ -275,7 +275,7 @@ export function ContentWorkspace({
       {viewportMode === "tablet" && (
         isEditing ? (
           <div className="flex flex-col flex-1 min-h-0">
-            <div className="h-[58%] border-b border-gray-border shrink-0 flex min-h-0 flex-col">
+            <div className="h-[58%] border-b border-[var(--st-line)] shrink-0 flex min-h-0 flex-col">
               <div className="min-h-0 flex-1">
                 <SitePreview isEditing onToggleEdit={() => setIsEditing(false)} />
               </div>
@@ -294,7 +294,7 @@ export function ContentWorkspace({
       {viewportMode === "mobile" && (
         isEditing ? (
           <div className="flex flex-1 min-h-0 flex-col">
-            <div className="h-[46%] min-h-[260px] max-h-[430px] shrink-0 border-b border-gray-border">
+            <div className="h-[46%] min-h-[260px] max-h-[430px] shrink-0 border-b border-[var(--st-line)]">
               <SitePreview isEditing onToggleEdit={() => setIsEditing(false)} />
             </div>
             <div className="flex min-h-0 flex-1 flex-col">
@@ -337,17 +337,14 @@ function SectionsRail({
   onSelect: (value: string) => void;
 }) {
   return (
-    <aside className="flex w-[220px] shrink-0 flex-col border-r border-[var(--st-line)] bg-[var(--st-sidebar)]">
-      <div className="shrink-0 border-b border-gray-border/60 px-4 py-3">
-        <span className="mb-1.5 block text-[13px] font-medium text-gray-faint">
-          Page
-        </span>
-        <div className="relative">
+    <aside className="flex w-[220px] shrink-0 flex-col border-r border-[var(--st-line)] bg-[var(--st-sidebar)]" aria-label="Pages and parts">
+      <label className="flex shrink-0 flex-col gap-2 border-b border-[var(--st-line)] px-4 py-3">
+        <span className="text-[13px] font-medium text-[var(--st-text-3)]">Page</span>
+        <span className="relative">
           <select
             value={activePage}
             onChange={(event) => onPageChange(event.target.value)}
-            className="w-full appearance-none rounded-lg border border-gray-border bg-surface-raised py-2 pl-3 pr-8 text-[13px] font-medium text-warm-black outline-none transition-colors hover:border-gray-muted focus:border-gray-muted"
-            aria-label="Page"
+            className="w-full appearance-none rounded-[var(--st-r-md)] border border-[var(--st-line)] bg-[var(--st-surface)] py-2 pl-3 pr-8 text-[14px] font-medium text-[var(--st-text)] outline-none focus-visible:border-[var(--st-accent)]"
           >
             {pages.map((page) => (
               <option key={page.value} value={page.value}>
@@ -355,21 +352,13 @@ function SectionsRail({
               </option>
             ))}
           </select>
-          <ChevronDown
-            className="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-muted"
-            strokeWidth={1.5}
-          />
-        </div>
-      </div>
-
-      <div className="flex shrink-0 items-center justify-between px-4 pb-1.5 pt-3.5">
-        <span className="text-[13px] font-medium text-gray-faint">
-          Sections
+          <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[var(--st-text-3)]" strokeWidth={1.5} aria-hidden="true" />
         </span>
-        <span className="text-[12px] tabular-nums text-gray-faint/70">{sections.length}</span>
-      </div>
+      </label>
+
+      <p className="m-0 shrink-0 px-4 pb-1.5 pt-3.5 text-[13px] font-medium text-[var(--st-text-3)]">{sections.length} parts on this page</p>
       <div className="min-h-0 flex-1 space-y-px overflow-y-auto px-2.5 pb-2">
-        {sections.map((section, index) => {
+        {sections.map((section) => {
           const active = section.value === activeSection;
           return (
             <button
@@ -377,15 +366,10 @@ function SectionsRail({
               type="button"
               onClick={() => onSelect(section.value)}
               aria-current={active ? "true" : undefined}
-              className={`group relative flex w-full items-center gap-2.5 rounded-[10px] py-2 pl-3 pr-2.5 text-left text-[14px] transition-colors duration-(--motion-fast) ${
-                active
-                  ? "bg-[var(--st-selected)] font-medium text-[var(--st-text)]"
-                  : "text-[var(--st-text-body)] hover:bg-[var(--st-hover)]"
+              className={`relative flex w-full items-center rounded-[var(--st-r-nav)] px-3 py-2 text-left text-[14px] transition-colors duration-(--motion-fast) focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--st-accent)] ${
+                active ? "bg-[var(--st-selected)] font-medium text-[var(--st-text)]" : "text-[var(--st-text-body)] hover:bg-[var(--st-hover)]"
               }`}
             >
-              <span className="w-4 shrink-0 text-[12px] tabular-nums text-[var(--st-text-3)]">
-                {index + 1}
-              </span>
               <span className="truncate">{section.label}</span>
             </button>
           );
@@ -397,16 +381,11 @@ function SectionsRail({
 
 function CollapsedRight() {
   const { toggleRight } = useDashboard();
-
   return (
-    <div className="flex flex-col items-center py-4 gap-2">
-      <button
-        onClick={toggleRight}
-        className="w-8 h-8 flex items-center justify-center text-gray-muted hover:text-warm-black hover: transition-colors duration-150"
-        title="Expand panel"
-      >
-        <PanelRightOpen className="h-4 w-4" strokeWidth={1.5} />
-      </button>
+    <div className="flex flex-col items-center gap-2 py-4">
+      <XaIconButton label="Open the editing panel" tone="plain" onClick={toggleRight}>
+        <PanelRightOpen className="h-4 w-4" strokeWidth={1.5} aria-hidden="true" />
+      </XaIconButton>
     </div>
   );
 }

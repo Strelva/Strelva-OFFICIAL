@@ -42,17 +42,17 @@ function reviewPrompt(order: OrderRecord): string {
   return `Help me ask the customer who bought ${label} on ${date} for a Google review. Write a short, friendly message I can send them and include my review link.`;
 }
 
-const PRODUCT_PROMPT =
-  "I'd like to add or change a product in my store. Here's what I need:";
-
 export function StorePanel({
   summary,
   orders,
   products = [],
+  productsHref,
 }: {
   summary: OrderSummary | null;
   orders: OrderRecord[];
   products?: Product[];
+  /** Where products are changed (Lists), already prefixed for the tenant. */
+  productsHref?: string;
 }) {
   const verdict = buildStoreVerdict(summary);
   const revenueSeries = dailyRevenueSeries(orders);
@@ -81,18 +81,12 @@ export function StorePanel({
         </DashSection>
       )}
 
-      <DashSection label={products.length ? `Products · ${products.length}` : "Products"} aside={<StoreChatButton prompt={PRODUCT_PROMPT} label="Ask to add or change one" />}>
-        {products.length > 0 ? (
-          <XaRows label="Products">
-            {products.map((p, i) => (
-              <XaRow key={`${p.name}-${i}`} title={p.name} detail={p.inStock ? undefined : "Sold out"} tone={p.inStock ? undefined : "waits"}
-                meta={p.priceCents != null ? formatMoney(p.priceCents, p.currency) : "No price yet"} />
-            ))}
-          </XaRows>
-        ) : (
-          <p className="m-0 text-[15px] text-[var(--st-text-2)]">No products listed yet. Strelva manages them for you; ask to add one.</p>
-        )}
-      </DashSection>
+      {/* Products have one home: Lists, where they are changed. Store is where they sell. */}
+      <p className="m-0 text-[15px] text-[var(--st-text-2)]">
+        {products.length ? `${products.length} ${products.length === 1 ? "product is" : "products are"} on your site${products.some((p) => !p.inStock) ? `, ${products.filter((p) => !p.inStock).length} sold out` : ""}.` : "No products on your site yet."}{" "}
+        {productsHref ? <a className="font-medium text-[var(--st-accent)] hover:underline" href={productsHref}>Change them in Lists</a>
+          : <StoreChatButton prompt="I'd like to add or change a product in my store. Here's what I need:" label="Ask to add or change one" />}
+      </p>
 
       <DashSection label="Recent orders">
         {orders.length ? (

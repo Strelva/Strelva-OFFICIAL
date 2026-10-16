@@ -9,6 +9,7 @@ import { DashNote, DashPage } from "@/components/dashboard/xa/DashboardXa";
 import styles from "./website-library.module.css";
 import { cn } from "@/lib/cn";
 import type { MediaAsset } from "@/lib/media";
+import { photoCaption } from "@/lib/media";
 import { PhotoDetail } from "@/components/dashboard/PhotoDetail";
 import { useDashboardOptional } from "@/components/dashboard/DashboardContext";
 
@@ -37,16 +38,8 @@ export function PhotoLibrary() {
   const [uploadProgress, setUploadProgress] = useState<{ current: number; total: number } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dragCounterRef = useRef(0);
-  const newestUpload = Math.max(
-    0,
-    ...assets.map((asset) => new Date(asset.createdAt || 0).getTime()).filter(Number.isFinite),
-  );
-  const recentCount = newestUpload
-    ? assets.filter((asset) => {
-        const uploaded = new Date(asset.createdAt || 0).getTime();
-        return Number.isFinite(uploaded) && newestUpload - uploaded < 30 * 86_400_000;
-      }).length
-    : 0;
+  const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).getTime();
+  const thisMonth = assets.filter((asset) => new Date(asset.createdAt || 0).getTime() >= monthStart).length;
 
   // Fetch assets on mount
   useEffect(() => {
@@ -214,8 +207,15 @@ export function PhotoLibrary() {
         : loadError ? <DashNote tone="down" role="alert">The photos could not be read. Reload this page to try again; the library is unchanged.</DashNote>
         : assets.length === 0 ? <XaEmpty pose="adds" title="No photos yet." job="Ready to place your photos on the site" action={<XaButton variant="primary" disabled={readOnly} onClick={upload}>Add your first photos</XaButton>}>Photos of your space, your team and your work. Images up to 5 MB.</XaEmpty>
         : <>
-          <p className="m-0 text-[14px] text-[var(--st-text-2)]"><span className="tabular-nums">{recentCount}</span> added in the 30 days before the newest one. Drop photos anywhere on this page to add more.</p>
-          <div className={styles.photoGrid}>{assets.map(asset => <div key={asset.id} className={styles.photoItem}><button type="button" aria-label={`Open ${asset.filename}`} aria-pressed={selected?.id === asset.id} onClick={() => setSelected(selected?.id === asset.id ? null : asset)} className={cn(styles.photo, selected?.id === asset.id && styles.selected)}><Image src={asset.url} alt={asset.filename} fill className="object-cover" sizes="(max-width: 767px) 50vw, 25vw" /></button><span>{asset.filename}</span><span className="text-[13px] tabular-nums text-[var(--st-text-3)]">{asset.width} × {asset.height}</span></div>)}</div>
+          <p className="m-0 text-[14px] text-[var(--st-text-2)]">{thisMonth === 0 ? "None added this month." : `${thisMonth} added this month.`} Drop photos anywhere here to add more.</p>
+          <div className={styles.photoGrid}>{assets.map(asset => {
+            const caption = photoCaption(asset.filename);
+            return <div key={asset.id} className={styles.photoItem}>
+              <button type="button" aria-label={`Open ${caption}`} aria-pressed={selected?.id === asset.id} onClick={() => setSelected(selected?.id === asset.id ? null : asset)} className={cn(styles.photo, selected?.id === asset.id && styles.selected)}><Image src={asset.url} alt={caption} fill className="object-cover" sizes="(max-width: 767px) 50vw, 25vw" /></button>
+              <span>{caption}</span>
+              <span className="text-[13px] text-[var(--st-text-3)]">Added {new Date(asset.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}</span>
+            </div>;
+          })}</div>
         </>}
     </DashPage>
     <PhotoDetail asset={selected} onClose={() => setSelected(null)} onDelete={readOnly ? undefined : deleteAsset} />

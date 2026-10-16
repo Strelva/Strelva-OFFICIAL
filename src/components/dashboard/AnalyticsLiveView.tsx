@@ -1,5 +1,5 @@
 import { XaSays, XaTextLink } from "@/components/ui/strelva/Xa";
-import { DashNote, DashPage } from "./xa/DashboardXa";
+import { DashPage } from "./xa/DashboardXa";
 import { TrendChart } from "./TrendChart";
 import { AnalyticsRangeSelector } from "./AnalyticsRangeSelector";
 import { SearchAnalyticsPanel } from "./SearchAnalyticsPanel";
@@ -7,7 +7,7 @@ import { TrafficSourcesPanel } from "./TrafficSourcesPanel";
 import { MilestonePanel } from "./MilestonePanel";
 import { AiVisibilityScorecard } from "./AiVisibilityScorecard";
 import { SiteHealthCard } from "./SiteHealthCard";
-import { periodHeadline, type PeriodStats } from "@/lib/analytics/period";
+import type { PeriodStats } from "@/lib/analytics/period";
 import type { getSearchConsolePerf, getGa4Perf } from "@/lib/analytics";
 import type { buildMilestone } from "@/lib/milestone";
 import type { buildAiVisibilityScorecard } from "@/lib/ai-visibility-scorecard";
@@ -49,26 +49,28 @@ export function AnalyticsLiveView({
   visitorSeries?: number[];
   aiVisibility: AiViz | null;
 }) {
-  const headline = periodHeadline(stats);
+  // One short verdict, then what the headline does not say: calls and bookings.
+  const when = stats.range.key === "live" || stats.range.key === "week" ? "this week" : stats.range.key === "month" ? "this month" : "in these days";
+  const headline = !stats.hasData ? "No visitors yet." : `${stats.pageViews.toLocaleString()} ${stats.pageViews === 1 ? "person" : "people"} found you ${when}.`;
   // The anomaly is a rolling "right now" signal (last 7d vs baseline), so it only
-  // belongs on the Live range; a dated window tells its own story via the delta.
+  // belongs on the rolling range; a dated window tells its own story.
   const showAnomaly = stats.range.key === "live" && anomaly;
 
   const actionsLine = !stats.hasData ? "Bookings and calls show up here as people find you."
-    : stats.actions === 0 ? "No one clicked to book or called in these days."
-      : `${stats.actions.toLocaleString()} clicked to book or called${stats.phoneClicks > 0 ? ` (${stats.bookingClicks} booked, ${stats.phoneClicks} called)` : ""}${stats.actionsDelta > 0 ? `, up ${stats.range.priorLabel}` : stats.actionsDelta < 0 ? `, down ${stats.range.priorLabel}` : ""}.`;
+    : stats.actions === 0 ? "No one clicked to book or called."
+      : `${stats.bookingClicks.toLocaleString()} clicked to book and ${stats.phoneClicks.toLocaleString()} called.`;
   const googleConnected = searchPerf?.status === "ok" || gaPerf?.status === "ok";
 
   return (
     <DashPage title={headline} quiet={actionsLine} actions={<AnalyticsRangeSelector current={stats.range.key} />} label="Visitors">
       {showAnomaly && anomaly ? (
-        <DashNote tone={anomaly.type === "drop" ? "waits" : "live"} links={[<XaTextLink key="ask" href={chatHref}>Ask Strelva to handle it</XaTextLink>]}>
+        <XaSays links={[<XaTextLink key="ask" href={chatHref}>Ask Strelva to do it</XaTextLink>]}>
           {anomaly.headline} {anomaly.why} {anomaly.suggestion}
-        </DashNote>
+        </XaSays>
       ) : null}
 
-      {/* The chart's window name follows the range, so "Live" never sits over "last 7 days". */}
-      <TrendChart metrics={stats.series} label={stats.range.key === "live" ? "Last 7 days" : stats.range.label} />
+      {/* The chart is titled by the same words as the selected range. */}
+      <TrendChart metrics={stats.series} label={stats.range.label} />
 
       {!stats.hasData && googleConnected ? (
         <p className="m-0 text-[15px] text-[var(--st-text-2)]">No visits in these days yet. As more people find you, this fills in.</p>

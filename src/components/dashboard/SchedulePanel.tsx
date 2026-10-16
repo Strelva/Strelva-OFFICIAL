@@ -2,13 +2,15 @@
 
 import { useMemo, useState } from "react";
 import { XaButton, XaEmpty, XaSegmented, XaSystemTile, XaTextLink } from "@/components/ui/strelva/Xa";
+import { TodayRoster, rosterHeadline } from "./RosterPanel";
+import { useDashboardOptional } from "./DashboardContext";
 import { DashNote, DashPage, DashSection, dashStyles as dash } from "./xa/DashboardXa";
 import type { Booking, BookingConfig, DateOverride, WeeklySlot } from "@/lib/types";
 import { ConfirmDialog } from "./ConfirmDialog";
 
 const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 const inputClass =
-  "min-h-[40px] rounded-[12px] border border-[var(--st-line)] bg-[var(--st-surface)] px-3 text-[15px] tabular-nums text-[var(--st-text)] outline-none transition-colors focus-visible:border-[var(--st-accent)] disabled:opacity-40";
+  "min-h-[40px] rounded-[var(--st-r-md)] border border-[var(--st-line)] bg-[var(--st-surface)] px-3 text-[15px] tabular-nums text-[var(--st-text)] outline-none transition-colors focus-visible:border-[var(--st-accent)] disabled:opacity-40";
 
 function formatTime(hhmm: string): string {
   const parts = hhmm.split(":").map(Number);
@@ -47,27 +49,37 @@ export function SchedulePanel({
   config,
   overrides,
   today,
+  initialView = "today",
 }: {
   bookings: Booking[];
   config: BookingConfig;
   overrides: DateOverride[];
   today: string;
+  initialView?: "today" | "week" | "availability";
 }) {
-  const [tab, setTab] = useState<"appointments" | "availability">("appointments");
+  // One Bookings System: today's roster, the week ahead, and when people can book.
+  const [tab, setTab] = useState<"today" | "week" | "availability">(initialView);
+  const [statuses, setStatuses] = useState<Record<string, Booking["status"]>>({});
+  const todays = bookings.filter((b) => b.date === today);
+  const weekCount = useMemo(() => {
+    const end = new Date(`${today}T00:00:00`); end.setDate(end.getDate() + 6);
+    const last = end.toISOString().slice(0, 10);
+    return bookings.filter((b) => b.date >= today && b.date <= last && b.status !== "cancelled").length;
+  }, [bookings, today]);
+  const title = tab === "today" ? rosterHeadline(todays, statuses)
+    : tab === "week" ? (weekCount ? `${weekCount} ${weekCount === 1 ? "appointment" : "appointments"} this week.` : "No one is booked this week.")
+      : "When people can book you.";
 
   return (
     <DashPage
-      title="Bookings."
-      quiet={tab === "appointments" ? "Who is coming, day by day." : "When people can book you online."}
+      title={title}
       lead={<XaSystemTile kind="bookings" size={48} label="Bookings" />}
-      actions={<XaSegmented label="Bookings view" value={tab} onChange={setTab} options={[{ value: "appointments", label: "Who's coming" }, { value: "availability", label: "When you're open" }]} />}
+      actions={<XaSegmented label="Bookings view" value={tab} onChange={setTab} options={[{ value: "today", label: "Today" }, { value: "week", label: "This week" }, { value: "availability", label: "When you're open" }]} />}
       label="Bookings"
     >
-      {tab === "appointments" ? (
-        <Appointments bookings={bookings} today={today} />
-      ) : (
-        <Availability config={config} overrides={overrides} today={today} />
-      )}
+      {tab === "today" ? <TodayRoster bookings={todays} today={today} onChange={setStatuses} />
+        : tab === "week" ? <Appointments bookings={bookings} today={today} />
+          : <Availability config={config} overrides={overrides} today={today} />}
     </DashPage>
   );
 }
@@ -75,7 +87,10 @@ export function SchedulePanel({
 // --- Appointments --------------------------------------------------------------
 
 function Appointments({ bookings, today }: { bookings: Booking[]; today: string }) {
+  const dashboard = useDashboardOptional();
+  const apiHref = dashboard?.dashboardHref ?? ((path: string) => path);
   const [cancelled, setCancelled] = useState<Set<string>>(new Set());
+  const [openId, setOpenId] = useState<string | null>(null);
   const [confirmId, setConfirmId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -87,14 +102,6 @@ function Appointments({ bookings, today }: { bookings: Booking[]; today: string 
         .sort((a, b) => a.date.localeCompare(b.date) || a.startTime.localeCompare(b.startTime)),
     [bookings, today, cancelled]
   );
-
-  // Verdict: appointments within the next 7 days (today through today+6).
-  const weekEnd = useMemo(() => {
-    const d = new Date(`${today}T00:00:00`);
-    d.setDate(d.getDate() + 6);
-    return d.toISOString().slice(0, 10);
-  }, [today]);
-  const thisWeek = upcoming.filter((b) => b.date <= weekEnd).length;
 
   const groups = useMemo(() => {
     const map = new Map<string, Booking[]>();
@@ -110,7 +117,7 @@ function Appointments({ bookings, today }: { bookings: Booking[]; today: string 
     setBusy(true);
     setError(null);
     try {
-      const res = await fetch(`/api/booking/${id}`, {
+      const res = await fetch(apiHref(`/api/booking/${id}`), {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: "cancelled" }),
@@ -118,6 +125,7 @@ function Appointments({ bookings, today }: { bookings: Booking[]; today: string 
       if (!res.ok) throw new Error();
       setCancelled((prev) => new Set(prev).add(id));
       setConfirmId(null);
+      setOpenId(null);
     } catch {
       setError("That appointment wasn't cancelled. Try again.");
     } finally {
@@ -130,38 +138,43 @@ function Appointments({ bookings, today }: { bookings: Booking[]; today: string 
       <>
         {error ? <DashNote tone="down" role="alert">{error}</DashNote> : null}
         <XaEmpty pose="resting" title="No one is booked yet." job="Your booking page is open and taking times">
-          The moment someone books, they show up here by day, and you can cancel if plans change.
+          The moment someone books, they show up here by day. Open one to call them or cancel it.
         </XaEmpty>
       </>
     );
   }
 
+  const confirming = upcoming.find((b) => b.id === confirmId) ?? null;
   return (
     <>
       {error ? <DashNote tone="down" role="alert">{error}</DashNote> : null}
-      <p className="m-0 text-[17px] leading-[1.45] text-[var(--st-text)]">
-        {thisWeek} {thisWeek === 1 ? "appointment" : "appointments"} this week, {upcoming.length} coming up in all.
-      </p>
       {groups.map(([date, dayBookings]) => (
         <DashSection key={date} label={dayHeading(date, today)}>
           <ul className={dash.list} aria-label={dayHeading(date, today)}>
-            {dayBookings.map((b) => (
-              <li key={b.id}>
-                <span className="w-[76px] shrink-0 pt-[1px] text-[15px] tabular-nums text-[var(--st-text)]">{formatTime(b.startTime)}</span>
-                <div className={dash.listText}>
-                  <span className={dash.listTitle}>{b.clientName}</span>
-                  <span className={dash.listDetail}>{b.serviceName} · until {formatTime(b.endTime)}</span>
-                </div>
-                <div className={dash.listEnd}><XaTextLink onClick={() => setConfirmId(b.id)} aria-label={`Cancel ${b.clientName} at ${formatTime(b.startTime)}`}>Cancel</XaTextLink></div>
-              </li>
-            ))}
+            {dayBookings.map((b) => {
+              const open = openId === b.id;
+              return <li key={b.id} className="!block">
+                <button type="button" className="flex w-full items-start gap-[14px] border-0 bg-transparent p-0 text-left text-inherit" aria-expanded={open} onClick={() => setOpenId(open ? null : b.id)}>
+                  <span className="w-[76px] shrink-0 pt-[1px] text-[15px] tabular-nums text-[var(--st-text)]">{formatTime(b.startTime)}</span>
+                  <span className={dash.listText}>
+                    <span className={dash.listTitle}>{b.clientName}</span>
+                    <span className={dash.listDetail}>{b.serviceName} · until {formatTime(b.endTime)}</span>
+                  </span>
+                </button>
+                {open ? <p className="m-0 mt-3 flex flex-wrap gap-x-2 gap-y-1 pl-[90px] text-[14px] text-[var(--st-text-2)] max-md:pl-0">
+                  {b.clientPhone ? <><a className="font-medium text-[var(--st-accent)] hover:underline" href={`tel:${b.clientPhone}`}>Call {b.clientPhone}</a><span aria-hidden="true">·</span></> : null}
+                  {b.clientEmail ? <><a className="font-medium text-[var(--st-accent)] hover:underline" href={`mailto:${b.clientEmail}`}>Email</a><span aria-hidden="true">·</span></> : null}
+                  <XaTextLink onClick={() => setConfirmId(b.id)} aria-label={`Cancel ${b.clientName} at ${formatTime(b.startTime)}`}>Cancel this appointment</XaTextLink>
+                </p> : null}
+              </li>;
+            })}
           </ul>
         </DashSection>
       ))}
 
       <ConfirmDialog
-        open={confirmId !== null}
-        title="Cancel this appointment?"
+        open={confirming !== null}
+        title={confirming ? `Cancel ${confirming.clientName} at ${formatTime(confirming.startTime)}?` : "Cancel this appointment?"}
         message="The time opens up for someone else. This can't be undone from here."
         confirmLabel="Cancel the appointment"
         cancelLabel="Keep it"
@@ -185,6 +198,8 @@ function Availability({
   overrides: DateOverride[];
   today: string;
 }) {
+  const dashboard = useDashboardOptional();
+  const apiHref = dashboard?.dashboardHref ?? ((path: string) => path);
   const [schedule, setSchedule] = useState<WeeklySlot[]>(() => normalizeSchedule(config.weeklySchedule));
   const [slotDuration, setSlotDuration] = useState(config.slotDuration);
   const [bufferTime, setBufferTime] = useState(config.bufferTime);
@@ -213,7 +228,7 @@ function Availability({
         slotDuration,
         bufferTime,
       };
-      const res = await fetch("/api/booking/config", {
+      const res = await fetch(apiHref("/api/booking/config"), {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(next),
@@ -264,7 +279,7 @@ function Availability({
         ...(r.available && r.end ? { end: r.end } : {}),
         ...(r.reason?.trim() ? { reason: r.reason.trim() } : {}),
       }));
-      const res = await fetch("/api/booking/overrides", {
+      const res = await fetch(apiHref("/api/booking/overrides"), {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(cleaned),

@@ -2,15 +2,13 @@
 
 import { useSearchParams } from "next/navigation";
 import { useState, useEffect, useMemo } from "react";
-import { XaAnswers, XaButton, XaField, XaInitial, XaSays, XaStatus, XaTextArea, XaTextLink } from "@/components/ui/strelva/Xa";
+import { XaAnswers, XaButton, XaField, XaSays, XaStatus, XaSystemTile, XaTextArea, XaTextLink } from "@/components/ui/strelva/Xa";
 import { DashEmpty, DashNote, DashPage } from "./xa/DashboardXa";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { connectionStatusWord } from "./ConnectionsPage";
 import {
-  INTELLIGENCE_CATEGORY_LABELS,
   deriveIntelligenceStatus,
   getIntegrationDefinition,
-  getIntegrationCategories,
   normalizeIntegrationStatus,
   type IntegrationStatus,
   type RawConnectionStatus,
@@ -26,11 +24,11 @@ function formatRelativeTime(isoDate: string): string {
   const diffHours = Math.floor(diffMs / 3600000);
   const diffDays = Math.floor(diffMs / 86400000);
 
-  if (diffMins < 1) return "Just now";
-  if (diffMins < 60) return `${diffMins}m ago`;
-  if (diffHours < 24) return `${diffHours}h ago`;
-  if (diffDays < 7) return `${diffDays}d ago`;
-  return date.toLocaleDateString();
+  if (diffMins < 1) return "just now";
+  if (diffMins < 60) return `${diffMins} ${diffMins === 1 ? "minute" : "minutes"} ago`;
+  if (diffHours < 24) return `${diffHours} ${diffHours === 1 ? "hour" : "hours"} ago`;
+  if (diffDays < 7) return `${diffDays} ${diffDays === 1 ? "day" : "days"} ago`;
+  return `on ${date.toLocaleDateString("en-US", { month: "short", day: "numeric" })}`;
 }
 
 export function ConnectionDetailPage({ connectionId }: { connectionId: string }) {
@@ -202,14 +200,13 @@ export function ConnectionDetailPage({ connectionId }: { connectionId: string })
   }
 
   const intelligenceStatus = deriveIntelligenceStatus(detail, status);
-  const categories = getIntegrationCategories(detail);
   const canUseNow = intelligenceStatus === "ai_using_it" ||
     intelligenceStatus === "can_act_here" ||
     intelligenceStatus === "signal_available";
   const setupPath = status === "connected"
-    ? "Connected. Strelva reads it each time it syncs."
+    ? `Connected. Strelva ${lastSyncedAt ? `last read it ${formatRelativeTime(lastSyncedAt)}` : "reads it every day"}.`
     : detail.connectionProvider === "google"
-      ? "Connect Google once to link your Business Profile, Search Console and Analytics. Then Strelva can rely on it."
+      ? "Connect Google once and Strelva can read your Google listing, what people search, and who visits your site."
       : detail.id === "google-search-console"
         ? "This one uses a key you paste in below, not a sign-in button."
         : detail.connectionProvider
@@ -226,11 +223,10 @@ export function ConnectionDetailPage({ connectionId }: { connectionId: string })
   return (
     <DashPage
       title={`${detail.displayName}.`}
-      quiet={detail.shortDescription}
-      lead={<XaInitial name={detail.displayName} size={48} />}
+      quiet={`${detail.shortDescription}.`}
+      lead={detail.id === "google-business" ? <XaSystemTile kind="listing" size={48} /> : undefined}
       actions={oauthHref ? <XaButton variant="primary" onClick={() => window.location.assign(oauthHref)}>Connect with {providerName}</XaButton>
-        : isConnected ? <XaStatus kind="live">Connected{lastSyncedAt ? `, synced ${formatRelativeTime(lastSyncedAt)}` : ""}</XaStatus>
-          : state.kind ? <XaStatus kind={state.kind === "live" ? "live" : state.kind}>{state.word}</XaStatus> : null}
+        : state.kind === "waits" || state.kind === "down" ? <XaStatus kind={state.kind}>{state.word}</XaStatus> : null}
       width="narrow"
       label={detail.displayName}
     >
@@ -242,13 +238,8 @@ export function ConnectionDetailPage({ connectionId }: { connectionId: string })
       <XaSays>{setupPath}</XaSays>
 
       <XaAnswers labelWidth={160} rows={[
-        ["What it gives Strelva", <>{detail.addsIntelligence} {canUseNow ? "Strelva uses it in chat, ideas and your weekly report when new data lands." : "Until it is connected, it stays silent: no made-up numbers."}</>],
-        ["Where it shows up", detail.appearsIn.join(", ")],
-        ["Kinds of signal", categories.map((category) => INTELLIGENCE_CATEGORY_LABELS[category]).join(", ")],
-        ...(detail.actionPaths?.length ? [["What Strelva can do", detail.actionPaths.join(". ")] as const] : []),
-        ["Refreshes", detail.syncFrequency],
-        ...(lastSyncedAt ? [["Last synced", formatRelativeTime(lastSyncedAt)] as const] : []),
-        ["Used in", detail.usedIn],
+        ["What it gives Strelva", <>{detail.addsIntelligence} {canUseNow ? "Strelva uses it when it answers you, suggests a change, and writes your weekly report." : "Until it is connected, Strelva shows no numbers from it."}</>],
+        ...(detail.actionPaths?.length ? [["What Strelva can do", `${detail.actionPaths.join(". ")}.`] as const] : []),
       ]} />
 
       {detail.connectionProvider === "yelp" && !isConnected && (

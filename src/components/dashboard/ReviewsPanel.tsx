@@ -280,7 +280,7 @@ export function ReviewsPanel({ reviews, googlePlaceId, gbpConnected = false, voi
     <div className={dash.scroll} aria-label="Reviews"><div className={dash.page}><div className={dash.column}>
       <ReputationHeader reviews={reviews} gbpConnected={gbpConnected} copyDest={copyDest} />
       <ul className={styles.reviews} aria-label="Reviews">
-        {reviews.map((review) => (
+        {[...reviews].sort((a, b) => Number(Boolean(a.reply)) - Number(Boolean(b.reply))).map((review) => (
           <ReviewCard
             key={review.id}
             review={review}

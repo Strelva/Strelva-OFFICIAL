@@ -197,13 +197,12 @@ function render(props: Parameters<typeof ReputationHeader>[0]): string {
 }
 
 describe("ReputationHeader render", () => {
-  it("renders the verdict, response rate, and velocity tiles", () => {
+  it("says the verdict in one short sentence, with no stat table or histogram", () => {
     const html = render({ reviews: strongPortfolio(), gbpConnected: true, copyDest: "Google" });
-    expect(html).toContain("Reputation");
-    expect(html).toContain("Your reputation is strong");
-    expect(html).toContain("Response rate");
-    expect(html).toContain("85%");
-    expect(html).toContain("Last 30 days");
+    expect(html).toMatch(/\d\.\d stars from \d+ reviews\./);
+    expect(html).not.toContain("Response rate");
+    expect(html).not.toContain("Reputation</");
+    expect(html).not.toContain("How many reviews gave each rating");
   });
 
   it("reframes a down-trend as an opportunity, never shame", () => {
@@ -215,7 +214,6 @@ describe("ReputationHeader render", () => {
       review({ rating: 5, date: daysAgo(50) }),
     ];
     const html = render({ reviews, gbpConnected: true, copyDest: "Google" });
-    expect(html).toContain("Last 30 days");
     // Keeps the prior number, points at the action, no shame language.
     expect(html).toContain("The share link brings them back");
     expect(html.toLowerCase()).not.toContain("down from");

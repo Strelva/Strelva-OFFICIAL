@@ -19,6 +19,7 @@ export function ConfirmDialog({
   busy = false,
   onConfirm,
   onCancel,
+  thumbnail,
 }: {
   open: boolean;
   title: string;
@@ -30,12 +31,15 @@ export function ConfirmDialog({
   busy?: boolean;
   onConfirm: () => void;
   onCancel: () => void;
+  /** The thing being removed, shown so the owner sees it instead of a name. */
+  thumbnail?: { src: string; alt: string };
 }) {
   return (
     <XaSheet
       open={open}
       onClose={() => { if (!busy) onCancel(); }}
       title={title}
+      art={thumbnail ? <img src={thumbnail.src} alt={thumbnail.alt} className="mb-1 block h-24 w-24 rounded-[var(--st-r-md)] object-cover" /> : undefined}
       actions={<>
         <XaButton variant="primary" size="lg" block busy={busy} onClick={onConfirm} data-destructive={destructive || undefined}>{confirmLabel}</XaButton>
         <XaButton variant="quiet" size="lg" disabled={busy} onClick={onCancel}>{cancelLabel}</XaButton>

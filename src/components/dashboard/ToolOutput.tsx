@@ -1,9 +1,13 @@
 "use client";
 
-import { useState } from "react";
-import { ChevronDown, ChevronUp, ExternalLink, Activity, Layers, Image as ImageIcon, Link2, CircleCheck, Circle, AlertCircle } from "lucide-react";
-import Image from "next/image";
-import { cn } from "@/lib/cn";
+/**
+ * What Strelva shows inside a conversation when it looks something up (XA ·
+ * AS2). Each answer is a sentence with one real object under it: the week as
+ * a sentence, the site's pages as open rows, photos as the photos, a preview
+ * as the page itself. No cards, no icon headers, no collapsing chrome; status
+ * only where something needs the owner.
+ */
+import { XaPage, XaRow, XaRows, XaSays, XaTextLink, XaWorking } from "@/components/ui/strelva/Xa";
 import { useDashboardOptional } from "./DashboardContext";
 
 /* ─────────────────────────────────────────────────────────────
@@ -84,444 +88,80 @@ interface ToolOutputProps {
   className?: string;
 }
 
-/* ─────────────────────────────────────────────────────────────
-   LOADING SHIMMER
-   ───────────────────────────────────────────────────────────── */
+const LOOKING: Record<string, string> = {
+  show_report: "Reading this week's numbers",
+  show_content: "Reading your site's pages",
+  show_photos: "Opening your photos",
+  show_connections: "Checking your connected accounts",
+  preview_site: "Opening your site",
+};
 
-function Shimmer({ className }: { className?: string }) {
-  return (
-    <div
-      className={cn(
-        "rounded bg-gray-bg animate-pulse",
-        className
-      )}
-    />
-  );
-}
-
-function PendingState({ toolName }: { toolName: string }) {
-  const label =
-    toolName === "show_report" ? "Loading report..." :
-    toolName === "show_content" ? "Loading content..." :
-    toolName === "show_photos" ? "Loading photos..." :
-    toolName === "show_connections" ? "Loading connections..." :
-    toolName === "preview_site" ? "Loading preview..." :
-    "Loading...";
-
-  return (
-    <div className="rounded-xl border border-gray-border bg-surface overflow-hidden">
-      <div className="px-4 py-3 border-b border-gray-border/50 flex items-center gap-2">
-        <div className="w-4 h-4 rounded bg-gray-bg animate-pulse" />
-        <span className="text-[12px] text-gray-muted">{label}</span>
-      </div>
-      <div className="p-4 space-y-3">
-        <Shimmer className="h-8 w-1/2" />
-        <Shimmer className="h-4 w-3/4" />
-        <Shimmer className="h-4 w-2/3" />
-      </div>
-    </div>
-  );
-}
-
-/* ─────────────────────────────────────────────────────────────
-   REPORT OUTPUT — metrics cards
-   ───────────────────────────────────────────────────────────── */
+function plural(n: number, one: string, many: string) { return `${n.toLocaleString()} ${n === 1 ? one : many}`; }
 
 function ReportOutput({ data }: { data: ReportData }) {
-  const [expanded, setExpanded] = useState(true);
-
-  return (
-    <div className="rounded-xl border border-gray-border bg-surface overflow-hidden">
-      {/* Header */}
-      <button
-        onClick={() => setExpanded(!expanded)}
-        className="w-full px-4 py-3 flex items-center justify-between border-b border-gray-border/50 hover:bg-gray-bg transition-colors"
-      >
-        <div className="flex items-center gap-2">
-          <Activity className="w-4 h-4 text-accent" strokeWidth={1.5} />
-          <span className="text-[14px] font-medium text-warm-black">Weekly report</span>
-          {data.weekLabel && (
-            <span className="text-[13px] text-gray-muted">{data.weekLabel}</span>
-          )}
-        </div>
-        {expanded ? (
-          <ChevronUp className="w-3.5 h-3.5 text-gray-muted" strokeWidth={1.5} />
-        ) : (
-          <ChevronDown className="w-3.5 h-3.5 text-gray-muted" strokeWidth={1.5} />
-        )}
-      </button>
-
-      {/* Content */}
-      {expanded && (
-        <div className="p-4 animate-fade-in-up">
-          {/* Headline */}
-          <p className="mb-2 text-[15px] font-medium text-warm-black">
-            {data.pageViews.thisWeek > 0
-              ? `${data.pageViews.thisWeek} people found you this week`
-              : "No visitors yet this week"}
-          </p>
-
-          {/* The numbers as one sentence, never a row of tiles. */}
-          <p className="m-0 text-[14px] leading-[1.5] text-[var(--st-text-body)]">
-            {data.pageViews.total.toLocaleString()} all time. {data.bookingClicks.thisWeek.toLocaleString()} booked or called this week, {data.bookingClicks.total.toLocaleString()} all time.
-            {data.trend?.percent ? ` Visits are ${data.trend.percent > 0 ? "up" : "down"} ${Math.abs(data.trend.percent)}% on last week.` : ""}
-          </p>
-
-          {/* Site score bar */}
-          {data.siteScore !== undefined && (
-            <div className="mt-4">
-              <div className="flex items-center justify-between mb-1.5">
-                <span className="text-[13px] text-gray-muted">Site completeness</span>
-                <span className="text-[13px] tabular-nums text-warm-black">{data.siteScore}%</span>
-              </div>
-              <div className="h-1.5 bg-gray-bg rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-accent rounded-full transition-all duration-500"
-                  style={{ width: `${data.siteScore}%` }}
-                />
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  );
+  const dashboard = useDashboardOptional();
+  const week = data.pageViews.thisWeek;
+  const trend = data.trend?.percent ? ` That is ${Math.abs(data.trend.percent)}% ${data.trend.percent > 0 ? "more" : "fewer"} than last week.` : "";
+  return <XaSays links={[<XaTextLink key="report" href={dashboard?.dashboardHref("/dashboard/reports") || "/dashboard/reports"}>Read the report</XaTextLink>]}>
+    {week > 0 ? `${plural(week, "person", "people")} found ${data.siteName} this week, and ${data.bookingClicks.thisWeek.toLocaleString()} clicked to book or called.${trend}` : `No one has found ${data.siteName} this week yet.`}
+  </XaSays>;
 }
-
-/* ─────────────────────────────────────────────────────────────
-   CONTENT OUTPUT — collapsible site tree
-   ───────────────────────────────────────────────────────────── */
 
 function ContentOutput({ data }: { data: ContentData }) {
-  const [expanded, setExpanded] = useState(true);
-  const [expandedPages, setExpandedPages] = useState<Set<string>>(new Set(["home"]));
-
-  const togglePage = (slug: string) => {
-    setExpandedPages((prev) => {
-      const next = new Set(prev);
-      if (next.has(slug)) next.delete(slug);
-      else next.add(slug);
-      return next;
-    });
-  };
-
-  const totalSections = data.pages.reduce((sum, p) => sum + p.sections.length, 0);
-  const liveSections = data.pages.reduce(
-    (sum, p) => sum + p.sections.filter((s) => s.status === "live").length,
-    0
-  );
-
-  return (
-    <div className="rounded-xl border border-gray-border bg-surface overflow-hidden">
-      {/* Header */}
-      <button
-        onClick={() => setExpanded(!expanded)}
-        className="w-full px-4 py-3 flex items-center justify-between border-b border-gray-border/50 hover:bg-gray-bg transition-colors"
-      >
-        <div className="flex items-center gap-2">
-          <Layers className="w-4 h-4 text-accent" strokeWidth={1.5} />
-          <span className="text-[12px] font-medium text-warm-black">Site Content</span>
-          <span className="text-[13px] text-gray-muted">
-            {liveSections}/{totalSections} sections live
-          </span>
-        </div>
-        {expanded ? (
-          <ChevronUp className="w-3.5 h-3.5 text-gray-muted" strokeWidth={1.5} />
-        ) : (
-          <ChevronDown className="w-3.5 h-3.5 text-gray-muted" strokeWidth={1.5} />
-        )}
-      </button>
-
-      {/* Content */}
-      {expanded && (
-        <div className="animate-fade-in-up">
-          {data.pages.map((page) => (
-            <div key={page.slug}>
-              {/* Page row */}
-              <button
-                onClick={() => togglePage(page.slug)}
-                className="w-full px-4 py-2.5 flex items-center gap-2 hover:bg-gray-bg transition-colors border-b border-gray-border/30"
-              >
-                {expandedPages.has(page.slug) ? (
-                  <ChevronDown className="w-3 h-3 text-gray-muted" strokeWidth={1.5} />
-                ) : (
-                  <ChevronDown className="w-3 h-3 text-gray-muted rotate-[-90deg]" strokeWidth={1.5} />
-                )}
-                <span className="text-[12px] font-medium text-warm-black">{page.label}</span>
-                <span className="text-[13px] text-gray-muted">
-                  {page.sections.length} sections
-                </span>
-              </button>
-
-              {/* Sections */}
-              {expandedPages.has(page.slug) && (
-                <div className="pl-8 py-1 space-y-0.5">
-                  {page.sections.map((section) => (
-                    <div
-                      key={section.type}
-                      className={cn(
-                        "flex items-center gap-2 px-3 py-1.5 rounded",
-                        !section.visible && "opacity-50"
-                      )}
-                    >
-                      <div
-                        className={cn(
-                          "w-1.5 h-1.5 rounded-full",
-                          section.status === "live" ? "bg-success" :
-                          section.status === "configured" ? "bg-gray-muted" :
-                          "bg-gray-subtle"
-                        )}
-                      />
-                      <span className="text-[12px] text-warm-black flex-1">{section.label}</span>
-                      {section.itemCount !== undefined && (
-                        <span className="text-[13px] text-gray-muted">{section.itemCount}</span>
-                      )}
-                      {!section.visible && (
-                        <span className="text-[13px] text-gray-muted">hidden</span>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
+  const dashboard = useDashboardOptional();
+  return <XaRows label="Your site's pages">
+    {data.pages.map((page) => {
+      const empty = page.sections.filter((section) => section.status === "empty").map((section) => section.label);
+      const hidden = page.sections.filter((section) => !section.visible).map((section) => section.label);
+      const shown = page.sections.filter((section) => section.visible).map((section) => section.label);
+      return <XaRow key={page.slug} title={page.label}
+        detail={empty.length ? `Still empty: ${empty.join(", ")}` : hidden.length ? `Hidden: ${hidden.join(", ")}` : shown.join(", ")}
+        tone={empty.length ? "waits" : undefined}
+        href={dashboard?.dashboardHref("/dashboard/site") || "/dashboard/site"} />;
+    })}
+  </XaRows>;
 }
-
-/* ─────────────────────────────────────────────────────────────
-   PHOTOS OUTPUT — thumbnail grid
-   ───────────────────────────────────────────────────────────── */
 
 function PhotosOutput({ data }: { data: PhotoData }) {
   const dashboard = useDashboardOptional();
-  const [expanded, setExpanded] = useState(true);
-  const displayPhotos = data.photos.slice(0, 6);
-  const remaining = data.total - displayPhotos.length;
-
-  return (
-    <div className="rounded-xl border border-gray-border bg-surface overflow-hidden">
-      {/* Header */}
-      <button
-        onClick={() => setExpanded(!expanded)}
-        className="w-full px-4 py-3 flex items-center justify-between border-b border-gray-border/50 hover:bg-gray-bg transition-colors"
-      >
-        <div className="flex items-center gap-2">
-          <ImageIcon className="w-4 h-4 text-accent" strokeWidth={1.5} />
-          <span className="text-[12px] font-medium text-warm-black">Photos</span>
-          <span className="text-[13px] text-gray-muted">{data.total} total</span>
-        </div>
-        {expanded ? (
-          <ChevronUp className="w-3.5 h-3.5 text-gray-muted" strokeWidth={1.5} />
-        ) : (
-          <ChevronDown className="w-3.5 h-3.5 text-gray-muted" strokeWidth={1.5} />
-        )}
-      </button>
-
-      {/* Content */}
-      {expanded && (
-        <div className="p-4 animate-fade-in-up">
-          {displayPhotos.length > 0 ? (
-            <>
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-                {displayPhotos.map((photo) => (
-                  <div
-                    key={photo.id}
-                    className="relative aspect-square rounded-lg overflow-hidden bg-gray-bg border border-gray-border"
-                  >
-                    <Image
-                      src={photo.url}
-                      alt={photo.filename}
-                      fill
-                      className="object-cover"
-                      sizes="100px"
-                    />
-                  </div>
-                ))}
-              </div>
-              {remaining > 0 && (
-                <a
-                  href={dashboard?.dashboardHref("/dashboard/assets") || "/dashboard/assets"}
-                  className="flex items-center justify-center gap-1.5 mt-3 py-2 text-[12px] text-accent hover:text-accent/80 transition-colors"
-                >
-                  View all {data.total} photos
-                  <ExternalLink className="w-3 h-3" strokeWidth={1.5} />
-                </a>
-              )}
-            </>
-          ) : (
-            <div className="text-center py-6">
-              <ImageIcon className="w-6 h-6 text-gray-muted mx-auto mb-2" strokeWidth={1.5} />
-              <p className="text-[12px] text-gray-muted">No photos uploaded yet</p>
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  );
+  const shown = data.photos.slice(0, 6);
+  const href = dashboard?.dashboardHref("/dashboard/assets") || "/dashboard/assets";
+  if (!shown.length) return <XaSays links={[<XaTextLink key="add" href={href}>Add photos</XaTextLink>]}>You have no photos yet. Your site uses Strelva&apos;s until you add your own.</XaSays>;
+  return <div className="flex flex-col gap-2">
+    <ul className="m-0 flex list-none flex-wrap gap-2 p-0" aria-label="Your photos">
+      {shown.map((photo) => <li key={photo.id}>
+        <img src={photo.url} alt="" width={96} height={96} className="block h-24 w-24 rounded-[var(--st-r-md)] object-cover" loading="lazy" />
+      </li>)}
+    </ul>
+    <p className="m-0 text-[14px]"><XaTextLink href={href}>{data.total > shown.length ? `See all ${data.total} photos` : "Open your photos"}</XaTextLink></p>
+  </div>;
 }
-
-/* ─────────────────────────────────────────────────────────────
-   CONNECTIONS OUTPUT — integration status cards
-   ───────────────────────────────────────────────────────────── */
 
 function ConnectionsOutput({ data }: { data: ConnectionData }) {
-  const [expanded, setExpanded] = useState(true);
-  const usefulCount = data.connections.filter((c) => c.status === "ai_using_it" || c.status === "can_act_here").length;
-
-  const statusLabel: Record<NonNullable<ConnectionData["connections"][number]["status"]>, string> = {
-    no_signal: "No signal",
-    signal_available: "Signal available",
-    ai_using_it: "Active",
-    needs_attention: "Needs attention",
-    can_act_here: "Can act here",
-  };
-
-  return (
-    <div className="rounded-xl border border-gray-border bg-surface overflow-hidden">
-      {/* Header */}
-      <button
-        onClick={() => setExpanded(!expanded)}
-        className="w-full px-4 py-3 flex items-center justify-between border-b border-gray-border/50 hover:bg-gray-bg transition-colors"
-      >
-        <div className="flex items-center gap-2">
-          <Link2 className="w-4 h-4 text-accent" strokeWidth={1.5} />
-          <span className="text-[12px] font-medium text-warm-black">Active integrations</span>
-          <span className="text-[13px] text-gray-muted">{usefulCount} usable now</span>
-        </div>
-        {expanded ? (
-          <ChevronUp className="w-3.5 h-3.5 text-gray-muted" strokeWidth={1.5} />
-        ) : (
-          <ChevronDown className="w-3.5 h-3.5 text-gray-muted" strokeWidth={1.5} />
-        )}
-      </button>
-
-      {/* Content */}
-      {expanded && (
-        <div className="p-3 animate-fade-in-up space-y-1.5">
-          {data.summary && (
-            <p className="px-1 pb-2 text-[12px] leading-relaxed text-gray-muted">{data.summary}</p>
-          )}
-          {data.connections.map((conn) => (
-            <div
-              key={conn.id}
-              className="flex items-start gap-3 px-3 py-2.5 rounded-lg border border-glass-border"
-            >
-              <div className="w-8 h-8 flex items-center justify-center shrink-0">
-                <span className="text-[12px] font-bold text-gray-fg">{conn.icon}</span>
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-[12px] font-medium text-warm-black block">{conn.name}</span>
-                  {conn.status && (
-                    <span className="rounded-full bg-gray-bg px-2 py-0.5 text-[12px] font-medium text-gray-muted">
-                      {statusLabel[conn.status]}
-                    </span>
-                  )}
-                </div>
-                {conn.description && (
-                  <span className="text-[13px] text-gray-muted block leading-relaxed">{conn.description}</span>
-                )}
-                {conn.sourceProof && (
-                  <span className="mt-1 text-[12px] text-gray-faint block">{conn.sourceProof}</span>
-                )}
-              </div>
-              {conn.status === "ai_using_it" || conn.status === "can_act_here" ? (
-                <CircleCheck className="w-4 h-4 text-success shrink-0" strokeWidth={1.5} />
-              ) : conn.status === "needs_attention" ? (
-                <AlertCircle className="w-4 h-4 text-warning0 shrink-0" strokeWidth={1.5} />
-              ) : (
-                <Circle className="w-4 h-4 text-gray-subtle shrink-0" strokeWidth={1.5} />
-              )}
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
+  const dashboard = useDashboardOptional();
+  const href = dashboard?.dashboardHref("/dashboard/integrations") || "/dashboard/integrations";
+  return <div className="flex flex-col gap-2">
+    {data.summary ? <p className="m-0 text-[15px] leading-[1.5] text-[var(--st-text-body)]">{data.summary}</p> : null}
+    <XaRows label="Connected accounts">
+      {data.connections.map((connection) => <XaRow key={connection.id} title={connection.name}
+        detail={connection.status === "needs_attention" ? "Needs you: sign in again" : !connection.connected ? "Not connected yet" : connection.description}
+        tone={connection.status === "needs_attention" ? "waits" : undefined} href={href} />)}
+    </XaRows>
+  </div>;
 }
-
-/* ─────────────────────────────────────────────────────────────
-   PREVIEW OUTPUT — iframe or screenshot thumbnail
-   ───────────────────────────────────────────────────────────── */
 
 function PreviewOutput({ data }: { data: PreviewData }) {
-  const [expanded, setExpanded] = useState(true);
-
-  return (
-    <div className="rounded-xl border border-gray-border bg-surface overflow-hidden">
-      {/* Header */}
-      <button
-        onClick={() => setExpanded(!expanded)}
-        className="w-full px-4 py-3 flex items-center justify-between border-b border-gray-border/50 hover:bg-gray-bg transition-colors"
-      >
-        <div className="flex items-center gap-2">
-          <ExternalLink className="w-4 h-4 text-accent" strokeWidth={1.5} />
-          <span className="text-[12px] font-medium text-warm-black">Site Preview</span>
-          {data.siteName && (
-            <span className="text-[13px] text-gray-muted">{data.siteName}</span>
-          )}
-        </div>
-        {expanded ? (
-          <ChevronUp className="w-3.5 h-3.5 text-gray-muted" strokeWidth={1.5} />
-        ) : (
-          <ChevronDown className="w-3.5 h-3.5 text-gray-muted" strokeWidth={1.5} />
-        )}
-      </button>
-
-      {/* Content */}
-      {expanded && (
-        <div className="p-4 animate-fade-in-up">
-          {data.screenshotUrl ? (
-            <div className="relative aspect-video rounded-lg overflow-hidden bg-gray-bg border border-gray-border">
-              <Image
-                src={data.screenshotUrl}
-                alt="Site preview"
-                fill
-                className="object-cover"
-                sizes="400px"
-              />
-            </div>
-          ) : (
-            <div className="relative aspect-video rounded-lg overflow-hidden bg-gray-bg border border-gray-border">
-              <iframe
-                src={data.url}
-                className="w-full h-full pointer-events-none"
-                title="Site preview"
-              />
-            </div>
-          )}
-          <a
-            href={data.url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center justify-center gap-1.5 mt-3 py-2 text-[12px] text-accent hover:text-accent/80 transition-colors"
-          >
-            Open site
-            <ExternalLink className="w-3 h-3" strokeWidth={1.5} />
-          </a>
-        </div>
-      )}
-    </div>
-  );
-}
-
-/* ─────────────────────────────────────────────────────────────
-   ERROR STATE
-   ───────────────────────────────────────────────────────────── */
-
-function ErrorState({ message }: { message?: string }) {
-  return (
-    <div className="rounded-xl border border-terra/30 bg-terra/5 p-4 flex items-start gap-3">
-      <AlertCircle className="w-4 h-4 text-terra shrink-0 mt-0.5" strokeWidth={1.5} />
-      <div>
-        <p className="text-[12px] font-medium text-terra">Something went wrong</p>
-        {message && <p className="text-[12px] text-terra/80 mt-0.5">{message}</p>}
+  const address = data.url.replace(/^https?:\/\//, "").replace(/\/$/, "") || data.siteName || "Your site";
+  return <div className="flex flex-col gap-2">
+    <XaPage address={address} flat label={`${address}, as visitors see it`}>
+      <div className="relative -mx-6 -mb-7 -mt-6 aspect-video overflow-hidden">
+        {data.screenshotUrl
+          ? <img src={data.screenshotUrl} alt="" className="h-full w-full object-cover object-top" />
+          : <iframe src={data.url} className="pointer-events-none h-full w-full border-0" title={`${address} preview`} tabIndex={-1} />}
       </div>
-    </div>
-  );
+    </XaPage>
+    {data.url ? <p className="m-0 text-[14px]"><a className="font-medium text-[var(--st-accent)] hover:underline" href={data.url} target="_blank" rel="noopener noreferrer">Open the live site</a></p> : null}
+  </div>;
 }
 
 /* ─────────────────────────────────────────────────────────────
@@ -598,30 +238,14 @@ function parseResult(toolName: string, result: unknown): ToolResult {
    ───────────────────────────────────────────────────────────── */
 
 export function ToolOutput({ toolName, result, status, className }: ToolOutputProps) {
-  // Pending/running state
   if (status === "pending" || status === "running") {
-    return (
-      <div className={className}>
-        <PendingState toolName={toolName} />
-      </div>
-    );
+    return <div className={className}><XaWorking title={LOOKING[toolName] ?? "Looking it up"} steps={[]} /></div>;
   }
-
-  // Error state
   if (status === "error") {
-    const errorMsg = typeof result === "object" && result !== null
-      ? (result as Record<string, unknown>).error as string | undefined
-      : undefined;
-    return (
-      <div className={className}>
-        <ErrorState message={errorMsg} />
-      </div>
-    );
+    const errorMsg = typeof result === "object" && result !== null ? (result as Record<string, unknown>).error as string | undefined : undefined;
+    return <div className={className} role="alert"><XaSays>{errorMsg ? `That didn't work: ${errorMsg}` : "That didn't work. Nothing changed. Ask again and Strelva tries once more."}</XaSays></div>;
   }
-
-  // Parse and render result
   const parsed = parseResult(toolName, result);
-
   return (
     <div className={className}>
       {parsed.type === "report" && <ReportOutput data={parsed.data} />}
@@ -629,13 +253,7 @@ export function ToolOutput({ toolName, result, status, className }: ToolOutputPr
       {parsed.type === "photos" && <PhotosOutput data={parsed.data} />}
       {parsed.type === "connections" && <ConnectionsOutput data={parsed.data} />}
       {parsed.type === "preview" && <PreviewOutput data={parsed.data} />}
-      {parsed.type === "unknown" && (
-        <div className="rounded-xl border border-gray-border bg-surface p-4">
-          <pre className="text-[13px] text-gray-muted overflow-x-auto">
-            {JSON.stringify(result, null, 2)}
-          </pre>
-        </div>
-      )}
+      {parsed.type === "unknown" && <p className="m-0 text-[14px] text-[var(--st-text-2)]">Strelva finished this step.</p>}
     </div>
   );
 }

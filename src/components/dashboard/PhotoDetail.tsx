@@ -2,11 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { X } from "lucide-react";
-import { XaAnswers, XaButton, XaIconButton, XaTextLink } from "@/components/ui/strelva/Xa";
+import { XaButton, XaIconButton, XaTextLink } from "@/components/ui/strelva/Xa";
 import { ConfirmDialog } from "@/components/dashboard/ConfirmDialog";
 import type { MediaAsset } from "@/lib/media";
-import { formatFileSize } from "@/lib/media";
-import { timeAgo } from "@/lib/utils";
+import { photoCaption } from "@/lib/media";
 
 interface PhotoDetailProps {
   asset: MediaAsset | null;
@@ -28,15 +27,16 @@ export function PhotoDetail({ asset, onClose, onDelete }: PhotoDetailProps) {
     setDeleting(false);
   }
 
-  // Close on Escape
+  // Close on Escape, unless the delete sheet is open: then Escape belongs to
+  // the sheet, which closes and hands focus back to "Delete photo".
   useEffect(() => {
-    if (!asset) return;
+    if (!asset || confirmingDelete) return;
     const handler = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape" && !document.querySelector("dialog[open]")) onClose();
     };
     document.addEventListener("keydown", handler);
     return () => document.removeEventListener("keydown", handler);
-  }, [asset, onClose]);
+  }, [asset, onClose, confirmingDelete]);
 
   const handleCopy = async () => {
     if (!asset) return;
@@ -59,17 +59,15 @@ export function PhotoDetail({ asset, onClose, onDelete }: PhotoDetailProps) {
 
   if (!asset) return null;
 
+  const caption = photoCaption(asset.filename);
+  const added = new Date(asset.createdAt).toLocaleDateString("en-US", { month: "long", day: "numeric" });
   const detail = (
     <div className="flex flex-col gap-5 p-5">
       <div className="flex items-start justify-between gap-3">
-        <p className="m-0 min-w-0 truncate text-[15px] font-medium text-[var(--st-text)]">{asset.filename}</p>
+        <p className="m-0 min-w-0 text-[15px] font-medium text-[var(--st-text)]">{caption}<span className="block text-[13px] font-normal text-[var(--st-text-3)]">Added {added}</span></p>
         <XaIconButton label="Close photo" tone="plain" onClick={onClose}><X className="h-4 w-4" strokeWidth={1.7} /></XaIconButton>
       </div>
-      <img src={asset.url} alt={asset.filename} className="max-h-[300px] w-full rounded-[12px] object-contain" />
-      <XaAnswers labelWidth={96} rows={[
-        ["Size", asset.width && asset.height ? `${asset.width} × ${asset.height}, ${formatFileSize(asset.size)}` : formatFileSize(asset.size)],
-        ["Added", timeAgo(asset.createdAt)],
-      ]} />
+      <img src={asset.url} alt={caption} className="max-h-[300px] w-full rounded-[var(--st-r-md)] object-contain" />
       <p className="m-0 text-[14px] text-[var(--st-text-2)]">Ask Strelva to put it on any part of your site, or copy its address.</p>
       <div className="flex flex-wrap items-center gap-4">
         <XaButton onClick={handleCopy}>{copied ? "Copied" : "Copy address"}</XaButton>
@@ -84,6 +82,7 @@ export function PhotoDetail({ asset, onClose, onDelete }: PhotoDetailProps) {
         open={confirmingDelete}
         title="Delete this photo?"
         message="It comes out of your photo library. Any part of your site still using it loses the image."
+        thumbnail={{ src: asset.url, alt: caption }}
         confirmLabel="Delete the photo"
         destructive
         busy={deleting}
@@ -101,7 +100,7 @@ export function PhotoDetail({ asset, onClose, onDelete }: PhotoDetailProps) {
         {/* Backdrop */}
         <div className="absolute inset-0 bg-[#16171566]" onClick={onClose} />
         {/* Sheet */}
-        <div className="relative max-h-[85vh] overflow-y-auto rounded-t-[24px] bg-[var(--st-surface)] animate-fade-in-up">
+        <div className="relative max-h-[85vh] overflow-y-auto rounded-t-[var(--st-r-lg)] bg-[var(--st-surface)] animate-fade-in-up">
           {detail}
         </div>
       </div>

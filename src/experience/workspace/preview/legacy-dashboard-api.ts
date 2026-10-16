@@ -18,6 +18,7 @@ export async function legacyApiFixture(method: string, path: string, query: URLS
     return ok({ success: true, fixture: true });
   }
   switch (true) {
+    case path === "workspace/owner-brand": return ok({ brand: null });
     case path === "my-properties": return ok({ properties: [{ id: LEGACY_TENANT, name: LEGACY_BUSINESS, href: "#" }] });
     case path === "content/settings": return ok({ siteName: LEGACY_BUSINESS, businessModel: state === "empty" ? "" : "local", brandVoice: "Warm and calm", ownerName: "Dr. Amy Lin", siteTagline: "Gentle family dentistry on Elmwood Ave", siteDescription: "Cleanings, fillings, crowns and children's visits in Buffalo.", bookingUrl: "/book", footerTagline: "Gentle family dentistry on Elmwood.", copyrightText: "Harbor Dental", phone: "(716) 555-0142", email: "hello@harbordental.com", address: "1180 Elmwood Ave, Buffalo, NY 14222" });
     case path === "dashboard/onboarding-status": return ok(state === "empty"
@@ -37,10 +38,13 @@ export async function legacyApiFixture(method: string, path: string, query: URLS
       { id: "m2", role: "assistant", content: "Done as a draft: your homepage says you're closed Thursday and Friday, Nov 26 and 27. It waits in Needs you for your yes.", timestamp: ago(2.9) },
     ] });
     case path === "media": return state === "error" ? { status: 503, body: { error: "Photos could not be read." } } : ok({ assets: state === "empty" ? [] : [
-      { id: "m1", url: "/xa/photo-dentist.webp", filename: "dr-lin-cleaning.webp", width: 1200, height: 1680, size: 182_000, createdAt: ago(30) },
-      { id: "m2", url: "/images/outcomes/storefront.webp", filename: "front-door-elmwood.webp", width: 1600, height: 1100, size: 240_000, createdAt: ago(80) },
-      { id: "m3", url: "/images/outcomes/dusk.webp", filename: "waiting-room-evening.webp", width: 1600, height: 1100, size: 210_000, createdAt: ago(200) },
-      { id: "m4", url: "/images/workspace/ink-moss.webp", filename: "logo-mark.webp", width: 800, height: 800, size: 40_000, createdAt: ago(900) },
+      { id: "m1", url: "/xa/photo-dentist.webp", filename: "Dr. Lin at work.webp", width: 1200, height: 1680, size: 182_000, createdAt: ago(30) },
+      { id: "m2", url: "/images/outcomes/storefront.webp", filename: "Our front windows on Elmwood.webp", width: 1600, height: 1100, size: 240_000, createdAt: ago(80) },
+    ] });
+    case path === "collections/product": return ok({ entries: state === "empty" ? [] : [
+      { slug: "whitening-kit", status: "published", data: { name: "Whitening kit", priceCents: 4900 }, updated_at: ago(70) },
+      { slug: "kids-brushing-set", status: "published", data: { name: "Kids' brushing set", priceCents: 1800 }, updated_at: ago(120) },
+      { slug: "night-guard", status: "draft", data: { name: "Night guard fitting", priceCents: 12500, inStock: false }, updated_at: ago(8) },
     ] });
     case path.startsWith("collections/"): return ok({ entries: state === "empty" ? [] : [
       { slug: "first-visit", status: "published", data: { title: "What happens at a child's first visit" }, updated_at: ago(40) },
@@ -51,7 +55,15 @@ export async function legacyApiFixture(method: string, path: string, query: URLS
       { provider: "google", status: "connected", lastSyncedAt: ago(2), platformReady: true },
       { provider: "calendly", status: "needs_reauth", lastSyncedAt: ago(90), platformReady: true },
     ] });
-    case path === "connections/google/resources": return ok({ gsc: { selected: "sc-domain:harbordental.com", resources: [{ id: "sc-domain:harbordental.com", label: "harbordental.com" }] }, ga4: { selected: "properties/1", resources: [{ id: "properties/1", label: "Harbor Dental website" }] }, gbp: { selected: "locations/1", resources: [{ id: "locations/1", label: "Harbor Dental", detail: "1180 Elmwood Ave" }] } });
+    case path === "connections/google/resources": return ok({
+      connection: { connected: true, status: "connected", scopes: [] },
+      gsc: { status: "ready", selected: "sc-domain:harbordental.com", resources: [{ id: "sc-domain:harbordental.com", label: "harbordental.com" }] },
+      // ?state=waiting shows the one case worth a sentence: two sites and none picked.
+      ga4: state === "waiting"
+        ? { status: "ready", selected: null, resources: [{ id: "properties/1", label: "harbordental.com" }, { id: "properties/2", label: "Harbor Dental old site" }] }
+        : { status: "ready", selected: "properties/1", resources: [{ id: "properties/1", label: "harbordental.com" }] },
+      gbp: { status: "ready", selected: { accountId: "a1", locationId: "l1" }, resources: [{ id: "a1|l1", label: "Harbor Dental", detail: "1180 Elmwood Ave" }] },
+    });
     case path === "dashboard/content-autonomy": return ok({ mode: "approve" });
     case path === "content/theme": return ok({ fontDisplay: "DM_Sans", fontBody: "DM_Sans", colors: { cream: "#ffffff", sage: "#1f4e5f", bark: "#16202a", terra: "#c9773f", wheat: "#edf1ea" } });
     case path === "content/navigation": return ok({ menuItems: [{ label: "Services", href: "/services" }, { label: "Insurance", href: "/insurance" }, { label: "About", href: "/about" }], ctaLabel: "Book a visit", ctaHref: "/book" });

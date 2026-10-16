@@ -163,7 +163,7 @@ export function AssetPickerModal({ open, onClose, onSelect }: AssetPickerModalPr
         role="dialog"
         aria-modal="true"
         aria-labelledby="asset-picker-title"
-        className="relative flex max-h-[86vh] w-full max-w-3xl flex-col overflow-hidden rounded-t-[24px] bg-[var(--st-surface)] shadow-[var(--st-shadow-lg)] sm:rounded-[24px]"
+        className="relative flex max-h-[86vh] w-full max-w-3xl flex-col overflow-hidden rounded-t-[var(--st-r-lg)] bg-[var(--st-surface)] shadow-[var(--st-shadow-lg)] sm:rounded-[var(--st-r-lg)]"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex flex-col gap-4 px-6 pb-4 pt-6">

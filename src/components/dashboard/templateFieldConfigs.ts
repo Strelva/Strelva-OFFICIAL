@@ -90,7 +90,7 @@ function uid() {
 export const FOOD_BRAND_SCHEMA: SiteModelEditorSchema = {
   sectionFields: {
     hero: [
-      { key: "headline", label: "Headline", type: "textarea", placeholder: "Main heading (use \\n for line breaks)" },
+      { key: "headline", label: "Headline", type: "textarea", placeholder: "The first thing people read" },
       { key: "subheadline", label: "Subheadline", type: "text", placeholder: "Short accent above headline" },
       { key: "tagline", label: "Tagline", type: "textarea", placeholder: "What makes the brand different..." },
       { key: "ctaText", label: "Button text", type: "text", placeholder: "See Our Products" },
@@ -98,7 +98,7 @@ export const FOOD_BRAND_SCHEMA: SiteModelEditorSchema = {
       { key: "backgroundImageUrl", label: "Background image", type: "image" },
     ],
     story: [
-      { key: "headline", label: "Headline", type: "textarea", placeholder: "Use \\n for line breaks" },
+      { key: "headline", label: "Headline", type: "textarea", placeholder: "The first thing people read" },
       { key: "accentText", label: "Caption under image", type: "text", placeholder: "From the shores of Lake Erie" },
       { key: "statement", label: "Opening statement", type: "textarea", placeholder: "One big sentence that sets the tone..." },
       { key: "quote", label: "Pull quote", type: "textarea", placeholder: "A memorable line..." },

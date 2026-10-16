@@ -28,7 +28,7 @@ export function PropertySwitcher({ fallbackName }: { fallbackName: string }) {
   return <select
     aria-label="Website"
     value={tenantId}
-    className="max-w-full min-h-10 rounded-full border-0 bg-[var(--st-surface)] px-4 py-2 text-[14px] text-[var(--st-text)] shadow-[0_1px_2px_#0000000f]"
+    className="max-w-full min-h-10 rounded-full border-0 bg-[var(--st-surface)] px-4 py-2 text-[14px] text-[var(--st-text)] shadow-[var(--st-shadow-sm)]"
     onChange={(event) => {
       const next = properties.find((property) => property.id === event.target.value);
       if (next && next.id !== tenantId) window.location.assign(next.href);

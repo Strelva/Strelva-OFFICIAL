@@ -1,16 +1,22 @@
 "use client";
 
 import { useState } from "react";
-import { XaTextLink } from "@/components/ui/strelva/Xa";
-import { DashNote } from "./xa/DashboardXa";
+import { XaSays, XaTextLink } from "@/components/ui/strelva/Xa";
 import { useDashboardOptional } from "./DashboardContext";
 
 interface BillingBannerProps {
-  subscriptionStatus: string;
+  /** Defaults to the dashboard's own subscription status. */
+  subscriptionStatus?: string;
 }
 
-export function BillingBanner({ subscriptionStatus }: BillingBannerProps) {
+/**
+ * The payment decision, said by Pebble in frame where it matters: on Today and
+ * on Settings > Plan beside "Manage billing". Never a shell banner. Renders
+ * nothing while the plan is in good standing.
+ */
+export function BillingBanner({ subscriptionStatus: given }: BillingBannerProps) {
   const dashboard = useDashboardOptional();
+  const subscriptionStatus = given ?? dashboard?.subscriptionStatus ?? "active";
   const dashboardHref = dashboard?.dashboardHref ?? ((path: string) => path);
   const [dismissed, setDismissed] = useState(false);
   const [openingPortal, setOpeningPortal] = useState(false);
@@ -52,12 +58,12 @@ export function BillingBanner({ subscriptionStatus }: BillingBannerProps) {
 
   if (isNone) {
     return (
-      <DashNote tone="waits" role="status" links={[
+      <div role="status"><XaSays links={[
         <XaTextLink key="start" onClick={startSubscription}>{starting ? "Opening" : "Start your plan"}</XaTextLink>,
         <XaTextLink key="later" onClick={() => setDismissed(true)}>Later</XaTextLink>,
       ]}>
         Your site is built and ready. Start your plan to make changes live.{error ? ` ${error}` : ""}
-      </DashNote>
+      </XaSays></div>
     );
   }
 
@@ -94,11 +100,11 @@ export function BillingBanner({ subscriptionStatus }: BillingBannerProps) {
 
   // No "Later" here: a billing problem (past due / ended) must not be hideable.
   return (
-    <DashNote tone="down" role="alert" links={[<XaTextLink key="billing" onClick={openBillingPortal}>{openingPortal ? "Opening" : isCancelled ? "Restart your plan" : "Update your card"}</XaTextLink>]}>
+    <div role="alert"><XaSays links={[<XaTextLink key="billing" onClick={openBillingPortal}>{openingPortal ? "Opening" : isCancelled ? "Restart your plan" : "Update your card"}</XaTextLink>]}>
       {isCancelled
-        ? "Your plan has ended. Restart it to keep changing your site."
-        : "Your last payment didn't go through. Update your card to keep your site running."}
+        ? "Your plan has ended. Your site stays up, and changes wait until you restart it."
+        : "Your last payment didn't go through. Your site is still up; update your card to keep it that way."}
       {error ? ` ${error}` : ""}
-    </DashNote>
+    </XaSays></div>
   );
 }

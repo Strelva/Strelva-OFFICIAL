@@ -1,10 +1,10 @@
 "use client";
 /** Client-only pieces of the legacy dashboard preview (functions cannot cross from the server page). */
 import { useState } from "react";
-import DashboardError from "@/app/dashboard/error";
+import { DashboardErrorView } from "@/components/dashboard/DashboardErrorView";
 import { ConfirmDialog } from "@/components/dashboard/ConfirmDialog";
 import { XaButton } from "@/components/ui/strelva/Xa";
-import { DashPage, DashProse } from "@/components/dashboard/xa/DashboardXa";
+import { DashPage } from "@/components/dashboard/xa/DashboardXa";
 import type { ReactNode } from "react";
 import { ChatPageClient } from "@/app/dashboard/chat/ChatPageClient";
 import SettingsPage from "@/app/dashboard/settings/page";
@@ -17,18 +17,18 @@ import { ContentWorkspace } from "@/components/dashboard/ContentWorkspace";
 import type { SectionData } from "@/platform/infra/section-summary";
 import { legacyPending, legacyResolved, type LegacyState } from "./legacy-dashboard-fixtures";
 
+/** The route error view, rendered directly: nothing is thrown or logged. */
 export function LegacyErrorPreview() {
-  const [error] = useState(() => Object.assign(new Error("Fixture: the page's data did not load."), { digest: "preview" }));
-  return <DashboardError error={error} reset={() => window.location.reload()} />;
+  return <DashboardErrorView onRetry={() => window.location.reload()} />;
 }
 
-/** The dashboard's confirm sheet, opened over a page the way a delete opens it. */
+/** The dashboard's confirm sheet, opened over the photo library the way a delete opens it. */
 export function LegacyConfirmPreview() {
   const [open, setOpen] = useState(true);
   const [busy, setBusy] = useState(false);
-  return <DashPage title="Photos." quiet="One photo is about to go." actions={<XaButton onClick={() => setOpen(true)}>Delete a photo</XaButton>}>
-    <DashProse>The confirm sheet is the screen while it is open: one ink pill, Escape or Cancel closes it, focus returns here.</DashProse>
-    <ConfirmDialog open={open} busy={busy} destructive title="Delete waiting-room.jpg?" confirmLabel="Delete the photo" cancelLabel="Keep it"
+  return <DashPage title="Photos." quiet="2 photos Strelva can use on your site." actions={<XaButton onClick={() => setOpen(true)}>Delete a photo</XaButton>}>
+    <ConfirmDialog open={open} busy={busy} destructive title="Delete this photo?" confirmLabel="Delete the photo" cancelLabel="Keep it"
+      thumbnail={{ src: "/xa/photo-dentist.webp", alt: "Dr. Lin at work" }}
       message="It comes off your site and out of your photo library. Pages that used it show the next photo instead."
       onCancel={() => setOpen(false)} onConfirm={() => { setBusy(true); window.setTimeout(() => { setBusy(false); setOpen(false); }, 900); }} />
   </DashPage>;

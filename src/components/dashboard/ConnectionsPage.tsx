@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { Search } from "lucide-react";
-import { XaInitial, XaRow, XaRows, XaSays, XaSegmented, XaStatus, XaTextLink } from "@/components/ui/strelva/Xa";
+import { XaRow, XaRows, XaSays, XaSystemTile, XaTextLink } from "@/components/ui/strelva/Xa";
 import { DashNote, DashPage, DashSection } from "./xa/DashboardXa";
 import { useState, useEffect, useMemo } from "react";
 import {
@@ -54,31 +54,35 @@ export function connectionStatusWord(status: IntegrationStatus): { kind: "waits"
   return { kind: null, word: "Not connected" };
 }
 
+/**
+ * One account as an open row. Only the Google listing is a System, so only it
+ * wears a clay tile; the rest are plain names. The section a row sits in says
+ * whether it is connected; a row adds a word only when something is wrong.
+ */
 function ConnectionRow({ connection, onClick }: { connection: Connection; onClick: () => void }) {
   const state = connectionStatusWord(connection.status);
-  const detail = !connection.connected && connection.providerId === "google-search-console"
-    ? `${connection.addsIntelligence} Needs one manual step.`
-    : connection.addsIntelligence;
+  const trouble = state.kind === "waits" || state.kind === "down";
+  const detail = trouble ? `${state.word}. ${connection.addsIntelligence}`
+    : !connection.connected && connection.providerId === "google-search-console"
+      ? `${connection.addsIntelligence} Needs one manual step.`
+      : connection.addsIntelligence;
   return (
     <XaRow
-      lead={<XaInitial name={connection.name} size={32} />}
+      lead={connection.id === "google-business" ? <XaSystemTile kind="listing" size={32} /> : undefined}
       title={connection.name}
       detail={detail}
-      tone={state.kind === "waits" || state.kind === "down" ? "waits" : undefined}
-      meta={state.kind === "waits" || state.kind === "down" ? <XaStatus kind={state.kind} size="sm">{state.word}</XaStatus> : <span>{state.word}</span>}
-      onClick={onClick}
+      tone={trouble ? "waits" : undefined}
+      action={!connection.connected && !trouble ? <XaTextLink onClick={onClick} aria-label={`Connect ${connection.name}`}>Connect</XaTextLink> : undefined}
+      onClick={connection.connected || trouble ? onClick : undefined}
     />
   );
 }
-
-type FilterTab = "all" | "active" | "attention";
 
 export function ConnectionsPage() {
   const router = useRouter();
   const dashboard = useDashboardOptional();
   const dashboardHref = dashboard?.dashboardHref ?? ((path: string) => path);
   const apiHref = dashboardHref;
-  const [activeTab, setActiveTab] = useState<FilterTab>("all");
   const [query, setQuery] = useState("");
   const [sourceState, setSourceState] = useState<SourceState>({
     providerStatuses: {},
@@ -162,14 +166,10 @@ export function ConnectionsPage() {
     [query]
   );
 
-  const connections = useMemo(() => {
-    const searched = allConnections.filter((connection) => searchedConnectionIds.has(connection.id));
-    if (activeTab === "active") {
-      return searched.filter((c) => c.intelligenceStatus === "ai_using_it" || c.intelligenceStatus === "can_act_here");
-    }
-    if (activeTab === "attention") return searched.filter((c) => c.intelligenceStatus === "needs_attention");
-    return searched;
-  }, [allConnections, searchedConnectionIds, activeTab]);
+  const connections = useMemo(
+    () => allConnections.filter((connection) => searchedConnectionIds.has(connection.id)),
+    [allConnections, searchedConnectionIds],
+  );
 
   const connectedCount = allConnections.filter((c) => c.connected).length;
   const totalCount = allConnections.length;
@@ -201,8 +201,9 @@ export function ConnectionsPage() {
   return (
     <DashPage
       title="Connections."
-      quiet={`${connectedCount} of ${totalCount} accounts are connected. Each one lets Strelva see or do a little more for you.`}
-      actions={<label className="flex min-h-[40px] w-full items-center gap-2 rounded-full bg-[var(--st-surface)] px-4 shadow-[var(--st-shadow-sm)] sm:w-[240px]">
+      quiet={`${connectedCount} of ${totalCount} connected.`}
+      lede="Each one lets Strelva see or do a little more for you."
+      actions={<label className="flex min-h-[40px] w-full items-center gap-2 rounded-full border border-[var(--st-line)] bg-[var(--st-surface)] px-4 sm:w-[240px]">
         <Search className="h-4 w-4 shrink-0 text-[var(--st-text-3)]" strokeWidth={1.7} aria-hidden="true" />
         <span className="sr-only">Search connections</span>
         <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search connections" className="w-full bg-transparent text-[14px] text-[var(--st-text)] outline-none placeholder:text-[var(--st-faint)]" />
@@ -216,12 +217,6 @@ export function ConnectionsPage() {
       ) : null}
 
       <GoogleResourceSelector connected={sourceState.providerStatuses.google?.status === "connected"} />
-
-      <div><XaSegmented label="Which connections" value={activeTab} onChange={setActiveTab} options={[
-        { value: "all", label: "All" },
-        { value: "active", label: "In use" },
-        { value: "attention", label: "Needs you" },
-      ]} /></div>
 
       {failed ? <DashNote tone="down" role="status">Your connections didn&apos;t load. Nothing about them changed; reload to try again.</DashNote> : null}
 
@@ -237,7 +232,7 @@ export function ConnectionsPage() {
         ))
       ) : (
         <p className="m-0 text-[15px] text-[var(--st-text-2)]">
-          {query.trim() ? "No connection matches that. Try an account name, or what it helps with." : activeTab === "attention" ? "Nothing needs you. Every connected account is syncing." : "Nothing is in use yet. Connect an account below to start."}
+          {query.trim() ? "No connection matches that. Try an account name, or what it helps with." : "Nothing is connected yet. Start with your Google listing."}
         </p>
       )}
     </DashPage>

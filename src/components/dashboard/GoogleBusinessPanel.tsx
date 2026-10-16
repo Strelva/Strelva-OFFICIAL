@@ -1,14 +1,16 @@
 "use client";
 
-import { XaAnswers, XaButtonLink, XaLabel, XaLines, XaPage, XaSays, XaStatus, XaSystemTile } from "@/components/ui/strelva/Xa";
+import { XaAnswers, XaButtonLink, XaLabel, XaLines, XaSays, XaSystemTile } from "@/components/ui/strelva/Xa";
+import { StoreChatButton } from "./StoreChatButton";
 import { DashNote, DashPage } from "./xa/DashboardXa";
 import styles from "./website-xa.module.css";
 import { useDashboard } from "./DashboardContext";
 import type { GbpState } from "@/lib/gbp-management";
 
+const WEEK = ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY"] as const;
 const DAY_LABEL: Record<string, string> = {
-  MONDAY: "Mon", TUESDAY: "Tue", WEDNESDAY: "Wed", THURSDAY: "Thu",
-  FRIDAY: "Fri", SATURDAY: "Sat", SUNDAY: "Sun",
+  MONDAY: "Monday", TUESDAY: "Tuesday", WEDNESDAY: "Wednesday", THURSDAY: "Thursday",
+  FRIDAY: "Friday", SATURDAY: "Saturday", SUNDAY: "Sunday",
 };
 
 function fmtTime(t?: { hours: number; minutes: number }): string {
@@ -38,38 +40,44 @@ export function GoogleBusinessPanel({ connected, state }: { connected: boolean; 
           ["Reviews", "New reviews land here with a reply written in your voice."],
           ["Search", "See how people find you on Google, in your weekly report."],
         ]} />
-        <XaSays>Connecting asks Google for your Business Profile, Search Console and Analytics in one step. Nothing posts until you say yes.</XaSays>
+        <XaSays>Connecting asks Google once for your listing, what people search, and who visits your site. Nothing posts until you say yes.</XaSays>
       </DashPage>
     );
   }
 
-  const hours = state?.regularHours?.periods ?? [];
+  const periods = state?.regularHours?.periods ?? [];
   const posts = state?.recentPosts ?? [];
-  const verdict = hours.length
-    ? "Your hours are set and Strelva keeps them in step with your site."
+  // Every day of the week, in order. A day with no opening period is Closed.
+  const week = WEEK.map((day) => ({ day, periods: periods.filter((p) => p.openDay === day) }));
+  const verdict = periods.length
+    ? "Your hours are set, and Strelva keeps them in step with your site."
     : "Add your hours so people know when you're open.";
+  const hoursPrompt = "Change my opening hours on Google and on my website. Here are the new hours:";
 
   return (
     <DashPage
       title="Your Google listing."
       quiet={verdict}
       lead={<XaSystemTile kind="listing" size={48} label="Google listing" />}
-      actions={<XaStatus kind="live" breathe>Connected</XaStatus>}
       label="Google listing"
     >
       {!state ? <DashNote tone="down" role="status">Google didn&apos;t answer just now, so this shows nothing new. Your listing itself is unchanged.</DashNote> : null}
       <div className={styles.split}>
-        <XaPage address="Google Maps" title="Hours" label="Your hours as people see them on Google" flat>
-          {hours.length ? (
-            <ul className={styles.hours}>
-              {hours.map((p, i) => (
-                <li key={i}><span>{DAY_LABEL[p.openDay] ?? p.openDay}</span><span className="tabular-nums">{fmtTime(p.openTime)} to {fmtTime(p.closeTime)}</span></li>
+        <section className="flex min-w-0 flex-col gap-3" aria-labelledby="gbp-hours">
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <XaLabel id="gbp-hours">Hours people see on Google</XaLabel>
+            <StoreChatButton prompt={hoursPrompt} label="Change hours" />
+          </div>
+          {periods.length ? (
+            <ul className={styles.hours} aria-label="Hours on Google">
+              {week.map(({ day, periods: open }) => (
+                <li key={day}><span>{DAY_LABEL[day]}</span><span className="tabular-nums">{open.length ? open.map((p) => `${fmtTime(p.openTime)} to ${fmtTime(p.closeTime)}`).join(", ") : "Closed"}</span></li>
               ))}
             </ul>
           ) : (
-            <p className={styles.quiet}>No hours on Google yet. Ask Strelva to add them; they go up after your yes.</p>
+            <p className={styles.quiet}>No hours on Google yet. Change hours and Strelva writes them up; they go live after your yes.</p>
           )}
-        </XaPage>
+        </section>
         <section className="flex min-w-0 flex-col gap-3" aria-labelledby="gbp-posts">
           <XaLabel id="gbp-posts">Recent posts on Google</XaLabel>
           {posts.length ? (

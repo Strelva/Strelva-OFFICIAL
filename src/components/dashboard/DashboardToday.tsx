@@ -1,7 +1,8 @@
 import type { ActivityEntry } from "@/lib/storage/activity-store";
 import type { OwnerRetentionSignals } from "@/lib/retention";
 import type { UnifiedEvent } from "@/lib/types";
-import { XaAnswers, XaHeadline, XaInitial, XaLabel, XaLede, XaMark, XaPebbleScene, XaRow, XaRows, XaTextLink } from "@/components/ui/strelva/Xa";
+import { XaAnswers, XaHeadline, XaInitial, XaLabel, XaLede, XaMark, XaRow, XaRows, XaTextLink } from "@/components/ui/strelva/Xa";
+import { BillingBanner } from "./BillingBanner";
 import { ActivityFeed } from "./ActivityFeed";
 import { DoThisNextCard } from "./DoThisNextCard";
 import { OnboardingChecklist } from "./OnboardingChecklist";
@@ -39,18 +40,18 @@ function plural(n: number, one: string, many: string) { return `${n.toLocaleStri
 
 /**
  * Today on the website dashboard (XA · O1). One column to act from: the
- * greeting, the composer with whatever waits on top, then Needs you in place.
- * Beside it, Pebble and what Strelva did, each line with its time.
+ * greeting and this week's verdict, then the one change that waits, open as
+ * the page it changes with the yes under it, then the composer. Each fact is
+ * said once: the waiting count lives only in the Needs you header. Beside it,
+ * what Strelva did and who reached out, each line with its time and actor.
  */
 export function DashboardToday(props: DashboardTodayProps) {
   const { tenant, ownerName, businessName, verdict, isFresh, isOperator, numbers, needsYou, strelvaWork, suggestion, leads, retentionSignals, hrefs } = props;
-  const first = needsYou.pending.find((event) => event.status === "pending" && event.type !== "change_request") ?? null;
   const waits = needsYou.pendingCount;
-  const lede = isFresh ? verdict
-    : waits > 0 ? `${waits === 1 ? "One change waits" : `${waits} changes wait`} for your yes. ${verdict}`
-      : `Nothing needs you. ${verdict}`;
+  const lede = isFresh || waits > 0 ? verdict : `Nothing needs you. ${verdict}`;
+  const reached = numbers.bookedWeek + numbers.calledWeek;
   const numbersLine = isFresh ? null
-    : `${plural(numbers.foundTotal, "person has", "people have")} found you so far, ${numbers.foundWeek.toLocaleString()} in the last 7 days. ${numbers.actionsTotal > 0 ? `${plural(numbers.actionsTotal, "visitor", "visitors")} clicked to book or called${numbers.bookedWeek + numbers.calledWeek > 0 ? `, ${(numbers.bookedWeek + numbers.calledWeek).toLocaleString()} this week` : ""}.` : "No one has clicked to book or called yet."}`;
+    : `${plural(numbers.foundTotal, "person has", "people have")} found you so far. ${numbers.actionsTotal > 0 ? `${reached > 0 ? `${reached.toLocaleString()} clicked to book or called this week` : `${plural(numbers.actionsTotal, "visitor", "visitors")} clicked to book or called`}.` : "No one has clicked to book or called yet."}`;
 
   return (
     <div className="h-full overflow-y-auto">
@@ -58,13 +59,11 @@ export function DashboardToday(props: DashboardTodayProps) {
         <div className={styles.splitLead}>
           <XaMark size={40} />
           <div className={styles.greeting}>
-            <XaHeadline size="lg">Hello, {greetingName(ownerName)}.</XaHeadline>
+            {/* A business name in the owner slot (old tenant records) greets plainly, never "Hello, Great." */}
+            <XaHeadline size="lg">{ownerName.trim() && ownerName.trim() !== businessName.trim() && ownerName.trim() !== "there" ? `Hello, ${greetingName(ownerName)}.` : "Hello."}</XaHeadline>
             <XaLede>{lede}</XaLede>
           </div>
-          <TodayComposer businessName={businessName} waiting={first ? { title: first.title, from: first.source === "ai" ? "strelva" : first.source === "google" || first.source === "yelp" ? "a review" : "your website" } : null} />
-          {!isFresh ? <OnboardingWizard /> : null}
-          <OnboardingChecklist tenant={tenant} defaultOpen={isFresh} />
-          {suggestion ? <DoThisNextCard title={suggestion.title} prompt={suggestion.prompt} /> : null}
+          <BillingBanner />
           {waits > 0 ? (
             <QueuePage
               initialPending={needsYou.pending}
@@ -75,22 +74,25 @@ export function DashboardToday(props: DashboardTodayProps) {
               compact
             />
           ) : null}
+          <TodayComposer businessName={businessName} />
+          {!isFresh ? <OnboardingWizard /> : null}
+          <OnboardingChecklist tenant={tenant} defaultOpen={isFresh} />
+          {suggestion ? <DoThisNextCard title={suggestion.title} prompt={suggestion.prompt} /> : null}
+          {!isFresh ? <RetentionPanel signals={suggestion ? { ...retentionSignals, ownerNextAction: "" } : retentionSignals} /> : null}
           {numbersLine ? <section className="flex flex-col gap-3" aria-labelledby="found-label">
             <XaLabel id="found-label">Who found you</XaLabel>
             <p className="m-0 max-w-[560px] text-[15px] leading-[1.5] text-[var(--st-text-body)]">{numbersLine}</p>
             {hrefs.reports ? <p className="m-0 text-[14px]"><XaTextLink href={hrefs.reports}>Read this week&apos;s report</XaTextLink></p> : null}
           </section> : null}
-          {!isFresh ? <RetentionPanel signals={retentionSignals} /> : null}
         </div>
 
         <aside className={styles.splitSide} aria-label="What happened">
-          <XaPebbleScene pose={isFresh ? "waving" : waits > 0 ? "website" : "resting"} size={280} label={isFresh ? "Pebble waving hello" : waits > 0 ? "Pebble with your website" : "Pebble resting beside your site"} />
           {isFresh ? (
             <section className="flex flex-col gap-3" aria-labelledby="next-label">
               <XaLabel id="next-label">What happens next</XaLabel>
               <XaAnswers labelWidth={112} rows={[
                 ["This week", "Strelva keeps your site and Google listing healthy. Nothing for you to do."],
-                ["First report", "In about a week, here and by email: who found you and what changed."],
+                ["First report", "In about a week, here: who found you and what changed."],
                 ["Any time", "Ask Strelva in plain words. Bigger changes wait in Needs you for your yes."],
               ]} />
             </section>

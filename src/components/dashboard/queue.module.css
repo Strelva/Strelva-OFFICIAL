@@ -12,11 +12,21 @@ button.row:focus-visible { outline: 2px solid var(--st-accent); outline-offset: 
 .detail { color: var(--st-text-2); font-size: 13px; line-height: 19px; }
 .end { display: flex; flex-shrink: 0; align-items: center; gap: 10px; }
 .word { color: var(--st-text-3); font-size: 14px; }
-.decision { display: flex; flex-direction: column; gap: 18px; margin: 0 0 18px 50px; padding: 20px 22px; border-radius: var(--st-r-lg); background: var(--st-surface); box-shadow: var(--st-shadow-sm); animation: st-xa-queue-open var(--motion-base) var(--ease-settle) both; }
+.decision { display: flex; flex-direction: column; gap: 18px; margin: 0 0 18px 50px; padding: 0; animation: st-xa-queue-open var(--motion-base) var(--ease-settle) both; }
 .body { margin: 0; color: var(--st-text-body); font-size: 15px; line-height: 1.5; }
-.change { padding-left: 14px; border-left: 2px solid var(--st-tint); }
-.change:empty { display: none; }
-.links { margin: 0; color: var(--st-text-3); font-size: 14px; }
+.change { display: flex; flex-direction: column; gap: 10px; }
+.diff { display: flex; flex-direction: column; gap: 6px; }
+.diff + .diff { padding-top: 6px; }
+.diffField { color: var(--st-text-3); font-size: 13px; line-height: 18px; }
+.diffGone { margin: 0; color: var(--st-text-3); font-size: 16px; line-height: 1.45; }
+.pageNote { margin: 0; color: var(--st-text-3); font-size: 13px; line-height: 18px; overflow-wrap: anywhere; }
+.hours { display: flex; flex-direction: column; gap: 6px; margin: 0; }
+.hours > div { display: flex; justify-content: space-between; gap: 12px; font-size: 15px; }
+.hours dt { color: var(--st-text-2); }
+.hours dd { margin: 0; color: var(--st-text); font-variant-numeric: tabular-nums; }
+.links { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 6px; margin: -6px 0 0; color: var(--st-text-3); font-size: 14px; line-height: 20px; }
+.linksWhy { flex-basis: 100%; color: var(--st-text-3); font-size: 13px; line-height: 18px; }
+.linksExtra { flex-basis: 100%; padding-top: 4px; }
 .request { display: flex; flex-direction: column; gap: 10px; margin: -6px 0 16px 50px; }
 .meta { margin: 0; color: var(--st-text-3); font-size: 13px; }
 .operator { display: flex; flex-wrap: wrap; gap: 8px; }

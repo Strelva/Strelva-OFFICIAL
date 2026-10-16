@@ -2,16 +2,19 @@
 
 import { useState } from "react";
 import type { UnifiedEvent } from "@/lib/types";
-import { XaButton, XaPebbleAvatar, XaStatus, XaSystemTile, XaTextLink, XaYes } from "@/components/ui/strelva/Xa";
+import type { ReactNode } from "react";
+import { XaButton, XaLabel, XaPage, XaPageChange, XaPebbleAvatar, XaStatus, XaSystemTile, XaTextLink, XaYes } from "@/components/ui/strelva/Xa";
+import type { PreviewDiff } from "@/lib/agent-risk";
 import { UseAsTestimonialModal } from "./UseAsTestimonialModal";
-import { QueueEventDetail } from "./QueueEventDetail";
+import { useDashboardOptional } from "./DashboardContext";
 import styles from "./queue.module.css";
 
 /**
  * One thing that waits, as an open row (XA · O5). Opened, it becomes the
- * decision in place: what changes, then the one yes (XA · O3). The yes is the
- * product's only approval gesture; "Not yet" closes it and keeps it waiting,
- * "Skip this change" turns it down.
+ * decision in place: the page as visitors will see it with the new words
+ * tinted, then the one yes (XA · O3). Beside the yes sit two text links with
+ * what each one does: "Not now" closes it and keeps it waiting, "Skip" turns
+ * it down and nothing changes.
  */
 
 // Owner-facing label for an event's source, never the raw internal slug.
@@ -102,6 +105,78 @@ function formatClientRequestStatus(status: string | null): string {
   return "In progress";
 }
 
+/* ---------- What the yes changes, as the page people will see ---------- */
+
+const MAX_DIFF_ROWS = 6;
+const DAY_LABELS: Record<string, string> = { MONDAY: "Monday", TUESDAY: "Tuesday", WEDNESDAY: "Wednesday", THURSDAY: "Thursday", FRIDAY: "Friday", SATURDAY: "Saturday", SUNDAY: "Sunday" };
+const PAGE_NAMES: Record<string, string> = { hero: "homepage", services: "Services page", faq: "FAQ", contact: "Contact page", about: "About page", testimonials: "reviews section" };
+
+function clock(value: string): string {
+  const m = /^(\d{1,2}):(\d{2})$/.exec(value.trim());
+  if (!m) return value;
+  const h = Number(m[1]);
+  return `${h % 12 === 0 ? 12 : h % 12}:${m[2]} ${h < 12 ? "AM" : "PM"}`;
+}
+
+function readDiffs(event: UnifiedEvent): PreviewDiff[] {
+  if (event.type !== "content_update" || !Array.isArray(event.metadata?.diffs)) return [];
+  return (event.metadata.diffs as unknown[]).filter((d): d is PreviewDiff => Boolean(d) && typeof d === "object" && typeof (d as PreviewDiff).field === "string" && ["added", "removed", "changed"].includes((d as PreviewDiff).type));
+}
+
+/** The address a change lands on, in owner words: "harbordental.com" for the homepage. */
+function pageAddress(event: UnifiedEvent, domain: string | null): string {
+  const section = typeof event.metadata?.section === "string" ? event.metadata.section : "hero";
+  const name = PAGE_NAMES[section] ?? "website";
+  if (!domain) return `Your ${name}`;
+  return section === "hero" ? domain : `${domain}/${section}`;
+}
+
+/**
+ * The change itself. A site edit is the page with the new words tinted moss
+ * and the words they replace under them; a Google post or hours draft is the
+ * listing the way people see it on Google. Nothing here is a label to trust:
+ * it is the thing the yes puts live.
+ */
+export function QueueChange({ event, domain }: { event: UnifiedEvent; domain: string | null }) {
+  const meta = event.metadata ?? {};
+  if (event.type === "content_update" && meta.kind === "gbp_post_draft" && typeof meta.summary === "string" && meta.summary.trim()) {
+    const cta = typeof meta.ctaUrl === "string" && meta.ctaUrl.trim() ? meta.ctaUrl.trim() : null;
+    return <div className={styles.change}>
+      <XaLabel>What will be posted to Google</XaLabel>
+      <XaPage address="Your Google listing · new post" flat>
+        <XaPageChange>{meta.summary.trim()}</XaPageChange>
+        {cta ? <p className={styles.pageNote}>Button link {cta}</p> : null}
+      </XaPage>
+    </div>;
+  }
+  if (event.type === "content_update" && meta.kind === "gbp_hours_draft" && Array.isArray(meta.hours)) {
+    const hours = (meta.hours as { day?: unknown; open?: unknown; close?: unknown }[]).filter((h) => typeof h?.day === "string" && typeof h.open === "string" && typeof h.close === "string") as { day: string; open: string; close: string }[];
+    if (hours.length) return <div className={styles.change}>
+      <XaLabel>New hours for Google</XaLabel>
+      <XaPage address="Your Google listing · hours" flat>
+        <dl className={styles.hours}>{hours.map((h, i) => <div key={`${h.day}-${i}`}><dt>{DAY_LABELS[h.day] ?? h.day}</dt><dd>{clock(h.open)} to {clock(h.close)}</dd></div>)}</dl>
+      </XaPage>
+    </div>;
+  }
+  const diffs = readDiffs(event);
+  if (!diffs.length) return null;
+  const shown = diffs.slice(0, MAX_DIFF_ROWS);
+  const extra = diffs.length - shown.length;
+  return <div className={styles.change}>
+    <XaLabel>What changed</XaLabel>
+    <XaPage address={pageAddress(event, domain)} flat>
+      {shown.map((d, i) => <div key={`${d.field}-${i}`} className={styles.diff}>
+        <span className={styles.diffField}>{d.field}</span>
+        {d.type === "removed"
+          ? <p className={`${styles.diffGone} line-through`}><span className="sr-only">Removed: </span>{d.before}</p>
+          : <XaPageChange>{d.after}</XaPageChange>}
+        {d.type === "changed" && d.before ? <p className={styles.pageNote}><span className="sr-only">Was: </span>Replaces <span className="line-through">{d.before}</span></p> : null}
+      </div>)}
+      {extra > 0 ? <p className={styles.pageNote}>+{extra} more field{extra === 1 ? "" : "s"} changed</p> : null}
+    </XaPage>
+  </div>;
+}
+
 type WorkflowAction = "triaged" | "quoted" | "accepted" | "in_progress" | "shipped" | "declined";
 
 interface QueueCardProps {
@@ -128,6 +203,8 @@ export function QueueCard({ event, onApprove, onDismiss, onWorkflowAction, disab
   const repoName = typeof repo?.repoName === "string" ? repo.repoName : null;
   const triageDueAt = isCustomRequest ? metadataString(event, "triageDueAt") : null;
   const [testimonialModalOpen, setTestimonialModalOpen] = useState(false);
+  const dashboard = useDashboardOptional();
+  const domain = dashboard?.siteUrl ? dashboard.siteUrl.replace(/^https?:\/\//, "").replace(/\/$/, "") || null : null;
 
   const isReview = event.source === "google" || event.source === "yelp";
   const reviewData = isReview && event.metadata
@@ -168,18 +245,18 @@ export function QueueCard({ event, onApprove, onDismiss, onWorkflowAction, disab
       {open && canDecide ? (
         <div className={styles.decision}>
           {event.body ? <p className={styles.body}>{event.body}</p> : null}
-          <QueueEventDetail event={event} className={styles.change} />
+          <QueueChange event={event} domain={domain} />
           <XaYes
             state={disabled ? "going" : "waiting"}
             yesLabel={isSuggestion ? "Use this idea" : "Make it live"}
             onYes={() => onApprove(event.id)}
-            onNotYet={onOpenChange ? () => onOpenChange(false) : undefined}
             block={false}
           />
-          <p className={styles.links}>
-            <XaTextLink onClick={() => onDismiss(event.id)}>Skip this change</XaTextLink>
-            {isReview && reviewData ? <> · <XaTextLink onClick={() => setTestimonialModalOpen(true)}>Use the review on your site</XaTextLink></> : null}
-          </p>
+          <DecisionLinks
+            onNotNow={onOpenChange ? () => onOpenChange(false) : undefined}
+            onSkip={() => onDismiss(event.id)}
+            extra={isReview && reviewData ? <XaTextLink onClick={() => setTestimonialModalOpen(true)}>Put this review on your site</XaTextLink> : null}
+          />
         </div>
       ) : null}
 
@@ -214,4 +291,14 @@ export function QueueCard({ event, onApprove, onDismiss, onWorkflowAction, disab
       )}
     </div>
   );
+}
+
+/** The two ways out of a decision, each saying what it does. */
+function DecisionLinks({ onNotNow, onSkip, extra }: { onNotNow?: () => void; onSkip: () => void; extra?: ReactNode }) {
+  return <p className={styles.links}>
+    {onNotNow ? <><XaTextLink onClick={onNotNow}>Not now</XaTextLink> · </> : null}
+    <XaTextLink onClick={onSkip}>Skip</XaTextLink>
+    <span className={styles.linksWhy}>{onNotNow ? "Not now keeps it here for later. " : ""}Skip turns it down and nothing on your site changes.</span>
+    {extra ? <span className={styles.linksExtra}>{extra}</span> : null}
+  </p>;
 }

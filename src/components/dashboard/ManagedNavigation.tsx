@@ -25,7 +25,7 @@ interface Props {
 const NAV_LABELS: Partial<Record<SurfaceId, string>> = {
   "google-business": "Google listing",
   schedule: "Bookings",
-  roster: "Today's bookings",
+  roster: "Bookings",
   analytics: "Visitors",
 };
 /** Surfaces that are Systems show their clay; the rest are places with a line icon. */
@@ -41,9 +41,13 @@ export function ManagedNavigation({ businessName, pendingCount, isSuperAdmin, vi
   const effectivePath = dashboardBasePath && pathname?.startsWith(dashboardBasePath)
     ? pathname.slice(dashboardBasePath.length) || "/dashboard"
     : pathname || "";
-  const isActive = (item: DashboardSurface) => item.id === "today" ? effectivePath === "/dashboard" : SURFACE_MATCH[item.id].some((match) => effectivePath.startsWith(match));
+  const isActive = (item: DashboardSurface) => item.id === "today" ? effectivePath === "/dashboard"
+    : SURFACE_MATCH[item.id].some((match) => effectivePath.startsWith(match)) || (item.id === "schedule" && effectivePath.startsWith("/dashboard/roster"));
   const places = surfaces.filter((surface) => !SURFACE_CLAY[surface.id]);
-  const systems = surfaces.filter((surface) => SURFACE_CLAY[surface.id]);
+  // Bookings is one System: when the full Bookings page exists, today's roster
+  // lives inside it (its Today view), so the rail never shows two bookings rows.
+  const hasSchedule = surfaces.some((surface) => surface.id === "schedule");
+  const systems = surfaces.filter((surface) => SURFACE_CLAY[surface.id] && !(surface.id === "roster" && hasSchedule));
   const aside = (item: DashboardSurface) => item.preview ? <small className={styles.aside} data-tone="waits">Off for this business</small>
     : item.state === "connect" && item.id !== "reviews" ? <small className={styles.aside}>Not connected</small> : null;
 
