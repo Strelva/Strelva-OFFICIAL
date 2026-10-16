@@ -6,7 +6,8 @@ import { useCallback, useEffect, useId, useRef, useState, type FormEvent, type R
 import {
   XaButton, XaButtonLink, XaField, XaHeadline, XaInitial, XaLabel, XaPebbleScene, XaSegmented, XaStatus, XaTextLink, XaWorking,
 } from "@/components/ui/strelva/Xa";
-import { AgencyFrame } from "./AgencyFrame";
+import { AgencyFrame, useAgencyFrameClients } from "./AgencyFrame";
+import { clientColor } from "@/platform/presentation/client-color";
 import styles from "./agency-door.module.css";
 import type { AddAgencyClientInput, AddAgencyClientResult, AgencyClientListItem, ClientAiCheck, OwnerClaim } from "@/products/agency-clients/contracts";
 import { addAgencyClientInputSchema, agencyClientAdditionSchema, agencyClientListItemSchema, ownerClaimSchema } from "@/products/agency-clients/contracts";
@@ -142,6 +143,17 @@ export function AgencyAddClient({ agencyWorkspaceId, agencyName = "your agency",
       .catch((cause) => { if (!controller.signal.aborted) { setProspects([]); setProspectError(cause instanceof Error ? cause.message : "Your prospects couldn’t be loaded."); } });
     return () => controller.abort();
   }, [agencyWorkspaceId, prospecting, initialProspectId]);
+
+  // The sidebar lists the agency's added clients, and the one just added as the current, new one.
+  const reportClients = useAgencyFrameClients();
+  const justAdded = result?.client;
+  useEffect(() => {
+    if (!reportClients || (!clients && !justAdded)) return;
+    const rows = (clients ?? []).filter(client => client.seatActive).map(client => ({ id: client.customerWorkspaceId, name: client.name }));
+    if (justAdded && !rows.some(row => row.id === justAdded.customerWorkspaceId)) rows.push({ id: justAdded.customerWorkspaceId, name: justAdded.name });
+    reportClients(rows.map(row => ({ ...row, href: `/workspace?workspaceId=${encodeURIComponent(row.id)}`, color: clientColor(row.id),
+      ...(row.id === justAdded?.customerWorkspaceId ? { current: true, detail: "New" } : {}) })));
+  }, [reportClients, clients, justAdded]);
 
   const added = new Set((clients ?? []).map((client) => client.prospectId).filter(Boolean));
   const chosen = prospects?.find((prospect) => prospect.id === prospectId) ?? null;
@@ -364,13 +376,13 @@ export function AgencyClientAiCheck({ check, agencyName = "your agency", site = 
 }
 
 /** What happened to the owner's link, in one sentence that names who did what. */
-function claimDeliverySentence(claim: OwnerClaim): string {
-  const until = `It works until ${dateLabel(claim.expiresAt)}.`;
+function claimDeliverySentence(claim: OwnerClaim, withUntil = true): string {
+  const until = withUntil ? `It works until ${dateLabel(claim.expiresAt)}.` : "";
   const to = claim.recipientEmail;
-  if (claim.delivery.status === "accepted") return `Strelva emailed the link to ${to}. You can also send it yourself. ${until}`;
-  if (claim.delivery.status === "sending" || claim.delivery.status === "unknown") return `Strelva couldn’t confirm its email to ${to}. Copy the link and send it yourself. ${until}`;
-  if (claim.delivery.reason === "permission_or_email_gate") return `Strelva didn’t email ${to}: your agency can’t send owner email yet. Copy the link and send it yourself. ${until}`;
-  return `Strelva doesn’t email owners yet. Copy the link and send it to ${to} yourself. ${until}`;
+  if (claim.delivery.status === "accepted") return `Strelva emailed the link to ${to}. You can also send it yourself. ${until}`.trim();
+  if (claim.delivery.status === "sending" || claim.delivery.status === "unknown") return `Strelva couldn’t confirm its email to ${to}. Copy the link and send it yourself. ${until}`.trim();
+  if (claim.delivery.reason === "permission_or_email_gate") return `Strelva didn’t email ${to}: your agency can’t send owner email yet. Copy the link and send it yourself. ${until}`.trim();
+  return `Strelva doesn’t email owners yet. Copy the link and send it to ${to} yourself. ${until}`.trim();
 }
 
 interface OwnerLinkSubject { customerWorkspaceId: string; ownerClaim: OwnerClaim | null; ownerClaimError: string | null }
@@ -454,16 +466,18 @@ function OwnerLink({ subject, agencyWorkspaceId, onClaim, currentClient, emailEn
   const showLink = claim && !replacing;
   return <aside className={styles.object} data-flat={primary ? undefined : true} aria-labelledby={headingId}>
     <p className={styles.objectHead}>
-      <span id={headingId} className={styles.objectTitle}>{ownerClaimed ? <XaStatus kind="live" size="sm">Owner claimed</XaStatus> : <XaStatus kind="waits" size="sm">Claim link{claim ? ` for ${claim.recipientEmail}` : ""}</XaStatus>}</span>
+      <span id={headingId} className={styles.objectTitle}>{ownerClaimed ? <XaStatus kind="live" size="sm">Owner claimed</XaStatus> : <XaStatus kind="waits" size="sm">Claim link{claim ? ` for ${claim.recipientEmail} · works until ${dateLabel(claim.expiresAt)}` : ""}</XaStatus>}</span>
       {claim && claim.delivery.status !== "accepted" ? <span className={styles.objectMeta}>Not sent</span> : null}
     </p>
     {ownerClaimed ? <p className={styles.sentence} role="status">The owner has accepted their claim. No new owner link is needed.</p> : showLink ? <>
-      <div className={styles.linkRow}>
+      <div><XaButton variant={variant} onClick={() => void copy()}>{copied ? <Check className="size-4" aria-hidden="true" /> : <Copy className="size-4" aria-hidden="true" />}{copied ? "Copied" : "Copy link"}</XaButton></div>
+      <p className={styles.sentenceBody} role="status">{claimDeliverySentence(claim, false)}</p>
+      {/* The link itself, for when copying doesn't work here. */}
+      <details className={styles.linkFold}>
+        <summary>Show the link</summary>
         <label htmlFor={`${headingId}-value`} className="sr-only">Owner claim link</label>
         <input id={`${headingId}-value`} readOnly value={link} onFocus={(event) => event.currentTarget.select()} className={styles.linkField} />
-        <XaButton variant={variant} onClick={() => void copy()}>{copied ? <Check className="size-4" aria-hidden="true" /> : <Copy className="size-4" aria-hidden="true" />}{copied ? "Copied" : "Copy link"}</XaButton>
-      </div>
-      <p className={styles.sentenceBody} role="status">{claimDeliverySentence(claim)}</p>
+      </details>
       <p className={styles.objectNote}>Only {claim.recipientEmail} can accept it. The link is shown once.</p>
       <p className={styles.links}><XaTextLink onClick={() => { if (!busy) { setEmail(claim.recipientEmail); setReplacing(true); setError(""); } }}>Make a new link (the old one stops working)</XaTextLink></p>
     </> : <form onSubmit={create} noValidate className={styles.fields}>

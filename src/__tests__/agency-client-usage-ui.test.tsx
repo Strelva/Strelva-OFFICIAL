@@ -34,13 +34,21 @@ describe("agency client usage", () => {
     expect(node.innerHTML).toBe("");
   });
 
-  it("shows usage, reset and limit, and who last changed it", async () => {
+  it("says where Strelva work stands, who set a limit and who last changed it, with no dollar figure", async () => {
     const b = budget({ spentUsd: "23.4", reservedUsd: "0.8" }, { monthlyCapCents: 2500, setBy: { kind: "agency", agencyName: "North Studio" }, changedAt: "2026-10-12T15:00:00Z" });
     await mount(vi.fn<typeof fetch>().mockResolvedValue(Response.json(page(true, b))));
     const text = node.textContent!;
-    expect(text).toContain("Usage this month: $23.40 estimated · resets Nov 1 · $0.80 held for work in progress");
-    expect(text).toContain("Limit $25.00 set by North Studio");
+    expect(text).toContain("Strelva work for Harbor Dental is running. This month resets Nov 1.");
+    expect(text).toContain("North Studio set a monthly limit.");
     expect(text).toContain("Last changed by North Studio on Oct 12, 2026");
+    expect(text).not.toMatch(/\$/);
+  });
+
+  it("says when work stopped at the limit, without the amount", async () => {
+    const b = budget({ spentUsd: "25" }, { monthlyCapCents: 2500, setBy: { kind: "agency", agencyName: "North Studio" } });
+    await mount(vi.fn<typeof fetch>().mockResolvedValue(Response.json(page(true, b))));
+    expect(node.textContent).toContain("Strelva work for Harbor Dental reached this month’s limit. It starts again Nov 1.");
+    expect(node.textContent).not.toMatch(/\$/);
   });
 
   it("says the cost is unknown instead of guessing", async () => {
@@ -59,7 +67,7 @@ describe("agency client usage", () => {
     await mount(request);
     expect(node.textContent).toContain("Usage for Harbor Dental could not be read. Nothing changed.");
     await click("Retry");
-    expect(node.textContent).toContain("Usage this month");
+    expect(node.textContent).toContain("Strelva work for Harbor Dental is running.");
   });
 
   it("saves the exact body with the revision, and a blank limit sends null", async () => {
@@ -76,16 +84,14 @@ describe("agency client usage", () => {
     expect(node.textContent).toContain("Saved. Harbor Dental sees who changed this.");
   });
 
-  it("turns 12.50 into 1250 cents and rejects a bad limit inline", async () => {
-    const request = vi.fn<typeof fetch>().mockResolvedValueOnce(Response.json(page())).mockResolvedValueOnce(Response.json(page(true, budget({}, { monthlyCapCents: 1250, revision: 3 }))));
+  it("shows the agency no limit field and keeps an existing limit when it saves", async () => {
+    const request = vi.fn<typeof fetch>().mockResolvedValueOnce(Response.json(page(true, budget({}, { monthlyCapCents: 1250 })))).mockResolvedValueOnce(Response.json(page(true, budget({}, { monthlyCapCents: 1250, paused: true, revision: 3 }))));
     await mount(request);
-    await type("Monthly usage limit", "-4");
-    expect(node.textContent).toContain("Enter a dollar amount like 25 or 12.50.");
-    await type("Reason for change", "Cap spend for October");
-    expect(button("Save usage controls")!.disabled).toBe(true);
-    await type("Monthly usage limit", "12.50");
+    expect([...node.querySelectorAll("input")].some(item => item.labels?.[0]?.textContent?.includes("Monthly usage limit"))).toBe(false);
+    await click("Paused");
+    await type("Reason for change", "Owner asked us to pause");
     await click("Save usage controls");
-    expect(JSON.parse(String(request.mock.calls[1]![1]!.body))).toMatchObject({ monthlyCapCents: 1250 });
+    expect(JSON.parse(String(request.mock.calls[1]![1]!.body))).toMatchObject({ paused: true, monthlyCapCents: 1250 });
   });
 
   it("explains a revision conflict", async () => {
@@ -104,10 +110,11 @@ describe("agency client usage", () => {
   });
 });
 
-describe("usage across clients", () => {
-  it("lazy-loads on open, sorts by usage and totals it", async () => {
+describe("Strelva work across clients", () => {
+  it("lazy-loads on open and lists only the exceptions, with no dollar figure", async () => {
     const second = { workspaceId: "26100000-0000-4000-8000-000000000011", name: "Elm Bakery", budget: budget({ spentUsd: "9.5" }, { paused: true }), linkedTenantIds: [] };
-    const body = { ...page(), clients: [page().clients[0]!, second] };
+    const third = { workspaceId: "26100000-0000-4000-8000-000000000012", name: "Fieldwork Studio", budget: budget({ spentUsd: "5" }, { monthlyCapCents: 500 }), linkedTenantIds: [] };
+    const body = { ...page(), clients: [page().clients[0]!, second, third] };
     const request = vi.fn<typeof fetch>().mockResolvedValue(Response.json(body));
     await act(async () => root.render(createElement(AgencyUsageSummary, { agencyWorkspaceId: AGENCY, request })));
     expect(request).not.toHaveBeenCalled();
@@ -115,9 +122,11 @@ describe("usage across clients", () => {
     await act(async () => { details.open = true; details.dispatchEvent(new Event("toggle")); });
     expect(request).toHaveBeenCalledTimes(1);
     const text = node.textContent!;
-    expect(text.indexOf("Elm Bakery")).toBeLessThan(text.indexOf("Harbor Dental"));
-    expect(text).toContain("Total $10.73 estimated");
+    expect(text).toContain("Elm Bakery");
     expect(text).toContain("Paused");
+    expect(text).toContain("Limit reached · starts again Nov 1");
+    expect(text).not.toContain("Harbor Dental");
+    expect(text).not.toMatch(/\$/);
   });
 
   it("renders nothing while controls are off", async () => {

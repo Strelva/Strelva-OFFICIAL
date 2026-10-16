@@ -135,7 +135,8 @@ export async function addAgencyClaimQueue(actor: WorkspaceActor, page: AgencyCli
     }
     const gaps = [...(page.queueGaps ?? []), ...(additions.length >= 200 ? ["Owner claims: only the latest 200 added clients were checked."] : [])];
     const waiting = new Set(queue.filter(item => item.kind === "owner_claim").map(item => item.workspaceId));
-    return { ...page, clients: page.clients.map(client => ({ ...client, ownerClaimWaiting: waiting.has(client.workspaceId) })), queue, queueGaps: gaps, queueComplete: !page.nextCursor && !gaps.length && page.queueComplete !== false };
+    const claimed = new Set(additions.filter(item => item.ownerClaimed && visible.has(item.customerWorkspaceId)).map(item => item.customerWorkspaceId));
+    return { ...page, clients: page.clients.map(client => ({ ...client, ownerClaimWaiting: waiting.has(client.workspaceId), ...(claimed.has(client.workspaceId) && !waiting.has(client.workspaceId) ? { ownerClaimed: true } : {}) })), queue, queueGaps: gaps, queueComplete: !page.nextCursor && !gaps.length && page.queueComplete !== false };
   } catch {
     return { ...page, queueComplete: false, queueGaps: [...new Set([...(page.queueGaps ?? []), "Owner claims: status could not be read."])] };
   }

@@ -11,7 +11,7 @@
 import { StSkeleton } from "@/components/ui/strelva/Kit";
 import { XaButton, XaEmpty, XaHeadline, XaInitial, XaRow, XaRows, XaSays, XaTextLink } from "@/components/ui/strelva/Xa";
 import { minutesHeadline, notesLine, peopleMinutesLine } from "./agency-xa-model";
-import { clientColor } from "./client-color";
+import { clientColor } from "@/platform/presentation/client-color";
 import { MINUTES_CLIENT_LIMIT, type AgencyMinutesState } from "./useAgencyMinutes";
 import styles from "./agency-xa.module.css";
 

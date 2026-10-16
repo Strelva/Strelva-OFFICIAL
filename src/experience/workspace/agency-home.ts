@@ -216,7 +216,7 @@ export function libraryReachLine(source: AgencyLibrarySource): string {
 export function libraryVersionLine(version: AgencyLibraryVersion, choosing = false): string {
   const own = version.localChanges ? ` · keeps ${plural(version.localChanges, "change")} of their own` : "";
   switch (version.state) {
-    case "up_to_date": return own.replace(/^ · /, "");
+    case "up_to_date": return `Live${own}`;
     case "ready": return `${choosing ? "Can be offered" : "Works as is"}${own}`;
     case "conflicts": return libraryConflictSentence(version);
     case "missing_accounts": return `${choosing ? "Skipped · " : ""}${missingAccountsLabel(version.missingBindings)}`;

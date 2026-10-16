@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { publicAppOrigin } from "@/platform/infra/brand";
 import { foundPhrase, ownerClaimUrl } from "@/experience/workspace/agency/AgencyAddClient";
 import { greetingFor } from "@/experience/workspace/agency/AgencyDayOne";
-import { lastChangeLabel, waitsOnYouSentence } from "@/experience/workspace/agency/AgencyEveryClient";
+import { lastChangeLabel, ownerWaitsSentence, waitsOnYouSentence } from "@/experience/workspace/agency/AgencyEveryClient";
 import type { AgencyClientRow } from "@/experience/workspace/agency-clients";
 
 // XA-2 words and links: the claim link is built on the public origin, and A6 names the client that waits.
@@ -43,5 +43,17 @@ describe("A6 words", () => {
     expect(lastChangeLabel(null, now)).toBe("None yet");
     expect(lastChangeLabel("2026-10-16T09:00:00Z", now)).toBe("Today");
     expect(lastChangeLabel("2026-10-12T09:00:00Z", now)).toMatch(/days ago$/);
+  });
+});
+
+describe("A6 owner line", () => {
+  const client = (name: string, over: Partial<AgencyClientRow> = {}) => ({ workspaceId: name, name, reach: "agency", role: "agency", provider: true, status: "ready", systems: [], needsYou: { count: 0, oldestAt: null }, openRequests: 0, improvementsWaiting: 0, lastReceiptAt: null, ...over }) as unknown as AgencyClientRow;
+  it("counts every owner wait, not just the first", () => {
+    expect(ownerWaitsSentence([client("Harbor Dental", { needsYou: { count: 1, oldestAt: "2026-11-22T00:00:00Z" } }), client("Fieldwork Studio", { needsYou: { count: 1, oldestAt: "2026-11-22T12:00:00Z" } }), client("North Coast Realty")]))
+      .toBe("Harbor Dental and Fieldwork Studio each wait on an owner for one decision.");
+    expect(ownerWaitsSentence([client("Harbor Dental", { needsYou: { count: 1, oldestAt: "2026-11-22T00:00:00Z" } })])).toBe("Harbor Dental waits on its owner for one decision.");
+    expect(ownerWaitsSentence([client("A", { ownerClaimWaiting: true }), client("B", { needsYou: { count: 2, oldestAt: "2026-11-20T00:00:00Z" } }), client("C", { needsYou: { count: 1, oldestAt: "2026-11-21T00:00:00Z" } })]))
+      .toBe("A waits for its owner to claim it. Two more wait on their owners.");
+    expect(ownerWaitsSentence([client("A")])).toBeNull();
   });
 });

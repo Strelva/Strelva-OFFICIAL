@@ -13,7 +13,7 @@ import { StSkeleton } from "@/components/ui/strelva/Kit";
 import { XaButton, XaButtonLink, XaComposer, XaEmpty, XaHeadline, XaInitial, XaLabel, XaLede, XaMark, XaPebbleAvatar, XaPebbleScene, XaRow, XaRows, XaTextLink } from "@/components/ui/strelva/Xa";
 import type { AgencyClientRow, AgencyQueueItem } from "../../agency-clients";
 import { clientStanding, greeting, problemSystems, queueActionLabel, splitQueue, todaySentence } from "./agency-xa-model";
-import { clientColor } from "./client-color";
+import { clientColor } from "@/platform/presentation/client-color";
 import styles from "./agency-xa.module.css";
 
 const ROWS_SHOWN = 8;

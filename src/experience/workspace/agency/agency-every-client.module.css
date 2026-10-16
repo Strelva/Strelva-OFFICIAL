@@ -1,14 +1,13 @@
-/* XA · A6, every client. One sentence, then one table; Pebble checks at the right. */
+/* XA · A6, every client. One sentence, then one table; Pebble speaks on the row that is broken. */
 .every { display: flex; min-width: 0; flex-direction: column; gap: 24px; }
 .head { display: flex; align-items: center; justify-content: space-between; gap: 32px; padding-bottom: 8px; }
 .headText { display: flex; min-width: 0; flex-direction: column; gap: 12px; }
 .checked { margin: 0; color: var(--st-text-3); font-size: 13px; line-height: 18px; }
-/* Pebble shows only when it has a job: holding the client that waits on you, or fixing what broke. */
-.pebble { display: flex; flex-shrink: 0; flex-direction: column; align-items: center; gap: 0; margin: 0; }
-.holding { position: relative; width: 260px; height: 260px; }
-.heldTile { position: absolute; z-index: 2; left: 58%; top: 42%; display: block; border-radius: 12px; box-shadow: 0 2px 4px #00000024; }
-.pebbleJob { margin-top: -52px; color: var(--st-text-2); font-size: 13px; line-height: 18px; text-align: center; }
-.head { margin-top: -40px; }
+/* Pebble is in frame only for bad news, on the row it is about: its avatar, what it knows, one link. */
+.pebbleLine { display: flex; align-items: flex-start; gap: 8px; max-width: 420px; color: var(--st-text-2); font-size: 13px; line-height: 19px; }
+.pebbleLine > span:first-child { flex-shrink: 0; margin-top: -1px; }
+.fix { font-size: 13px; }
+.fix small { color: var(--st-text-2); font-size: 13px; }
 
 .table { width: 100%; border-collapse: collapse; font-size: 15px; }
 .table thead th { padding: 0 16px 10px 0; border-bottom: 1px solid var(--st-line); color: var(--st-text-3); font-size: 13px; font-weight: 500; text-align: left; }
@@ -16,7 +15,7 @@
 .table tbody tr[data-stale="true"] > * { background: none; }
 .row { cursor: pointer; transition: background-color var(--motion-fast) var(--ease-settle); }
 .row:hover > * { background: var(--st-hover); }
-.phoneLine { display: none; }
+.phoneLine, .phoneMeta, .phoneOnly { display: none; }
 .right { text-align: right !important; padding-right: 0 !important; }
 
 .client { min-width: 240px; }
@@ -27,12 +26,6 @@
 .name { color: var(--st-text); font-size: 15px; font-weight: 500; line-height: 21px; }
 .summary { color: var(--st-text-2); font-size: 13px; line-height: 19px; }
 
-.detailBody { display: flex; flex-direction: column; gap: 8px; padding: 6px 0 4px; color: var(--st-text-2); font-size: 13px; line-height: 1.5; }
-.detailBody p, .detailBody ul { margin: 0; padding: 0; list-style: none; }
-.detailBody a { color: var(--st-accent); font-weight: 500; text-decoration: none; }
-.inlineAction { padding: 0; border: 0; background: none; color: var(--st-accent); font: inherit; font-size: 13px; font-weight: 500; cursor: pointer; }
-.inlineAction:hover { text-decoration: underline; text-underline-offset: 3px; }
-.inlineAction:focus-visible { outline: 2px solid var(--st-accent); outline-offset: 2px; border-radius: 4px; }
 
 .state { color: var(--st-text-body); font-size: 14px; line-height: 20px; }
 .state[data-tone="waits"] { color: var(--st-need); }
@@ -43,16 +36,10 @@
 .stale { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
 .stale small { color: var(--st-text-2); font-size: 13px; line-height: 1.45; }
 
-.review { display: flex; flex-direction: column; gap: 16px; padding: 8px 0 24px; }
-.closer { display: flex; flex-direction: column; gap: 12px; }
-.closerPick { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 8px; color: var(--st-text-2); font-size: 14px; }
-.closerPick select { min-height: 36px; padding: 0 10px; border: 1px solid var(--st-line); border-radius: var(--st-r-sm, 8px); background: var(--st-surface); color: var(--st-text); font: inherit; font-size: 14px; }
-.closerPick select:focus-visible { outline: 2px solid var(--st-accent); outline-offset: 2px; }
 .foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
 .alert { margin: 0; color: var(--st-critical); font-size: 14px; }
 
 .empty { display: flex; flex-direction: column; align-items: flex-start; gap: 20px; padding: 24px 0; }
-.empty > div:first-child { margin: -48px 0 -64px -32px; }
 .error { display: flex; align-items: center; gap: 24px; padding: 24px 0; }
 .errorText { display: flex; flex-direction: column; align-items: flex-start; gap: 12px; color: var(--st-text); font-size: 15px; }
 .errorText p { margin: 0; }
@@ -60,7 +47,6 @@
 /* Phone (390): one row per client, the name and domain plus at most one exception line. */
 @media (max-width: 767px) {
   .head { align-items: flex-start; }
-  .pebble { display: none; }
   .table thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
   .table, .table tbody, .table tbody tr { display: block; width: 100%; }
   .table tbody tr { border-bottom: 1px solid var(--st-line); }
@@ -71,5 +57,7 @@
   .phoneLine { display: block; margin-top: 2px; color: var(--st-text-2); font-size: 13px; line-height: 18px; }
   .phoneLine[data-tone="waits"] { color: var(--st-need); }
   .phoneLine[data-tone="down"] { color: var(--st-critical); }
+  .phoneMeta { display: block; margin-top: 2px; color: var(--st-text-3); font-size: 13px; line-height: 18px; font-variant-numeric: tabular-nums; }
+  .phoneOnly { display: block; padding: 8px 0 0 48px; }
   .error { flex-direction: column; align-items: flex-start; }
 }

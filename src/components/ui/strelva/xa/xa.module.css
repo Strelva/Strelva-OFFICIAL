@@ -270,6 +270,8 @@
 .headlineQuiet { display: block; color: var(--st-text-3); }
 .lede { margin: 0; color: var(--st-text-2); font-size: 17px; line-height: 1.45; }
 @media (max-width: 767px) { .headline, .headline[data-size="sm"] { font-size: 26px; } .headline[data-size="lg"] { font-size: 30px; letter-spacing: -0.8px; } .lede { font-size: 15px; } }
+/* Phone: the quiet second sentence drops to body size under the headline, so two or three 26 px grey lines never stand above the content. */
+@media (max-width: 767px) { .headlineQuiet { margin-top: 6px; color: var(--st-text-2); font-size: 16px; font-weight: 400; letter-spacing: 0; line-height: 1.45; } }
 
 .answers { display: flex; flex-direction: column; gap: 12px; margin: 0; }
 .answer { display: grid; grid-template-columns: var(--xa-answer-label, 140px) minmax(0, 1fr); gap: 16px; font-size: 15px; line-height: 1.4; }

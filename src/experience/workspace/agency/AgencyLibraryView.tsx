@@ -8,7 +8,7 @@ import { systemHref } from "@/experience/systems/model";
 import { SourcePackageControls } from "./SourcePackageControls";
 import { StLabel, StNotice, StRow, StRows, StSection, StSkeleton, StTextButton } from "@/components/ui/strelva/Kit";
 import { XaButton, XaChoices, XaEmpty, XaHeadline, XaInitial, XaLabel, XaRow, XaRows, XaSays, XaTextLink, XaWorking } from "@/components/ui/strelva/Xa";
-import { clientColor } from "./xa/client-color";
+import { clientColor } from "@/platform/presentation/client-color";
 import { AgencyFold } from "./xa/AgencyFold";
 import { LibraryResolveError, resolveLibraryConflict, type ConflictChoice } from "./library-resolve";
 import xa from "./xa/agency-xa.module.css";
@@ -46,10 +46,13 @@ type ReviewState =
 export function AgencyLibraryView({
   request,
   agencyWorkspaceId,
+  leadExtra,
 }: {
   request: typeof fetch;
   agencyWorkspaceId: string;
   onWorkspace: (workspaceId: string) => void;
+  /** The agency's own Library tools (adapt a source for another client), under the sources list. */
+  leadExtra?: ReactNode;
 }) {
   const [provider, setProvider] = useState<ConnectionProvider | "">("");
   const [state, setState] = useState<LibraryState>({ status: "loading" });
@@ -143,10 +146,11 @@ export function AgencyLibraryView({
       </button></li>)}</ul> : null}
       {!visibleSources.length ? <p className={xa.note}>No sources work with this connection yet. <XaTextLink onClick={() => setProvider("")}>Show every source</XaTextLink></p> : null}
       {refreshError ? <p role="alert" className={xa.inlineAlert}>{refreshError}</p> : null}
+      {leadExtra}
     </div>
     <div>
       {selectedSource ? <LibrarySource key={selectedSource.systemId} request={request} source={selectedSource} review={reviews[selectedSource.systemId]} reviewEnabled={state.library.reviewEnabled === true} held={refreshing || Boolean(refreshError) || state.library.reviewEnabled !== true} tools={tools} onChanged={() => void refresh()} onReview={ids => void review(selectedSource, ids)} />
-        : <AgencyFold label="Releases and packaging" open>{tools}</AgencyFold>}
+        : <AgencyFold label="Releases" open>{tools}</AgencyFold>}
       {!provider ? <InquiryLibraryVersions library={state.library} /> : null}
     </div>
   </div>;
@@ -205,7 +209,7 @@ function LibrarySource({ request, source, review, onReview, held, onChanged, rev
       } : undefined} />)}</XaRows> : <p className={xa.note}>No client has a Version of this yet.</p>}
     {latest ? <div className={xa.panelFoot}>
       {readyIds.length >= 2 ? <>
-        <p id={`${headingId}-review-note`} className={xa.note}>Each owner gets their own review. Nothing changes until they say yes. Clients with a choice to make or a Connection missing are skipped.</p>
+        <p id={`${headingId}-review-note`} className={xa.note}>Each owner gets their own review. Nothing changes until they say yes. Clients with a choice to make or a missing account connection are skipped.</p>
         {bulk ? <p className={xa.panelBody}>{reviewableVersionGroups(source, selectedIds).map(group => source.revisions.find(revision => revision.number === group.revision)?.summary || "The latest update").join(" · ") || "Choose at least one client."}</p> : null}
         <div className={xa.toolbar}>
           {bulk ? <XaButton variant="primary" disabled={held || !selectedIds.length || running} busy={running} onClick={() => onReview(selectedIds)}>Send {selectedIds.length} {selectedIds.length === 1 ? "offer" : "offers"}</XaButton>
@@ -215,14 +219,24 @@ function LibrarySource({ request, source, review, onReview, held, onChanged, rev
       </> : readyIds.length === 0 && source.versions.length ? <p className={xa.note}>{allSettled ? "Every client is up to date." : "Nothing else is ready to offer."}</p> : null}
     </div> : null}
     {review ? <ReviewResult reviewEnabled={reviewEnabled} source={source} review={review} /> : null}
-    <XaSays>Pebble checks each client&apos;s setup before anything is offered.</XaSays>
-    <AgencyFold label="Releases and packaging" count={source.revisions.length || null}>
+    {/* Pebble speaks only when its check held a client back, naming who and why. */}
+    {heldBack(source) ? <XaSays>{heldBack(source)}</XaSays> : null}
+    <AgencyFold label="Releases" count={source.revisions.length || null}>
       {tools}
       <SystemCreator requestOverride={request} workspaceId={source.workspaceId} systemId={source.systemId} />
       {source.revisions.length ? <XaRows label={`Releases of ${source.name}`}>{[...source.revisions].sort((a, b) => b.number - a.number).map(revision => <XaRow key={revision.number} title={revision.summary || revision.label || "No summary"} detail={`Shared ${new Date(revision.publishedAt).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" })}`} meta={source.versions.some(version => version.baselineRevision === revision.number) ? "In use" : undefined} />)}</XaRows> : <p className={xa.note}>Nothing shared yet.</p>}
       <SourcePackageControls request={request} workspaceId={source.workspaceId} systemId={source.systemId} onChanged={onChanged} />
     </AgencyFold>
   </section>;
+}
+
+/** "Pebble held North Coast Realty back from this offer until you choose which one stays." Empty when nothing was held. */
+function heldBack(source: AgencyLibrarySource): string {
+  const held = source.versions.filter(version => version.state === "conflicts" || version.state === "missing_accounts");
+  if (!held.length) return "";
+  const first = held[0]!;
+  const until = first.state === "conflicts" ? "until you choose which one stays" : "until its account is connected";
+  return `Pebble held ${first.clientName}${held.length > 1 ? ` and ${held.length - 1} more` : ""} back from this offer ${until}.`;
 }
 
 interface ResolveProps {

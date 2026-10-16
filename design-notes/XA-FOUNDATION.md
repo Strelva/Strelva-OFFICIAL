@@ -88,7 +88,7 @@ tabular figures. Geist Mono is no longer loaded.
 | `XaYes state onYes onNotYet onUndo working liveLabel failure settled disabledReason disabled question yesAriaLabel notYetAriaLabel` | `Xa` | O3 decision + N2cSZg | **The one yes gesture.** See below. |
 | `XaDecision status meta yes label` | `Xa` | O3 panel | The one object that gets the large shadow |
 | `XaUndo onUndo windowMs onExpire shortcut` + `XaUndoDock` | `Xa` | N2cSZg | Has a draining 2 px bar, and ⌘Z works when `shortcut` is set |
-| `XaHeadline quiet size="sm\|md\|lg"`, `XaLede`, `XaAnswers`, `XaLabel`, `XaLines` | `Xa` | O1, O3 | The headline is two-tone and must never repeat itself. Labels use sentence case at 13/500. |
+| `XaHeadline quiet size="sm\|md\|lg"`, `XaLede`, `XaAnswers`, `XaLabel`, `XaLines` | `Xa` | O1, O3 | The headline is two-tone and must never repeat itself. Below 768 px the quiet sentence is 16 px body text under the headline. Labels use sentence case at 13/500. |
 | `XaSays links` | `Xa` | R1 footer | Pebble, one plain sentence, then text links |
 | `XaRows` / `XaRow lead title detail tone meta action href onClick current` | `Xa` | AG1 rows, O6 | Open rows with a hairline between them |
 | `XaEmpty pose job title action secondary` | `Xa` | xLm8z | `job` is required, so Pebble is always doing something |

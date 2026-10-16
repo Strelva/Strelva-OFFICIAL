@@ -4,7 +4,8 @@ import { useEffect, useMemo, useRef, useState, type SyntheticEvent } from "react
 import { z } from "zod";
 import { StSkeleton } from "@/components/ui/strelva/Kit";
 import { ArrowDown, ArrowUp } from "lucide-react";
-import { XaAnswers, XaButton, XaEmpty, XaHeadline, XaIconButton, XaSays, XaTextLink } from "@/components/ui/strelva/Xa";
+import { XaAnswers, XaButton, XaEmpty, XaHeadline, XaIconButton, XaSays, XaTextLink, XaUndo, XaUndoDock } from "@/components/ui/strelva/Xa";
+import { strelvaUndoWindowMs } from "@/platform/infra/motion";
 import { AgencySendPanel, type AgencyDraftChange } from "@/experience/workspace/agency/xa/AgencySendPanel";
 import { AgencyFold } from "@/experience/workspace/agency/xa/AgencyFold";
 import { dayAndClockLabel } from "@/experience/workspace/agency/xa/agency-xa-model";
@@ -63,8 +64,11 @@ export function agencyEditableNodes(nodes: Record<string, CatalogNode>, section:
 const pointer = (id: string) => id.replace(/~/g, "~0").replace(/\//g, "~1");
 function object(value: string): Record<string, unknown> | null { try { const parsed: unknown = JSON.parse(value); return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed as Record<string, unknown> : null; } catch { return null; } }
 type Edit = { props: string; children: string[] };
+/** What was just sent, so the page stays on it and Undo can put the draft back. */
+type Sent = { nodeId: string; edits: Record<string, Edit>; changes: AgencyDraftChange[]; title: string | null; undo: AgencyDocumentPatch[]; undo_window: boolean };
 
-export function AgencyWebsiteDocumentDraftExperience({ bindingId, transport = agencyDocumentTransport, clientName, initialEdits }: { bindingId: string; transport?: AgencyDocumentTransport; clientName?: string; /** Preview fixtures only: edits already made, so the send panel can be seen filled. */ initialEdits?: Record<string, Edit> }) {
+export function AgencyWebsiteDocumentDraftExperience({ bindingId, transport = agencyDocumentTransport, clientName, initialEdits, developerFields = false }: { bindingId: string; transport?: AgencyDocumentTransport; clientName?: string; /** Preview fixtures only: edits already made, so the send panel can be seen filled. */ initialEdits?: Record<string, Edit>;
+  /** Developers only: the raw field editor for parts whose fields aren't plain text. Agencies edit through the named fields. */ developerFields?: boolean }) {
   const editorRef = useRef<HTMLDivElement>(null);
   const [state, setState] = useState<AgencyDocumentState | null>(null);
   const [loading, setLoading] = useState(true);
@@ -79,9 +83,13 @@ export function AgencyWebsiteDocumentDraftExperience({ bindingId, transport = ag
   const [page, setPage] = useState("/");
   const [previewError, setPreviewError] = useState(false);
   const [edits, setEdits] = useState<Record<string, Edit>>({});
+  const [sent, setSent] = useState<Sent | null>(null);
+  const [undoing, setUndoing] = useState(false);
+  // Said when editing goes on during the Undo window, so Undo never disappears without a word.
+  const [undoNote, setUndoNote] = useState("");
   useEffect(() => {
     const controller = new AbortController(); setLoading(true); setError("");
-    transport.read(bindingId, controller.signal, scope).then(value => { if (!controller.signal.aborted) { setState(value); setPermissionChecked(true); setEdits(initialEdits ?? {}); setSelected(""); setSaved(""); setLoading(false); } }).catch(cause => { if (!controller.signal.aborted) { setError(cause instanceof Error ? cause.message : "Permission could not be checked."); setPermissionChecked(false); setLoading(false); } });
+    transport.read(bindingId, controller.signal, scope).then(value => { if (!controller.signal.aborted) { setState(value); setPermissionChecked(true); setEdits(initialEdits ?? {}); setSelected(""); setSaved(""); setSent(null); setLoading(false); } }).catch(cause => { if (!controller.signal.aborted) { setError(cause instanceof Error ? cause.message : "Permission could not be checked."); setPermissionChecked(false); setLoading(false); } });
     return () => controller.abort();
   // eslint-disable-next-line react-hooks/exhaustive-deps -- initialEdits seeds the first read only.
   }, [bindingId, transport, attempt, scope]);
@@ -89,8 +97,8 @@ export function AgencyWebsiteDocumentDraftExperience({ bindingId, transport = ag
   const website = state?.website;
   const candidate = website?.rebuild.candidate;
   const nodes = useMemo(() => candidate ? agencyEditableNodes(candidate.document.nodes, state?.section ?? null) : [], [candidate, state?.section]);
-  // Open on the section that holds the pending changes, so the brief and the send panel agree.
-  const node = nodes.find(item => item.id === selected) ?? nodes.find(item => edits[item.id]) ?? nodes[0];
+  // Open on the section that holds the pending changes, or the one just sent, so the brief and the send panel agree.
+  const node = nodes.find(item => item.id === selected) ?? nodes.find(item => edits[item.id]) ?? nodes.find(item => item.id === sent?.nodeId) ?? nodes[0];
   const edit = node ? edits[node.id] ?? { props: JSON.stringify(node.props, null, 2), children: node.children } : null;
   const props = edit ? object(edit.props) : null;
   const active = Boolean(permissionChecked && state?.grant?.status === "active" && now !== null && Date.parse(state.grant.expiresAt) > now);
@@ -102,7 +110,12 @@ export function AgencyWebsiteDocumentDraftExperience({ bindingId, transport = ag
   function checkPreview(event: SyntheticEvent<HTMLIFrameElement>) {
     try { const hash = event.currentTarget.contentDocument?.querySelector('meta[name="strelva-site-hash"]')?.getAttribute("content"); setPreviewError(hash !== candidate?.contentHash); } catch { setPreviewError(true); }
   }
-  function update(next: Partial<Edit>) { if (node && edit) { setEdits(values => ({ ...values, [node.id]: { ...edit, ...next } })); setSaved(""); } }
+  function update(next: Partial<Edit>) {
+    if (!node || !edit) return;
+    setEdits(values => ({ ...values, [node.id]: { ...edit, ...next } })); setSaved("");
+    if (sent?.undo_window) setUndoNote(`Undo closed because you kept editing. ${clientName || "The client"} still has what you sent; send again to replace it.`);
+    setSent(null);
+  }
   function field(key: string, value: string) { if (props) update({ props: JSON.stringify({ ...props, [key]: value }, null, 2) }); }
   const ops = useMemo(() => {
     const values: AgencyDocumentPatch[] = [];
@@ -118,11 +131,34 @@ export function AgencyWebsiteDocumentDraftExperience({ bindingId, transport = ag
     if (!website || !candidate || !active || !ops?.length) return;
     const document = structuredClone(candidate.document);
     for (const [id, value] of Object.entries(edits)) { document.nodes[id]!.props = object(value.props) as CatalogNode["props"]; document.nodes[id]!.children = value.children; }
-    if (!siteDocumentSchema.safeParse(document).success) { setError("The section settings do not match this website component. Correct the settings before saving."); return; }
+    if (!siteDocumentSchema.safeParse(document).success) { setError("Some fields don't fit this part of the page. Correct them before sending."); return; }
     setSaving(true); setError(""); setSaved("");
-    try { const result = await transport.save(bindingId, website, state!.section!, ops); setState(current => current ? { ...current, ...result } : current); setEdits({}); setSaved(`Sent to ${clientName || "the client"}. ${clientName || "The client"} can now review it.`); }
+    // The exact inverse of this send: every edited part back to what the saved draft said before it.
+    const undo: AgencyDocumentPatch[] = [];
+    for (const [id, value] of Object.entries(edits)) {
+      const original = candidate.document.nodes[id]!;
+      if (JSON.stringify(object(value.props)) !== JSON.stringify(original.props)) undo.push({ op: "replace", path: `/nodes/${pointer(id)}/props`, value: structuredClone(original.props) });
+      if (JSON.stringify(value.children) !== JSON.stringify(original.children)) undo.push({ op: "replace", path: `/nodes/${pointer(id)}/children`, value: [...original.children] });
+    }
+    const sending = { nodeId: changedNode?.id ?? node?.id ?? "", edits, changes, title: changedTitle, undo, undo_window: true };
+    try { const result = await transport.save(bindingId, website, state!.section!, ops); setState(current => current ? { ...current, ...result } : current); setEdits({}); setSelected(sending.nodeId); setSent(sending); setUndoNote(""); setSaved(`Sent to ${clientName || "the client"}.`); }
     catch (cause) { setError(cause instanceof Error ? cause.message : "The draft could not be saved. Your edits are preserved."); if (cause instanceof AgencyDocumentTransportError && cause.requiresPermissionReload) setPermissionChecked(false); }
     finally { setSaving(false); }
+  }
+  /** Undo: send the inverse, then hand the edits back so the agency keeps working where it was. */
+  async function takeBack() {
+    if (!sent || !website || !state?.section || undoing) return;
+    setUndoing(true); setError("");
+    try {
+      const result = await transport.save(bindingId, website, state.section, sent.undo);
+      setState(current => current ? { ...current, ...result } : current);
+      // Honest about what the save can do: the draft the client reviews reads as it did before; the review itself stays open on their side.
+      setEdits(sent.edits); setSent(null); setSaved(`Taken back. The draft ${clientName || "the client"} reviews reads as it did before you sent this. Your edits are still here.`);
+    } catch (cause) {
+      setSent(current => current ? { ...current, undo_window: false } : current);
+      setError(cause instanceof Error ? `Undo did not go through. ${cause.message}` : "Undo did not go through. The draft is still with the client.");
+      if (cause instanceof AgencyDocumentTransportError && cause.requiresPermissionReload) setPermissionChecked(false);
+    } finally { setUndoing(false); }
   }
   if (!loading && state && !website && !error) return <AgencyManagedWebsiteDraftExperience bindingId={bindingId} />;
   const client = clientName || "the client";
@@ -130,12 +166,17 @@ export function AgencyWebsiteDocumentDraftExperience({ bindingId, transport = ag
   const changedNode = Object.keys(edits).map(id => candidate?.document.nodes[id]).find(item => item && changes.some(change => change.id.startsWith(`${item.id}:`)));
   const pageName = sectionTitle(changedNode ?? node) ?? sectionWord(state?.section ?? null);
   const changedTitle = changedNode ? sectionTitle({ ...changedNode, props: (object(edits[changedNode.id]!.props) ?? changedNode.props) as CatalogNode["props"] } as CatalogNode) : null;
+  // After a send the page stays on what was sent: its title, its lines, and who it waits on.
+  const shownChanges = !changes.length && sent ? sent.changes : changes;
+  const headline = changedTitle ?? (sent && !changes.length ? sent.title : null) ?? pageName;
+  // The panel says "Draft · N changes", so the quiet line says who it is for instead.
+  const headlineQuiet = changes.length ? `For ${client}.` : sent ? `Waiting on ${client}.` : "Nothing changed yet.";
   const keepEditing = () => { setSaved(""); const target = editorRef.current; const still = typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches; target?.scrollIntoView?.({ block: "start", behavior: still ? "auto" : "smooth" }); target?.querySelector<HTMLElement>("select, textarea")?.focus({ preventScroll: true }); };
   const editor = node && edit ? <div className={xa.editor} ref={editorRef}>
-    <SelectInput label="Section to edit" value={node.id} onChange={event => setSelected(event.target.value)} options={nodes.map(item => ({ value: item.id, label: sectionTitle(item) ?? typeLabel(item.type) }))} disabled={saving} />
+    <SelectInput label="Part of the page" value={node.id} onChange={event => setSelected(event.target.value)} options={nodes.map(item => ({ value: item.id, label: sectionTitle(item) ?? typeLabel(item.type) }))} disabled={saving} />
     {Object.entries(props ?? {}).filter(([,value]) => typeof value === "string").map(([key,value]) => <TextArea key={key} label={fieldLabel(key)} value={String(value)} rows={key === "body" || key === "text" ? 4 : 2} onChange={event => field(key, event.target.value)} disabled={saving} />)}
-    {edit.children.length > 1 ? <AgencyFold label="Section order" count={edit.children.length}>
-      <ol className={xa.order} aria-label="Section order">{edit.children.map((id, index) => {
+    {edit.children.length > 1 ? <AgencyFold label="Order on the page" count={edit.children.length}>
+      <ol className={xa.order} aria-label="Order on the page">{edit.children.map((id, index) => {
         const name = sectionTitle(candidate!.document.nodes[id]) ?? typeLabel(candidate!.document.nodes[id]?.type ?? "Section");
         const move = (direction: number) => { const children = [...edit.children]; const target = index + direction; [children[index], children[target]] = [children[target]!, children[index]!]; update({ children }); };
         return <li key={id}><span>{name}</span>
@@ -144,27 +185,29 @@ export function AgencyWebsiteDocumentDraftExperience({ bindingId, transport = ag
         </li>;
       })}</ol>
     </AgencyFold> : null}
-    <AgencyFold label="Section settings"><TextArea label="Component settings" value={edit.props} onChange={event => update({ props: event.target.value })} rows={8} spellCheck={false} disabled={saving} helperText="Use the settings already supported by this component. Facts and verification are managed by the client’s review." />{!props ? <p role="alert" className={xa.inlineAlert}>Settings must be a valid JSON object.</p> : null}</AgencyFold>
+    {developerFields ? <AgencyFold label="Every field in this part of the page"><TextArea label="Every field of this part" value={edit.props} onChange={event => update({ props: event.target.value })} rows={8} spellCheck={false} disabled={saving} helperText="Only the fields this part of the page already has. Facts are confirmed in the client’s own review." />{!props ? <p role="alert" className={xa.inlineAlert}>These fields don’t read right. Check the quotes and commas, then try again.</p> : null}</AgencyFold> : null}
   </div> : null;
   return <main className="min-h-screen" style={{ background: "var(--st-canvas, #faf9f6)" }}>
     {loading ? <div className={xa.state}><StSkeleton label="Checking the current website permission" width="65%" /></div> : null}
     {error ? <div className={xa.state}><XaSays links={[<XaTextLink key="reload" onClick={saving ? undefined : () => setAttempt(value => value + 1)}>Reload saved document and permission</XaTextLink>]}><span role="alert">{error}{Object.keys(edits).length ? " Your unsaved edits are preserved. Reloading replaces them with the saved document." : ""}</span></XaSays></div> : null}
     {!loading && state && !state.grant ? <div className={xa.state}><XaEmpty pose="resting" size="sm" job={`Pebble opens this page for you the moment ${client} turns on draft editing.`} title={`${clientName || "The client"} needs to turn on draft editing first.`} /></div> : null}
     {!loading && state?.grant && !active ? <div className={xa.state}><XaSays>This draft permission is {!permissionChecked ? "unconfirmed" : state.grant.status === "revoked" ? "revoked" : "expired"}. Sending is unavailable. Website history stays with {client}.</XaSays></div> : null}
-    {!loading && candidate && state?.grant && active ? <div className={xa.prepare}>
+    {!loading && candidate && state?.grant && active ? <div className={xa.prepare} data-undo-open={sent?.undo_window ? "" : undefined}>
       <div className={xa.prepareBrief}>
         <nav aria-label="Breadcrumb"><ol className={xa.crumbs}>{clientName ? <li>{clientName}</li> : null}<li>Website</li><li aria-current="page">{pageName}</li></ol></nav>
-        <XaHeadline quiet={changes.length ? "A draft, prepared by you." : "Nothing changed yet."}>{changedTitle ?? pageName}.</XaHeadline>
+        <XaHeadline quiet={headlineQuiet}>{headline}.</XaHeadline>
         <XaAnswers labelWidth={120} rows={[
-          ["Changes", changes.length ? `${changes.length} ${changes.length === 1 ? "line" : "lines"} on ${pageName}` : "Nothing edited yet"],
+          // The send panel counts the changes beside this, so the count shows here only when there is no panel.
+          ...(editor ? [] : [["Changes", changes.length ? `${changes.length} ${changes.length === 1 ? "line" : "lines"} on ${pageName}` : sent ? `${sent.changes.length} ${sent.changes.length === 1 ? "line" : "lines"} sent for ${client}’s yes` : "Nothing edited yet"] as const]),
           ["Website", `Prepare. ${clientName || "The client"} puts it live.`],
           ["Your access", `You can edit this page until ${dayAndClockLabel(state.grant.expiresAt)}.`],
         ]} />
         {state.sections.length > 1 ? <SelectInput label="Part of the site you can edit" value={state.section ?? ""} options={state.sections.map(value => ({ value, label: sectionWord(value) }))} onChange={event => setScope(event.target.value)} disabled={saving || Object.keys(edits).length > 0} helperText={Object.keys(edits).length > 0 ? "Send or reload your edits before changing the part you edit." : undefined} /> : null}
       </div>
-      {editor ? <div className={xa.prepareSide}><AgencySendPanel clientName={clientName || "the client"} address={previewAddress(state.previewHref, page, `${website!.rebuild.title} · ${pageName}`)} changes={changes} sending={saving}
-        blocked={ops === null ? "One section's settings aren't valid. Fix them before sending." : null}
-        sent={saved && !changes.length ? saved : undefined}
+      {editor ? <div className={xa.prepareSide}><AgencySendPanel clientName={clientName || "the client"} address={previewAddress(state.previewHref, page, `${website!.rebuild.title} · ${pageName}`)} changes={shownChanges} sending={saving}
+        blocked={ops === null ? "One part's fields don't read right. Fix them before sending." : null}
+        sent={saved || undefined} takenBack={!sent && Boolean(saved)}
+        note={undoNote || null}
         onSend={() => void save()} onKeepEditing={keepEditing} /></div> : null}
       <div className={xa.prepareEditor}>
         {editor ?? <p className={xa.note}>{state.section === "navigation" || state.section === "footer" ? "Navigation and footer changes need the client or Strelva to prepare them. This agency permission does not allow saving those sections." : "No editable sections match this permission."}</p>}
@@ -172,6 +215,7 @@ export function AgencyWebsiteDocumentDraftExperience({ bindingId, transport = ag
       </div>
     </div> : null}
     {!loading && state?.website && !candidate ? <div className={xa.state}><XaEmpty pose="resting" size="sm" job="Pebble opens the draft here as soon as one is prepared." title="This website has no draft yet.">The client or Strelva needs to prepare one first.</XaEmpty></div> : null}
+    {sent?.undo_window && sent.undo.length ? <XaUndoDock><XaUndo shortcut windowMs={strelvaUndoWindowMs} onUndo={undoing ? undefined : () => void takeBack()} onExpire={() => setSent(current => current ? { ...current, undo_window: false } : current)}>{undoing ? "Taking it back…" : `Sent to ${clientName || "the client"}`}</XaUndo></XaUndoDock> : null}
   </main>;
 }
 

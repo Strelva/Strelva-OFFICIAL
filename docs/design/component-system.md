@@ -7,6 +7,66 @@ The [visual direction map](../../DESIGN.md#visual-direction-and-extension-map) o
 how identity, imagery, composition and component treatment fit together. This
 file owns component contracts, extension and adoption, including gaps in source.
 
+## October 16 agency fix lane, second pass (local, branch xa/fix-agency)
+
+- `AgencyAskDock` (`agency/xa/AgencyAskDock.tsx`) is the agency's one composer:
+  `XaComposer` in the frame's dock, no "+", lined up with the page column
+  (`column="every"` matches the A6 table). AgencyHome's Queue and clients views
+  and the A6 door preview all render it; nothing else docks a composer there.
+- `AgencyEveryClient` (A6): the Owner column shows exceptions only and stays
+  out when no row has one; "Not claimed yet" carries "Make a new claim link".
+  The line under the headline names every client waiting on its owner
+  (`ownerWaitsSentence`). Pebble speaks on the broken row (avatar, the health
+  summary, "Fix it") at both widths; the floating scene is gone. Phone rows keep
+  a meta line (owner exception, last change, time). The footer count shows only
+  as "Showing X of Y". Usage across clients is no longer drawn here.
+- `UsageControlsPanel amounts`: dollar figures and the limit field render only
+  for the operator console. Agencies see where Strelva work stands (running,
+  paused, stopped at a limit until the reset) and an existing limit is kept on
+  save. `AgencyUsageSummary` lists exceptions only, with no amounts.
+- `clientColor` has one home, `src/platform/presentation/client-color.ts`; the
+  `agency/xa/client-color` re-export and the copy in AgencyEveryClient are gone.
+- `AgencySendPanel`: Send stands alone while drafting; after a send the panel
+  keeps only its status and a "Keep editing" link; `note` says when Undo closed
+  because editing went on. The diff table is fixed-layout (Part 20%, Now and
+  After equal). `AgencyWebsiteDocumentDraftExperience developerFields` gates
+  the raw JSON field editor; no route passes it.
+- `AgencyLibraryView leadExtra` puts the agency's own Library tools under the
+  sources list. Pebble's line appears only when its check held a client back.
+- `XaHeadline` on phone: the quiet sentence drops to 16 px body text.
+- `AgencyDayOne` (A3) has no mark and no Pebble scene; the promise is the
+  sentence under the primary.
+
+## October 16 agency fix lane (local, branch xa/fix-agency)
+
+- `AgencyClientXa` (AG3) is one column with no cards: "Waiting on <client>"
+  first, then "Who makes each change live" as a `dl` whose rows are the
+  levels labelled in place (Full control, Prepare, "<owner> keeps"), each
+  listing its Systems as clay-tile links; the lock list and the legend
+  footnote are gone, and what only the owner can do is one sentence. Without
+  a shared owner name it says "<client>'s owner", never "the owner". Its
+  `tools` slot takes `AgencyClientTools` (`agency/xa/AgencyClientTools.tsx`):
+  the agency's Full-control decisions and its responsibility, availability
+  and time, each in an `AgencyFold` that reads only once opened
+  (`ClientAdditionalControlsBody` is the body of the old fold).
+- `AgencyEveryClient` (A6) drops the "Look closer at" picker (detail lives on
+  the client's page). The Owner column reads Claimed / Not claimed yet /
+  Can't be reached with the fix beside the exception (new optional
+  `ownerClaimed` on the client row, set by `addAgencyClaimQueue`); "Time this
+  month" shows when `minutes` is passed; the line under the headline names a
+  different fact than the headline and the Pebble caption. AgencyHome's XA
+  `clients` view renders it in `.every` with the agency composer docked.
+- `AgencySendPanel` never shows a disabled pill: with nothing to send, or a
+  blocked draft, it says why. `takenBack` marks an undone send. Every row is
+  a change, so rows are untinted with hairlines. AG4 stays on what it sent
+  (no swap to the first section), and Undo (`XaUndo`, 5 s, ⌘Z) sends the
+  exact inverse through the same save and hands the edits back.
+- `AgencyFrame` takes the clients a page reads (`useAgencyFrameClients`), so
+  Add a client lists the agency's added clients and the new one, current.
+- `AgencyHome.onOpenSystem`: a broken System in the Queue opens that System
+  (where its connection is reconnected), not the client's Home. `now` is for
+  preview harnesses only.
+
 ## October 16 XA-6 agency screens (local, branch xa/lane-xa6-agency)
 
 The agency's own screens move to XA in `src/experience/workspace/agency/xa/`,
@@ -34,7 +94,7 @@ Critic pass (same day): status shows only on exceptions; `AgencyFold`
 chevron; stays mounted while closed so its parts can report counts); the
 Library gives each ready client its own Offer and resolves a conflict inline
 through `/api/workspace/versions` (`agency/library-resolve.ts`), with filter and
-refresh inside "Releases and packaging"; AG4 diffs long text line by line
+refresh inside "Releases" (October 16: was "Releases and packaging"); AG4 diffs long text line by line
 (`lineChanges`), opens on the section that holds the changes, and moves the
 send panel under the brief below 1180px with a sticky Send on phone; AG6 has
 one Pebble line under the rows and names who logged each client's minutes.

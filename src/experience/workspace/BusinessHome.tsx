@@ -46,6 +46,7 @@ import { useHomeOutcomes } from "./outcomes/HomeOutcomes";
 import styles from "./business-home.module.css";
 import { useWorkspaceRequest } from "./WorkspaceRequest";
 import { AgencyClientXa, useAgencyGrants } from "./agency/xa/AgencyClientXa";
+import { AgencyClientTools } from "./agency/xa/AgencyClientTools";
 
 interface Props {
   needs?: ReturnType<typeof useNeedsYou>;
@@ -457,7 +458,9 @@ export function BusinessHome({ needs: providedNeeds, agencyHome: providedAgencyH
   // XA · AG3: inside one client, the agency sees what the owner let it do.
   const agencyClient = agencySeat && business && agencyWorkspace && !showHandled && !readLocation.deliveryCheck
     ? <AgencyClientXa clientName={name} workspaceId={snapshot.workspaceId} agencyName={navigationBrand?.agencyId ? navigationBrand.name : agencyWorkspace.name} agencyHref={`${appBase}/workspace?workspaceId=${encodeURIComponent(agencyWorkspace.id)}&agencyView=clients`}
-        systems={systems} systemsLoading={busy || systemsLoading} grants={agencyGrants} shared={sharedHome.state} systemHref={openSystemHref} onOpenSystem={onOpenSystem} onRetryShared={sharedHome.refresh} onAsk={readOnly || busy ? undefined : () => onStart()} />
+        systems={systems} systemsLoading={busy || systemsLoading} grants={agencyGrants} shared={sharedHome.state} systemHref={openSystemHref} onOpenSystem={onOpenSystem} onRetryShared={sharedHome.refresh} onAsk={readOnly || busy ? undefined : () => onStart()}
+        tools={<AgencyClientTools workspaceId={snapshot.workspaceId} clientName={name} agencyWorkspaceId={agencyWorkspace.id} agencyName={navigationBrand?.agencyId ? navigationBrand.name : agencyWorkspace.name}
+          viewerEmail={snapshot.actor.email} canManage={agencyWorkspace.role === "owner" || agencyWorkspace.role === "admin"} request={workspaceRequest} />} />
     : null;
   const page = view === "needs-you" && needsYouReleased ? xaOwner ? xaDecision : needsYouPage
     : business ? xaOwner && !showHandled ? xaToday : agencyClient ?? paperHome : homePage;

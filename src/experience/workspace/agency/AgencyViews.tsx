@@ -90,9 +90,16 @@ export function OwnerReachLines({ client, agencyWorkspaceId }: { client: AgencyC
   </span>;
 }
 
-export function ClientAdditionalControls({ workspaceId, clientName, agencyWorkspaceId, viewerEmail, canManage, request }: { workspaceId: string; clientName: string; agencyWorkspaceId?: string; viewerEmail?: string; canManage?: boolean; request?: typeof fetch }) {
+type ClientControlsProps = { workspaceId: string; clientName: string; agencyWorkspaceId?: string; viewerEmail?: string; canManage?: boolean; request?: typeof fetch };
+
+export function ClientAdditionalControls(props: ClientControlsProps) {
   const [open, setOpen] = useState(false);
-  return <details onToggle={event => setOpen(event.currentTarget.open)}><summary className="min-h-11 cursor-pointer py-2 text-xs font-normal text-gray-muted focus-visible:outline-2 focus-visible:outline-offset-2">Responsibility and availability</summary>{open ? <><ClientResponsibilityProof workspaceId={workspaceId} />{agencyWorkspaceId ? <AgencyClientAvailability agencyWorkspaceId={agencyWorkspaceId} workspaceId={workspaceId} request={request} /> : null}{agencyWorkspaceId ? <AgencyClientUsage agencyWorkspaceId={agencyWorkspaceId} workspaceId={workspaceId} clientName={clientName} request={request} /> : null}{agencyWorkspaceId ? <ListingsSyncSummary workspaceId={workspaceId} clientName={clientName} request={request} /> : null}{agencyWorkspaceId ? <AgencyClientTime agencyWorkspaceId={agencyWorkspaceId} workspaceId={workspaceId} clientName={clientName} viewerEmail={viewerEmail} canManage={canManage} request={request} /> : null}{agencyWorkspaceId ? <AgencyClientEvents agencyWorkspaceId={agencyWorkspaceId} workspaceId={workspaceId} clientName={clientName} request={request} /> : null}</> : null}</details>;
+  return <details onToggle={event => setOpen(event.currentTarget.open)}><summary className="min-h-11 cursor-pointer py-2 text-xs font-normal text-gray-muted focus-visible:outline-2 focus-visible:outline-offset-2">Responsibility and availability</summary>{open ? <ClientAdditionalControlsBody {...props} /> : null}</details>;
+}
+
+/** What the agency carries for one client: responsibility, availability, usage, listings, time and events. Each part reads on mount. */
+export function ClientAdditionalControlsBody({ workspaceId, clientName, agencyWorkspaceId, viewerEmail, canManage, request }: ClientControlsProps) {
+  return <><ClientResponsibilityProof workspaceId={workspaceId} />{agencyWorkspaceId ? <AgencyClientAvailability agencyWorkspaceId={agencyWorkspaceId} workspaceId={workspaceId} request={request} /> : null}{agencyWorkspaceId ? <AgencyClientUsage agencyWorkspaceId={agencyWorkspaceId} workspaceId={workspaceId} clientName={clientName} request={request} /> : null}{agencyWorkspaceId ? <ListingsSyncSummary workspaceId={workspaceId} clientName={clientName} request={request} /> : null}{agencyWorkspaceId ? <AgencyClientTime agencyWorkspaceId={agencyWorkspaceId} workspaceId={workspaceId} clientName={clientName} viewerEmail={viewerEmail} canManage={canManage} request={request} /> : null}{agencyWorkspaceId ? <AgencyClientEvents agencyWorkspaceId={agencyWorkspaceId} workspaceId={workspaceId} clientName={clientName} request={request} /> : null}</>;
 }
 
 function ClientResponsibilityProof({ workspaceId }: { workspaceId: string }) {

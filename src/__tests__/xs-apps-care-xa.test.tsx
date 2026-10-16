@@ -3,6 +3,8 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { createRoot, type Root } from "react-dom/client";
 import { act, createElement, type ReactElement } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { existsSync } from "node:fs";
+import { join } from "node:path";
 import { PREVIEW_FACTS, PREVIEW_NOTE, PREVIEW_BRAND, PREVIEW_SNAPSHOT, PREVIEW_RELEASES } from "@/experience/care-reports/preview-fixture";
 import { CARE_REPORT_MAIL_ART, renderCareReportMail } from "@/platform/care-reports/mail";
 import { careCheckException, careSiteCheckSentence } from "@/platform/care-reports/model";
@@ -34,6 +36,8 @@ describe("Care plan report email (XA · E3, template only)", () => {
     const { subject, html, text } = mail();
     expect(subject).toBe("North Studio: Harbor Dental · September 2026 report");
     expect(html).toContain(`https://app.example.test${CARE_REPORT_MAIL_ART}`);
+    // The art is a file the app actually serves, not a path that 404s in the inbox.
+    expect(existsSync(join(process.cwd(), "public", CARE_REPORT_MAIL_ART))).toBe(true);
     expect(html).toContain("Pebble and Harbor Dental");
     expect(html).toContain(PREVIEW_NOTE);
     expect(text).toContain(PREVIEW_NOTE);

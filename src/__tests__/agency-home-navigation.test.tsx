@@ -43,7 +43,8 @@ it("opens agency Home, preserves separate Clients navigation, and returns Home f
   const clients = [...node.querySelectorAll<HTMLAnchorElement>("aside a")].find(link => link.textContent?.trim() === "All clients")!;
   await act(async () => clients.click()); await settle();
   expect(selected()).toBe("All clients");
-  expect(node.querySelector("h1")?.textContent).toBe("Clients");
+  // XA · A6 with no clients yet: Pebble holds the empty tile and says how one arrives.
+  expect(node.querySelector("h1")?.textContent).toMatch(/^No clients yet\./);
   expect(new URLSearchParams(window.location.search).get("agencyView")).toBe("clients");
   // With the agency switcher in the header, Today is the way home.
   const brandHome = [...mainNav().querySelectorAll<HTMLAnchorElement>("a")].find(link => link.textContent?.trim() === "Home")!;

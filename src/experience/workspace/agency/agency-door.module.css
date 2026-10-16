@@ -8,26 +8,20 @@
 .door:focus-visible { outline: 2px solid var(--st-accent); outline-offset: -2px; }
 @media (pointer: coarse) { .door { min-height: 44px; } }
 
-/* A3: day one. Lead column 560 at x352 on the board; Pebble at the right. */
-.dayOne { display: grid; grid-template-columns: minmax(0, 560px) minmax(0, 340px); justify-content: center; gap: 96px; align-items: center; min-height: calc(100dvh - 96px); padding: 48px 32px; box-sizing: border-box; }
+/* A3: day one. One left-aligned 560 column in the XA page column; nothing centres it. */
+.dayOne { display: grid; grid-template-columns: minmax(0, 560px); justify-content: start; gap: 96px; align-items: center; min-height: calc(100dvh - 96px); padding: 48px 32px 48px 96px; box-sizing: border-box; }
 .dayLead { display: flex; min-width: 0; flex-direction: column; gap: 28px; }
 .greeting { display: flex; flex-direction: column; gap: 12px; }
 .dayActions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 20px; }
 .sentence { margin: 0; color: var(--st-text-2); font-size: 15px; line-height: 1.45; }
+.dayPromise { flex-basis: 100%; }
 .after { display: flex; flex-direction: column; gap: 10px; margin: 0; padding: 0; color: var(--st-text-body); font-size: 15px; line-height: 1.5; list-style: none; }
-.daySide { display: flex; flex-direction: column; align-items: center; gap: 4px; }
-/* Pebble holds the empty client tile it fills when the first site is read: no felt, no dot. */
-.holding { --hold: 300px; position: relative; display: block; flex-shrink: 0; width: var(--hold); height: var(--hold); }
-.holding > span:first-child { --xa-size: var(--hold) !important; }
-.emptyTile { position: absolute; z-index: 2; left: 58%; top: 44%; width: calc(var(--hold) * 0.2); height: calc(var(--hold) * 0.2); box-sizing: border-box; border: 1.5px dashed color-mix(in srgb, var(--st-need) 60%, transparent); border-radius: calc(var(--hold) * 0.05); background: color-mix(in srgb, #efe6d6 85%, var(--st-surface)); box-shadow: inset 0 -3px 0 #00000010, 0 2px 4px #00000014; }
 .caption { max-width: 280px; margin: -64px 0 0; color: var(--st-text-2); font-size: 15px; line-height: 1.45; text-align: center; }
 .inPlace { padding-top: 8px; border-top: 1px solid var(--st-line); }
-@media (max-width: 1100px) { .dayOne { grid-template-columns: minmax(0, 1fr); gap: 24px; justify-content: stretch; min-height: 0; } .daySide { align-items: flex-start; } .caption { text-align: left; } }
+@media (max-width: 1100px) { .dayOne { grid-template-columns: minmax(0, 1fr); gap: 24px; justify-content: stretch; min-height: 0; padding-left: 48px; } .caption { text-align: left; } }
 /* Phone: Pebble and its tile sit small beside the caption, under the one action. */
 @media (max-width: 767px) {
   .dayOne { padding: 24px 16px 96px; gap: 16px; } .dayLead { gap: 22px; }
-  .daySide { order: 0; flex-direction: row; align-items: center; gap: 8px; }
-  .daySide .holding { --hold: 120px !important; }
   .caption { margin: 0; font-size: 14px; }
 }
 /* The preview notice sits inside the content gutter, never on the shell edge. */
@@ -73,7 +67,11 @@
 .objectNote { margin: 0; color: var(--st-text-2); font-size: 13px; line-height: 1.5; }
 .rule { width: 100%; height: 1px; margin: 4px 0; border: 0; background: var(--st-line); }
 .linkRow { display: flex; gap: 8px; }
-.linkField { box-sizing: border-box; min-width: 0; min-height: 44px; flex: 1; padding: 10px 16px; border: 0; border-radius: var(--st-r-md); background: var(--st-inset); color: var(--st-text-body); font: inherit; font-size: 14px; text-overflow: ellipsis; }
+/* The raw link stays folded: the agency copies it with the button, and opens this only when copying fails. */
+.linkFold > summary { display: inline-flex; min-height: 32px; align-items: center; color: var(--st-accent); font-size: 14px; cursor: pointer; }
+.linkFold > summary:focus-visible { outline: 2px solid var(--st-accent); outline-offset: 2px; border-radius: 6px; }
+.linkFold[open] > .linkField { margin-top: 8px; }
+.linkField { box-sizing: border-box; width: 100%; min-width: 0; min-height: 44px; flex: 1; padding: 10px 16px; border: 0; border-radius: var(--st-r-md); background: var(--st-inset); color: var(--st-text-body); font: inherit; font-size: 14px; text-overflow: ellipsis; }
 .linkField:focus-visible { outline: 2px solid var(--st-accent); outline-offset: 2px; }
 .found { display: flex; flex-direction: column; gap: 10px; }
 .facts { display: flex; flex-direction: column; gap: 10px; margin: 0; }
