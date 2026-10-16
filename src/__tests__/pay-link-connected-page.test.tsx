@@ -27,7 +27,7 @@ describe("connected pay-link page", () => {
   it("shows the agency, the amount and the form, without the founder's address", async () => {
     const html = await render();
     expect(html).toContain("Pay North Studio"); expect(html).toContain("Harbor Dental"); expect(html).toContain("$500.00");
-    expect(html).toContain("Pay this link"); expect(html).toContain("Strelva never holds the money");
+    expect(html).toContain("Pay this link"); expect(html).toContain("Runs on Strelva. Payments go straight to North Studio through Stripe."); expect(html).not.toContain("Strelva never holds");
     expect(html).not.toContain("Contact Jacob"); expect(html).not.toContain("secret-creator"); expect(html).not.toContain("secret-revoker");
   });
   it("expires without a form", async () => {
@@ -58,7 +58,7 @@ describe("payer Payment receipt", () => {
     mocks.resolve.mockResolvedValue({ kind: "connected", link: link({ status: "paid" }) });
     mocks.receipt.mockResolvedValue(doc);
     const html = renderToStaticMarkup(await PayLinkReceiptPage({ params: Promise.resolve({ slug: "harbor-site" }) }));
-    expect(html).toContain("RCT-000001"); expect(html).toContain("$500.00"); expect(html).toContain("Not emailed"); expect(html).not.toContain("secret-creator");
+    expect(html).toContain("RCT-000001"); expect(html).toContain("$500.00"); expect(html).toContain("nothing is emailed"); expect(html).not.toContain("secret-creator");
   });
   it("records no receipt for an unpaid link", async () => {
     mocks.resolve.mockResolvedValue({ kind: "connected", link: link() });

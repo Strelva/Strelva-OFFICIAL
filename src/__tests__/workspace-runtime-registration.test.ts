@@ -33,7 +33,7 @@ it("runtime registration eagerly loads only lightweight port definitions", () =>
   expect([...reachable].filter(file => file.startsWith("src/platform/bookings/")))
     .toEqual(["src/platform/bookings/runtime-ports.ts"]);
   expect([...reachable].filter(file => file.startsWith("src/platform/infra/")))
-    .toEqual(["src/platform/infra/tenant-publishing.ts"]);
+    .toEqual(["src/platform/infra/email/visitor-brand-port.ts", "src/platform/infra/tenant-publishing.ts"]);
   expect([...reachable].filter(file => file.startsWith("src/products/") || file.startsWith("src/experience/")))
     .toEqual([]);
   expect([...reachable].filter(file => file.startsWith("src/lib/")))

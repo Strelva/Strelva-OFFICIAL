@@ -138,7 +138,8 @@ export async function chooseInquiryBookingOffer(token: string, start: string): P
   if (!booking) throw new PublicBookingError("unavailable", "The booking request receipt is unavailable.");
   return booking;
 }
-export function bookingOfferEmailOptions(offer: InquiryBookingOffer): Pick<EmailOptions, "rows" | "button"> {
-  return { rows: offer.slots.map(s => ({ label: offer.serviceName, value: formatVisitorTime(s.start, offer.timeZone) })),
-    button: { label: "Choose a time to request", url: offer.url } };
+/** Each suggested time is its own link that opens the page with that time picked (the visitor still presses Request). */
+export function bookingOfferEmailOptions(offer: InquiryBookingOffer): Pick<EmailOptions, "choices" | "button"> {
+  return { choices: { label: offer.serviceName, items: offer.slots.map(s => ({ label: formatVisitorTime(s.start, offer.timeZone), url: `${offer.url}?pick=${encodeURIComponent(s.start)}` })) },
+    button: { label: "See all open times", url: offer.url } };
 }

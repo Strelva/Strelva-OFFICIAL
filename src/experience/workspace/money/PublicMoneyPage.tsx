@@ -19,18 +19,21 @@ export function PublicMoneyPage({
   lead,
   panel,
   single = false,
+  credit,
 }: {
   brand: OwnerBrand | string;
   lead: ReactNode;
   panel?: ReactNode;
   single?: boolean;
+  /** A fact the credit line may carry after "Runs on Strelva", e.g. where the money goes. */
+  credit?: string;
 }) {
   const name = typeof brand === "string" ? brand : brand.name;
   const logo = typeof brand === "string" ? null : brand.logoUrl;
   return (
     <main className={styles.public} data-workspace-theme="linen" style={accentStyle(brand)}>
       <header className={styles.publicHeader}>
-        <span className={styles.publicBrand}>
+        <span className={styles.publicBrand} data-branded={typeof brand !== "string" && /^#[0-9a-f]{6}$/i.test(brand.accentColor) ? true : undefined}>
           {logo ? <img src={logo} alt="" /> : null}
           {name}
         </span>
@@ -43,10 +46,10 @@ export function PublicMoneyPage({
         {panel ? (
           <section className={styles.panel} aria-label="Payment">
             {panel}
-            <p className={styles.panelFoot}>Runs on Strelva</p>
           </section>
         ) : null}
       </div>
+      <footer className={styles.publicCredit}>Runs on Strelva{credit ? `. ${credit}` : ""}</footer>
     </main>
   );
 }

@@ -5,7 +5,8 @@ import { visitorWeek, type VisitorClosure } from "@/platform/bookings/visitor-we
 /**
  * XA · E4. The open times as the visitor's week: one column per day on a
  * wide screen, one row per day on a phone, each time a choice. A day the
- * hours record closes says so in place ("Closed, Thanksgiving"); any other
+ * hours record closes says "Closed" in place, with the reason as a small
+ * caption under it (and the chip's title), so a narrow column never clips; any other
  * day with nothing open says "Nothing open", never a gray slab. One radio
  * group, so the form has one submit.
  *
@@ -13,7 +14,7 @@ import { visitorWeek, type VisitorClosure } from "@/platform/bookings/visitor-we
  * its ISO start for an offer link. Every choice's accessible name is the full
  * date and zone, so a screen reader never hears a bare "10:30".
  */
-export function VisitorSlotWeek({ slots, timeZone, name, value, legend, closures = [], closed = [] }: {
+export function VisitorSlotWeek({ slots, timeZone, name, value, legend, closures = [], closed = [], picked }: {
   slots: readonly { start: string }[];
   timeZone: string;
   name: string;
@@ -22,6 +23,8 @@ export function VisitorSlotWeek({ slots, timeZone, name, value, legend, closures
   closures?: readonly VisitorClosure[];
   /** Same as `closures` (an offer's closedDays), said in place on the day. */
   closed?: readonly VisitorClosure[];
+  /** The start the visitor already tapped (from their email), checked when the page opens. */
+  picked?: string | null;
 }) {
   const week = visitorWeek(slots, timeZone, [...closures, ...closed]);
   const firstStart = slots[0]?.start;
@@ -33,13 +36,22 @@ export function VisitorSlotWeek({ slots, timeZone, name, value, legend, closures
         <p className={styles.dayHead}><span>{day.weekday}</span><b>{day.date}</b></p>
         <div className={styles.times}>
           {day.times.length ? day.times.map(slot => <label key={slot.start} className={styles.time}>
-            <input type="radio" name={name} value={value(slot, slot.index)} required aria-label={formatVisitorTime(slot.start, week.zone)} data-picked={pickedWords(slot.start, week.zone)} />
+            <input type="radio" name={name} value={value(slot, slot.index)} required defaultChecked={picked ? Date.parse(picked) === Date.parse(slot.start) : undefined} aria-label={formatVisitorTime(slot.start, week.zone)} data-picked={pickedWords(slot.start, week.zone)} />
             <span aria-hidden="true">{slot.label}</span>
-          </label>) : <span className={day.closed ? styles.closed : styles.noTimes}>{day.closed ?? "Nothing open"}</span>}
+          </label>) : day.closed ? <>
+            <span className={styles.closed} title={day.closed}>Closed</span>
+            {closedWhy(day.closed) ? <span className={styles.closedWhy}>{closedWhy(day.closed)}</span> : null}
+          </> : <span className={styles.noTimes}>Nothing open</span>}
         </div>
       </div>)}
     </div>
   </fieldset>;
+}
+
+/** The reason a closed day gives ("Thanksgiving" from "Closed, Thanksgiving"), or nothing when it is only "Closed". */
+function closedWhy(label: string): string | null {
+  const why = label.replace(/^closed\b[,:\s]*/i, "").trim();
+  return why ? why.charAt(0).toUpperCase() + why.slice(1) : null;
 }
 
 /** "Tuesday, Nov 24 at 9:15 AM": the pick said back under the week; the week already names the zone. */

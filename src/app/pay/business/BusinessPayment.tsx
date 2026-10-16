@@ -13,15 +13,19 @@ import {
   type PublicPaymentRequest,
 } from "./public-payment";
 import { formatMoney } from "@/platform/connect/money-format";
+import type { VisitorBrand } from "@/products/websites/client";
 
 export default function BusinessPayment({
   token,
   initialRequest,
   preview = false,
+  brand,
 }: {
   token: string;
   initialRequest?: PublicPaymentRequest;
   preview?: boolean;
+  /** The charging business's own look, read on the server from the request's workspace. */
+  brand?: VisitorBrand | null;
 }) {
   const active = useRef(true);
   useEffect(() => {
@@ -116,7 +120,7 @@ export default function BusinessPayment({
   const termsAvailable = request ? hasPaymentTerms(request) : false;
   const refundTerms = request ? paymentRefundTerms(request) : null;
   return (
-    <VisitorBookingShell siteName={businessName} wide>
+    <VisitorBookingShell siteName={businessName} wide brand={brand}>
       <div className={styles.split}>
         <section className={styles.description} aria-label="Payment details">
           <h1 className={visitor.title}>{title}</h1>

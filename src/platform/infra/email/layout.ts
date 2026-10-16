@@ -124,6 +124,8 @@ export interface EmailOptions {
   decisions?: EmailDecision[];
   /** Optional label/value table (lead details, receipts). Values auto-escaped. */
   rows?: EmailRow[];
+  /** Customer mail: times the reader can pick, each its own link (an inquiry's suggested times). */
+  choices?: { label?: string; items: EmailButton[] };
   /** Optional primary call-to-action button. */
   button?: EmailButton;
   /** Optional secondary action, rendered as an outline pill under the primary
@@ -315,6 +317,11 @@ export function renderEmailText(opts: EmailOptions): string {
   }
   if (opts.rows) for (const r of opts.rows) parts.push(`${r.label}: ${r.value}`);
   if (opts.rows && opts.rows.length) parts.push("");
+  if (opts.choices?.items.length) {
+    if (opts.choices.label) parts.push(opts.choices.label);
+    for (const item of opts.choices.items) parts.push(`${item.label}: ${item.url}`);
+    parts.push("");
+  }
   if (opts.button) parts.push(`${opts.button.label}: ${opts.button.url}`, "");
   if (opts.secondaryButton) parts.push(`${opts.secondaryButton.label}: ${opts.secondaryButton.url}`, "");
   if (opts.footerNote) parts.push(opts.footerNote);

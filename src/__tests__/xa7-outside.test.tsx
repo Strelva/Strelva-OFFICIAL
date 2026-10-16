@@ -101,7 +101,8 @@ describe("XA · E1 and E3 emails (templates only)", () => {
     const html = renderXaMailHtml(mail);
     expect(html).toContain("Maya at North Studio prepared this for Harbor Dental. Nothing goes live until you say yes.");
     expect(html).toContain("harbordental.com/hours");
-    expect(html).toContain(">H</span>Harbor Dental</p>");
+    // The business is a plain wordmark, never an initial in a tile.
+    expect(html).toContain(">Harbor Dental</p>"); expect(html).not.toContain(">H</span>");
     expect(html).toContain("Review and say yes");
     expect(html.match(/border-radius:999px;"><a /g)).toHaveLength(1);
     expect(html).toContain('color-scheme" content="light"');
@@ -172,7 +173,7 @@ describe("XA · E4 the public booking page", () => {
     expect(render("expired-link")).toContain("This link expired");
     const requested = render("requested");
     expect(requested).toContain("Waiting on Harbor Dental");
-    expect(requested).toContain("New-patient exam, Wednesday, Nov 25 at 10:30 AM Eastern. Harbor Dental will reply to your email.");
+    expect(requested).toContain("New-patient exam, Tuesday, Nov 24 at 9:15 AM Eastern. Harbor Dental will reply to your email.");
     expect(requested).not.toContain("<dl");
     expect(render("held")).not.toContain("<form");
     for (const state of ["empty", "error", "expired-link", "requested", "held", "confirmed"]) expect(clean(render(state))).toEqual([]);

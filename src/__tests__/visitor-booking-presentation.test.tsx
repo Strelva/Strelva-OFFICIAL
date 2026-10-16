@@ -42,7 +42,7 @@ describe("visitor presentation preserves explicit booking actions", () => {
     vi.useFakeTimers(); vi.setSystemTime(new Date("2026-11-06T13:55:00Z"));
     const offer = { serviceId: "service", serviceName: "Consultation", services: [], timeZone: "America/New_York", chooseUrl: "/fictional", expiresAt: "2026-11-07T00:00:00Z", slots: [] };
     const render = (status: "held" | "requested" | "confirmed") => renderToStaticMarkup(createElement(InquiryBookingChoice, { now: Date.now(), businessName: "Lakeview Yoga", choice: { offer, booking: parseStoreBooking({ id: "fictional", status, serviceName: "Consultation", start: "2026-11-06T15:00:00Z", end: "2026-11-06T15:30:00Z", timeZone: "America/New_York", createdAt: "2026-11-06T13:50:00Z" }) }, actionUrl: "/fictional/action" }));
-    expect(render("held")).toContain("Check your email to confirm"); expect(render("held")).toContain("Confirm by Friday, Nov 6 at 9:05 AM."); expect(render("held")).toContain("10:00 AM Eastern."); expect(render("held")).not.toContain("<form");
+    expect(render("held")).toContain("Check your email to confirm"); expect(render("held")).toContain("Confirm by 9:05 AM today."); expect(render("held")).toContain("10:00 AM Eastern."); expect(render("held")).not.toContain("<form");
     expect(render("requested")).toContain("Waiting on Lakeview Yoga"); expect(render("requested")).not.toContain("Confirm by");
     expect(render("confirmed")).toContain("Confirmed"); expect(render("confirmed")).toContain("change or cancel");
     vi.setSystemTime(new Date("2026-11-06T14:06:00Z")); expect(render("held")).toContain("Confirmation time expired");
@@ -55,15 +55,17 @@ describe("visitor presentation preserves explicit booking actions", () => {
   });
   it("puts readable deadlines in their own spaced paragraph and gives each offered time one zone", () => {
     const offer = { businessName: "Lakeview Yoga", id: "fixture", serviceId: "service", serviceName: "Consultation", timeZone: "America/New_York", slots: [{ start: "2026-11-06T14:00:00Z", end: "2026-11-06T14:30:00Z" }], expiresAt: "2026-11-05T14:00:00Z", url: "/fictional", token: "fixture", booked: false };
-    const html = renderToStaticMarkup(createElement(InquiryBookingOffer, { offer, actionUrl: "/fictional/action" }));
-    expect(html).toContain(`<p class="${styles.deadline}">Choose by Thursday, Nov 5, 2026, 9:00 AM Eastern Time.</p>`);
+    const html = renderToStaticMarkup(createElement(InquiryBookingOffer, { offer, actionUrl: "/fictional/action", now: Date.parse("2026-11-04T12:00:00Z") }));
+    // One deadline form on every visitor page: the week names the zone, the year only when it is not this one.
+    expect(html).toContain(`<p class="${styles.deadline}">Choose by Thursday, Nov 5 at 9:00 AM.</p>`);
     expect(html).toContain("Friday, Nov 6, 2026, 9:00 AM Eastern Time");
     expect(html).not.toContain("America/New_York");
     expect(html).not.toContain(" EST");
     const deadlineStyle = readFileSync("src/experience/bookings/visitor.module.css", "utf8").match(/\.deadline\s*\{([^}]+)\}/)?.[1];
     expect(deadlineStyle).toContain("display: block");
     expect(deadlineStyle).toContain("margin: 16px 0");
-    expect(bookingOfferEmailOptions(offer).rows?.[0]?.value).toBe("Friday, Nov 6, 2026, 9:00 AM Eastern Time");
+    const mail = bookingOfferEmailOptions(offer);
+    expect(mail.choices?.items[0]).toEqual({ label: "Friday, Nov 6, 2026, 9:00 AM Eastern Time", url: "/fictional?pick=2026-11-06T14%3A00%3A00Z" });
   });
   it("keeps pending separate from confirmation and preserves exact native POST fields", () => {
     const html = renderManage(ready);

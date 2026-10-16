@@ -61,7 +61,7 @@ export async function POST(request: Request) {
         const visitorBrand = visitorBrandForMail(await readVisitorBrand(input.tenantId).catch(() => null));
         const sent = await sendEmailWithReceipt({ authorship: "business", businessName, fromName: businessName, audience: "customer", tenantId: input.tenantId, to: inquiry.email,
           fromAddress: "bookings@mail.strelva.com", subject: `Suggested times: ${offer.serviceName}`,
-          idempotencyKey: `inquiry-offer:${offer.id}`, options: { heading: "Choose a time to request", paragraphs: ["The business suggested these times. Choose one to request it. The business will confirm your request."], ...bookingOfferEmailOptions(offer), ...(visitorBrand ? { visitorBrand } : {}) } });
+          idempotencyKey: `inquiry-offer:${offer.id}`, options: { heading: "Pick a time that works", paragraphs: [`${businessName} suggested these times. Tap one to request it, and ${businessName} will confirm it.`], ...bookingOfferEmailOptions(offer), ...(visitorBrand ? { visitorBrand } : {}) } });
         delivery = sent.status === "suppressed" && sent.reason === "business_identity_unavailable" ? "identity_held" : sent.status;
       } catch { delivery = "unavailable"; }
     }

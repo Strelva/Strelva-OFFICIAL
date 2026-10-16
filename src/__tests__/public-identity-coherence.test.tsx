@@ -39,14 +39,15 @@ describe("token-verified public identity", () => {
   it("renders a readable zoned time and the recorded confirmation deadline", async () => {
     m.rpc.mockResolvedValue({ ...identity, timeZone: "America/New_York", expiresAt: "2026-11-06T12:15:00Z" });
     const html = await confirmation();
-    expect(html).toContain("7:00 AM</span><span"); expect(html).toContain("Eastern Time"); expect(html).toContain("Confirm by Friday, Nov 6, 2026, 7:15 AM Eastern Time");
+    expect(html).toContain("7:00 AM</span><span"); expect(html).toContain("Eastern Time"); expect(html).toContain("Confirm by Friday, Nov 6 at 7:15 AM");
     expect(html).not.toContain("2026-11-06T12:00");
     expect(html).not.toContain("America/New_York");
-    expect(html).toContain(`<p class="${styles.deadline}">Confirm by Friday, Nov 6, 2026, 7:15 AM Eastern Time.</p>`);
+    // The same deadline form as every visitor page: the time above names the zone.
+    expect(html).toContain(`<p class="${styles.deadline}">Confirm by Friday, Nov 6 at 7:15 AM.</p>`);
   });
   it("holds a consumed but unplaced outcome for a read rather than offering another placement", async () => {
     m.rpc.mockResolvedValue({ ...identity, state: "confirming" });
-    const html = await confirmation(); expect(html).toContain("Outcome not confirmed"); expect(html).toContain("Read current status"); expect(html).not.toContain("<form");
+    const html = await confirmation(); expect(html).toContain("Outcome not confirmed"); expect(html).toContain("See where my booking stands"); expect(html).not.toContain("<form");
   });
   it("names and escapes the newsletter business on a read-only GET and successful POST", async () => {
     const request = new Request("https://example.test/api/newsletter/unsubscribe?token=fixture");

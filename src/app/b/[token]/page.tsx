@@ -5,6 +5,7 @@ import { bookingManagePageEnabled } from "@/platform/bookings/flags";
 import { loadManageState, type ManageBookingState } from "@/platform/bookings/manage";
 import { manageDeps } from "@/server/bookings/manage-server";
 import { readVisitorBrand } from "@/products/websites";
+import { readVisitorBusinessPhone } from "@/platform/bookings/visitor-phone";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Your booking", robots: { index: false, follow: false }, referrer: "no-referrer" };
@@ -22,11 +23,13 @@ export default async function ManageBookingPage({ params, searchParams }: {
     state = await loadManageState(token, {
       done: typeof query.done === "string" ? query.done : null,
       error: typeof query.error === "string" ? query.error : null,
+      from: typeof query.from === "string" ? query.from : null,
     }, manageDeps());
   } catch (error) {
     console.error("[bookings] manage page read failed", error instanceof Error ? error.message : String(error));
     state = { kind: "error" };
   }
-  const brand = state.kind === "ready" || state.kind === "ended" ? await readVisitorBrand(state.tenantId) : null;
-  return <ManageBooking state={state} brand={brand} actionUrl={`/b/${encodeURIComponent(token)}/action`} />;
+  const tenantId = state.kind === "ready" || state.kind === "ended" ? state.tenantId : null;
+  const [brand, phone] = tenantId ? await Promise.all([readVisitorBrand(tenantId), readVisitorBusinessPhone(tenantId)]) : [null, null];
+  return <ManageBooking state={state} brand={brand} phone={phone} actionUrl={`/b/${encodeURIComponent(token)}/action`} />;
 }

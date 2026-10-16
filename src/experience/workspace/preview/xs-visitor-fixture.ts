@@ -15,7 +15,7 @@ import type { SiteLinkItem } from "@/components/public/SiteLinks";
 import type { StoreBooking } from "@/platform/bookings/store";
 import type { EmailOptions } from "@/platform/infra/email/layout";
 import { XA_HARBOR, XA_NORTH } from "./xa-day";
-import { visitorBrandFromSiteDocument, type VisitorBrand } from "@/products/websites/client";
+import { visitorBrandFromRecord, visitorBrandFromSiteDocument, type VisitorBrand } from "@/products/websites/client";
 
 export const HARBOR = { name: XA_HARBOR.name, doctor: XA_HARBOR.owner, street: XA_HARBOR.address, city: "Buffalo", region: "NY", phone: "(716) 555-0142", email: "hello@harbordental.example.test", zone: "America/New_York" } as const;
 export const PREVIEW_NOW = Date.parse("2026-11-20T14:05:00Z");
@@ -67,14 +67,28 @@ export const harborPosts: PublicBlogPost[] = [
 /**
  * Harbor Dental's own look on its visitor pages, read from its website the
  * way /b, /book-inquiry and /inquiry-booking read a real business's published
- * site. The photo stands in for the hero image a real site carries.
+ * site. Its only photo is 300 px wide, under MIN_VISITOR_PHOTO_WIDTH, so the
+ * pages leave it out rather than show it soft (the same rule the live read
+ * applies to a site's hero image).
  * ?brand=none on a preview shows the unbranded fallback.
  */
-export const harborBrand: VisitorBrand = {
-  ...visitorBrandFromSiteDocument(harborSite, "https://harbordental.example.test"),
-  photo: { url: "/xa/photo-dentist.webp", alt: "Dr. Lin with a patient in the Elmwood office" },
+export const harborBrand: VisitorBrand = visitorBrandFromSiteDocument(harborSite, "https://harbordental.example.test");
+
+/**
+ * A second fictional business for logo and type coverage: Hertel Barbers, an
+ * older-model site whose theme records Fraunces headings, Work Sans body and a
+ * rust accent, with its wordmark logo. ?brand=hertel on a preview.
+ */
+export const HERTEL = { name: "Hertel Barbers", phone: "(716) 555-0199", service: "Haircut and beard trim", length: "45 min", website: "https://hertelbarbers.example.test" } as const;
+export const hertelBrand: VisitorBrand = {
+  ...visitorBrandFromRecord({ accent: "#8a3b1c", type: { display: "Fraunces", body: "Work_Sans" }, website: HERTEL.website })!,
+  logo: { url: "/xa/fixture-logo-hertel.png", alt: HERTEL.name },
 };
-export const previewBrand = (brand?: string): VisitorBrand | null => brand === "none" ? null : harborBrand;
+export const previewBrand = (brand?: string): VisitorBrand | null => brand === "none" ? null : brand === "hertel" ? hertelBrand : harborBrand;
+/** Who a preview speaks for: Harbor Dental, or Hertel Barbers with ?brand=hertel. */
+export const previewBusiness = (brand?: string) => brand === "hertel"
+  ? { name: HERTEL.name, phone: HERTEL.phone, service: HERTEL.service, length: HERTEL.length }
+  : { name: HARBOR.name, phone: HARBOR.phone, service: "New-patient exam with Dr. Lin", length: "60 min" };
 
 /* ---------- The business page (/biz) ---------- */
 
@@ -113,12 +127,28 @@ const days = [
   { day: "Monday, Nov 30", slots: [{ id: "s6", time: "8:00 AM" }, { id: "s7", time: "10:30 AM" }, { id: "s8", time: "2:00 PM" }, { id: "s9", time: "3:45 PM" }] },
 ];
 export const MANAGE_STATES = ["confirmed", "pending", "held", "rescheduled", "cancelled", "changes-closed", "slots-unavailable", "no-slots", "error-notice", "agent", "ended", "not-found", "load-error"] as const;
-export function manageState(state: string): ManageBookingState {
+/** The slot a reschedule picked, as its day and time ("Saturday, November 28", "9:00 AM"). */
+function pickedSlot(slotId?: string): { day: string; time: string; id: string } | null {
+  for (const d of days) for (const slot of d.slots) if (slot.id === slotId) return { day: d.day.replace(/Nov\b/, "November"), time: slot.time, id: slot.id };
+  return null;
+}
+export function manageState(state: string, opts: { slot?: string; brand?: string } = {}): ManageBookingState {
+  const biz = previewBusiness(opts.brand);
+  const named = { ...booking, siteName: biz.name, title: biz.service };
+  const view = manageStateFor(state, named, opts.slot);
+  return view;
+}
+function manageStateFor(state: string, booking: ManagedBookingView, slot?: string): ManageBookingState {
   const ready = { kind: "ready" as const, booking, days, slotsUnavailable: false, changesClosed: false };
   switch (state) {
     case "pending": return { ...ready, booking: { ...booking, status: "pending" }, notice: "pending" };
     case "held": return { ...ready, booking: { ...booking, status: "held", confirmationRequired: true } };
-    case "rescheduled": return { ...ready, booking: { ...booking, day: "Saturday, November 28", time: "9:00 AM" }, notice: "rescheduled" };
+    case "rescheduled": {
+      // The time the visitor picked becomes the booking; the time it left is open again, so Undo can go back to it.
+      const moved = pickedSlot(slot) ?? { day: "Saturday, November 28", time: "9:00 AM", id: "s4" };
+      const freed = [{ day: "Tuesday, Nov 24", slots: [{ id: "s0", time: "9:15 AM" }] }, ...days].map(d => ({ ...d, slots: d.slots.filter(item => item.id !== moved.id) })).filter(d => d.slots.length);
+      return { ...ready, booking: { ...booking, day: moved.day, time: moved.time }, days: freed, notice: "rescheduled", undo: { slotId: "s0", label: "Tue, Nov 24, 9:15 AM" } };
+    }
     case "cancelled": return { ...ready, booking: { ...booking, status: "cancelled" }, notice: "cancelled" };
     case "changes-closed": return { ...ready, changesClosed: true };
     case "slots-unavailable": return { ...ready, days: [], slotsUnavailable: true };
@@ -135,8 +165,8 @@ export function manageState(state: string): ManageBookingState {
 /* ---------- Email confirmation (/booking-confirm/[token]) ---------- */
 
 export const CONFIRM_STATES = ["held", "confirming", "requested", "confirmed", "cancelled", "failed", "rate"] as const;
-export function confirmState(state: string): { identity: VisitorConfirmationView | null; error: string | null } {
-  const identity: VisitorConfirmationView = { businessName: HARBOR.name, start: "2026-11-24T14:15:00Z", end: "2026-11-24T15:15:00Z", state: "held", bookingStatus: null, timeZone: HARBOR.zone, expiresAt: "2026-11-20T14:20:00Z" };
+export function confirmState(state: string, brand?: string): { identity: VisitorConfirmationView | null; error: string | null } {
+  const identity: VisitorConfirmationView = { businessName: previewBusiness(brand).name, start: "2026-11-24T14:15:00Z", end: "2026-11-24T15:15:00Z", state: "held", bookingStatus: null, timeZone: HARBOR.zone, expiresAt: "2026-11-20T14:20:00Z" };
   switch (state) {
     case "confirming": return { identity: { ...identity, state: "confirming" }, error: null };
     case "requested": return { identity: { ...identity, state: "placed", bookingStatus: "requested" }, error: null };
@@ -153,15 +183,25 @@ export function confirmState(state: string): { identity: VisitorConfirmationView
 const slot = (iso: string) => ({ start: iso, end: new Date(Date.parse(iso) + 3_600_000).toISOString() });
 export const harborOfferSlots = ["2026-11-23T13:00:00Z", "2026-11-23T15:30:00Z", "2026-11-24T14:15:00Z", "2026-11-24T18:30:00Z", "2026-11-25T13:30:00Z", "2026-11-28T14:00:00Z", "2026-11-28T16:00:00Z"].map(slot);
 export const OFFER_STATES = ["choose", "empty", "error", "gone", "unavailable", "held", "requested", "confirmed", "expired", "unknown"] as const;
-export function offerState(state: string): { offer: InquiryBookingOffer | null; receipt: InquiryReceipt | null; error: boolean; unavailable: boolean } {
-  const offer = { businessName: HARBOR.name, id: "fixture", serviceId: "exam", serviceName: "New-patient exam · 60 min", timeZone: HARBOR.zone, slots: harborOfferSlots, expiresAt: "2026-11-22T23:00:00Z", url: "#", token: "fixture", booked: false, closedDays: [{ date: "2026-11-26", label: "Thanksgiving" }, { date: "2026-11-27", label: "Thanksgiving" }] } as unknown as InquiryBookingOffer;
-  const receipt = (status: InquiryReceipt["status"], confirmUntil: string | null = null): InquiryReceipt => ({ status, start: "2026-11-24T14:15:00Z", timeZone: HARBOR.zone, confirmUntil });
+/**
+ * One timeline for every visitor fixture: it is Friday, Nov 20 at 9:05 AM
+ * Eastern (PREVIEW_NOW). The offered times are open until Sunday, Nov 22 at
+ * 8:00 PM (the same deadline as E4); a time requested now is held for 15
+ * minutes, so it must be confirmed by 9:20 AM today.
+ */
+export const OFFER_EXPIRES = "2026-11-23T01:00:00Z";
+export const HOLD_UNTIL = "2026-11-20T14:20:00Z";
+export function offerState(state: string, opts: { start?: string; brand?: string } = {}): { offer: InquiryBookingOffer | null; receipt: InquiryReceipt | null; error: boolean; unavailable: boolean } {
+  const biz = previewBusiness(opts.brand);
+  const picked = opts.start && harborOfferSlots.some(item => Date.parse(item.start) === Date.parse(opts.start!)) ? new Date(opts.start).toISOString() : "2026-11-24T14:15:00Z";
+  const offer = { businessName: biz.name, id: "fixture", serviceId: "exam", serviceName: `${biz.service.replace(/ with Dr\. Lin$/, "")} · ${biz.length}`, timeZone: HARBOR.zone, slots: harborOfferSlots, expiresAt: OFFER_EXPIRES, url: "#", token: "fixture", booked: false, closedDays: [{ date: "2026-11-26", label: "Thanksgiving" }, { date: "2026-11-27", label: "Thanksgiving" }] } as unknown as InquiryBookingOffer;
+  const receipt = (status: InquiryReceipt["status"], confirmUntil: string | null = null): InquiryReceipt => ({ status, start: picked, timeZone: HARBOR.zone, confirmUntil });
   switch (state) {
     case "empty": return { offer: { ...offer, slots: [] }, receipt: null, error: false, unavailable: false };
     case "error": return { offer, receipt: null, error: true, unavailable: false };
     case "gone": return { offer: null, receipt: null, error: false, unavailable: false };
     case "unavailable": return { offer: null, receipt: null, error: false, unavailable: true };
-    case "held": return { offer: { ...offer, booked: true }, receipt: receipt("held", "2026-11-20T14:20:00Z"), error: false, unavailable: false };
+    case "held": return { offer: { ...offer, booked: true }, receipt: receipt("held", HOLD_UNTIL), error: false, unavailable: false };
     case "expired": return { offer: { ...offer, booked: true }, receipt: receipt("held", "2026-11-20T13:50:00Z"), error: false, unavailable: false };
     case "requested": return { offer: { ...offer, booked: true }, receipt: receipt("requested"), error: false, unavailable: false };
     case "confirmed": return { offer: { ...offer, booked: true }, receipt: receipt("confirmed"), error: false, unavailable: false };
@@ -182,11 +222,12 @@ export const previewBooking = store;
 const options = (o: EmailOptions): EmailOptions => ({ businessName: HARBOR.name, ...o });
 /** Customer emails whose HTML comes from the generic visitor mapping (their options are unchanged). */
 export const genericVisitorEmails: Record<string, EmailOptions> = {
-  "inquiry-reply": options({ heading: "We received your message", preheader: "We received your message for Harbor Dental", paragraphs: ["Hi Jordan, Harbor Dental received your message. Someone will review it and follow up as soon as they can.", "This is an automatic confirmation from Harbor Dental."], rows: [{ label: "Your message", value: "Do you see new patients on Saturdays? I have a cracked filling." }], footerNote: "Automatic reply · from Harbor Dental" }),
-  "inquiry-offer": options({ heading: "We received your message", paragraphs: ["Hi Jordan, Harbor Dental received your message. Someone will review it and follow up as soon as they can.", "This is an automatic confirmation from Harbor Dental."], rows: [{ label: "Your message", value: "Do you see new patients on Saturdays?" }, { label: "Request a time", value: "Sat, Nov 28, 9:00 AM" }, { label: "Request a time", value: "Sat, Nov 28, 11:00 AM" }], button: { label: "Choose a time", url: "/preview/strelva/xa/xs-visitor/offer" }, footerNote: "Choosing a time requests an appointment; the business must confirm. Automatic reply · from Harbor Dental" }),
-  "inquiry-follow": options({ heading: "Checking in", paragraphs: ["Hi Jordan, we are checking in about your message to Harbor Dental. If you still need help, reply to this email and we will take it from there.", "This is an automatic follow-up from Harbor Dental."], footerNote: "Automatic follow-up · from Harbor Dental" }),
+  "inquiry-reply": options({ heading: "We received your message", preheader: "We received your message for Harbor Dental", paragraphs: ["Hi Jordan, Harbor Dental received your message. Someone will review it and follow up as soon as they can."], rows: [{ label: "Your message", value: "Do you see new patients on Saturdays? I have a cracked filling." }], footerNote: "This is an automatic reply from Harbor Dental." }),
+  // What createInquiryDeliveryMessage builds for a message with suggested times: each time its own link.
+  "inquiry-offer": options({ heading: "Pick a time that works", preheader: "Pick a time with Harbor Dental", paragraphs: ["Hi Jordan, Harbor Dental got your message. Tap a time to request it, and Harbor Dental will confirm it or suggest another."], rows: [{ label: "Your message", value: "Do you see new patients on Saturdays?" }], choices: { items: [{ label: "Sat, Nov 28, 9:00 AM Eastern Time", url: "/preview/strelva/xa/xs-visitor/offer?pick=2026-11-28T14:00:00.000Z" }, { label: "Sat, Nov 28, 11:00 AM Eastern Time", url: "/preview/strelva/xa/xs-visitor/offer?pick=2026-11-28T16:00:00.000Z" }] }, button: { label: "See all open times", url: "/preview/strelva/xa/xs-visitor/offer" }, footerNote: "This is an automatic reply from Harbor Dental." }),
+  "inquiry-follow": options({ heading: "Checking in", paragraphs: ["Hi Jordan, we are checking in about your message to Harbor Dental. If you still need help, reply to this email and we will take it from there."], footerNote: "This is an automatic follow-up from Harbor Dental." }),
   "authored-reply": options({ heading: "A reply from your business", paragraphs: ["Hi Jordan, yes, Dr. Lin sees new patients on Saturdays from 9 to 1. The 9:00 on Nov 28 is open; pick it from the link we sent and we'll confirm the same day."], footerNote: "Automatic reply · from Harbor Dental" }),
-  "confirm-request": options({ heading: "Confirm your booking request with Harbor Dental", rows: [{ label: "Requested time", value: "Tuesday, Nov 24, 2026, 9:15 AM Eastern Time" }, { label: "Confirm by", value: "Friday, Nov 20, 2026, 9:20 AM Eastern Time" }], paragraphs: ["Check your email to confirm. Nothing is booked until you confirm your email. The business may then need to accept your request."], button: { label: "Review and confirm", url: "/preview/strelva/xa/xs-visitor/confirm" } }),
+  "confirm-request": options({ heading: "Confirm your booking request with Harbor Dental", rows: [{ label: "Requested time", value: "Tuesday, Nov 24 at 9:15 AM Eastern Time" }, { label: "Confirm by", value: "Friday, Nov 20 at 9:20 AM Eastern Time" }], paragraphs: ["Check your email to confirm. Nothing is booked until you confirm your email. The business may then need to accept your request."], button: { label: "Review and confirm", url: "/preview/strelva/xa/xs-visitor/confirm" } }),
 };
 
 export const newsletterIssue = {

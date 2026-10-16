@@ -1,8 +1,14 @@
 import type { CSSProperties, ReactNode } from "react";
 import { visitorBrandStyle, type VisitorBrand } from "@/products/websites/client";
 import styles from "./visitor.module.css";
+import { visitorTypeStyle } from "./visitor-fonts";
 
-const telHref = (phone: string) => `tel:${phone.replace(/[^0-9+]/g, "")}`;
+export const telHref = (phone: string) => `tel:${phone.replace(/[^0-9+]/g, "")}`;
+
+/** "Call Harbor Dental at (716) 555-0142": the one way to reach a person when a page brings bad news. */
+export function VisitorCall({ name, phone, lead = "Call" }: { name?: string | null; phone: string; lead?: string }) {
+  return <a className={styles.call} href={telHref(phone)}>{lead} {name?.trim() || "the office"} at <span className={styles.nowrap}>{phone}</span></a>;
+}
 
 /**
  * The visitor's page is the business's page: its logo or name heads it, its
@@ -29,7 +35,7 @@ export function VisitorBookingShell({ children, siteName, navigation, wide = fal
   const mark = brand?.logo ? <img className={styles.logo} src={brand.logo.url} alt={name || brand.logo.alt} /> : name ? <span>{name}</span> : null;
   const home = mark && brand?.website ? <a className={styles.brandLink} href={brand.website}>{mark}</a> : mark;
   const call = phone?.trim() ? <a className={styles.headerCall} href={telHref(phone)} aria-label={`Call ${name || "the business"} at ${phone}`}>{phone}</a> : null;
-  return <main className={styles.shell} style={visitorBrandStyle(brand) as CSSProperties} data-branded={brand ? true : undefined}><div className={wide ? styles.wide : styles.column}>
+  return <main className={styles.shell} style={{ ...visitorBrandStyle(brand), ...visitorTypeStyle(brand?.type) } as CSSProperties} data-branded={brand ? true : undefined}><div className={wide ? styles.wide : styles.column}>
     {/* An unknown business is left unnamed rather than labeled "unavailable": the page's sentence says what happened. */}
     {name || reading || navigation || brand?.logo ? <header className={styles.header}>
       {reading && !name ? <span className={`${styles.skeleton} ${styles.brandHold}`} aria-hidden="true" /> : home ? <p className={styles.brand}>{home}</p> : null}

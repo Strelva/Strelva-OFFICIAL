@@ -202,9 +202,33 @@ item on a phone, `&prospect=<id>` picks a check result).
   (`@/products/websites`, lives in `hosted-public.tsx`) is the server read;
   any failure is no brand. `/b`, `/book-inquiry` and `/inquiry-booking` pass it.
   `/booking-confirm` cannot yet: its confirmation read returns no tenant.
+  October 16 fixes: a hero photo is used only when its recorded width is at
+  least `MIN_VISITOR_PHOTO_WIDTH` (1136), never shown soft. `VisitorBrand.type`
+  carries the site's type: the native renderer's display weight (400), or an
+  older site's saved theme faces (`VISITOR_FONTS`, read with
+  `getStoredContent("theme")`), loaded by `visitor-fonts.ts` (next/font, no
+  preload) and set as `--visitor-display` / `--visitor-font`.
+  `visitorBrandFromRecord` builds a brand from an accent and/or type.
+  `readVisitorBrandForWorkspace` reads the one linked tenant's brand
+  (`/pay/business`). `readVisitorBusinessPhone` (platform/bookings) gives the
+  header phone on `/b` and `/book-inquiry`.
 - **VisitorBookingShell** takes `brand` and `phone`: the logo or name links to
   the business's site, the phone is a tap-to-call link, and "Runs on Strelva"
-  is one quiet line under every visitor page.
+  is one quiet line under every visitor page. `VisitorCall` is the one
+  "Call {business} at {phone}" link bad news ends with. Every visitor page
+  (E4, offer, manage, confirm, held and bad-news states) passes the phone.
+- **Deadlines:** `visitorDeadlineWords(iso, zone, now)` is the one form:
+  "Sunday, Nov 22 at 8:00 PM", "9:20 AM today", the year only when it differs.
+- **Closed days:** the week says "Closed" in the chip and the reason as a
+  caption under it, so narrow columns never clip.
+- **Manage after a live act:** a move headlines "Moved to {day}" and offers
+  "Go back to {old time}" (a plain reschedule post, `undo` on the ready state,
+  only while the old slot is still open; the action route passes `from`). A
+  cancel has no server reversal: the page gives "Book another time" (the
+  business's site) and "Changed your mind? Call …".
+- **Picked from email:** `?pick=ISO` on `/book-inquiry` and `?slot=N` on
+  `/inquiry-booking` check that time on load (the visitor still presses
+  Request); the suggested-times emails link each time this way.
 - **Choosing a time (E4):** `InquiryBookingChoice` and `InquiryBookingOffer`
   render the business's booking page: the sentence on the left (plus the
   site's hero photo at 960 and wider), the service and week as one card on
@@ -214,13 +238,19 @@ item on a phone, `&prospect=<id>` picks a check result).
   focus moves to the first time; the picked time is said back. Without
   JavaScript the routes answer an empty pick with `?error=pick`.
 - **Visitor mail:** `XaMail.brand` / `EmailOptions.visitorBrand` put the
-  business's accent on the button, links and initial (and its logo when it is
-  https). Wired for the suggested-times email; other customer senders still
-  render XA ink until they pass a brand.
+  business's accent on the button and links. The business heads the mail as
+  its logo (https, 32 px high) or its name as a plain wordmark in its accent:
+  never an initial in a tile. The one send path (`send.ts`) asks the
+  `visitor-brand-port` reader (registered at the app edge) for every
+  business-authored customer email that has no brand yet, so every visitor
+  sender is branded. `EmailOptions.choices` renders suggested times as one
+  hairline list of links.
 - **Payer, after paying:** [PaidNote](../../src/app/pay/[slug]/PaidNote.tsx)
   replaces the receipt sheet on `/pay/[slug]/receipt` with one sentence, the
-  reference line and Print. `PublicMoneyPage` fills the pay button with the
-  charging business's recorded accent.
+  one "Reference …" line and a quiet Print link. `PublicMoneyPage` fills the
+  pay button, links and name with the charging business's recorded accent;
+  "Runs on Strelva" (plus an optional `credit` fact) sits under the page, not
+  in the card, and a single column lines up with the header.
 
 ### xs-visitor · What a business's visitors see (local, branch xa/lane-xs-visitor)
 

@@ -152,8 +152,11 @@ describe("inquiry to requested booking", () => {
     const route = { tenantId: "site", customerEmail: inquiry.email, ownerEmail: null, businessName: "Mooney Firm", source: "fixture" } as never;
     const plain = createInquiryDeliveryMessage(inquiry, route, "reply")!;
     const proposed = createInquiryDeliveryMessage({ ...inquiry, bookingOffer: offer }, route, "reply")!;
-    expect(renderInquiryMessage(proposed).text).toContain("business must confirm");
-    expect(renderInquiryMessage(proposed).text).toContain("Choose a time");
+    expect(renderInquiryMessage(proposed).text).toContain("Mooney Firm will confirm it or suggest another");
+    expect(renderInquiryMessage(proposed).text).toContain("Pick a time that works");
+    // Each offered time is its own link, not a "Request a time" row.
+    expect(renderInquiryMessage(proposed).text).toMatch(/: \S*\/inquiry-booking\/[^?\s]+\?slot=0/);
+    expect(renderInquiryMessage(proposed).text).not.toContain("Request a time");
     expect(getInquiryDeliveryMessageDigest(proposed)).not.toEqual(getInquiryDeliveryMessageDigest(plain));
     expect(getInquiryDeliveryMessageDigest(proposed)).toEqual(getInquiryDeliveryMessageDigest(createInquiryDeliveryMessage({ ...inquiry, bookingOffer: offer }, route, "reply")!));
   });

@@ -56,13 +56,22 @@ export const E4_CLOSURES = [{ date: "2026-11-26", label: "Thanksgiving" }, { dat
 const at = (day: number, time: string) => `2026-11-${String(day).padStart(2, "0")}T${time}:00-05:00`;
 export const SLOT_STARTS = [at(23, "08:00"), at(23, "10:30"), at(23, "14:00"), at(24, "09:15"), at(24, "13:30"), at(24, "15:45"), at(25, "08:30"), at(25, "11:00"), at(25, "14:15"), at(28, "09:00"), at(28, "11:00")];
 
-export function e4Choice(state: string): InquiryBookingChoice | null {
+/**
+ * `slot` is the index the visitor posted (the preview's act route carries it
+ * back), so the held page says back the time that was picked. The hold starts
+ * at the fixture's now (Fri Nov 20, 9:05 AM) and runs 15 minutes, to 9:20 AM;
+ * the times themselves are offered until Sunday, Nov 22 at 8:00 PM.
+ */
+export function e4Choice(state: string, slot?: string | number, business?: { name: string; phone: string; service: string; length: string }): InquiryBookingChoice | null {
   if (state === "expired-link" || state === "error") return null;
+  const index = Number(slot);
+  const start = Number.isInteger(index) && SLOT_STARTS[index] ? SLOT_STARTS[index]! : at(24, "09:15");
   const slots = state === "empty" ? [] : SLOT_STARTS.map(start => ({ start, end: new Date(Date.parse(start) + 3_600_000).toISOString(), label: start, chooseUrl: "#" }));
-  const offer = { serviceId: "exam", services: [{ id: "exam", name: "New-patient exam", durationMinutes: 60 }], serviceName: "New-patient exam · 60 min", timeZone: HARBOR.timeZone, chooseUrl: "#", expiresAt: at(22, "20:00"), slots };
+  const serviceName = business ? business.service.replace(/ with Dr\. Lin$/, "") : "New-patient exam";
+  const offer = { serviceId: "exam", services: [{ id: "exam", name: serviceName, durationMinutes: 60 }], serviceName: `${serviceName} · ${business?.length ?? "60 min"}`, timeZone: HARBOR.timeZone, chooseUrl: "#", expiresAt: at(22, "20:00"), slots };
   const status = state === "held" || state === "requested" || state === "confirmed" ? state : null;
-  const booking = status ? parseStoreBooking({ id: "fixture", status, serviceName: "New-patient exam", start: at(25, "10:30"), end: at(25, "11:30"), timeZone: HARBOR.timeZone, createdAt: "2026-11-20T14:00:00Z" }) : null;
-  return { businessName: HARBOR.business, offer, booking, businessPhone: HARBOR.phone, closures: E4_CLOSURES };
+  const booking = status ? parseStoreBooking({ id: "fixture", status, serviceName, start, end: new Date(Date.parse(start) + 3_600_000).toISOString(), timeZone: HARBOR.timeZone, createdAt: "2026-11-20T14:05:00Z" }) : null;
+  return { businessName: business?.name ?? HARBOR.business, offer, booking, businessPhone: business?.phone ?? HARBOR.phone, closures: E4_CLOSURES };
 }
 
 /* ---------- E5 · patient form ---------- */

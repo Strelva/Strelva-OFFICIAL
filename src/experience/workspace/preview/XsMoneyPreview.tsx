@@ -38,6 +38,7 @@ import { PaymentsScreen } from "@/app/workspace/payments/PaymentsScreen";
 import { ConnectedPayLink } from "@/app/pay/[slug]/ConnectedPayLink";
 import { PaidNote } from "@/app/pay/[slug]/PaidNote";
 import BusinessPayment from "@/app/pay/business/BusinessPayment";
+import { harborBrand } from "./xs-visitor-fixture";
 import CreatorMaintenance from "@/app/workspace/creator-maintenance/CreatorMaintenance";
 import ReviewQueue from "@/app/workspace/money-reconciliation/ReviewQueue";
 import { businessDepositFixture } from "./deposit-fixture";
@@ -666,6 +667,7 @@ export function XsMoneyPreview({
           key={state}
           token={"0".repeat(64)}
           preview
+          brand={harborBrand}
           initialRequest={
             state === "paid"
               ? {

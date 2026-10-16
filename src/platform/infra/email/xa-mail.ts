@@ -95,20 +95,20 @@ function url(value: string): string {
   if (!["https:", "http:", "mailto:"].includes(parsed.protocol)) throw new Error("Unsafe email URL");
   return e(value);
 }
-/** The business's initial in a small ink tile, when it has no logo. Never Strelva's mark. */
 const HEX = /^#[0-9a-f]{6}$/i;
-/** The fill and label for the one button, the initial and links: the business's accent when it has one. */
+/** The fill and label for the one button and links: the business's accent when it has one. */
 function tone(brand?: XaMailBrand) {
   return brand && HEX.test(brand.accent) && HEX.test(brand.onAccent) ? { fill: brand.accent, on: brand.onAccent, link: brand.accent } : { fill: X.ink, on: X.onInk, link: X.moss };
 }
-const monogram = (name: string, brand?: XaMailBrand) => `<span style="display:inline-block;width:24px;height:24px;margin-right:8px;border-radius:7px;background:${tone(brand).fill};color:${tone(brand).on};font-size:13px;line-height:24px;font-weight:600;text-align:center;vertical-align:1px;">${e((name.trim().match(/[\p{L}\p{N}]/u)?.[0] ?? "?").toUpperCase())}</span>`;
 const table = (body: string, style = "", width = "100%") => `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="${width}" style="border-collapse:separate;${style}">${body}</table>`;
 const pill = (action: XaMailAction, block: boolean, brand?: XaMailBrand) => table(`<tr><td align="center" bgcolor="${tone(brand).fill}" style="background:${tone(brand).fill};border-radius:999px;"><a href="${url(action.url)}" style="display:block;padding:15px 28px;font-family:${X.font};font-size:17px;line-height:22px;font-weight:600;color:${tone(brand).on};text-decoration:none;border-radius:999px;">${e(action.label)}</a></td></tr>`, "", block ? "100%" : "");
 
 function block(b: XaMailBlock, brand?: XaMailBrand): string {
   switch (b.kind) {
+    // The business's own logo when it has one (its name as the alt), otherwise its name as a plain wordmark in its accent. Never a tile.
     case "identity": { const logo = b.logoUrl ?? brand?.logoUrl;
-      return `<p style="margin:0;font-size:16px;line-height:24px;font-weight:600;color:${X.text};">${logo ? `<img src="${url(logo)}" alt="" width="24" height="24" style="vertical-align:-6px;margin-right:8px;border:0;">` : monogram(b.business, brand)}${e(b.business)}</p>`; }
+      return logo ? `<p style="margin:0;line-height:0;"><img src="${url(logo)}" alt="${e(b.business)}" height="32" style="display:block;height:32px;width:auto;max-width:220px;border:0;"></p>`
+        : `<p style="margin:0;font-size:18px;line-height:24px;font-weight:600;letter-spacing:-0.2px;color:${brand ? tone(brand).link : X.text};">${e(b.business)}</p>`; }
     case "waits": return `<p style="margin:0;font-size:15px;line-height:22px;color:${X.need};"><span style="display:inline-block;width:7px;height:7px;margin-right:8px;border-radius:999px;background:${X.needDot};vertical-align:1px;"></span>${e(b.label)}</p>`;
     case "headline": return `<h1 style="margin:0;font-size:28px;line-height:34px;font-weight:600;letter-spacing:-0.6px;color:${X.text};overflow-wrap:anywhere;">${e(b.text)}</h1>${b.lede ? `<p style="margin:12px 0 0;font-size:16px;line-height:24px;color:${X.muted};">${e(b.lede)}</p>` : ""}`;
     case "page": return table(`<tr><td align="center" style="padding:10px 16px;background:${X.inset};border-bottom:1px solid ${X.line};border-radius:16px 16px 0 0;font-size:13px;line-height:18px;color:${X.muted};">${e(b.page.address)}</td></tr>

@@ -1,5 +1,5 @@
 "use client";
-import { useId, useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type FormEvent, type ReactNode } from "react";
 import styles from "./visitor.module.css";
 
 /**
@@ -11,7 +11,8 @@ import styles from "./visitor.module.css";
  * and the action route answers an empty pick with the same sentence.
  *
  * Each choice carries `data-picked`, the words said back ("Tuesday, Nov 24
- * at 9:15 AM"). Nothing here preselects a time.
+ * at 9:15 AM"). Nothing here preselects a time; a choice the page checks
+ * ahead (the time the visitor tapped in their email) is said back on load.
  */
 export function VisitorTimeForm({ action, name, submitLabel, children, hiddenFields, emptyMessage = "Pick a time first. Nothing is requested until you do.", tone = "primary", sticky = false, className }: {
   action: string;
@@ -29,7 +30,15 @@ export function VisitorTimeForm({ action, name, submitLabel, children, hiddenFie
   const id = useId();
   const [picked, setPicked] = useState<string | null>(null);
   const [missing, setMissing] = useState(false);
+  const form = useRef<HTMLFormElement>(null);
   const field = (form: HTMLFormElement) => Array.from(form.querySelectorAll<HTMLInputElement>("input[type=radio]")).filter(input => input.name === name);
+
+  useEffect(() => {
+    const checked = form.current ? field(form.current).find(input => input.checked) : undefined;
+    if (checked) setPicked(checked.dataset.picked || checked.getAttribute("aria-label"));
+    // Only the page's first render can carry a checked time.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   function change(event: FormEvent<HTMLFormElement>) {
     const target = event.target as HTMLInputElement;
@@ -46,7 +55,7 @@ export function VisitorTimeForm({ action, name, submitLabel, children, hiddenFie
     choices[0]?.focus();
   }
 
-  return <form action={action} method="post" noValidate onChange={change} onSubmit={submit} className={className} aria-describedby={missing ? `${id}-missing` : undefined}>
+  return <form ref={form} action={action} method="post" noValidate onChange={change} onSubmit={submit} className={className} aria-describedby={missing ? `${id}-missing` : undefined}>
     {hiddenFields ? Object.entries(hiddenFields).map(([key, value]) => <input key={key} type="hidden" name={key} value={value} />) : null}
     {children}
     <div className={`${styles.submitRow} ${sticky ? styles.sticky : ""}`}>

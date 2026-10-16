@@ -13,7 +13,9 @@ import { readHostedBusinessFacts } from "./business-facts-server";
 import { isSitesPathHost } from "@/platform/infra/brand";
 import { websiteDocumentStore } from "./document-store";
 import { websiteRebuildReleaseEnabledForTenant } from "./rebuild-release";
-import { visitorBrandFromAccent, visitorBrandFromSiteDocument, type VisitorBrand } from "./visitor-brand";
+import { getStoredContent } from "@/lib/storage";
+import { getSupabase } from "@/platform/infra/db/client";
+import { visitorBrandFromRecord, visitorBrandFromSiteDocument, visitorTypeFromTheme, type VisitorBrand } from "./visitor-brand";
 
 export const getHostedSite = cache(async () => {
   const requestHeaders = await headers();
@@ -81,7 +83,30 @@ export async function readVisitorBrand(tenantId: string | null | undefined): Pro
     ]);
     if (document) return visitorBrandFromSiteDocument(document, tenantCanonicalOrigin(tenantId, config));
     const own = config?.productionDomain || config?.siteUrl ? tenantCanonicalOrigin(tenantId, config) : null;
-    return visitorBrandFromAccent(config?.branding?.accentColor, own);
+    // An older site records its faces in its theme section; only a saved theme counts, never the template default.
+    const theme = await getStoredContent("theme", tenantId).catch(() => null);
+    return visitorBrandFromRecord({ accent: config?.branding?.accentColor, type: visitorTypeFromTheme(theme), website: own });
+  } catch {
+    return null;
+  }
+}
+
+const WORKSPACE_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+/**
+ * The same brand for a page that knows only the business's workspace (a
+ * business payment link): its one linked website tenant's look. No link, or
+ * more than one, is no brand. Read-only; any failure is no brand.
+ */
+export async function readVisitorBrandForWorkspace(workspaceId: string | null | undefined): Promise<VisitorBrand | null> {
+  if (!workspaceId || !WORKSPACE_ID.test(workspaceId)) return null;
+  try {
+    const db = getSupabase();
+    if (!db) return null;
+    const links = await db.from("tenant_workspace_links").select("tenant_stable_id").eq("workspace_id", workspaceId);
+    const ids = [...new Set((links.data ?? []).map(row => row.tenant_stable_id).filter((id): id is string => Boolean(id)))];
+    if (links.error || ids.length !== 1) return null;
+    const tenant = await db.from("tenants").select("id").eq("stable_id", ids[0]!).maybeSingle();
+    return tenant.error || !tenant.data?.id ? null : readVisitorBrand(tenant.data.id);
   } catch {
     return null;
   }

@@ -15,5 +15,5 @@ export default async function InquiryBookingPage({ params, searchParams }: { par
   let unavailable = false;
   try { choice = await loadInquiryBookingChoice(token); } catch { unavailable = true; }
   const brand = await readVisitorBrand(choice?.tenantId);
-  return <InquiryBookingChoice now={await readVisitorPresentationTime()} businessName={choice?.businessName} choice={choice} brand={brand} unavailable={unavailable} actionUrl={`/inquiry-booking/${encodeURIComponent(token)}/action`} error={typeof query.error === "string" ? query.error : undefined} />;
+  return <InquiryBookingChoice now={await readVisitorPresentationTime()} businessName={choice?.businessName} choice={choice} brand={brand} unavailable={unavailable} actionUrl={`/inquiry-booking/${encodeURIComponent(token)}/action`} error={typeof query.error === "string" ? query.error : undefined} pick={typeof query.slot === "string" ? query.slot : null} />;
 }

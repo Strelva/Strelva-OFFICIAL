@@ -7,6 +7,7 @@ import "@/lib/lenis";
 export function NewsletterSignup() {
   const sectionRef = useRef<HTMLElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
   const [email, setEmail] = useState("");
   const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [errorMsg, setErrorMsg] = useState("");
@@ -39,7 +40,13 @@ export function NewsletterSignup() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!email.trim()) return;
+    // The form is noValidate: a missing or incomplete email is said in a sentence and focus returns to the field.
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+      setStatus("error");
+      setErrorMsg(email.trim() ? "That email doesn't look complete. Check it and try again." : "Add your email to get updates.");
+      inputRef.current?.focus();
+      return;
+    }
 
     setStatus("loading");
     setErrorMsg("");
@@ -100,10 +107,14 @@ export function NewsletterSignup() {
               You&apos;re in! We&apos;ll keep you updated.
             </p>
           ) : (
-            <form data-newsletter-animate onSubmit={handleSubmit} className="flex flex-col sm:flex-row gap-3">
+            <form data-newsletter-animate onSubmit={handleSubmit} noValidate className="flex flex-col sm:flex-row gap-3">
               <input
+                ref={inputRef}
                 type="email"
-                required
+                aria-label="Email"
+                aria-required="true"
+                aria-invalid={status === "error" || undefined}
+                aria-describedby={status === "error" && errorMsg ? "newsletter-error" : undefined}
                 placeholder="your@email.com"
                 value={email}
                 onChange={(e) => {
@@ -135,6 +146,8 @@ export function NewsletterSignup() {
 
           {status === "error" && errorMsg && (
             <p
+              id="newsletter-error"
+              role="alert"
               className="text-xs mt-3"
               style={{ color: "#b54a4a" }}
             >

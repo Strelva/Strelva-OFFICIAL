@@ -109,28 +109,23 @@ export function createInquiryDeliveryMessage(
   const followUpTemplate = isFollowUp && inquiry.followUpMessageTemplate
     ? cleanSubjectText(inquiry.followUpMessageTemplate).replaceAll("{name}", name).slice(0, 2000)
     : "";
+  const offering = !isFollowUp && Boolean(inquiry.bookingOffer);
   const options: EmailOptions = {
     businessName: business,
-    preheader: isFollowUp ? `Following up with ${business}` : `We received your message for ${business}`,
-    heading: isFollowUp ? "Checking in" : "We received your message",
+    preheader: isFollowUp ? `Following up with ${business}` : offering ? `Pick a time with ${business}` : `We received your message for ${business}`,
+    // With times to pick, the headline is the next step; the lede says the message arrived, once.
+    heading: isFollowUp ? "Checking in" : offering ? "Pick a time that works" : "We received your message",
     paragraphs: isFollowUp
-      ? [
-          followUpTemplate || `Hi ${name}, we are checking in about your message to ${business}. If you still need help, reply to this email and we will take it from there.`,
-          `This is an automatic follow-up from ${business}.`,
-        ]
-      : [
-          `Hi ${name}, ${business} received your message. Someone will review it and follow up as soon as they can.`,
-          `This is an automatic confirmation from ${business}.`,
-        ],
+      ? [followUpTemplate || `Hi ${name}, we are checking in about your message to ${business}. If you still need help, reply to this email and we will take it from there.`]
+      : offering
+        ? [`Hi ${name}, ${business} got your message. Tap a time to request it, and ${business} will confirm it or suggest another.`]
+        : [`Hi ${name}, ${business} received your message. Someone will review it and follow up as soon as they can.`],
     ...(message && !isFollowUp ? { rows: [{ label: "Your message", value: message }] } : {}),
-    ...(!isFollowUp && inquiry.bookingOffer ? {
-      rows: [
-        ...(message ? [{ label: "Your message", value: message }] : []),
-        ...inquiry.bookingOffer.slots.map((slot) => ({ label: "Request a time", value: `${slot.label}: ${bookingLink(slot.chooseUrl)}` })),
-      ],
-      button: { label: "Choose a time", url: bookingLink(inquiry.bookingOffer.chooseUrl) },
+    ...(offering && inquiry.bookingOffer ? {
+      choices: { items: inquiry.bookingOffer.slots.map((slot) => ({ label: slot.label, url: bookingLink(slot.chooseUrl) })) },
+      button: { label: "See all open times", url: bookingLink(inquiry.bookingOffer.chooseUrl) },
     } : {}),
-    footerNote: `${inquiry.bookingOffer && !isFollowUp ? "Choosing a time requests an appointment; the business must confirm. " : ""}Automatic ${isFollowUp ? "follow-up" : "reply"} · from ${business}`,
+    footerNote: `This is an automatic ${isFollowUp ? "follow-up" : "reply"} from ${business}.`,
   };
   const trackingReplyTo = getInquiryReplyTrackingAddress(inquiry);
   const fallbackReplyTo = validEmail(route.customerReplyTo);
@@ -160,7 +155,9 @@ export async function prepareInquiryDeliveryMessage(inquiry: InquiryDeliverySubm
     const offer = await readInquiryBookingOfferForReceipt(inquiry.tenantId, inquiry.id);
     if (offer) {
       const booking = bookingOfferEmailOptions(offer);
-      message.options = { ...message.options, rows: [...(message.options.rows ?? []), ...(booking.rows ?? [])], button: booking.button };
+      message.options = { ...message.options, heading: "Pick a time that works", preheader: `Pick a time with ${message.options.businessName}`,
+        paragraphs: [`${message.options.paragraphs?.[0]?.replace(/ Someone will review it and follow up as soon as they can\.$/, "") ?? ""} Tap a time to request it, and ${message.options.businessName} will confirm it or suggest another.`.trim()],
+        choices: booking.choices, button: booking.button };
       message.tags = { ...message.tags, strelva_booking_offer: "1" };
       message.fromName = inquiryBusinessName(inquiry, route.businessName);
     }
