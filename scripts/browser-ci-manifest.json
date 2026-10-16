@@ -3747,6 +3747,72 @@
           "originalStatus": "skipped"
         }
       ]
+    },
+    {
+      "file": "xs-visitor-fonts.spec.ts",
+      "context": "preview",
+      "cases": [
+        {
+          "title": "visitor route manage?state=confirmed renders in DM Sans",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "visitor route confirm?state=held renders in DM Sans",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "visitor route offer?state=choose renders in DM Sans",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "visitor route handoff?state=choose renders in DM Sans",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "visitor route links renders in DM Sans",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "visitor route blog renders in DM Sans",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "visitor route post renders in DM Sans",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "visitor route site-error renders in DM Sans",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "visitor route site renders in DM Sans",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "visitor route site?doc=mooney renders in DM Sans",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "visitor route biz renders in DM Sans",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "visitor route biz-missing renders in DM Sans",
+          "project": "desktop",
+          "originalStatus": "passed"
+        }
+      ]
     }
   ]
 }
