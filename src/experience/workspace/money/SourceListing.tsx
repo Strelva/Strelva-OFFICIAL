@@ -1,5 +1,5 @@
 "use client";
-import { XaButton, XaChoices, XaYes } from "@/components/ui/strelva/Xa";
+import { XaButton, XaChoices, XaTextLink, XaYes } from "@/components/ui/strelva/Xa";
 import xa from "@/experience/workspace/money/money.module.css";
 import { useEffect, useRef, useState } from "react";
 import { strelvaUndoWindowMs } from "@/platform/infra/motion";
@@ -310,6 +310,7 @@ function ScopedSourceListing({
             current ? (
               <>
                 {graph.agreements.length > 1 ? (
+                  <div id="offer-what-you-earn">
                   <XaChoices
                     label="What you earn"
                     variant="list"
@@ -324,6 +325,7 @@ function ScopedSourceListing({
                       label: percent(item.rateBps),
                     }))}
                   />
+                  </div>
                 ) : agreement ? (
                   <p className={xa.note}>{percent(agreement.rateBps)}.</p>
                 ) : null}
@@ -333,9 +335,12 @@ function ScopedSourceListing({
                   yesAriaLabel={`Offer ${current.name}`}
                   block={false}
                   disabled={locked}
-                  disabledReason={
-                    agreement ? undefined : "Choose what you earn first."
-                  }
+                  {...(agreement
+                    ? { disabledReason: undefined, unblock: undefined }
+                    : {
+                        disabledReason: "Choose what you earn first.",
+                        unblock: <XaTextLink href="#offer-what-you-earn">Choose what you earn</XaTextLink>,
+                      })}
                   onYes={() => held.hold()}
                   onUndo={held.undo}
                   undoWindowMs={undoWindowMs}
