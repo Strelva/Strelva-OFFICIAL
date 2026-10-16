@@ -1,18 +1,21 @@
 "use client";
 
 import { useCallback, useEffect, useId, useRef, useState, type FormEvent, type ReactNode } from "react";
-import { CircleAlert, Loader2 } from "lucide-react";
-import { LogoMark } from "@/components/Logo";
-import { StComposerBar, StComposerDock, StEmpty, StHead, StMono, StNotice, StRows, StRow, StSection, StSkeleton, StState, StSurface, StTextButton } from "@/components/ui/strelva/Kit";
 import { SelectInput } from "@/components/ui/TextInput";
 import { GooeyDisclosure } from "@/components/ui/motion/GooeyDisclosure";
+import {
+  XaButtonLink, XaComposer, XaComposerDock, XaHeadline, XaLabel, XaPebbleAvatar, XaPebbleScene, XaRow, XaRows, XaStatus, XaSystemTile, XaTextLink, XaWorking,
+  type XaWorkingStep,
+} from "@/components/ui/strelva/Xa";
 import { ConversationStreamDecoder } from "@/experience/conversation/stream";
 import { useWorkspaceRequest } from "@/experience/workspace/WorkspaceRequest";
 import { askSuggestions } from "@/platform/ask/suggestions";
+import { actorLabel } from "@/platform/presentation/actor";
 import {
-  askErrorMessage, askHistoryFailure, readAskResult, readAskSuggestions, receiptLines, resultHeadline,
-  type AskConversationSummaryView, type AskMessageView, type AskTurnResult,
+  askErrorMessage, askHistoryFailure, latestDraft, readAskResult, sameAppPath, readAskSuggestions, receiptLines, resultHeadline,
+  type AskChangeOutcome, type AskConversationSummaryView, type AskMessageView, type AskReceiptItemView, type AskTurnResult,
 } from "./ask-model";
+import { AskChangePanel, AskChangeStory, AskQuestion, type AskDecider } from "./AskChange";
 import styles from "./ask.module.css";
 
 export interface AskStrelvaProps {
@@ -21,12 +24,22 @@ export interface AskStrelvaProps {
   /** The System this conversation is about (its page), or null on Home. */
   systemId?: string | null;
   systemName?: string;
+  /** The System's kind, for its clay tile beside ideas. */
+  systemKind?: string;
+  /** The public address of the website this conversation changes, when known (harbordental.com). */
+  address?: string;
+  /** Who says yes to a drafted change. Defaults to the owner, unnamed. */
+  decider?: AskDecider;
+  /** Recorded outcomes of drafted changes, by the draft's item ref. The route does not supply these yet. */
+  outcomes?: Readonly<Record<string, AskChangeOutcome>>;
+  /** Which side of a waiting change opens first: the change, or what the decider sees. */
+  initialChangeView?: "change" | "sees";
   /** Words to start with (from "Ask for a change"). Never sent until the person sends them. */
   initialText?: string;
   /** No new asks (shared read-only, stopped workspace). History stays readable. */
   readOnly?: boolean;
   readOnlyReason?: string;
-  /** Embedded beside another surface (the site editor): no page heading. */
+  /** Embedded beside another surface (the site editor): no heading, no side panel. */
   compact?: boolean;
   /** Fixture initial value; the server confirms operator authority before enabling this. */
   canAskOnBehalf?: boolean;
@@ -40,18 +53,21 @@ export interface AskStrelvaProps {
   refusalLinks?: { needsYou: string; help: string };
   /** Built-in Release label ("Ask Strelva Release 1") when STRELVA_APP_RELEASES is on. */
   release?: string;
-
 }
 
 type HistoryState = "loading" | "ready" | "unavailable" | "off";
 
+const OWNER: AskDecider = { name: "the owner", you: false };
+
 /**
- * Ask Strelva in the workspace. One person's conversation with Strelva about
- * this business (or one System), saved per business. Every finished turn
- * shows what it actually did: answered, drafted (not live), opened a
- * Possibility, or filed a Request. Nothing typed here approves anything.
+ * Ask Strelva in the workspace (XA · AS1 to AS6). One person's conversation
+ * with Strelva about this business (or one System), saved per business. Every
+ * finished turn shows what it actually did: answered, drafted (not live),
+ * opened a Possibility, or filed a Request. A drafted change sits beside the
+ * conversation as the page its visitors would see. Nothing typed here
+ * approves anything: the yes happens where the decider decides.
  */
-export function AskStrelva({ workspaceId, businessName, systemId = null, systemName, initialText = "", readOnly = false, readOnlyReason, compact = false, canAskOnBehalf: initialCanAskOnBehalf = false, request: requestOverride, initialMessages = [], renderResult, refusalLinks, release }: AskStrelvaProps) {
+export function AskStrelva({ workspaceId, businessName, systemId = null, systemName, systemKind, address, decider = OWNER, outcomes, initialChangeView = "change", initialText = "", readOnly = false, readOnlyReason, compact = false, canAskOnBehalf: initialCanAskOnBehalf = false, request: requestOverride, initialMessages = [], renderResult, refusalLinks, release }: AskStrelvaProps) {
   const contextRequest = useWorkspaceRequest();
   const request = requestOverride ?? contextRequest;
   const [canAskOnBehalf, setCanAskOnBehalf] = useState(initialCanAskOnBehalf);
@@ -64,15 +80,18 @@ export function AskStrelva({ workspaceId, businessName, systemId = null, systemN
   const [messages, setMessages] = useState<AskMessageView[]>(() => [...initialMessages]);
   const [input, setInput] = useState(initialText);
   const [streaming, setStreaming] = useState(false);
-  const [toolLabel, setToolLabel] = useState<string | null>(null);
+  const [steps, setSteps] = useState<XaWorkingStep[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [opening, setOpening] = useState<string | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [showThread, setShowThread] = useState(false);
   const [suggestions, setSuggestions] = useState<string[] | null>(null);
   const historyId = useId();
+  const titleId = useId();
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const logRef = useRef<HTMLDivElement>(null);
   const place = systemName ?? businessName;
+  const site = address ?? place;
 
   const loadConversations = useCallback(async () => {
     const params = new URLSearchParams({ workspaceId });
@@ -93,7 +112,7 @@ export function AskStrelva({ workspaceId, businessName, systemId = null, systemN
 
   useEffect(() => { void loadConversations(); }, [loadConversations]);
   useEffect(() => { if (initialText) inputRef.current?.focus(); }, [initialText]);
-  useEffect(() => { logRef.current?.scrollTo({ top: logRef.current.scrollHeight }); }, [messages]);
+  useEffect(() => { logRef.current?.scrollTo?.({ top: logRef.current.scrollHeight }); }, [messages]);
 
   async function openConversation(id: string) {
     if (streaming) return;
@@ -108,6 +127,7 @@ export function AskStrelva({ workspaceId, businessName, systemId = null, systemN
       setConversationSystemId(body.conversation.systemId);
       setConversationMine(body.conversation.mine);
       setMessages(body.conversation.messages.map((message) => ({ id: message.id, role: message.role, content: message.content, result: readAskResult(message.result), askedOnBehalf: message.askedOnBehalf })));
+      setHistoryOpen(false);
     } catch {
       setError("This conversation couldn't be opened. Try again.");
     } finally {
@@ -122,21 +142,22 @@ export function AskStrelva({ workspaceId, businessName, systemId = null, systemN
     setConversationMine(true);
     setMessages([]);
     setError(null);
+    setShowThread(false);
     inputRef.current?.focus();
   }
 
-  async function send(event?: FormEvent) {
+  async function send(event?: FormEvent, words?: string) {
     event?.preventDefault();
-    const text = input.trim();
+    const text = (words ?? input).trim();
     if (!text || streaming || readOnly || !conversationMine) return;
     const userMessage: AskMessageView = { id: `local-${Date.now()}`, role: "user", content: text, result: null, askedOnBehalf: canAskOnBehalf && askedOnBehalf ? askedOnBehalf : null };
     const replyId = `reply-${Date.now()}`;
     const prior = messages.filter((message) => message.content.trim()).slice(-38).map((message) => ({ role: message.role, content: message.content.slice(0, 20_000) }));
     setMessages((current) => [...current, userMessage, { id: replyId, role: "assistant", content: "", result: null, pending: true }]);
-    setInput("");
+    if (words === undefined) setInput("");
     setError(null);
     setStreaming(true);
-    setToolLabel(null);
+    setSteps([]);
     const turn: { result: AskTurnResult | null } = { result: null };
     try {
       const response = await request("/api/workspace/ask", {
@@ -159,8 +180,9 @@ export function AskStrelva({ workspaceId, businessName, systemId = null, systemN
       const apply = (events: ReturnType<typeof decoder.push>) => {
         for (const item of events) {
           if (item.type === "text") setMessages((current) => current.map((message) => message.id === replyId ? { ...message, content: message.content + item.text } : message));
-          else if (item.type === "tool") setToolLabel(item.label);
-          else if (item.type === "tool-done") setToolLabel(null);
+          // Each tool the route reports becomes one named step; the trail shows real progress only.
+          else if (item.type === "tool") setSteps((current) => [...current.map((step) => step.state === "active" ? { ...step, state: "done" as const } : step), { id: `${current.length}`, label: item.label, state: "active" }]);
+          else if (item.type === "tool-done") setSteps((current) => current.map((step) => step.state === "active" ? { ...step, state: "done" as const } : step));
           else if (item.type === "result") turn.result = readAskResult(item.result);
         }
       };
@@ -183,68 +205,172 @@ export function AskStrelva({ workspaceId, businessName, systemId = null, systemN
       setError(cause instanceof Error && cause.message ? cause.message : "Strelva can't answer right now. Nothing was changed.");
     } finally {
       setStreaming(false);
-      setToolLabel(null);
+      setSteps([]);
     }
   }
 
-
-  const examples = suggestions ?? askSuggestions({ businessName, systemName, aboutSystem: Boolean(systemId) });
+  const examples = suggestions ?? askSuggestions({ businessName, systemName: address ?? systemName, aboutSystem: Boolean(systemId) });
   const blockedReason = readOnly ? readOnlyReason || "You can read this business's conversations but can't ask here." : !conversationMine ? "This conversation was started by someone else. Start a new one to ask." : null;
   const unsaved = messages.some((message) => message.result && !message.result.saved);
+  const empty = messages.length === 0;
+  const last = messages.at(-1);
+  const openQuestion = !streaming && !blockedReason && last?.role === "assistant" && last.result?.question ? last.result.question : null;
+  const draft = compact ? null : latestDraft(messages);
+  const outcome = draft ? outcomeFor(draft.item, outcomes) : null;
+  const making = !compact && last?.role === "assistant" && !last.pending && (Boolean(last.result?.creationAction) || Boolean(last.result?.items.some(item => item.kind === "possibility" && item.status === "opened")));
+  const makingName = making && last?.result ? (last.result.items.find(item => item.kind === "possibility")?.summary.split(" · ")[0] || null) : null;
+  const scope = { label: systemName && systemName !== businessName ? `${businessName} · ${systemName}` : businessName };
+  const placeholder = blockedReason ?? (empty && !compact ? "Tell Strelva what should happen" : openQuestion ? "Or type the answer" : draft && !outcome ? "Ask for a change before it goes live" : `Ask Strelva about ${address ?? place}`);
+  const deciderYes = decider.you ? "your yes" : `${decider.name}'s yes`;
 
-  const composer = <StComposerBar scope={place} placeholder={blockedReason ?? `Ask about ${place}`} value={input} onChange={setInput} onSubmit={() => void send()} disabled={streaming || Boolean(blockedReason)} inputLabel={`Ask Strelva about ${place}`} multiline textareaRef={inputRef} maxLength={20_000} />;
+  const composer = <XaComposer value={input} onChange={setInput} onSubmit={() => void send()} placeholder={placeholder} inputLabel={`Ask Strelva about ${place}`} scope={scope}
+    disabled={Boolean(blockedReason)} busy={streaming} maxLength={20_000} inputRef={inputRef} />;
 
-  return <section className={styles.ask} data-compact={compact || undefined} aria-labelledby="ask-strelva-title">
-    <StHead title="Ask Strelva" titleId="ask-strelva-title" meta={<>{systemName ? `About ${systemName}.` : `About ${businessName}.`} Strelva answers, drafts a change, opens a Possibility or files a Request. Decisions stay in Needs you.{release ? <> · <StMono>{release}</StMono></> : null}</>} actions={<StTextButton onClick={startNew} disabled={streaming || (!conversationId && messages.length === 0)}>New conversation</StTextButton>} />
-
-    <div ref={logRef} className={styles.log} role="log" aria-live="polite" aria-relevant="additions" aria-busy={streaming || undefined} aria-label={`Conversation about ${place}`}>
-      {messages.length === 0 ? <StSection title="Ask in your own words" meta="For example">
-        <StRows>{examples.map(example => <StRow key={example} title={<StTextButton disabled={Boolean(blockedReason)} onClick={() => { setInput(example); inputRef.current?.focus(); }}>{example}</StTextButton>} />)}</StRows>
-      </StSection> : messages.map(message => <article key={message.id} className={styles.message} data-role={message.role}>
-        <h2 className="sr-only">{message.role === "user" ? "You asked" : "Strelva"}</h2>
-        {message.role === "assistant" ? <LogoMark className={styles.mark} /> : null}
-        <div className={styles.messageBody}>
-          {message.role === "user" && message.askedOnBehalf ? <small>Asked for the owner by {message.askedOnBehalf}</small> : null}
-          {message.pending && !message.content ? <StSurface label="Strelva is working"><p className={styles.thinking}><Loader2 size={14} className="motion-safe:animate-spin" aria-hidden="true" />{toolLabel || "Strelva is reading…"}</p></StSurface> : <p className={styles.text}>{message.content}</p>}
-          {message.pending && message.content && toolLabel ? <p className={styles.thinking}><Loader2 size={14} className="motion-safe:animate-spin" aria-hidden="true" />{toolLabel}</p> : null}
-          {renderResult?.(message) ?? (message.result ? <TurnReceipt result={message.result} /> : null)}
-          {message.role === "assistant" && message.result?.creationAction ? <StTextButton tone="accent" href={message.result.creationAction.href}>{message.result.creationAction.label}</StTextButton> : null}
-          {message.result && (message.result.kind === "refusal" || message.result.budgetRecovery) ? <div className={styles.refusalActions}>{message.result.items.some(item => item.summary === "approval_in_chat") ? <StTextButton href={refusalLinks?.needsYou ?? `/workspace?workspaceId=${encodeURIComponent(workspaceId)}&view=needs-you`}>Open Needs you</StTextButton> : null}<StTextButton href={message.result.budgetRecovery === "plan" ? `/workspace/billing?workspaceId=${encodeURIComponent(workspaceId)}` : refusalLinks?.help ?? `/workspace?workspaceId=${encodeURIComponent(workspaceId)}&view=help`}>{message.result.budgetRecovery === "plan" ? "Choose a plan" : message.result.items.some(item => item.summary === "budget_paused") ? "Bring in an agency" : "Ask for help"}</StTextButton></div> : null}
-        </div>
-      </article>)}
-    </div>
-
-    {error ? <StNotice tone="critical" icon={<CircleAlert size={16} aria-hidden="true" />}>{error}</StNotice> : null}
-    {unsaved ? <StNotice>Part of this conversation couldn&apos;t be saved. What Strelva drafted or filed is unaffected.</StNotice> : null}
-
+  const footer = <div className={styles.footer}>
     {canAskOnBehalf ? <SelectInput label="Who asked for this?" value={askedOnBehalf} disabled={streaming || Boolean(blockedReason)}
       options={[{ value: "", label: "I am asking" }, { value: "email", label: "The owner, by email" }, { value: "phone", label: "The owner, by phone" }]}
       onChange={event => setAskedOnBehalf(event.target.value as "email" | "phone" | "")}
       helperText="The owner still decides in Needs you." /> : null}
+    <p className={styles.note}>
+      Saying yes in this conversation never approves anything.
+      {release ? <span> · {release}</span> : null}
+    </p>
     <div className={styles.history}>
-      <StTextButton aria-expanded={historyOpen} aria-controls={historyId} onClick={() => setHistoryOpen(open => !open)}>Earlier conversations</StTextButton>
+      <span className={styles.historyLinks}>
+        <button type="button" className={styles.quietLink} aria-expanded={historyOpen} aria-controls={historyId} onClick={() => setHistoryOpen(open => !open)}>Earlier conversations</button>
+        {!empty ? <button type="button" className={styles.quietLink} onClick={startNew} disabled={streaming}>New conversation</button> : null}
+      </span>
       <GooeyDisclosure id={historyId} open={historyOpen}>
-      {historyState === "loading" ? <><p role="status">Loading conversations…</p><StSkeleton label="Loading conversations" /></>
-        : historyState === "unavailable" ? <StNotice>Earlier conversations can&apos;t be read right now. New ones may not be saved. <StTextButton onClick={() => void loadConversations()}>Try again</StTextButton></StNotice>
-        : historyState === "off" ? <StNotice>Ask Strelva isn&apos;t on for this business yet.</StNotice>
-        : conversations.length === 0 ? <StEmpty>Nothing yet. Conversations you start here are kept for this business.</StEmpty>
-        : <StRows>{conversations.map(item => <StRow key={item.id} selected={item.id === conversationId} title={<StTextButton disabled={streaming || opening === item.id} onClick={() => void openConversation(item.id)}>{item.title}</StTextButton>} detail={item.mine ? undefined : "Someone else's conversation"} end={<StMono>{new Date(item.updatedAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })}</StMono>} />)}</StRows>}
+        {historyState === "loading" ? <p role="status" className={styles.historyState}>Loading conversations</p>
+          : historyState === "unavailable" ? <p className={styles.historyState}>Earlier conversations can&apos;t be read right now, and new ones may not be saved. <XaTextLink onClick={() => void loadConversations()}>Try again</XaTextLink></p>
+          : historyState === "off" ? <p className={styles.historyState}>Ask Strelva isn&apos;t on for this business yet.</p>
+          : conversations.length === 0 ? <p className={styles.historyState}>Nothing yet. Conversations you start here are kept for this business.</p>
+          : <ul className={styles.historyList} aria-label="Earlier conversations">{conversations.map(item => <li key={item.id} aria-current={item.id === conversationId || undefined}>
+            <button type="button" disabled={streaming || opening === item.id} onClick={() => void openConversation(item.id)}>{item.title}</button>
+            <span>{item.mine ? null : "Someone else's · "}<time dateTime={item.updatedAt} suppressHydrationWarning>{new Date(item.updatedAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })}</time></span>
+          </li>)}</ul>}
       </GooeyDisclosure>
     </div>
-    <p className={styles.note}>{blockedReason ?? "Saying yes here never approves anything. Approvals happen in Needs you."}</p>
-    {compact ? composer : <StComposerDock>{composer}</StComposerDock>}
+  </div>;
+
+  const errorLine = error ? <div className={styles.error} role="alert"><XaPebbleAvatar size={28} /><p>{error}</p></div> : null;
+
+  if (empty && !compact) return <section className={styles.ask} data-layout="empty" aria-labelledby={titleId}>
+    <div className={styles.intro}>
+      <XaPebbleAvatar size={56} />
+      <div className={styles.introHead}>
+        <XaHeadline id={titleId}>What should change for {businessName}?</XaHeadline>
+        <p className={styles.introLede}>Say it the way you&apos;d tell a person. Nothing goes public without {deciderYes}.</p>
+      </div>
+      {composer}
+      {errorLine}
+      <div className={styles.ideas}>
+        <XaLabel id={`${titleId}-ideas`}>Start from what {businessName} needs</XaLabel>
+        <XaRows label={`Things to ask about ${businessName}`}>
+          {examples.map(example => <XaRow key={example} lead={<XaSystemTile kind={systemKind ?? "website"} size={30} />} title={example}
+            onClick={blockedReason ? undefined : () => { setInput(example); inputRef.current?.focus(); }} />)}
+        </XaRows>
+      </div>
+      {footer}
+    </div>
+  </section>;
+
+  const story = outcome && draft ? <AskChangeStory outcome={outcome} site={site} decider={decider} /> : null;
+  const thread = <div ref={logRef} className={styles.log} role="log" aria-live="polite" aria-relevant="additions" aria-busy={streaming || undefined} aria-label={`Conversation about ${place}`}>
+    {messages.map(message => <Message key={message.id} message={message} place={place} steps={message.pending && message === last ? steps : []}>
+      {renderResult?.(message) ?? (message.result ? <TurnResult result={message.result} latest={message === last} decider={decider} workspaceId={workspaceId} refusalLinks={refusalLinks}
+        inlineReview={compact || draft?.message !== message} question={message === last && openQuestion ? <AskQuestion question={openQuestion} onAnswer={words => void send(undefined, words)} onAdd={() => inputRef.current?.focus()} /> : null} /> : null)}
+    </Message>)}
+  </div>;
+
+  const panel = draft ? <AskChangePanel item={draft.item} site={site} decider={decider} outcome={outcome} initialView={initialChangeView} />
+    : making ? <figure className={styles.making} aria-label="Pebble adding a new System to the business">
+      <XaPebbleScene pose="adds" size={280} bare />
+      <figcaption>{makingName ? `Pebble is adding ${makingName}. ` : "Pebble is adding it. "}Nothing turns on until {decider.you ? "you say yes" : `${decider.name} says yes`}.</figcaption>
+    </figure> : null;
+
+  return <section className={styles.ask} data-layout={compact ? "compact" : panel ? "split" : "thread"} aria-labelledby={titleId}>
+    <h1 id={titleId} className={styles.srOnly}>Ask Strelva about {place}</h1>
+    <div className={styles.grid}>
+      <div className={styles.thread}>
+        {story}
+        {story && !showThread ? <p className={styles.note}><button type="button" className={styles.quietLink} onClick={() => setShowThread(true)}>Show the conversation</button></p> : null}
+        {story && !showThread ? null : thread}
+        {errorLine}
+        {unsaved ? <p className={styles.note}>Part of this conversation couldn&apos;t be saved. What Strelva drafted or filed is unaffected.</p> : null}
+      </div>
+      {panel ? <aside className={styles.panel} aria-label="The change this conversation made">{panel}</aside> : null}
+      <div className={styles.threadFooter}>
+        {footer}
+        {compact ? composer : null}
+      </div>
+    </div>
+    {compact ? null : <XaComposerDock><div className={styles.dockGrid} data-layout={panel ? "split" : "thread"}><div className={styles.dockThread}>{composer}</div></div></XaComposerDock>}
   </section>;
 }
 
-function TurnReceipt({ result }: { result: AskTurnResult }) {
-  const lines = receiptLines(result);
-  const headline = lines.length ? null : resultHeadline(result);
-  if (!lines.length && !headline) return null;
-  return <StSurface label="What Strelva did">
-    {headline ? <p className={styles.receiptHeadline}>{headline}</p> : <StRows>{lines.map(line => <StRow key={line.key}
-      title={<StState kind={line.tone === "failed" ? "down" : line.tone === "waiting" ? "need" : "live"}>{line.text}</StState>}
-      detail={line.ref ? <StMono>Ref {line.ref}</StMono> : undefined}
-      end={line.decideHref || line.openHref ? <div className={styles.refusalActions}>{line.openHref ? <StTextButton tone="accent" href={line.openHref}>{line.openLabel}</StTextButton> : null}{line.decideHref ? <StTextButton tone="accent" href={line.decideHref}>Open Needs you</StTextButton> : null}</div> : undefined}
-    />)}</StRows>}
-  </StSurface>;
+function outcomeFor(item: AskReceiptItemView, outcomes: AskStrelvaProps["outcomes"]): AskChangeOutcome | null {
+  if (!outcomes) return null;
+  for (const ref of [item.needsYou?.itemRef, ...item.ids]) if (ref && outcomes[ref]) return outcomes[ref]!;
+  return null;
+}
+
+function Message({ message, place, steps, children }: { message: AskMessageView; place: string; steps: readonly XaWorkingStep[]; children?: ReactNode }) {
+  if (message.role === "user") return <article className={styles.you}>
+    <h2 className={styles.srOnly}>You asked</h2>
+    {message.askedOnBehalf ? <small>Asked for the owner by {message.askedOnBehalf}</small> : null}
+    <p>{message.content}</p>
+  </article>;
+  const working = message.pending ? <XaWorking title={[...steps].reverse().find(step => step.state === "active")?.label ?? `Reading ${place}`} steps={steps} /> : null;
+  return <article className={styles.says}>
+    <h2 className={styles.srOnly}>Strelva</h2>
+    <XaPebbleAvatar size={28} />
+    <div className={styles.saysBody}>
+      {message.content ? <p className={styles.text}>{message.content}</p> : null}
+      {working}
+      {children}
+    </div>
+  </article>;
+}
+
+function TurnResult({ result, latest, decider, workspaceId, refusalLinks, question, inlineReview }: { result: AskTurnResult; latest: boolean; decider: AskDecider; workspaceId: string; refusalLinks?: { needsYou: string; help: string }; question: ReactNode; inlineReview: boolean }) {
+  const refusal = result.kind === "refusal" || Boolean(result.budgetRecovery);
+  const headline = result.items.length ? null : resultHeadline(result);
+  // The newest opened Possibility offers Try as the screen's one primary; its sentence keeps the rest.
+  const tryItem = latest && !result.creationAction ? result.items.find(item => item.kind === "possibility" && item.status === "opened" && (sameAppPath(item.tryHref) ?? sameAppPath(item.previewHref))) : undefined;
+  const tryHref = tryItem ? sameAppPath(tryItem.tryHref) ?? sameAppPath(tryItem.previewHref) : undefined;
+  return <>
+    {question}
+    {result.items.map((item, index) => <ItemLine key={`${index}:${item.toolId}`} item={item} result={result} decider={decider} promoted={item === tryItem} inlineReview={inlineReview} />)}
+    {tryItem && tryHref ? <div className={styles.actions}><XaButtonLink variant="primary" href={tryHref}>{tryItem.tryHref ? "Try it" : "Open preview"}</XaButtonLink></div> : null}
+    {headline && !result.creationAction && !result.question ? <p className={styles.meta}>{headline}</p> : null}
+    {result.creationAction ? <div className={styles.actions}><XaButtonLink variant={latest ? "primary" : "secondary"} href={result.creationAction.href}>{result.creationAction.label}</XaButtonLink></div> : null}
+    {refusal ? <p className={styles.links}>
+      {result.items.some(item => item.summary === "approval_in_chat") ? <><XaTextLink href={refusalLinks?.needsYou ?? `/workspace?workspaceId=${encodeURIComponent(workspaceId)}&view=needs-you`}>Open Needs you</XaTextLink><span aria-hidden="true"> · </span></> : null}
+      <XaTextLink href={result.budgetRecovery === "plan" ? `/workspace/billing?workspaceId=${encodeURIComponent(workspaceId)}` : refusalLinks?.help ?? `/workspace?workspaceId=${encodeURIComponent(workspaceId)}&view=help`}>{result.budgetRecovery === "plan" ? "Choose a plan" : result.items.some(item => item.summary === "budget_paused") ? "Bring in an agency" : "Ask for help"}</XaTextLink>
+    </p> : null}
+  </>;
+}
+
+/** One receipt item as one line: a dot and a word only when something waits or failed. */
+function ItemLine({ item, result, decider, promoted = false, inlineReview = true }: { item: AskReceiptItemView; result: AskTurnResult; decider: AskDecider; promoted?: boolean; inlineReview?: boolean }) {
+  const line = receiptLines({ ...result, items: [item] })[0];
+  if (!line) return null;
+  if (line.tone === "failed") return <p className={styles.line}><XaStatus kind="down" size="sm">Didn&apos;t finish</XaStatus><span>{line.text}</span></p>;
+  if (item.kind === "draft" && item.needsYou?.route === "owner_decides") return <p className={styles.line}>
+    <XaStatus kind="waits" size="sm">{decider.you ? "Waits for your yes" : `Waiting for ${decider.name}`}</XaStatus>
+    <span className={styles.faint}>· nothing is public yet</span>
+    {decider.you && inlineReview && line.decideHref ? <span className={styles.lineLink}><XaTextLink href={line.decideHref}>Review it</XaTextLink></span> : null}
+    <span className={styles.srOnly}>{line.text}</span>
+  </p>;
+  const by = item.actor ? actorLabel(item.actor) : null;
+  const openHref = promoted ? undefined : line.openHref;
+  return <p className={styles.line} data-tone={line.tone}>
+    <span>{line.text}{by && item.kind !== "request" ? ` By ${by}.` : ""}</span>
+    {openHref || line.decideHref ? <span className={styles.lineLink}>
+      {openHref ? <XaTextLink href={openHref}>{line.openLabel}</XaTextLink> : null}
+      {openHref && line.decideHref ? <span aria-hidden="true"> · </span> : null}
+      {line.decideHref ? <XaTextLink href={line.decideHref}>Open Needs you</XaTextLink> : null}
+    </span> : null}
+  </p>;
 }

@@ -37,6 +37,19 @@ export interface AskTurnResult {
   saved: boolean;
   budgetRecovery?: "plan" | "agency";
   creationAction?: { kind: "website" | "booking"; label: string; href: string };
+  /** One bounded question Strelva asks before it drafts (XA · AS2). Answering sends an ordinary message. */
+  question?: AskQuestionView;
+}
+
+/**
+ * A question with known answers Strelva read somewhere (a form, the business
+ * record). The route does not emit this yet; the reader accepts it so the
+ * screen is ready, and anything malformed reads as no question.
+ */
+export interface AskQuestionView {
+  options: { label: string; source: string | null }[];
+  /** What the add row says, e.g. "Add a plan the form doesn't have". */
+  addLabel: string | null;
 }
 
 export interface AskMessageView {
@@ -106,6 +119,7 @@ export function readAskResult(raw: unknown): AskTurnResult | null {
     }];
   }).slice(0, 20) : [];
   const creationAction = readCreationAction(value.creationAction);
+  const question = readQuestion(value.question);
   return {
     kind: kind as AskResultKind,
     items,
@@ -114,7 +128,59 @@ export function readAskResult(raw: unknown): AskTurnResult | null {
     saved: value.saved === true,
     ...((value.budgetRecovery === "plan" || value.budgetRecovery === "agency") ? { budgetRecovery: value.budgetRecovery } : {}),
     ...(creationAction ? { creationAction } : {}),
+    ...(question ? { question } : {}),
   };
+}
+
+const PLAIN = /^[^\u0000-\u001f\u007f]+$/;
+
+function readQuestion(raw: unknown): AskQuestionView | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+  const value = raw as Record<string, unknown>;
+  if (!Array.isArray(value.options) || value.options.length < 1 || value.options.length > 8) return undefined;
+  const options = value.options.flatMap(option => {
+    if (!option || typeof option !== "object") return [];
+    const entry = option as Record<string, unknown>;
+    const label = typeof entry.label === "string" ? entry.label.trim() : "";
+    if (!label || label.length > 80 || !PLAIN.test(label)) return [];
+    const source = typeof entry.source === "string" && entry.source.trim() && entry.source.length <= 60 && PLAIN.test(entry.source) ? entry.source.trim() : null;
+    return [{ label, source }];
+  });
+  if (options.length !== value.options.length || new Set(options.map(option => option.label)).size !== options.length) return undefined;
+  const addLabel = typeof value.addLabel === "string" && value.addLabel.trim() && value.addLabel.length <= 80 && PLAIN.test(value.addLabel) ? value.addLabel.trim() : null;
+  return { options, addLabel };
+}
+
+/** The draft a finished turn produced, if any: the change the screen is about. */
+export function latestDraft(messages: readonly AskMessageView[]): { message: AskMessageView; item: AskReceiptItemView } | null {
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const message = messages[index]!;
+    if (message.role !== "assistant" || !message.result) continue;
+    const item = message.result.items.find(entry => entry.kind === "draft" && entry.status !== "failed");
+    if (item) return { message, item };
+    if (message.result.items.length || message.result.creationAction) return null;
+  }
+  return null;
+}
+
+/**
+ * After the yes: what the decision record says happened to a drafted change.
+ * Built from the Needs you item state and its What changed receipt
+ * (src/platform/needs-you/contracts.ts). The Ask route does not read it yet;
+ * callers that have it pass it in by the draft's item ref.
+ */
+export interface AskChangeOutcome {
+  state: "approved" | "declined" | "expired" | "withdrawn";
+  outcome: "done" | "done_unverified" | "failed" | null;
+  decidedBy: string;
+  decidedAt: string;
+  /** Read back on the live page, when the receipt records it. */
+  readBackAt: string | null;
+  /** Every step, oldest first, each naming whoever acted. */
+  steps: { at: string; text: string; by: { name: string; kind: "agency" | "owner" | "strelva" } }[];
+  facts?: readonly (readonly [string, string])[];
+  /** Minutes of agency time the record logged, when it logged any. */
+  minutes?: { person: string; value: number; to: string } | null;
 }
 
 export interface ReceiptLine {

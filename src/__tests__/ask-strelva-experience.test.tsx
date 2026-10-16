@@ -66,11 +66,12 @@ describe("Ask Strelva in the workspace", () => {
 
   it("renders the empty state with examples and the no-approval rule", () => {
     const html = renderToStaticMarkup(createElement(AskStrelva, { workspaceId: WS, businessName: "Great Lakes Dried Fruit", systemId: SYSTEM, systemName: "greatlakesdriedfruit.com", request: (async () => new Response("{}")) as typeof fetch }));
-    expect(html).toContain("About greatlakesdriedfruit.com.");
+    expect(html).toContain("What should change for Great Lakes Dried Fruit?");
+    expect(html).toContain("Nothing goes public without the owner&#x27;s yes.");
     expect(html).toContain("What does greatlakesdriedfruit.com do today?");
     expect(html).not.toContain("estate planning");
     expect(html).not.toContain("holiday gift boxes");
-    expect(html).toContain("Saying yes here never approves anything. Approvals happen in Needs you.");
+    expect(html).toContain("Saying yes in this conversation never approves anything.");
     expect(html).toContain("Loading conversations");
     expect(html).not.toMatch(/\b(AI|agent|automation|workflow)\b/);
   });

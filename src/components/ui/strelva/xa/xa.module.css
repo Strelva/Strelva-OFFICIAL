@@ -149,6 +149,8 @@
 }
 .composer[data-shape="bar"] .composerInput { min-height: 24px; flex: 1; }
 .composerInput::placeholder { color: var(--st-faint); }
+/* The composer card draws the focus ring (:focus-within); the shell :focus-visible outline would draw a second box inside it. */
+.composer .composerInput:focus-visible { outline: none; }
 .composerBar { display: flex; align-items: center; gap: 8px; padding: 4px; }
 .composerPlus { display: grid; width: 36px; height: 36px; flex-shrink: 0; place-items: center; border: 0; border-radius: 999px; background: var(--st-chip); color: var(--st-text); cursor: pointer; }
 .composer[data-shape="bar"] .composerPlus { background: transparent; }
