@@ -22,14 +22,13 @@ export function PropertySwitcher({ fallbackName }: { fallbackName: string }) {
     return () => controller.abort();
   }, [dashboardHref]);
 
-  if (!properties || properties.length <= 1) {
-    return <p className="truncate text-[13px] font-medium leading-tight text-warm-black" title={fallbackName}>{fallbackName}</p>;
-  }
+  // One website: the sidebar and phone header already name it, so the switcher says nothing.
+  if (!properties || properties.length <= 1) return null;
 
   return <select
     aria-label="Website"
     value={tenantId}
-    className="max-w-full min-h-10 rounded-xl border border-gray-border bg-surface-raised px-3 py-2 text-[13px] text-warm-black"
+    className="max-w-full min-h-10 rounded-full border-0 bg-[var(--st-surface)] px-4 py-2 text-[14px] text-[var(--st-text)] shadow-[0_1px_2px_#0000000f]"
     onChange={(event) => {
       const next = properties.find((property) => property.id === event.target.value);
       if (next && next.id !== tenantId) window.location.assign(next.href);

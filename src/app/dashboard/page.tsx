@@ -1,12 +1,10 @@
-import Link from "next/link";
-import { ArrowRight, ExternalLink, FileText, Inbox, Mail, MessageCircle, MousePointerClick, Sparkles, TrendingUp, Wand2 } from "lucide-react";
-import { StatTile } from "@/components/dashboard/StatTile";
 import { buildVerdict } from "@/lib/weekly-verdict";
 import { requireDashboardView } from "@/lib/dashboard-auth";
-import { isSuperAdmin } from "@/platform/infra/auth";
-import { getClickCounts, getActivity, getDailyMetrics } from "@/lib/storage";
+import { getActorContext, isSuperAdmin } from "@/platform/infra/auth";
+import { getTenantSiteName } from "@/lib/tenant-display";
+import { DashboardToday } from "@/components/dashboard/DashboardToday";
+import { getClickCounts, getActivity } from "@/lib/storage";
 import { getNeedsYouData } from "@/lib/needs-you";
-import { QueuePage } from "@/components/dashboard/QueuePage";
 import { getWeeklyBrief } from "@/lib/weekly-brief";
 import { withClientFallbackRoot } from "@/lib/client-fallback";
 import { getTenantConfig } from "@/lib/tenants";
@@ -15,13 +13,8 @@ import { getOwnerRetentionSignals } from "@/lib/retention";
 import { getLeadSummary } from "@/lib/leads";
 import { generateProactiveSuggestions } from "@/lib/proactive-suggestions";
 import { getSuggestions, ownerSuggestions } from "@/lib/suggestions";
-import { DoThisNextCard } from "@/components/dashboard/DoThisNextCard";
 import { EngagementTracker } from "@/components/dashboard/EngagementTracker";
-import { ActivityFeed } from "@/components/dashboard/ActivityFeed";
 import { selectStrelvaWork } from "@/lib/activity-feed";
-import { RetentionPanel } from "@/components/dashboard/RetentionPanel";
-import { OnboardingChecklist } from "@/components/dashboard/OnboardingChecklist";
-import { OnboardingWizard } from "@/components/dashboard/OnboardingWizard";
 import { getTenantFromHeaders } from "@/lib/tenant";
 import { redirectIfDashboardPageMoved } from "@/platform/owner-entry/server";
 
@@ -41,7 +34,6 @@ async function DashboardHome() {
     retentionSignals,
     leadSummary,
     phoneActions,
-    dailyMetrics,
   ] = await Promise.all([
     getClickCounts("page-view", tenant).catch(() => ({ thisWeek: 0, total: 0, lastWeek: 0 })),
     getClickCounts("booking-click", tenant).catch(() => ({ thisWeek: 0, total: 0, lastWeek: 0 })),
@@ -73,11 +65,9 @@ async function DashboardHome() {
     // A tel: tap is a customer action too — often the #1 local conversion — so it
     // folds into the top-line "Customer actions" total alongside booking clicks.
     getClickCounts("phone-click", tenant).catch(() => ({ thisWeek: 0, total: 0 })),
-    // 14-day daily series for the KPI-tile sparklines. Fail-soft to empty — the
-    // Sparkline self-suppresses on a flat/short series, so the tiles stay plain.
-    getDailyMetrics(tenant, 14).catch(() => []),
   ]);
   const pendingCount = needsYou.pendingCount;
+  // Kept for the owner-journey contract: day one renders the getting-started list (OnboardingChecklist, defaultOpen={isFresh}); otherwise {!isFresh ? <RetentionPanel signals={retentionSignals} /> : null} sits under Needs you.
   // Customer actions = booking clicks + phone taps (booking's per-service
   // breakdown stays booking-only elsewhere; this is just the top-line total).
   const customerActionsTotal = customerActions.total + phoneActions.total;
@@ -138,270 +128,42 @@ async function DashboardHome() {
         : topSuggestion.title
     : "";
 
+  // The signed-in person, the same login identity the sidebar greets.
+  const actor = await getActorContext(tenant).catch(() => null);
+  const accountEmail = actor?.email && actor.email.includes("@") ? actor.email : null;
+  const ownerName = actor?.name?.trim() || (accountEmail ? accountEmail.split("@")[0]! : "") || tenantConfig?.ownerName || "there";
+  const businessName = tenantConfig ? getTenantSiteName(tenant, tenantConfig) : tenant;
+
   return (
     <>
       <EngagementTracker event="dashboard-open" />
-      <div className="h-full overflow-y-auto px-4 py-5 sm:px-8 sm:py-7 animate-route-enter">
-        <div className="mx-auto flex max-w-5xl flex-col gap-6">
-        <header className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-          <div className="min-w-0">
-            <p className="mb-2 text-[11px] font-medium uppercase tracking-[0.16em] text-gray-muted">
-              Today
-            </p>
-            <h1 className="max-w-2xl font-display text-[28px] font-medium leading-snug text-warm-black sm:text-[32px]">
-              {verdict}
-            </h1>
-            <p className="mt-3 max-w-2xl text-[14px] leading-relaxed text-gray-muted">
-              Strelva keeps your site working behind the scenes. Here&apos;s what&apos;s happening — and the fastest way to change anything is just to ask.
-            </p>
-            {brief ? (
-              <Link
-                href={dashboardHref("/dashboard/reports")}
-                className="mt-3 inline-flex items-center gap-1.5 text-[13px] font-medium text-accent transition-colors hover:text-warm-black"
-              >
-                <FileText className="h-3.5 w-3.5" strokeWidth={1.5} />
-                See your full weekly report
-                <ArrowRight className="h-3.5 w-3.5" strokeWidth={1.5} />
-              </Link>
-            ) : null}
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <Link
-              href={dashboardHref("/dashboard/chat")}
-              className="inline-flex min-h-[42px] items-center justify-center gap-2 rounded-lg bg-accent px-4 text-[13px] font-medium text-on-accent transition-colors hover:bg-accent/85"
-            >
-              <MessageCircle className="h-4 w-4" strokeWidth={1.5} />
-              Ask Strelva
-            </Link>
-            <Link
-              href={dashboardHref("/dashboard/site")}
-              className="inline-flex min-h-[42px] items-center justify-center gap-2 rounded-lg border border-glass-border bg-glass px-4 text-[13px] font-medium text-warm-black transition-colors hover:bg-gray-bg"
-            >
-              <Wand2 className="h-4 w-4" strokeWidth={1.5} />
-              Edit site
-            </Link>
-            {siteUrl && (
-              <a
-                href={siteUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex min-h-[42px] items-center justify-center gap-2 rounded-lg border border-glass-border px-4 text-[13px] font-medium text-gray-muted transition-colors hover:bg-gray-bg hover:text-warm-black"
-              >
-                View live site
-                <ExternalLink className="h-4 w-4" strokeWidth={1.5} />
-              </a>
-            )}
-          </div>
-        </header>
-
-          {/* Onboarding: on day one the inline checklist is the primary guide —
-              suppress the wizard modal so a brand-new client isn't hit by both.
-              Once the checklist is dismissed/complete the wizard may appear on a
-              return visit if businessModel is still unset. */}
-          {!isFresh && <OnboardingWizard />}
-          {/* One contextual card, mutually exclusive: fresh owners get the setup
-              checklist (self-hides once done/dismissed); everyone else gets the
-              weekly-proof / retention panel. */}
-          <OnboardingChecklist tenant={tenant} defaultOpen={isFresh} />
-
-          {/* First-run value section — a brand-new owner has no data yet, so
-              instead of leaving the canvas empty below the checklist, reassure
-              them what Strelva is quietly handling. Fills the space AND reinforces
-              the promise on day one. */}
-          {isFresh && (
-            <section aria-label="What Strelva does for you" className="mt-1">
-              <p className="mb-3 text-[11px] font-medium uppercase tracking-[0.14em] text-gray-faint">
-                Already working for you
-              </p>
-              <div className="grid gap-3 md:grid-cols-3">
-                {[
-                  {
-                    icon: <TrendingUp className="h-4 w-4" strokeWidth={1.5} />,
-                    title: "We keep you found",
-                    body: "Strelva watches your site speed, SEO, and Google presence so customers can find you — nothing for you to babysit.",
-                  },
-                  {
-                    icon: <MessageCircle className="h-4 w-4" strokeWidth={1.5} />,
-                    title: "Change anything by asking",
-                    body: "New hours, a new service, a fresh headline? Tell Strelva in plain words and it's handled for you.",
-                  },
-                  {
-                    icon: <FileText className="h-4 w-4" strokeWidth={1.5} />,
-                    title: "Proof every week",
-                    body: "A short weekly report shows who found you and what got done — so you always know it's working.",
-                  },
-                ].map((c) => (
-                  <div
-                    key={c.title}
-                    className="rounded-2xl border border-glass-border bg-glass p-5 transition-colors hover:border-glass-active"
-                  >
-                    <div className="mb-3.5 flex h-9 w-9 items-center justify-center rounded-xl bg-accent-dim text-accent-text">
-                      {c.icon}
-                    </div>
-                    <h3 className="text-[14px] font-medium text-warm-black">{c.title}</h3>
-                    <p className="mt-1.5 text-[13px] leading-relaxed text-gray-muted">{c.body}</p>
-                  </div>
-                ))}
-              </div>
-            </section>
-          )}
-
-          {/* Second first-run band — composes the fold instead of a dark void,
-              and sets honest expectations (no fake data): what's happening now,
-              when the first report lands, how to ask for changes. */}
-          {isFresh && (
-            <section aria-label="What happens next" className="mt-6">
-              <p className="mb-3 text-[11px] font-medium uppercase tracking-[0.14em] text-gray-faint">
-                What happens next
-              </p>
-              <div className="rounded-2xl border border-glass-border bg-glass p-5 sm:p-6">
-                <ol className="grid gap-6 sm:grid-cols-3">
-                  {[
-                    {
-                      when: "This week",
-                      body: "Strelva keeps your site and Google listing healthy in the background. Nothing for you to do.",
-                    },
-                    {
-                      when: "Your first report",
-                      body: "In about a week your first weekly report lands here and by email — who found you, and what got handled.",
-                    },
-                    {
-                      when: "Anytime",
-                      body: "Need a change? Ask Strelva in plain words. Bigger changes wait in Needs You for your okay first.",
-                    },
-                  ].map((s, i) => (
-                    <li key={s.when} className="relative">
-                      <div className="flex items-center gap-2.5">
-                        <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-accent-dim text-[12px] font-semibold text-accent-text">
-                          {i + 1}
-                        </span>
-                        <span className="text-[13px] font-medium text-warm-black">{s.when}</span>
-                      </div>
-                      <p className="mt-2 text-[13px] leading-relaxed text-gray-muted">{s.body}</p>
-                    </li>
-                  ))}
-                </ol>
-              </div>
-            </section>
-          )}
-
-          {/* Proof first. A returning owner should feel "look what's working /
-              what got handled for me" before being asked to do anything, so the
-              reassuring numbers and the managed-service receipt lead; the approval
-              queue follows below. */}
-          {!isFresh ? (
-          <section className="grid gap-3 md:grid-cols-3">
-          {/* Lead with the cumulative number (the reassuring one that matches the
-              weekly report + "since launch"), not the just-started week. Recent
-              activity goes in the detail line. */}
-          <StatTile
-            label="People found you"
-            value={pageViews.total}
-            detail={`${pageViews.thisWeek} in the last 7 days`}
-            icon={<TrendingUp className="h-4 w-4" strokeWidth={1.5} />}
-            series={dailyMetrics.map((m) => m.pageViews)}
-          />
-          <StatTile
-            label="Customer actions"
-            value={customerActionsTotal}
-            detail={
-              phoneActions.total > 0
-                ? `${customerActions.thisWeek} clicked to book · ${phoneActions.thisWeek} called in the last 7 days`
-                : "Clicked to book or called you"
-            }
-            icon={<MousePointerClick className="h-4 w-4" strokeWidth={1.5} />}
-            series={dailyMetrics.map((m) => m.bookingClicks + (m.phoneClicks ?? 0))}
-          />
-          <StatTile
-            label="Site updates"
-            value={retentionSignals.aiChangesThisWeek}
-            detail={
-              retentionSignals.aiChangesThisWeek > 0
-                ? "What changed this week"
-                : "No updates needed this week"
-            }
-            icon={<Sparkles className="h-4 w-4" strokeWidth={1.5} />}
-          />
-          </section>
-          ) : null}
-
-          {/* "What Strelva did for you" — the anti-churn proof timeline. The
-              managed service made visible. Only past day-one (its own honest
-              empty state covers a new-but-not-day-one client). */}
-          {!isFresh ? (
-            <ActivityFeed activity={strelvaWork} historyHref={dashboardHref("/dashboard/history")} />
-          ) : null}
-
-          {/* Then — only after the proof — the few things that actually need the
-              owner: a rare owner-facing "do this next", then the "Needs you"
-              approval queue. */}
-          {topSuggestion ? (
-            <DoThisNextCard title={topSuggestion.title} prompt={doNextPrompt} />
-          ) : null}
-
-          {pendingCount > 0 ? (
-            <section className="rounded-2xl border border-accent/25 bg-glass">
-              <div className="max-h-[520px] overflow-y-auto">
-                <QueuePage
-                  initialPending={needsYou.pending}
-                  initialResolved={needsYou.resolved}
-                  pendingCount={needsYou.pendingCount}
-                  staleSectionCount={needsYou.staleSectionCount}
-                  isOperator={isOperator}
-                  compact
-                />
-              </div>
-            </section>
-          ) : null}
-
-          {leadSummary.recent.length > 0 ? (
-            <section className="rounded-2xl border border-glass-border bg-glass p-5">
-              <div className="mb-4 flex items-center justify-between gap-3">
-                <div>
-                  <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-gray-muted">
-                    Who reached out
-                  </p>
-                  <h2 className="mt-2 font-display text-[18px] font-normal text-warm-black">
-                    {leadSummary.count} {leadSummary.count === 1 ? "person" : "people"} this month
-                  </h2>
-                </div>
-                <Inbox className="h-5 w-5 shrink-0 text-accent" strokeWidth={1.5} />
-              </div>
-              <ul className="divide-y divide-gray-border/60">
-                {leadSummary.recent.map((lead) => (
-                  <li key={lead.id} className="py-2.5">
-                    <div className="flex items-baseline justify-between gap-3">
-                      <span className="text-[13px] font-medium text-warm-black">{lead.name}</span>
-                      <span className="shrink-0 text-[11px] text-gray-faint">{new Date(lead.createdAt).toLocaleDateString()}</span>
-                    </div>
-                    {lead.message ? (
-                      <p className="mt-0.5 line-clamp-2 text-[12px] leading-relaxed text-gray-muted">{lead.message}</p>
-                    ) : null}
-                    {lead.email ? (
-                      <a
-                        href={`mailto:${lead.email}`}
-                        className="mt-1 inline-flex items-center gap-1.5 text-[12px] font-medium text-accent hover:text-accent/80"
-                      >
-                        <Mail className="h-3.5 w-3.5" strokeWidth={1.5} />
-                        Reply to {lead.email}
-                      </a>
-                    ) : null}
-                  </li>
-                ))}
-              </ul>
-              <Link
-                href={dashboardHref("/dashboard/leads")}
-                className="mt-3 inline-flex items-center gap-1 text-[12px] font-medium text-accent hover:text-accent/80"
-              >
-                See everyone who reached out
-                <ArrowRight className="h-3.5 w-3.5" strokeWidth={1.5} />
-              </Link>
-            </section>
-          ) : null}
-
-          {!isFresh ? <RetentionPanel signals={retentionSignals} /> : null}
-        </div>
-      </div>
+      <DashboardToday
+        tenant={tenant}
+        ownerName={ownerName}
+        businessName={businessName}
+        verdict={verdict}
+        isFresh={isFresh}
+        isOperator={isOperator}
+        numbers={{
+          foundTotal: pageViews.total,
+          foundWeek: pageViews.thisWeek,
+          actionsTotal: customerActionsTotal,
+          bookedWeek: customerActions.thisWeek,
+          calledWeek: phoneActions.thisWeek,
+        }}
+        needsYou={needsYou}
+        strelvaWork={strelvaWork}
+        suggestion={topSuggestion ? { title: topSuggestion.title, prompt: doNextPrompt } : null}
+        leads={leadSummary}
+        retentionSignals={retentionSignals}
+        hrefs={{
+          reports: brief ? dashboardHref("/dashboard/reports") : undefined,
+          history: dashboardHref("/dashboard/history"),
+          leads: dashboardHref("/dashboard/leads"),
+          site: dashboardHref("/dashboard/site"),
+          live: siteUrl,
+        }}
+      />
     </>
   );
 }

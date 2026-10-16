@@ -1,11 +1,13 @@
 "use client";
 
-import { useEffect, type ReactNode } from "react";
+import type { ReactNode } from "react";
+import { XaButton, XaSheet } from "@/components/ui/strelva/Xa";
 
 /**
- * Reusable confirmation dialog for destructive actions (delete photo / remove
- * component / remove domain, etc.). Keeps single-click destructive actions from
- * firing without a confirm step. Controlled via `open`.
+ * The confirmation a destructive action needs before it happens (delete a
+ * photo, remove a domain, cancel a booking). An XA sheet: a native <dialog>,
+ * focus moves in, Escape closes, focus returns to the opener. The confirm is
+ * the sheet's one ink pill; the sheet counts as its own screen.
  */
 export function ConfirmDialog({
   open,
@@ -23,51 +25,23 @@ export function ConfirmDialog({
   message?: ReactNode;
   confirmLabel?: string;
   cancelLabel?: string;
+  /** Said in the words; the pill stays ink so a sheet never shouts. */
   destructive?: boolean;
   busy?: boolean;
   onConfirm: () => void;
   onCancel: () => void;
 }) {
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && !busy) onCancel();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [open, busy, onCancel]);
-
-  if (!open) return null;
-
   return (
-    <div className="fixed inset-0 z-[300] flex items-center justify-center p-4" role="dialog" aria-modal="true">
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => !busy && onCancel()} />
-      <div className="relative w-full max-w-sm rounded-2xl border border-glass-border bg-surface-base p-5 shadow-2xl">
-        <h2 className="text-[15px] font-semibold text-warm-black">{title}</h2>
-        {message && (
-          <div className="mt-2 text-[13px] leading-relaxed text-gray-muted">{message}</div>
-        )}
-        <div className="mt-5 flex justify-end gap-2">
-          <button
-            type="button"
-            onClick={onCancel}
-            disabled={busy}
-            className="rounded-lg border border-gray-border px-3.5 py-2 text-[13px] font-medium text-warm-black transition-colors hover:bg-gray-bg disabled:opacity-50"
-          >
-            {cancelLabel}
-          </button>
-          <button
-            type="button"
-            onClick={onConfirm}
-            disabled={busy}
-            className={`rounded-lg px-3.5 py-2 text-[13px] font-medium transition-colors disabled:opacity-60 ${
-              destructive ? "bg-action-danger text-on-action-danger" : "bg-accent text-on-accent hover:bg-accent/85"
-            }`}
-          >
-            {busy ? "Working…" : confirmLabel}
-          </button>
-        </div>
-      </div>
-    </div>
+    <XaSheet
+      open={open}
+      onClose={() => { if (!busy) onCancel(); }}
+      title={title}
+      actions={<>
+        <XaButton variant="primary" size="lg" block busy={busy} onClick={onConfirm} data-destructive={destructive || undefined}>{confirmLabel}</XaButton>
+        <XaButton variant="quiet" size="lg" disabled={busy} onClick={onCancel}>{cancelLabel}</XaButton>
+      </>}
+    >
+      {message ? <div className="text-[15px] leading-[1.5] text-[var(--st-text-2)]">{message}</div> : null}
+    </XaSheet>
   );
 }

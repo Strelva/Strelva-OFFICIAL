@@ -43,37 +43,29 @@ function QueueDiff({ diffs }: { diffs: PreviewDiff[] }) {
   const extra = diffs.length - shown.length;
 
   return (
-    <div className="rounded-lg border border-glass-border bg-surface-inset px-3 py-2.5">
-      <p className="mb-2 text-[10px] font-medium uppercase tracking-[0.14em] text-gray-muted">
+    <div className="flex flex-col gap-2">
+      <p className="m-0 text-[13px] font-medium text-gray-muted">
         What changed
       </p>
       <ul className="space-y-2">
         {shown.map((d, i) => (
-          <li key={`${d.field}-${i}`} className="text-[12px] leading-snug">
-            <span className="font-mono text-[11px] text-gray-muted">{d.field}</span>
+          <li key={`${d.field}-${i}`} className="text-[14px] leading-snug">
+            <span className="text-[13px] text-gray-muted">{d.field}</span>
             {d.type === "added" ? (
-              <div className="mt-0.5 rounded bg-success-dim px-1.5 py-0.5 text-success">
-                + {truncate(d.after)}
-              </div>
+              <div className="mt-0.5 text-warm-black"><span className="sr-only">Added: </span>{truncate(d.after)}</div>
             ) : d.type === "removed" ? (
-              <div className="mt-0.5 rounded bg-critical0/10 px-1.5 py-0.5 text-critical0 line-through">
-                − {truncate(d.before)}
-              </div>
+              <div className="mt-0.5 text-gray-muted line-through"><span className="sr-only">Removed: </span>{truncate(d.before)}</div>
             ) : (
               <div className="mt-0.5 space-y-0.5">
-                <div className="rounded bg-critical0/10 px-1.5 py-0.5 text-critical0 line-through">
-                  {truncate(d.before)}
-                </div>
-                <div className="rounded bg-success-dim px-1.5 py-0.5 text-success">
-                  {truncate(d.after)}
-                </div>
+                <div className="text-gray-muted line-through"><span className="sr-only">Was: </span>{truncate(d.before)}</div>
+                <div className="text-warm-black"><span className="sr-only">Now: </span>{truncate(d.after)}</div>
               </div>
             )}
           </li>
         ))}
       </ul>
       {extra > 0 && (
-        <p className="mt-2 text-[11px] text-gray-subtle">
+        <p className="m-0 text-[13px] text-gray-muted">
           +{extra} more field{extra === 1 ? "" : "s"} changed
         </p>
       )}
@@ -145,16 +137,16 @@ function formatTime(value: string): string {
 
 function QueueGbpPost({ post }: { post: { summary: string; ctaUrl?: string } }) {
   return (
-    <div className="rounded-lg border border-glass-border bg-surface-inset px-3 py-2.5">
-      <p className="mb-2 text-[10px] font-medium uppercase tracking-[0.14em] text-gray-muted">
+    <div className="flex flex-col gap-2">
+      <p className="m-0 text-[13px] font-medium text-gray-muted">
         What will be posted to Google
       </p>
-      <p className="whitespace-pre-wrap rounded bg-success-dim px-2 py-1.5 text-[12px] leading-snug text-success">
+      <p className="m-0 whitespace-pre-wrap text-[14px] leading-snug text-warm-black">
         {post.summary}
       </p>
       {post.ctaUrl && (
-        <p className="mt-1.5 truncate text-[11px] text-gray-subtle">
-          <span className="font-mono text-gray-muted">Button link</span> {post.ctaUrl}
+        <p className="m-0 truncate text-[13px] text-gray-muted">
+          <span>Button link</span> {post.ctaUrl}
         </p>
       )}
     </div>
@@ -163,16 +155,16 @@ function QueueGbpPost({ post }: { post: { summary: string; ctaUrl?: string } }) 
 
 function QueueGbpHours({ hours }: { hours: GbpHour[] }) {
   return (
-    <div className="rounded-lg border border-glass-border bg-surface-inset px-3 py-2.5">
-      <p className="mb-2 text-[10px] font-medium uppercase tracking-[0.14em] text-gray-muted">
+    <div className="flex flex-col gap-2">
+      <p className="m-0 text-[13px] font-medium text-gray-muted">
         New hours for Google
       </p>
       <ul className="space-y-1.5">
         {hours.map((h, i) => (
-          <li key={`${h.day}-${i}`} className="flex items-center justify-between gap-3 text-[12px]">
-            <span className="font-medium text-warm-black">{DAY_LABELS[h.day] ?? h.day}</span>
-            <span className="rounded bg-success-dim px-1.5 py-0.5 text-success">
-              {formatTime(h.open)} – {formatTime(h.close)}
+          <li key={`${h.day}-${i}`} className="flex items-center justify-between gap-3 text-[14px]">
+            <span className="text-warm-black">{DAY_LABELS[h.day] ?? h.day}</span>
+            <span className="tabular-nums text-warm-black">
+              {formatTime(h.open)} to {formatTime(h.close)}
             </span>
           </li>
         ))}
@@ -190,7 +182,7 @@ export function hasQueueEventDetail(event: QueueEventLike): boolean {
 
 export function QueueEventDetail({
   event,
-  className = "mt-1.5 ml-11",
+  className = "mt-1.5",
 }: {
   event: QueueEventLike;
   /** Positioning wrapper. Defaults to the client-queue indent; the operator

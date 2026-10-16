@@ -1,7 +1,6 @@
-import Link from "next/link";
-import { ArrowRight, FileText, Pencil, Sparkles, Star, MessageSquareQuote } from "lucide-react";
+import { XaLabel, XaLines, XaTextLink } from "@/components/ui/strelva/Xa";
 import type { ActivityEntry } from "@/lib/storage/activity-store";
-import { buildActivityFeed, type ActivityFeedKind } from "@/lib/activity-feed";
+import { buildActivityFeed } from "@/lib/activity-feed";
 
 /**
  * "What Strelva did for you" — the owner-facing proof timeline on Today.
@@ -22,11 +21,7 @@ function feedTime(iso: string): string {
   const diff = Date.now() - then;
   const hour = 3_600_000;
   const day = 24 * hour;
-  if (diff < hour) {
-    if (diff < 60_000) return "just now";
-    return `${Math.floor(diff / 60_000)}m ago`;
-  }
-  if (diff < day) return `${Math.floor(diff / hour)}h ago`;
+  if (diff < day) return new Date(then).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }).replace(" AM", "").replace(" PM", " pm");
   if (diff < 7 * day) return new Date(then).toLocaleDateString("en-US", { weekday: "short" });
   return new Date(then).toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
@@ -45,94 +40,41 @@ function feedTimeTitle(iso: string): string {
   });
 }
 
-const KIND_ICON: Record<ActivityFeedKind, typeof Pencil> = {
-  site: Pencil,
-  post: FileText,
-  review: Star,
-  testimonial: MessageSquareQuote,
-  look: Sparkles,
-};
-
-function EmptyState() {
-  return (
-    <p className="rounded-lg border border-gray-border/70 bg-surface-raised px-4 py-4 text-[13px] leading-relaxed text-gray-muted">
-      Strelva just started managing your site. The updates we make will show up here as your proof
-      trail. Ask Strelva for one small change to see it land.
-    </p>
-  );
-}
-
+/**
+ * O1 "Since yesterday": times beside sentences. Each line names Strelva because
+ * activity-feed.ts only keeps Strelva's own logged work; the owner's edits stay out.
+ */
 export function ActivityFeed({
   activity,
   historyHref,
+  limit = 6,
 }: {
   activity: ActivityEntry[];
   historyHref?: string;
+  limit?: number;
 }) {
   const groups = buildActivityFeed(activity);
+  const items = groups.flatMap((group) => group.items).slice(0, limit);
 
   return (
-    <section className="rounded-2xl border border-glass-border bg-glass p-5">
-      <div className="mb-4">
-        <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-gray-muted">
-          What Strelva did for you
+    <section className="flex flex-col gap-3" aria-labelledby="activity-feed-label">
+      <XaLabel id="activity-feed-label">What Strelva did</XaLabel>
+      {items.length === 0 ? (
+        <p className="m-0 text-[15px] leading-[1.45] text-[var(--st-text-2)]">
+          Nothing yet. The first change Strelva makes to your site shows up here, with the time it landed.
         </p>
-        <h2 className="mt-2 font-display text-[18px] font-normal text-warm-black">
-          {groups.length > 0 ? "We've been busy on your site" : "Your updates land here"}
-        </h2>
-      </div>
-
-      {groups.length === 0 ? (
-        <EmptyState />
       ) : (
-        <div className="flex flex-col gap-5">
-          {groups.map((group) => (
-            <div key={group.label}>
-              <p className="mb-2.5 text-[11px] font-medium uppercase tracking-[0.14em] text-gray-faint">
-                {group.label}
-              </p>
-              <ul className="flex flex-col gap-2">
-                {group.items.map((item) => {
-                  const Icon = KIND_ICON[item.kind];
-                  return (
-                    <li
-                      key={item.id}
-                      className="flex items-start gap-3 rounded-lg border border-gray-border/70 bg-surface-raised px-3 py-2.5"
-                    >
-                      <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-accent/10 text-accent">
-                        <Icon className="h-3.5 w-3.5" strokeWidth={1.5} />
-                      </span>
-                      <div className="min-w-0 flex-1">
-                        <p className="text-[13px] font-medium leading-snug text-warm-black">{item.label}</p>
-                        {item.detail ? (
-                          <p className="mt-0.5 line-clamp-1 text-[12px] text-gray-muted">{item.detail}</p>
-                        ) : null}
-                      </div>
-                      {feedTime(item.time) ? (
-                        <span
-                          className="mt-0.5 shrink-0 text-[11px] tabular-nums text-gray-faint"
-                          title={feedTimeTitle(item.time)}
-                        >
-                          {feedTime(item.time)}
-                        </span>
-                      ) : null}
-                    </li>
-                  );
-                })}
-              </ul>
-            </div>
-          ))}
-        </div>
+        <XaLines
+          label="What Strelva did"
+          lines={items.map((item) => ({
+            time: feedTime(item.time),
+            dateTime: item.time,
+            text: <span title={feedTimeTitle(item.time)}>{item.label}{item.detail ? <span className="text-[var(--st-text-2)]">. {item.detail}</span> : null}</span>,
+          }))}
+        />
       )}
-
-      {groups.length > 0 && historyHref ? (
-        <Link
-          href={historyHref}
-          className="mt-4 inline-flex items-center gap-1 text-[12px] font-medium text-accent hover:text-accent/80"
-        >
-          See everything Strelva did
-          <ArrowRight className="h-3.5 w-3.5" strokeWidth={1.5} />
-        </Link>
+      {items.length > 0 && historyHref ? (
+        <p className="m-0 text-[14px]"><XaTextLink href={historyHref}>See everything in History</XaTextLink></p>
       ) : null}
     </section>
   );

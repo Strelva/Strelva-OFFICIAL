@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Target, Check, X } from "lucide-react";
+import { XaButton, XaLabel, XaTextLink } from "@/components/ui/strelva/Xa";
 import type { Goal, GoalMetric } from "@/lib/goals";
 import { GOAL_METRIC_LABELS, currentGoalValue } from "@/lib/goals";
 import { useDashboardOptional } from "./DashboardContext";
@@ -74,131 +74,55 @@ export function GoalCard({ goal: initialGoal, stats }: GoalCardProps) {
     }
   }
 
-  // No goal, not editing → a quiet invitation to set one.
+  const inputClass = "min-h-[40px] rounded-[12px] border border-[var(--st-line)] bg-[var(--st-surface)] px-3 text-[15px] text-[var(--st-text)] outline-none focus-visible:border-[var(--st-accent)]";
+
+  // No goal, not editing: a quiet invitation to set one.
   if (!goal && !editing) {
     return (
-      <button
-        type="button"
-        onClick={() => !readOnly && setEditing(true)}
-        disabled={readOnly}
-        className="flex w-full items-center gap-3 rounded-xl border border-dashed border-gray-border bg-glass/40 p-4 text-left transition-colors hover:border-accent/40 disabled:cursor-not-allowed disabled:opacity-60"
-      >
-        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-accent-dim text-accent">
-          <Target className="h-4 w-4" strokeWidth={1.6} />
-        </span>
-        <span>
-          <span className="block text-[14px] font-medium text-warm-black">Set a weekly goal</span>
-          <span className="block text-[12px] text-gray-muted">
-            Pick a number to chase. We&apos;ll track it on every report.
-          </span>
-        </span>
-      </button>
+      <section className="flex flex-col gap-2" aria-labelledby="goal-label">
+        <XaLabel id="goal-label">Weekly goal</XaLabel>
+        <p className="m-0 text-[15px] text-[var(--st-text-2)]">
+          No goal yet. Pick a number to chase and every report tracks it.{" "}
+          {!readOnly ? <XaTextLink onClick={() => setEditing(true)}>Set a weekly goal</XaTextLink> : null}
+        </p>
+      </section>
     );
   }
 
-  // Editing (or setting a first goal) → the form.
+  // Editing (or setting a first goal): the form, in place.
   if (editing) {
     return (
-      <div className="rounded-xl border border-glass-border bg-glass p-4 sm:p-5">
-        <div className="flex items-center gap-2">
-          <Target className="h-4 w-4 text-accent" strokeWidth={1.6} />
-          <p className="text-[12px] font-medium uppercase tracking-wide text-accent">Weekly goal</p>
-        </div>
-        <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center">
-          <select
-            value={metric}
-            onChange={(e) => setMetric(e.target.value as GoalMetric)}
-            className="rounded-lg border border-gray-border bg-surface-base px-3 py-2 text-[13px] text-warm-black outline-none focus:border-accent/40"
-          >
-            {METRIC_OPTIONS.map((o) => (
-              <option key={o.value} value={o.value}>
-                {o.label}
-              </option>
-            ))}
+      <section className="flex flex-col gap-3" aria-labelledby="goal-label">
+        <XaLabel id="goal-label">Weekly goal</XaLabel>
+        <div className="flex flex-wrap items-center gap-3">
+          <select aria-label="What to count" value={metric} onChange={(e) => setMetric(e.target.value as GoalMetric)} className={inputClass} data-owned-select>
+            {METRIC_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
           </select>
-          <input
-            type="number"
-            min={1}
-            value={target}
-            onChange={(e) => setTarget(e.target.value)}
-            placeholder="Target"
-            className="w-28 rounded-lg border border-gray-border bg-surface-base px-3 py-2 text-[13px] text-warm-black outline-none focus:border-accent/40"
-          />
-          <span className="text-[13px] text-gray-muted">per week</span>
-          <div className="flex gap-2 sm:ml-auto">
-            <button
-              type="button"
-              onClick={save}
-              disabled={busy}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-3 py-2 text-[13px] font-medium text-on-accent transition-colors hover:bg-accent/85 disabled:opacity-60"
-            >
-              <Check className="h-3.5 w-3.5" strokeWidth={2} />
-              Save
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setEditing(false);
-                setError("");
-              }}
-              className="rounded-lg border border-gray-border px-3 py-2 text-[13px] font-medium text-gray-muted transition-colors hover:text-warm-black"
-            >
-              Cancel
-            </button>
-          </div>
+          <input aria-label="How many each week" type="number" min={1} value={target} onChange={(e) => setTarget(e.target.value)} placeholder="How many" className={`w-28 ${inputClass}`} />
+          <span className="text-[15px] text-[var(--st-text-2)]">a week</span>
+          <XaButton busy={busy} onClick={save}>Save goal</XaButton>
+          <XaTextLink onClick={() => { setEditing(false); setError(""); }}>Cancel</XaTextLink>
         </div>
-        {error && <p className="mt-2 text-[12px] text-critical">{error}</p>}
-      </div>
+        {error ? <p className="m-0 text-[14px] text-[var(--st-critical)]" role="alert">{error}</p> : null}
+      </section>
     );
   }
 
-  // Goal set → progress.
+  // Goal set: progress.
   const current = currentGoalValue(goal!.metric, stats);
   const pct = Math.min(100, Math.round((current / goal!.target) * 100));
   const hit = current >= goal!.target;
 
   return (
-    <div className="rounded-xl border border-glass-border bg-glass p-4 sm:p-5">
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <Target className="h-4 w-4 text-accent" strokeWidth={1.6} />
-          <p className="text-[12px] font-medium uppercase tracking-wide text-accent">Weekly goal</p>
-        </div>
-        {!readOnly && (
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setEditing(true)}
-              className="text-[12px] font-medium text-gray-muted transition-colors hover:text-warm-black"
-            >
-              Edit
-            </button>
-            <button
-              type="button"
-              onClick={clear}
-              disabled={busy}
-              className="text-gray-faint transition-colors hover:text-warm-black"
-              aria-label="Remove goal"
-            >
-              <X className="h-3.5 w-3.5" strokeWidth={1.8} />
-            </button>
-          </div>
-        )}
+    <section className="flex flex-col gap-3" aria-labelledby="goal-label">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <XaLabel id="goal-label">Weekly goal</XaLabel>
+        {!readOnly ? <span className="flex gap-3 text-[14px]"><XaTextLink onClick={() => setEditing(true)}>Change</XaTextLink><XaTextLink onClick={clear} aria-label="Remove the weekly goal">Remove</XaTextLink></span> : null}
       </div>
-      <p className="mt-2 text-[14px] font-semibold tracking-[-0.01em] text-warm-black">
-        {current.toLocaleString()} of {goal!.target.toLocaleString()} {GOAL_METRIC_LABELS[goal!.metric]}
-      </p>
-      <div className="mt-3 h-2 overflow-hidden rounded-full bg-surface-raised">
-        <div
-          className={`h-full rounded-full transition-all ${hit ? "bg-success" : "bg-accent"}`}
-          style={{ width: `${pct}%` }}
-        />
+      <p className="m-0 text-[17px] text-[var(--st-text)]"><span className="tabular-nums">{current.toLocaleString()}</span> of <span className="tabular-nums">{goal!.target.toLocaleString()}</span> {GOAL_METRIC_LABELS[goal!.metric]}{hit ? ". Goal reached." : `, ${goal!.target - current} to go this week.`}</p>
+      <div className="h-1.5 max-w-[560px] overflow-hidden rounded-full bg-[var(--st-inset)]" role="progressbar" aria-valuemin={0} aria-valuemax={goal!.target} aria-valuenow={current} aria-label="Progress toward the weekly goal">
+        <div className="h-full rounded-full bg-[var(--st-accent)] transition-[width] duration-(--motion-slow)" style={{ width: `${pct}%` }} />
       </div>
-      <p className="mt-2 text-[12px] text-gray-muted">
-        {hit
-          ? "Goal hit. Nice. Raise the bar or ride the momentum."
-          : `${goal!.target - current} to go this week.`}
-      </p>
-    </div>
+    </section>
   );
 }

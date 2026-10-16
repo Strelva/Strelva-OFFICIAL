@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Sparkles, Check, Loader2 } from "lucide-react";
+import { XaChoices, XaStatus } from "@/components/ui/strelva/Xa";
 import type { ContentAutonomy } from "@/lib/content-autonomy";
 import { useDashboardOptional } from "./DashboardContext";
 
@@ -14,7 +14,7 @@ const MODES: { value: ContentAutonomy; label: string; blurb: string }[] = [
   {
     value: "approve",
     label: "Ask me first",
-    blurb: "Every change waits for your okay before it goes live.",
+    blurb: "Every change waits for your yes before it goes live.",
   },
 ];
 
@@ -76,48 +76,16 @@ export function ContentAutonomyPanel() {
   }
 
   return (
-    <section className="rounded-xl dashboard-panel p-5">
-      <div className="flex items-start gap-3">
-        <span className="mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-accent-dim text-accent">
-          <Sparkles className="h-[18px] w-[18px]" strokeWidth={1.6} />
-        </span>
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            <h2 className="text-[15px] font-semibold text-warm-black">How much Strelva handles on its own</h2>
-            {saving && <Loader2 className="h-3.5 w-3.5 animate-spin text-gray-muted" strokeWidth={2} />}
-            {saved && <span className="text-[12px] font-medium text-accent">Saved</span>}
-          </div>
-          <p className="mt-0.5 text-[13px] leading-relaxed text-gray-muted">
-            Your hours, prices, phone, and booking link always come to you before they change. This only decides the small stuff.
-          </p>
-        </div>
+    <section className="flex flex-col gap-3" aria-labelledby="autonomy-label">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <h2 id="autonomy-label" className="m-0 text-[13px] font-medium text-[var(--st-text-3)]">How much Strelva does on its own</h2>
+        {saving ? <XaStatus kind="working" size="sm">Saving</XaStatus> : saved ? <XaStatus kind="live" size="sm">Saved</XaStatus> : null}
       </div>
-
-      <div className="mt-4 grid gap-2 sm:grid-cols-2">
-        {MODES.map((m) => {
-          const on = mode === m.value;
-          return (
-            <button
-              key={m.value}
-              type="button"
-              onClick={() => choose(m.value)}
-              disabled={saving}
-              className={`rounded-lg border p-3 text-left transition-colors disabled:opacity-70 ${
-                on ? "border-accent/60 bg-accent-dim" : "border-glass-border bg-glass hover:border-gray-border"
-              }`}
-            >
-              <div className="flex items-center justify-between">
-                <span className="text-[13px] font-semibold text-warm-black">{m.label}</span>
-                {on && <Check className="h-4 w-4 text-accent" strokeWidth={2.4} />}
-              </div>
-              <p className="mt-1 text-[11.5px] leading-snug text-gray-muted">{m.blurb}</p>
-            </button>
-          );
-        })}
-      </div>
-
-      {note && <p className="mt-2 text-[12px] leading-relaxed text-gray-muted" role="status">{note}</p>}
-      {error && <p className="mt-2 text-[12px] text-critical" role="alert">{error}</p>}
+      <p className="m-0 text-[15px] leading-[1.5] text-[var(--st-text-2)]">Your hours, prices, phone and booking link always come to you before they change. This only decides the small stuff.</p>
+      <XaChoices label="Small changes to your site" value={mode} onChange={(value) => void choose(value)}
+        options={MODES.map((m) => ({ value: m.value, label: m.label, detail: m.blurb, disabled: saving }))} />
+      {note ? <p className="m-0 text-[14px] leading-relaxed text-[var(--st-text-2)]" role="status">{note}</p> : null}
+      {error ? <p className="m-0 text-[14px] text-[var(--st-critical)]" role="alert">{error}</p> : null}
     </section>
   );
 }

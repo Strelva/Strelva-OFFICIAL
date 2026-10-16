@@ -13,7 +13,7 @@ import { ChevronDown } from "lucide-react";
 import { cn } from "@/lib/cn";
 
 const INPUT_BASE =
-  "w-full bg-surface-base border border-gray-border rounded-md px-3 py-2 text-[13px] text-warm-white outline-none focus:border-accent/40 transition-colors placeholder:text-gray-faint";
+  "min-h-[44px] w-full bg-[var(--st-surface,var(--surface-base))] border border-[var(--st-line,var(--gray-border))] rounded-[12px] px-3 py-2 text-[15px] text-warm-black outline-none focus-visible:border-[var(--st-accent,var(--accent))] transition-colors placeholder:text-[var(--st-faint,var(--gray-faint))]";
 
 interface DashSelectOption {
   value: string;
@@ -76,15 +76,15 @@ export function FormRow({
   return (
     <div
       className={cn(
-        "flex flex-col md:flex-row md:items-start gap-1.5 md:gap-4 px-5 py-4",
-        !last && "border-b border-gray-border/50",
+        "flex flex-col md:flex-row md:items-start gap-2 md:gap-6 py-4",
+        !last && "border-b border-[var(--st-line,var(--gray-border))]",
       )}
     >
       <div className="md:w-[180px] shrink-0 md:pt-1.5">
-        <label htmlFor={canLabel ? fieldId : undefined} className="block text-[13px] text-warm-white">
+        <label htmlFor={canLabel ? fieldId : undefined} className="block text-[15px] text-warm-black">
           {label}
         </label>
-        <div className="text-[11px] text-gray-faint mt-0.5">{description}</div>
+        <div className="mt-0.5 text-[13px] text-gray-muted">{description}</div>
       </div>
       <div className="flex-1">{field}</div>
     </div>

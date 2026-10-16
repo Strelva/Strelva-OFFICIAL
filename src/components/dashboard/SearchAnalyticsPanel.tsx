@@ -1,6 +1,5 @@
-import Link from "next/link";
-import type { ComponentType } from "react";
-import { Search, Eye, MapPin, Users, MousePointerClick, Link2 } from "lucide-react";
+import { XaLabel, XaRow, XaRows, XaSays, XaTextLink } from "@/components/ui/strelva/Xa";
+import { pageName } from "./page-name";
 import type { SearchPerf, GaPerf } from "@/lib/analytics";
 
 interface SearchAnalyticsPanelProps {
@@ -12,41 +11,11 @@ interface SearchAnalyticsPanelProps {
   connectHref: string;
 }
 
-function StatTile({
-  label,
-  value,
-  detail,
-  icon: Icon,
-}: {
-  label: string;
-  value: string;
-  detail: string;
-  icon: ComponentType<{ className?: string; strokeWidth?: number }>;
-}) {
-  return (
-    <div className="rounded-xl border border-glass-border bg-glass p-4">
-      <div className="mb-3 flex items-center gap-2 text-gray-muted">
-        <Icon className="h-4 w-4" strokeWidth={1.5} />
-        <span className="text-[11px] font-medium uppercase tracking-[0.12em]">{label}</span>
-      </div>
-      <p className="text-[26px] font-semibold leading-none text-warm-black">{value}</p>
-      <p className="mt-2 text-[12px] leading-relaxed text-gray-muted">{detail}</p>
-    </div>
-  );
-}
-
-/** Section shell — shared eyebrow + heading so every state looks intentional. */
+/** Section shell: one sentence-case label so every state reads as the same place. */
 function Shell({ children }: { children: React.ReactNode }) {
   return (
-    <section className="space-y-3">
-      <div>
-        <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-gray-muted">
-          Search &amp; Analytics
-        </p>
-        <h2 className="mt-1 font-display text-[18px] font-normal text-warm-black">
-          How people find you on Google
-        </h2>
-      </div>
+    <section className="flex flex-col gap-3" aria-labelledby="search-label">
+      <XaLabel id="search-label">How people find you on Google</XaLabel>
       {children}
     </section>
   );
@@ -58,154 +27,52 @@ export function SearchAnalyticsPanel({ search, ga, connectHref }: SearchAnalytic
   const anyOk = searchOk || gaOk;
   const anyUnavailable = search?.status === "unavailable" || ga?.status === "unavailable";
 
-  // Most clients haven't linked Google yet — this must read as a next step, not a
-  // broken tab. A gentle connect nudge pointing at the existing Connect Google flow.
+  // Most clients haven't linked Google yet: a next step, not a broken tab.
   if (!anyOk && !anyUnavailable) {
     return (
       <Shell>
-        <div className="rounded-xl border border-accent/20 bg-accent-dim/40 p-5">
-          <div className="flex items-start gap-3">
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-surface-raised text-accent">
-              <Link2 className="h-4 w-4" strokeWidth={1.5} />
-            </div>
-            <div className="min-w-0">
-              <p className="text-[14px] font-medium text-warm-black">
-                Connect Google to see your search performance
-              </p>
-              <p className="mt-1 text-[13px] leading-relaxed text-gray-muted">
-                Link your Google account and we&apos;ll show the searches people use to find you and
-                the pages they visit most.
-              </p>
-              <Link
-                href={connectHref}
-                className="mt-3 inline-flex min-h-[40px] items-center justify-center gap-2 rounded-lg bg-accent px-4 text-[13px] font-medium text-on-accent transition-colors hover:bg-accent/85"
-              >
-                <Link2 className="h-4 w-4" strokeWidth={1.5} />
-                Connect Google
-              </Link>
-            </div>
-          </div>
-        </div>
+        <XaSays links={[<XaTextLink key="connect" href={connectHref}>Connect Google</XaTextLink>]}>Link Google and I show the searches people use to find you and the pages they visit most.</XaSays>
       </Shell>
     );
   }
 
-  // Configured, but the data isn't ready this cycle (auth hiccup / fresh property).
-  // Honest, not alarming, no raw API error.
+  // Configured, but the data isn't ready this cycle. Honest, not alarming, no raw API error.
   if (!anyOk) {
     return (
       <Shell>
-        <div className="rounded-xl border border-glass-border bg-glass p-5">
-          <p className="text-[13px] leading-relaxed text-gray-muted">
-            Search data from Google couldn&apos;t be read this time. Strelva tries again on the next refresh.
-          </p>
-        </div>
+        <p className="m-0 text-[15px] text-[var(--st-text-2)]">Google didn&apos;t answer this time. Strelva tries again at the next refresh; nothing is lost.</p>
       </Shell>
     );
   }
 
-  const position = searchOk && search!.position > 0 ? `#${search!.position}` : null;
   const topQueries = searchOk ? search!.topQueries.slice(0, 5) : [];
   const topPages = gaOk ? ga!.topPages.slice(0, 5) : [];
+  const searchLine = searchOk
+    ? `Over the last 4 weeks Google showed you ${search!.impressions.toLocaleString()} times and ${search!.clicks.toLocaleString()} ${search!.clicks === 1 ? "person" : "people"} clicked through${search!.position > 0 ? `; you usually sit around spot ${search!.position}` : ""}.`
+    : null;
+  const gaLine = gaOk ? `${ga!.users.toLocaleString()} ${ga!.users === 1 ? "person" : "people"} visited your site ${ga!.sessions.toLocaleString()} times.` : null;
 
   return (
     <Shell>
-      <p className="text-[12px] text-gray-muted">Last 4 weeks</p>
-
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-        {searchOk && (
-          <>
-            <StatTile
-              label="Found you"
-              value={search!.clicks.toLocaleString()}
-              detail="clicked through from Google"
-              icon={Search}
-            />
-            <StatTile
-              label="Times shown"
-              value={search!.impressions.toLocaleString()}
-              detail="appeared in Google search"
-              icon={Eye}
-            />
-            <StatTile
-              label="Average spot"
-              value={position ?? "—"}
-              detail="where you rank on Google"
-              icon={MapPin}
-            />
-          </>
+      <p className="m-0 max-w-[640px] text-[15px] leading-[1.5] text-[var(--st-text-body)]">{[searchLine, gaLine].filter(Boolean).join(" ")}</p>
+      <div className="grid gap-8 md:grid-cols-2">
+        {topQueries.length > 0 && (
+          <div className="flex flex-col gap-1">
+            <p className="m-0 text-[13px] text-[var(--st-text-3)]">What they searched</p>
+            <XaRows label="What they searched">
+              {topQueries.map((q, i) => <XaRow key={`${q.query}-${i}`} title={q.query} meta={`${q.clicks.toLocaleString()} ${q.clicks === 1 ? "click" : "clicks"}`} detail={`Shown ${q.impressions.toLocaleString()} times`} />)}
+            </XaRows>
+          </div>
         )}
-        {gaOk && (
-          <>
-            <StatTile
-              label="Visitors"
-              value={ga!.users.toLocaleString()}
-              detail="people who visited your site"
-              icon={Users}
-            />
-            <StatTile
-              label="Visits"
-              value={ga!.sessions.toLocaleString()}
-              detail="total visits to your site"
-              icon={MousePointerClick}
-            />
-          </>
+        {topPages.length > 0 && (
+          <div className="flex flex-col gap-1">
+            <p className="m-0 text-[13px] text-[var(--st-text-3)]">Pages they opened most</p>
+            <XaRows label="Pages they opened most">
+              {topPages.map((p, i) => <XaRow key={`${p.path}-${i}`} title={pageName(p.path)} meta={`${p.views.toLocaleString()} ${p.views === 1 ? "visit" : "visits"}`} />)}
+            </XaRows>
+          </div>
         )}
       </div>
-
-      {topQueries.length > 0 && (
-        <div className="space-y-2">
-          <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-gray-muted">
-            What people search to find you
-          </p>
-          <div className="overflow-hidden rounded-xl border border-glass-border bg-glass">
-            <table className="w-full text-left text-[13px]">
-              <thead>
-                <tr className="border-b border-glass-border text-[11px] uppercase tracking-wide text-gray-muted">
-                  <th scope="col" className="px-4 py-2.5 font-medium">Search</th>
-                  <th scope="col" className="px-4 py-2.5 text-right font-medium">Clicks</th>
-                  <th scope="col" className="px-4 py-2.5 text-right font-medium">Times shown</th>
-                </tr>
-              </thead>
-              <tbody>
-                {topQueries.map((q, i) => (
-                  <tr key={`${q.query}-${i}`} className="border-t border-glass-border first:border-t-0">
-                    <td className="px-4 py-2.5 text-warm-black">{q.query}</td>
-                    <td className="px-4 py-2.5 text-right tabular-nums text-gray-fg">{q.clicks.toLocaleString()}</td>
-                    <td className="px-4 py-2.5 text-right tabular-nums text-gray-fg">{q.impressions.toLocaleString()}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {topPages.length > 0 && (
-        <div className="space-y-2">
-          <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-gray-muted">
-            Most-visited pages
-          </p>
-          <div className="overflow-hidden rounded-xl border border-glass-border bg-glass">
-            <table className="w-full text-left text-[13px]">
-              <thead>
-                <tr className="border-b border-glass-border text-[11px] uppercase tracking-wide text-gray-muted">
-                  <th scope="col" className="px-4 py-2.5 font-medium">Page</th>
-                  <th scope="col" className="px-4 py-2.5 text-right font-medium">Visits</th>
-                </tr>
-              </thead>
-              <tbody>
-                {topPages.map((p, i) => (
-                  <tr key={`${p.path}-${i}`} className="border-t border-glass-border first:border-t-0">
-                    <td className="px-4 py-2.5 text-warm-black">{p.path}</td>
-                    <td className="px-4 py-2.5 text-right tabular-nums text-gray-fg">{p.views.toLocaleString()}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
     </Shell>
   );
 }

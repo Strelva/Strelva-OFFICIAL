@@ -85,7 +85,7 @@ export function CustomChangeRequestPanel() {
   return (
     <div className="flex h-full flex-col bg-surface">
       <div className="border-b border-gray-border px-4 py-3">
-        <p className="text-[11px] font-mono uppercase tracking-[0.08em] text-gray-muted">
+        <p className="text-[13px] text-gray-muted">
           Custom request
         </p>
         <p className="mt-1 text-[12px] leading-5 text-gray-faint">
@@ -98,14 +98,14 @@ export function CustomChangeRequestPanel() {
 
       <div className="flex-1 overflow-y-auto px-4 py-4">
         <div className="rounded-lg border border-gray-border bg-surface-raised px-3 py-2">
-          <p className="text-[11px] uppercase tracking-[0.12em] text-gray-faint">
+          <p className="text-[13px] text-gray-faint">
             Selected
           </p>
-          <p className="mt-1 truncate text-[12px] font-medium text-warm-white">
+          <p className="mt-1 truncate text-[12px] font-medium text-warm-black">
             {label || "Current page"}
           </p>
           {selectedNode?.field && (
-            <p className="mt-1 break-all font-mono text-[11px] text-gray-faint">
+            <p className="mt-1 break-all text-[12px] text-gray-faint">
               {selectedNode.field}
             </p>
           )}
@@ -121,10 +121,10 @@ export function CustomChangeRequestPanel() {
                 type="button"
                 onClick={() => setRequestKind(option.value)}
                 aria-pressed={active}
-                className={`flex h-8 items-center justify-center gap-1 rounded-md border text-[11px] font-medium transition-colors ${
+                className={`flex h-8 items-center justify-center gap-1 rounded-md border text-[12px] font-medium transition-colors ${
                   active
                     ? "border-accent/40 bg-accent/15 text-accent"
-                    : "border-gray-border text-gray-muted hover:text-warm-white"
+                    : "border-gray-border text-gray-muted hover:text-warm-black"
                 }`}
               >
                 <Icon className="h-3.5 w-3.5" strokeWidth={1.5} />
@@ -134,7 +134,7 @@ export function CustomChangeRequestPanel() {
           })}
         </div>
 
-        <label className="mt-4 block text-[11px] text-gray-muted">
+        <label className="mt-4 block text-[12px] text-gray-muted">
           What should change?
         </label>
         <textarea
@@ -142,11 +142,11 @@ export function CustomChangeRequestPanel() {
           onChange={(event) => setPrompt(event.target.value)}
           rows={7}
           placeholder="Example: Update this section's text to mention our new Saturday hours."
-          className="mt-1 w-full resize-none rounded-xl border border-gray-border bg-surface-inset px-3 py-2 text-[13px] leading-5 text-warm-white outline-none transition-colors placeholder:text-gray-subtle focus:border-accent/45"
+          className="mt-1 w-full resize-none rounded-xl border border-gray-border bg-surface-inset px-3 py-2 text-[13px] leading-5 text-warm-black outline-none transition-colors placeholder:text-gray-subtle focus:border-accent/45"
         />
 
         {error && (
-          <p className="mt-2 text-[11px] text-critical">
+          <p className="mt-2 text-[12px] text-critical">
             {errorMessage ?? "Could not send the request. Try again."}
           </p>
         )}
@@ -156,13 +156,13 @@ export function CustomChangeRequestPanel() {
               <Check className="h-3.5 w-3.5 shrink-0" strokeWidth={2} />
               Request received
             </p>
-            <p className="mt-1 text-[11px] leading-[1.55] text-gray-muted">
+            <p className="mt-1 text-[12px] leading-[1.55] text-gray-muted">
               We&apos;ll review this and get back to you with a quote. You can track it under your approvals in the meantime.
             </p>
             <button
               type="button"
               onClick={() => setSent(false)}
-              className="mt-2 text-[11px] text-accent hover:underline"
+              className="mt-2 text-[12px] text-accent hover:underline"
             >
               Send another request
             </button>
@@ -184,7 +184,7 @@ export function CustomChangeRequestPanel() {
               type="button"
               onClick={submitRequest}
               disabled={submitting || !prompt.trim()}
-              className="flex h-9 w-full items-center justify-center gap-2 rounded-lg bg-accent px-3 text-[12px] font-medium text-on-accent transition-colors hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-45"
+              className="flex h-9 w-full items-center justify-center gap-2 rounded-full bg-surface border border-gray-border px-3 text-[12px] font-medium text-warm-black transition-colors hover:bg-surface-inset disabled:cursor-not-allowed disabled:opacity-45"
             >
               <Send className="h-3.5 w-3.5" strokeWidth={1.5} />
               {submitting ? "Sending..." : "Send request"}

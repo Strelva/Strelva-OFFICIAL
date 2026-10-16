@@ -309,8 +309,7 @@ export const PromptInputBox = forwardRef<HTMLTextAreaElement, PromptInputBoxProp
     return (
       <div
         className={cn(
-          "ai-prompt-box rounded-3xl border border-glass-border bg-surface-inset p-2 shadow-[0_10px_35px_rgba(0,0,0,0.22)] transition-colors focus-within:border-white/12 focus-within:bg-surface-inset focus-within:shadow-[0_10px_35px_rgba(0,0,0,0.22)]",
-          isLoading && "border-white/12 bg-surface-inset",
+          "ai-prompt-box rounded-[28px] bg-[var(--st-surface,var(--surface))] p-2 shadow-[var(--st-shadow-sm)] transition-shadow duration-(--motion-fast) focus-within:shadow-[var(--st-shadow-lg)]",
           className,
         )}
       >
@@ -329,7 +328,7 @@ export const PromptInputBox = forwardRef<HTMLTextAreaElement, PromptInputBoxProp
           placeholder={thinkMode ? "Ask for the best next move..." : placeholder}
           aria-label="Message the AI about your site"
           rows={1}
-          className="block max-h-[180px] min-h-[42px] w-full resize-none overflow-y-auto rounded-2xl border-0 bg-transparent px-3 py-2.5 text-[14px] leading-relaxed text-warm-black caret-warm-black placeholder:text-gray-subtle outline-none ring-0 transition-none focus:bg-transparent focus:outline-none focus:ring-0 focus:ring-transparent focus-visible:bg-transparent focus-visible:outline-none focus-visible:ring-0 focus-visible:ring-transparent"
+          className="block max-h-[180px] min-h-[42px] w-full resize-none overflow-y-auto rounded-2xl border-0 bg-transparent px-3 py-2.5 text-[15px] leading-relaxed text-warm-black caret-warm-black placeholder:text-[var(--st-faint,var(--gray-subtle))] outline-none ring-0 transition-none focus:bg-transparent focus:outline-none focus:ring-0 focus:ring-transparent focus-visible:bg-transparent focus-visible:outline-none focus-visible:ring-0 focus-visible:ring-transparent"
         />
 
         <div className="flex items-center justify-between gap-2 pt-2">
@@ -341,10 +340,10 @@ export const PromptInputBox = forwardRef<HTMLTextAreaElement, PromptInputBoxProp
                   onClick={() => setActionsOpen((current) => !current)}
                   disabled={isLoading}
                   className={cn(
-                    "flex h-8 w-8 items-center justify-center rounded-full border transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/20",
+                    "flex h-8 w-8 items-center justify-center rounded-full border transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--st-accent,var(--accent))]",
                     actionsOpen
-                      ? "border-white/16 bg-white/[0.04] text-warm-white"
-                      : "border-transparent text-gray-muted hover:bg-white/[0.025] hover:text-gray-fg",
+                      ? "border-transparent bg-[var(--st-selected,var(--gray-bg))] text-warm-black"
+                      : "border-transparent text-gray-muted hover:bg-[var(--st-hover,var(--gray-bg-hover))] hover:text-warm-black",
                     isLoading && "cursor-not-allowed opacity-45",
                   )}
                   aria-expanded={actionsOpen}
@@ -357,21 +356,21 @@ export const PromptInputBox = forwardRef<HTMLTextAreaElement, PromptInputBoxProp
                 {actionsOpen && (
                     <div
                       role="menu"
-                      className="absolute bottom-full left-0 z-30 mb-2 w-[min(calc(100vw-2rem),360px)] overflow-visible rounded-2xl border border-white/10 bg-surface-popover text-text-popover p-1.5 shadow-[0_18px_55px_rgba(0,0,0,0.42)]"
+                      className="absolute bottom-full left-0 z-30 mb-2 w-[min(calc(100vw-2rem),360px)] overflow-visible rounded-2xl border border-[var(--st-line,var(--gray-border))] bg-[var(--st-surface,var(--surface-popover))] text-[var(--st-text-2,var(--text-popover))] p-1.5 shadow-[var(--st-shadow-lg)]"
                     >
                     <button
                       type="button"
                       role="menuitem"
                       onClick={() => fileInputRef.current?.click()}
                       disabled={uploading}
-                      className="flex min-h-12 w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-warm-white transition-colors hover:bg-white/10 disabled:opacity-50"
+                      className="flex min-h-12 w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-warm-black transition-colors hover:bg-[var(--st-hover,var(--gray-bg-hover))] disabled:opacity-50"
                     >
                       <Paperclip className="h-5 w-5 shrink-0 text-gray-fg" strokeWidth={1.7} />
                       <span className="min-w-0 flex-1">
                         <span className="block text-[13px] font-medium">
                           {uploading ? "Uploading..." : "Upload photos & files"}
                         </span>
-                        <span className="mt-0.5 block truncate text-[11px] text-text-popover">
+                        <span className="mt-0.5 block truncate text-[13px] text-[var(--st-text-3,var(--text-popover))]">
                           Attach files to this AI request.
                         </span>
                       </span>
@@ -386,13 +385,13 @@ export const PromptInputBox = forwardRef<HTMLTextAreaElement, PromptInputBoxProp
                           setActionsOpen(false);
                           setConnectionsOpen(false);
                         }}
-                        className="flex min-h-12 w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-warm-white transition-colors hover:bg-white/10"
+                        className="flex min-h-12 w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-warm-black transition-colors hover:bg-[var(--st-hover,var(--gray-bg-hover))]"
                       >
                         <action.icon className="h-5 w-5 shrink-0 text-gray-fg" strokeWidth={1.7} />
                         <span className="min-w-0 flex-1">
                           <span className="block text-[13px] font-medium">{action.label}</span>
                           {action.description && (
-                            <span className="mt-0.5 block truncate text-[11px] text-text-popover">
+                            <span className="mt-0.5 block truncate text-[13px] text-[var(--st-text-3,var(--text-popover))]">
                               {action.description}
                             </span>
                           )}
@@ -400,7 +399,7 @@ export const PromptInputBox = forwardRef<HTMLTextAreaElement, PromptInputBoxProp
                       </a>
                     ))}
 
-                    <div className="my-1 h-px bg-white/10" />
+                    <div className="my-1 h-px bg-[var(--st-line,var(--gray-border))]" />
 
                     {AI_CONTEXT_ACTIONS.map((action) => (
                       <button
@@ -409,15 +408,15 @@ export const PromptInputBox = forwardRef<HTMLTextAreaElement, PromptInputBoxProp
                         role="menuitem"
                         onClick={() => runQuickAction(action.message)}
                         className={cn(
-                          "flex min-h-12 w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-warm-white transition-colors hover:bg-white/10",
-                          action.label === "Custom site request" && "animate-pulse border border-amber-300/20 bg-amber-300/10 shadow-[0_0_24px_rgba(245,158,11,0.08)]",
+                          "flex min-h-12 w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-warm-black transition-colors hover:bg-[var(--st-hover,var(--gray-bg-hover))]",
+                          action.label === "Custom site request" && "bg-[var(--st-need-tint,var(--gray-bg))]",
                         )}
                       >
                         <action.icon className={cn("h-5 w-5 shrink-0", action.label === "Custom site request" ? "text-warning" : "text-gray-fg")} strokeWidth={1.7} />
                         <span className="min-w-0 flex-1">
                           <span className="block text-[13px] font-medium">{action.label}</span>
                           {action.description && (
-                            <span className="mt-0.5 block truncate text-[11px] text-text-popover">
+                            <span className="mt-0.5 block truncate text-[13px] text-[var(--st-text-3,var(--text-popover))]">
                               {action.description}
                             </span>
                           )}
@@ -425,7 +424,7 @@ export const PromptInputBox = forwardRef<HTMLTextAreaElement, PromptInputBoxProp
                       </button>
                     ))}
 
-                    <div className="my-1 h-px bg-white/10" />
+                    <div className="my-1 h-px bg-[var(--st-line,var(--gray-border))]" />
 
                     {quickActions.map((action) => {
                       const Icon = action.icon ?? MessageSquareText;
@@ -435,13 +434,13 @@ export const PromptInputBox = forwardRef<HTMLTextAreaElement, PromptInputBoxProp
                           type="button"
                           role="menuitem"
                           onClick={() => runQuickAction(action.message)}
-                          className="flex min-h-12 w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-warm-white transition-colors hover:bg-white/10"
+                          className="flex min-h-12 w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-warm-black transition-colors hover:bg-[var(--st-hover,var(--gray-bg-hover))]"
                         >
                           <Icon className="h-5 w-5 shrink-0 text-gray-fg" strokeWidth={1.7} />
                           <span className="min-w-0 flex-1">
                             <span className="block text-[13px] font-medium">{action.label}</span>
                             {action.description && (
-                              <span className="mt-0.5 block truncate text-[11px] text-text-popover">
+                              <span className="mt-0.5 block truncate text-[13px] text-[var(--st-text-3,var(--text-popover))]">
                                 {action.description}
                               </span>
                             )}
@@ -450,7 +449,7 @@ export const PromptInputBox = forwardRef<HTMLTextAreaElement, PromptInputBoxProp
                       );
                     })}
 
-                    <div className="my-1 h-px bg-white/10" />
+                    <div className="my-1 h-px bg-[var(--st-line,var(--gray-border))]" />
 
                     <div
                       className="relative"
@@ -461,24 +460,24 @@ export const PromptInputBox = forwardRef<HTMLTextAreaElement, PromptInputBoxProp
                         type="button"
                         role="menuitem"
                         onClick={() => setConnectionsOpen((current) => !current)}
-                        className="flex min-h-12 w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-warm-white transition-colors hover:bg-white/10"
+                        className="flex min-h-12 w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-warm-black transition-colors hover:bg-[var(--st-hover,var(--gray-bg-hover))]"
                         aria-haspopup="menu"
                         aria-expanded={connectionsOpen}
                       >
                         <Link2 className="h-5 w-5 shrink-0 text-gray-fg" strokeWidth={1.7} />
                         <span className="min-w-0 flex-1">
                           <span className="block text-[13px] font-medium">Use a source</span>
-                          <span className="mt-0.5 block truncate text-[11px] text-text-popover">
+                          <span className="mt-0.5 block truncate text-[13px] text-[var(--st-text-3,var(--text-popover))]">
                             Add source context to the prompt.
                           </span>
                         </span>
-                        <ChevronRight className="h-4 w-4 shrink-0 text-text-popover" strokeWidth={1.8} />
+                        <ChevronRight className="h-4 w-4 shrink-0 text-[var(--st-text-3,var(--text-popover))]" strokeWidth={1.8} />
                       </button>
 
                       {connectionsOpen && (
                         <div
                           role="menu"
-                          className="absolute bottom-0 left-[calc(100%+0.5rem)] z-40 w-[min(calc(100vw-2rem),310px)] rounded-2xl border border-white/10 bg-surface-popover text-text-popover p-1.5 shadow-[0_18px_55px_rgba(0,0,0,0.42)] max-md:bottom-full max-md:left-0 max-md:mb-2"
+                          className="absolute bottom-0 left-[calc(100%+0.5rem)] z-40 w-[min(calc(100vw-2rem),310px)] rounded-2xl border border-[var(--st-line,var(--gray-border))] bg-[var(--st-surface,var(--surface-popover))] text-[var(--st-text-2,var(--text-popover))] p-1.5 shadow-[var(--st-shadow-lg)] max-md:bottom-full max-md:left-0 max-md:mb-2"
                         >
                           {SOURCE_ACTIONS.map((action) => (
                             <button
@@ -486,20 +485,20 @@ export const PromptInputBox = forwardRef<HTMLTextAreaElement, PromptInputBoxProp
                               type="button"
                               role="menuitem"
                               onClick={() => insertSourcePrompt(action.message)}
-                              className="flex min-h-11 w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-warm-white transition-colors hover:bg-white/10"
+                              className="flex min-h-11 w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-warm-black transition-colors hover:bg-[var(--st-hover,var(--gray-bg-hover))]"
                             >
                               <action.icon className="h-[18px] w-[18px] shrink-0 text-gray-fg" strokeWidth={1.7} />
                               <span className="min-w-0 flex-1">
                                 <span className="block text-[13px] font-medium">{action.label}</span>
                                 {action.description && (
-                                  <span className="mt-0.5 block truncate text-[11px] text-text-popover">
+                                  <span className="mt-0.5 block truncate text-[13px] text-[var(--st-text-3,var(--text-popover))]">
                                     {action.description}
                                   </span>
                                 )}
                               </span>
                             </button>
                           ))}
-                          <div className="my-1 h-px bg-white/10" />
+                          <div className="my-1 h-px bg-[var(--st-line,var(--gray-border))]" />
                           <a
                             href={actionHref("/dashboard/integrations")}
                             role="menuitem"
@@ -507,12 +506,12 @@ export const PromptInputBox = forwardRef<HTMLTextAreaElement, PromptInputBoxProp
                               setActionsOpen(false);
                               setConnectionsOpen(false);
                             }}
-                            className="flex min-h-11 w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-warm-white transition-colors hover:bg-white/10"
+                            className="flex min-h-11 w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-warm-black transition-colors hover:bg-[var(--st-hover,var(--gray-bg-hover))]"
                           >
                             <Link2 className="h-[18px] w-[18px] shrink-0 text-gray-fg" strokeWidth={1.7} />
                             <span className="min-w-0 flex-1">
                               <span className="block text-[13px] font-medium">Manage sources</span>
-                              <span className="mt-0.5 block truncate text-[11px] text-text-popover">
+                              <span className="mt-0.5 block truncate text-[13px] text-[var(--st-text-3,var(--text-popover))]">
                                 Open source settings.
                               </span>
                             </span>
@@ -540,10 +539,10 @@ export const PromptInputBox = forwardRef<HTMLTextAreaElement, PromptInputBoxProp
               }}
               onBlur={closeUsage}
               className={cn(
-                "relative flex h-8 items-center gap-1.5 rounded-full border px-2.5 text-[12px] transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/20",
+                "relative flex h-8 items-center gap-1.5 rounded-full border px-2.5 text-[12px] transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--st-accent,var(--accent))]",
                 thinkMode
-                  ? "border-white/16 bg-white/[0.04] text-gray-fg"
-                  : "border-transparent text-gray-muted hover:bg-white/[0.025] hover:text-gray-fg",
+                  ? "border-transparent bg-[var(--st-selected,var(--gray-bg))] text-warm-black"
+                  : "border-transparent text-gray-muted hover:bg-[var(--st-hover,var(--gray-bg-hover))] hover:text-warm-black",
               )}
               aria-pressed={thinkMode}
               aria-describedby="ai-think-usage"
@@ -556,7 +555,7 @@ export const PromptInputBox = forwardRef<HTMLTextAreaElement, PromptInputBoxProp
                 <span
                   id="ai-think-usage"
                   role="tooltip"
-                  className="pointer-events-none absolute bottom-full left-0 z-40 mb-2 w-max max-w-[240px] rounded-lg border border-white/10 bg-surface-tooltip px-2.5 py-1.5 text-left text-[11px] leading-relaxed text-text-tooltip shadow-[0_12px_30px_rgba(0,0,0,0.32)]"
+                  className="pointer-events-none absolute bottom-full left-0 z-40 mb-2 w-max max-w-[240px] rounded-lg bg-surface-tooltip px-2.5 py-1.5 text-left text-[13px] leading-relaxed text-text-tooltip"
                 >
                   {usage
                     ? `AI requests left: ${usage.remaining} of ${usage.limit} this minute`
@@ -571,12 +570,12 @@ export const PromptInputBox = forwardRef<HTMLTextAreaElement, PromptInputBoxProp
             onClick={isLoading ? onStop : submit}
             disabled={!isLoading && !hasContent}
             className={cn(
-              "flex h-9 w-9 items-center justify-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/20",
+              "flex h-9 w-9 items-center justify-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--st-accent,var(--accent))]",
               isLoading
-                ? "bg-white/[0.07] text-warm-white hover:bg-white/[0.09]"
+                ? "bg-[var(--st-selected,var(--gray-bg))] text-warm-black"
                 : hasContent
-                  ? "bg-accent text-on-accent hover:bg-accent/85"
-                  : "bg-white/[0.045] text-gray-subtle hover:bg-white/[0.06]",
+                  ? "bg-[var(--st-action,var(--warm-black))] text-[var(--st-on-action,var(--surface))] hover:bg-[var(--st-action-hover,var(--warm-black))]"
+                  : "bg-[var(--st-inset,var(--gray-bg))] text-[var(--st-faint,var(--gray-subtle))]",
             )}
             title={isLoading ? "Stop generation" : "Send message"}
             aria-label={isLoading ? "Stop generation" : "Send message"}

@@ -52,7 +52,7 @@ export function ImageField({ value, onChange, label, size = "md" }: ImageFieldPr
   return (
     <div>
       {label && (
-        <label className="block text-[11px] text-gray-muted mb-1.5">{label}</label>
+        <label className="block text-[12px] text-gray-muted mb-1.5">{label}</label>
       )}
       {url ? (
         <div className="flex items-center gap-2">
@@ -76,7 +76,7 @@ export function ImageField({ value, onChange, label, size = "md" }: ImageFieldPr
           <button
             type="button"
             onClick={() => setPickerOpen(true)}
-            className="text-[11px] text-gray-muted hover:text-sage underline underline-offset-2 transition-colors"
+            className="text-[12px] text-gray-muted hover:text-sage underline underline-offset-2 transition-colors"
           >
             Change
           </button>
@@ -87,7 +87,7 @@ export function ImageField({ value, onChange, label, size = "md" }: ImageFieldPr
             type="button"
             onClick={() => inputRef.current?.click()}
             disabled={uploading}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border border-dashed border-gray-border text-[11px] text-gray-muted hover:border-sage hover:text-sage transition-colors"
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border border-dashed border-gray-border text-[12px] text-gray-muted hover:border-sage hover:text-sage transition-colors"
           >
             <Upload className="w-3 h-3" strokeWidth={1.5} />
             {uploading ? "Uploading..." : "Upload image"}
@@ -95,7 +95,7 @@ export function ImageField({ value, onChange, label, size = "md" }: ImageFieldPr
           <button
             type="button"
             onClick={() => setPickerOpen(true)}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border border-dashed border-gray-border text-[11px] text-gray-muted hover:border-sage hover:text-sage transition-colors"
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border border-dashed border-gray-border text-[12px] text-gray-muted hover:border-sage hover:text-sage transition-colors"
           >
             <Images className="w-3 h-3" strokeWidth={1.5} />
             Choose from library
@@ -114,7 +114,7 @@ export function ImageField({ value, onChange, label, size = "md" }: ImageFieldPr
         onClose={() => setPickerOpen(false)}
         onSelect={(picked) => onChange(picked)}
       />
-      {uploadError ? <p role="alert" className="mt-1 text-[11px] text-critical">{uploadError}</p> : null}
+      {uploadError ? <p role="alert" className="mt-1 text-[12px] text-critical">{uploadError}</p> : null}
     </div>
   );
 }

@@ -1,18 +1,15 @@
 "use client";
 
 import { useCallback, useRef, useState } from "react";
-import Link from "next/link";
-import { Image as ImageIcon } from "lucide-react";
-import { StHead, StNotice, StPage, StPillLink, StSection, StState, StSurface } from "@/components/ui/strelva/Kit";
-import { TextArea, TextInput } from "@/components/ui/TextInput";
-import styles from "./website-library.module.css";
+import { XaField, XaSays, XaStatus, XaTextArea, XaTextLink } from "@/components/ui/strelva/Xa";
+import { DashNote, DashPage, DashSection } from "./xa/DashboardXa";
 import { useDashboard } from "./DashboardContext";
 
 type Settings = Record<string, string>;
 type SaveStatus = "idle" | "saving" | "saved" | "error";
 
 const VOICE_PLACEHOLDER =
-  "e.g. Warm and down-to-earth. Talk like a friendly local, not a corporation. Short sentences, no jargon, a little personality.";
+  "Warm and down to earth. Like a friendly neighbor, not a corporation. Short sentences, no jargon.";
 
 function Field({
   label,
@@ -33,7 +30,9 @@ function Field({
   placeholder?: string;
   readOnly?: boolean;
 }) {
-  return multiline ? <TextArea disabled={readOnly} label={label} helperText={hint} value={value} onChange={event => onChange(event.target.value)} onBlur={onBlur} placeholder={placeholder} rows={4} /> : <TextInput disabled={readOnly} label={label} helperText={hint} value={value} onChange={event => onChange(event.target.value)} onBlur={onBlur} placeholder={placeholder} />;
+  return multiline
+    ? <XaTextArea disabled={readOnly} label={label} hint={hint} value={value} onChange={event => onChange(event.target.value)} onBlur={onBlur} placeholder={placeholder} rows={4} />
+    : <XaField disabled={readOnly} label={label} hint={hint} value={value} onChange={event => onChange(event.target.value)} onBlur={onBlur} placeholder={placeholder} />;
 }
 
 export function BrandKitPanel({ initialSettings }: { initialSettings: Settings }) {
@@ -72,68 +71,30 @@ export function BrandKitPanel({ initialSettings }: { initialSettings: Settings }
   const logoUrl = settings.logoUrl?.trim();
 
   return (
-    <StPage>
-      <StHead title="Your website’s voice" meta="What Strelva draws on to write and update your site. Changes save when you leave a field." actions={<SavePill status={status} />} />
-      {readOnly ? <StNotice>You can read these details. Only an owner or admin can change them.</StNotice> : null}
-      <StNotice>Strelva reads these details when preparing changes to your site.</StNotice>
-      <StSurface label="Website voice and business details"><div className={styles.brandFields}>
-
-        <Field
-          readOnly={readOnly}
-          label="Business name"
-          value={settings.siteName ?? ""}
-          onChange={(v) => onChange("siteName", v)}
-          onBlur={save}
-        />
-        <Field
-          readOnly={readOnly}
-          label="What you do, in one line"
-          hint="The short version a stranger would understand instantly."
-          value={settings.siteTagline ?? ""}
-          onChange={(v) => onChange("siteTagline", v)}
-          onBlur={save}
-          placeholder="Assisted stretching studio in Williamsville, NY"
-        />
-        <Field
-          readOnly={readOnly}
-          label="About your business"
-          hint="Who you serve, what makes you different, anything Strelva should always know."
-          value={settings.siteDescription ?? ""}
-          onChange={(v) => onChange("siteDescription", v)}
-          onBlur={save}
-          multiline
-        />
-        <Field
-          readOnly={readOnly}
-          label="How should Strelva sound?"
-          hint="Your voice and tone. Strelva writes everything this way."
-          value={settings.brandVoice ?? ""}
-          onChange={(v) => onChange("brandVoice", v)}
-          onBlur={save}
-          multiline
-          placeholder={VOICE_PLACEHOLDER}
-        />
-      </div></StSurface>
-
-      {/* Media */}
-      <StSection title="Your media">
-        <p className={styles.description}>Photos and your logo, ready for Strelva to use on the site.</p>
-        <div className={styles.mediaRow}>{logoUrl ? <img src={logoUrl} alt="Logo" className={styles.mediaLogo} /> : <ImageIcon size={24} aria-label="No logo recorded" />}<StPillLink href={dashboardHref("/dashboard/assets")} variant="soft">Manage media</StPillLink></div>
-      </StSection>
-
-      <p className={styles.description}>
-        Your services, story, and page copy live in{" "}
-        <Link href={dashboardHref("/dashboard/site")} prefetch={false} className="font-medium text-accent underline-offset-2 hover:underline">
-          Website
-        </Link>
-        . Strelva uses these details together.
-      </p>
-    </StPage>
+    <DashPage
+      title="Your website's voice."
+      quiet="Strelva reads these every time it writes or changes your site."
+      actions={<SavePill status={status} />}
+      width="narrow"
+      label="Brand"
+    >
+      {readOnly ? <DashNote tone="quiet">You can read these. Only an owner or admin can change them.</DashNote> : null}
+      <div className="flex flex-col gap-6">
+        <Field readOnly={readOnly} label="Business name" value={settings.siteName ?? ""} onChange={(v) => onChange("siteName", v)} onBlur={save} />
+        <Field readOnly={readOnly} label="What you do, in one line" hint="The short version a stranger understands at once." value={settings.siteTagline ?? ""} onChange={(v) => onChange("siteTagline", v)} onBlur={save} placeholder="Gentle family dentistry on Elmwood Ave" />
+        <Field readOnly={readOnly} label="About your business" hint="Who you serve, what makes you different, anything Strelva should always know." value={settings.siteDescription ?? ""} onChange={(v) => onChange("siteDescription", v)} onBlur={save} multiline />
+        <Field readOnly={readOnly} label="How your site should sound" hint="Strelva writes everything this way." value={settings.brandVoice ?? ""} onChange={(v) => onChange("brandVoice", v)} onBlur={save} multiline placeholder={VOICE_PLACEHOLDER} />
+      </div>
+      <DashSection label="Logo and photos" aside={<XaTextLink href={dashboardHref("/dashboard/assets")}>Open your photos</XaTextLink>}>
+        {logoUrl ? <img src={logoUrl} alt="Your logo" className="h-14 w-auto max-w-[200px] object-contain" /> : <p className="m-0 text-[15px] text-[var(--st-text-2)]">No logo yet. Add one in your photos and Strelva uses it across the site.</p>}
+      </DashSection>
+      <XaSays links={[<XaTextLink key="site" href={dashboardHref("/dashboard/site")}>Open your site</XaTextLink>]}>Your services, story and page words live on the site itself. I use them together with these.</XaSays>
+    </DashPage>
   );
 }
 
 function SavePill({ status }: { status: SaveStatus }) {
-  if (status === "idle") return null;
-  const copy = { saving: "Saving…", saved: "Saved", error: "Could not save" };
-  return <span role={status === "error" ? "alert" : "status"} aria-live={status === "error" ? "assertive" : "polite"}><StState kind={status === "error" ? "down" : status === "saved" ? "live" : "need"}>{copy[status]}</StState></span>;
+  if (status === "idle") return <span className="text-[13px] text-[var(--st-text-3)]">Saves when you leave a field</span>;
+  const copy = { saving: "Saving", saved: "Saved", error: "Didn't save. Try again." };
+  return <span role={status === "error" ? "alert" : "status"} aria-live={status === "error" ? "assertive" : "polite"}><XaStatus kind={status === "error" ? "down" : status === "saved" ? "live" : "working"} size="sm">{copy[status]}</XaStatus></span>;
 }

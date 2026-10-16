@@ -7,11 +7,7 @@ import {
   CalendarPlus,
   Mail,
   BarChart3,
-  ExternalLink,
-  Inbox,
-  CheckCircle2,
   AlertCircle,
-  MessageCircle,
   Mic,
   MicOff,
   X,
@@ -21,6 +17,8 @@ import { timeAgo } from "@/lib/utils";
 import { PromptInputBox } from "@/components/ui/ai-prompt-box";
 import type { UploadedFile } from "@/components/ui/ai-prompt-box";
 import { ShiningText } from "@/components/ui/shining-text";
+import { XaIconButton, XaPebbleAvatar, XaSays, XaTextLink, XaWorking } from "@/components/ui/strelva/Xa";
+import { DashNote } from "./xa/DashboardXa";
 import { useDashboardOptional } from "./DashboardContext";
 import { ToolOutput } from "./ToolOutput";
 import { SectionErrorBoundary } from "@/components/public/SectionErrorBoundary";
@@ -680,197 +678,82 @@ export function ChatPanel({ threadId, ownerName, onThreadCreated, variant = "ful
         onScroll={updateShouldStickToBottom}
       >
         {isEmpty ? (
-          /* Empty state: greeting + chips */
-          <div className={`flex min-h-full flex-col items-center justify-start px-4 pb-8 ${variant === "compact" ? "pt-8" : "pt-16 sm:justify-center sm:px-8 sm:py-12"}`}>
-            <h1
-              className={`${variant === "compact" ? "text-[22px]" : "text-[30px] sm:text-[40px]"} font-display font-medium text-warm-black tracking-[-0.01em] text-center`}
-              suppressHydrationWarning
-            >
-              {getGreeting()}, {ownerName}
+          /* Empty state (XA · AS1): a greeting, what waits, a few things to ask. */
+          <div className={`flex min-h-full flex-col justify-start gap-7 ${variant === "compact" ? "px-4 pb-8 pt-6" : "mx-auto w-full max-w-[680px] px-4 pb-10 pt-12 sm:justify-center sm:px-6"}`}>
+            <XaPebbleAvatar size={variant === "compact" ? 36 : 48} />
+            <h1 className={`m-0 ${variant === "compact" ? "text-[22px]" : "text-[30px] sm:text-[40px]"} font-medium tracking-[-0.8px] text-[var(--st-text)]`} suppressHydrationWarning>
+              {getGreeting()}, {ownerName}.
+              <span className="block text-[var(--st-text-3)]">Tell me the change. I make it, or show you what needs your yes first.</span>
             </h1>
-            <p className={`${variant === "compact" ? "text-[12px]" : "text-[14px] sm:text-[15px]"} text-gray-muted mt-3 text-center max-w-xl`}>
-              I&apos;m Strelva &mdash; I manage your site. Tell me the business change and I can update the site, draft the customer note, or show what needs your okay before it goes live.
-            </p>
-
-            {variant !== "compact" && (
-              <div className={`mt-6 w-full max-w-3xl flex-col gap-2 rounded-2xl border border-glass-border bg-glass p-3 sm:flex sm:flex-row sm:items-center sm:justify-between ${
-                pendingNeedsCount > 0 ? "flex" : "hidden"
-              }`}>
-                <div className="min-w-0">
-                  <p className="text-[12px] font-medium text-warm-black">
-                    {pendingNeedsCount > 0
-                      ? `${pendingNeedsCount} item${pendingNeedsCount === 1 ? "" : "s"} need your okay`
-                      : "No drafts need your okay right now"}
-                  </p>
-                  <p className="mt-1 text-[12px] leading-relaxed text-gray-muted">
-                    Review larger AI changes in a side panel while keeping the conversation open.
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setNeedsDrawerOpen(true)}
-                  className="inline-flex min-h-[38px] shrink-0 items-center justify-center gap-2 rounded-lg border border-gray-border bg-surface-raised px-3 text-[12px] font-medium text-warm-black transition-colors hover:border-accent/35"
-                >
-                  <Inbox className="h-4 w-4" strokeWidth={1.5} />
-                  Needs You
-                </button>
-              </div>
-            )}
-
-            {/* Suggestion chips - min-h-[48px] ensures 44px+ tap target */}
-            <div className={`grid grid-cols-1 gap-3 w-full max-w-3xl ${variant === "compact" ? "mt-6" : "sm:grid-cols-2 mt-8 sm:mt-10"}`}>
+            {variant !== "compact" && pendingNeedsCount > 0 ? (
+              <XaSays links={[<XaTextLink key="open" onClick={() => setNeedsDrawerOpen(true)}>Open them here</XaTextLink>]}>
+                {pendingNeedsCount === 1 ? "One change waits" : `${pendingNeedsCount} changes wait`} for your yes.
+              </XaSays>
+            ) : null}
+            <div className="flex flex-wrap gap-2" aria-label="Things to ask">
               {SUGGESTION_CHIPS.slice(0, variant === "compact" ? 2 : SUGGESTION_CHIPS.length).map((chip) => (
-                <button
-                  key={chip.label}
-                  onClick={() => sendChat(chip.label)}
-                  className={`${variant === "compact" ? "min-h-[56px] px-3 py-2.5" : "min-h-[72px] px-4 py-3.5"} ${
-                    chip.hideOnMobile ? "hidden sm:block" : ""
-                  } rounded-2xl border border-glass-border bg-glass hover:bg-gray-bg-hover hover:border-gray-border active:bg-gray-bg transition-all text-left`}
-                >
-                  <div className="flex items-center gap-2 mb-1">
-                    <chip.icon className="w-4 h-4 text-gray-muted" strokeWidth={1.5} />
-                    <span className="text-[13px] font-medium text-warm-black">{chip.label}</span>
-                  </div>
-                  <span className="text-[12px] text-gray-muted leading-relaxed">
-                    {chip.description}
-                  </span>
+                <button key={chip.label} type="button" onClick={() => sendChat(chip.label)} title={chip.description}
+                  className={`${chip.hideOnMobile ? "hidden sm:inline-flex" : "inline-flex"} min-h-[40px] items-center rounded-full bg-[var(--st-surface)] px-4 text-[14px] text-[var(--st-text)] shadow-[0_1px_2px_#0000000f] transition-colors duration-(--motion-fast) hover:bg-[var(--st-hover)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--st-accent)]`}>
+                  {chip.label}
                 </button>
               ))}
             </div>
           </div>
         ) : messages.length === 0 && isLoading ? (
-          <div className="flex min-h-full flex-col items-center justify-start px-4 pb-8 pt-20 sm:justify-center sm:px-8 sm:py-12">
-            <div className="ai-thinking-pop rounded-2xl border border-glass-border bg-glass px-4 py-3 shadow-[0_10px_30px_rgba(0,0,0,0.08)]">
-              <ShiningText text={toolStatus || "Strelva is thinking..."} className="text-[12px] font-medium" />
-            </div>
+          <div className="mx-auto flex min-h-full w-full max-w-[680px] flex-col justify-center px-4 py-12 sm:px-6">
+            <XaWorking title={toolStatus || "Strelva is reading your question"} steps={[{ id: "read", label: toolStatus || "Reading your site and your question", state: "active" }]} />
           </div>
         ) : (
-          /* Active conversation */
-          <div className={`${variant === "compact" ? "px-3 py-4" : "max-w-3xl mx-auto w-full px-4 sm:px-6 py-5 sm:py-7"} space-y-4`}>
-            {/* Update toast */}
+          /* Active conversation (XA · AS2) */
+          <div className={`${variant === "compact" ? "px-3 py-4" : "mx-auto w-full max-w-[680px] px-4 py-6 sm:px-6 sm:py-8"} flex flex-col gap-5`}>
             {updateToast && (
-              <div
-                className={`flex items-start gap-3 px-3 py-3 rounded-lg animate-fade-in-up ${
-                  updateToast.status === "published" || updateToast.status === "applied" || updateToast.status === "drafted" || updateToast.status === "queued"
-                    ? "bg-success-dim border border-success/20"
-                    : "bg-critical0/10 border border-critical0/20"
-                }`}
+              <DashNote
+                tone={updateToast.status === "published" || updateToast.status === "applied" ? "live" : updateToast.status === "drafted" || updateToast.status === "queued" ? "waits" : "down"}
+                role="status"
+                links={[
+                  ...(updateToast.nextAction === "view_site" ? [<a key="site" href={dashCtx?.siteUrl || "/dashboard/site"} target={dashCtx?.siteUrl ? "_blank" : undefined} rel={dashCtx?.siteUrl ? "noopener noreferrer" : undefined} className="font-medium text-[var(--st-accent)] hover:underline">View site</a>] : []),
+                  ...(updateToast.nextAction === "review_queue" ? [<Link key="needs" href={dashCtx?.dashboardHref("/dashboard/review") || "/dashboard/review"} className="font-medium text-[var(--st-accent)] hover:underline">Open Needs you</Link>] : []),
+                  <XaTextLink key="close" onClick={() => setUpdateToast(null)} aria-label="Dismiss update message">Dismiss</XaTextLink>,
+                ]}
               >
-                {updateToast.status === "published" || updateToast.status === "applied" || updateToast.status === "drafted" || updateToast.status === "queued" ? (
-                  <CheckCircle2 className="w-4 h-4 text-success shrink-0 mt-0.5" strokeWidth={2} />
-                ) : (
-                  <AlertCircle className="w-4 h-4 text-critical shrink-0 mt-0.5" strokeWidth={2} />
-                )}
-                <div className="min-w-0 flex-1">
-                  <p
-                    className={`text-[12px] font-medium ${
-                      updateToast.status === "published" || updateToast.status === "applied" || updateToast.status === "drafted" || updateToast.status === "queued"
-                        ? "text-success"
-                        : "text-critical"
-                    }`}
-                  >
-                    {updateToast.text}
-                  </p>
-                  <p className="mt-0.5 text-[12px] leading-relaxed text-gray-fg">
-                    {updateToast.detail}
-                  </p>
-                  <p className="mt-1 text-[11px] leading-relaxed text-gray-muted">
-                    {updateToast.proof}
-                  </p>
-                  {updateToast.nextAction === "view_site" && (
-                    <a
-                      href={dashCtx?.siteUrl || "/dashboard/site"}
-                      target={dashCtx?.siteUrl ? "_blank" : undefined}
-                      rel={dashCtx?.siteUrl ? "noopener noreferrer" : undefined}
-                      className="mt-2 inline-flex items-center gap-1.5 text-[12px] font-medium text-success hover:underline"
-                    >
-                      <ExternalLink className="h-3.5 w-3.5" strokeWidth={1.5} />
-                      View site
-                    </a>
-                  )}
-                  {updateToast.nextAction === "review_queue" && (
-                    <Link
-                      href={dashCtx?.dashboardHref("/dashboard/review") || "/dashboard/review"}
-                      className="mt-2 inline-flex items-center gap-1.5 text-[12px] font-medium text-success hover:underline"
-                    >
-                      <Inbox className="h-3.5 w-3.5" strokeWidth={1.5} />
-                      Open Needs You
-                    </Link>
-                  )}
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setUpdateToast(null)}
-                  className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-gray-muted transition-colors hover:bg-white/10 hover:text-warm-black"
-                  aria-label="Dismiss update message"
-                >
-                  <X className="h-3.5 w-3.5" strokeWidth={1.5} />
-                </button>
-              </div>
+                <strong className="font-medium">{updateToast.text}</strong> {updateToast.detail} <span className="text-[var(--st-text-2)]">{updateToast.proof}</span>
+              </DashNote>
             )}
 
             {messages.map((message) => (
-              <div
-                key={message.id}
-                className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}
-              >
-                <div className={`${variant === "compact" ? "max-w-[94%]" : "max-w-[88%] sm:max-w-[80%]"} ${message.role === "user" ? "order-2" : ""}`}>
-                  {message.role === "assistant" && (
-                    <div className="flex items-center gap-2 mb-1.5">
-                      <div className="w-5 h-5 rounded-full bg-accent-dim flex items-center justify-center">
-                        <MessageCircle className="w-3 h-3 text-accent" strokeWidth={1.5} />
-                      </div>
-                      <span className="text-[11px] text-gray-muted">Strelva</span>
-                    </div>
-                  )}
-                  <div
-                    className={`${variant === "compact" ? "px-3 py-2.5 text-[12px]" : "px-4 py-3 text-[13px]"} rounded-2xl leading-relaxed shadow-[0_10px_30px_rgba(0,0,0,0.08)] ${
-                      message.role === "user"
-                        ? "bg-accent/15 text-warm-black border border-accent/20"
-                        : `bg-glass text-warm-black border border-glass-border ${message.content ? "ai-output-pop" : ""}`
-                    }`}
-                  >
-                    {message.content ? (
-                      message.role === "assistant" ? (
-                        <div className="chat-markdown whitespace-pre-wrap">
-                          <ReactMarkdown>{message.content.replace(/\\n/g, "\n")}</ReactMarkdown>
-                        </div>
-                      ) : (
-                        <p className="whitespace-pre-wrap">{message.content}</p>
-                      )
-                    ) : (
-                      <span className="flex items-center py-1">
-                        <ShiningText text={toolStatus || "Strelva is thinking..."} className="text-[12px] font-medium" />
-                      </span>
-                    )}
-                  </div>
-                  <span className="text-[11px] text-gray-subtle mt-1 block px-1">
-                    {timeAgo(message.timestamp)}
-                  </span>
+              message.role === "user" ? (
+                <div key={message.id} className="flex flex-col items-end gap-1">
+                  <p className={`m-0 max-w-[86%] whitespace-pre-wrap rounded-[20px] bg-[var(--st-hover)] px-4 py-2.5 ${variant === "compact" ? "text-[14px]" : "text-[15px]"} leading-[1.5] text-[var(--st-text)]`}>{message.content}</p>
+                  <span className="px-1 text-[12px] text-[var(--st-text-3)]">{timeAgo(message.timestamp)}</span>
                 </div>
-              </div>
+              ) : (
+                <div key={message.id} className="flex items-start gap-3">
+                  <XaPebbleAvatar size={28} label="Strelva" />
+                  <div className="min-w-0 flex-1">
+                    {message.content ? (
+                      <div className={`chat-markdown whitespace-pre-wrap ${variant === "compact" ? "text-[14px]" : "text-[15px]"} leading-[1.55] text-[var(--st-text)] ${message.content ? "ai-output-pop" : ""}`}>
+                        <ReactMarkdown>{message.content.replace(/\\n/g, "\n")}</ReactMarkdown>
+                      </div>
+                    ) : (
+                      <ShiningText text={toolStatus || "Strelva is thinking"} className="text-[14px] font-medium" />
+                    )}
+                    <span className="mt-1 block text-[12px] text-[var(--st-text-3)]">{timeAgo(message.timestamp)}</span>
+                  </div>
+                </div>
+              )
             ))}
 
             {showThinkingBubble && (
-              <div className="flex justify-start">
-                <div className="max-w-[80%]">
-                  <div className="flex items-center gap-2 mb-1.5">
-                    <div className="w-5 h-5 rounded-full bg-accent-dim flex items-center justify-center">
-                      <MessageCircle className="w-3 h-3 text-accent" strokeWidth={1.5} />
-                    </div>
-                    <span className="text-[11px] text-gray-muted">Strelva</span>
-                  </div>
-                  <div className="ai-thinking-pop px-4 py-3 rounded-2xl bg-glass border border-glass-border shadow-[0_10px_30px_rgba(0,0,0,0.08)]">
-                    <ShiningText text={toolStatus || "Strelva is thinking..."} className="text-[12px] font-medium" />
-                  </div>
-                </div>
+              <div className="flex items-start gap-3">
+                <XaPebbleAvatar size={28} label="Strelva" />
+                <ShiningText text={toolStatus || "Strelva is thinking"} className="pt-1 text-[14px] font-medium" />
               </div>
             )}
 
             {/* Rich inline tool cards (report / content / photos / connections) */}
             {toolCards.length > 0 && (
-              <div className="flex justify-start">
-                <div className="max-w-[80%] space-y-2">
+              <div className="flex justify-start pl-10">
+                <div className="w-full max-w-[600px] space-y-2">
                   {toolCards.map((card) => (
                     // Contain a malformed card payload to its own bubble — a crash
                     // here used to take down the whole conversation.
@@ -886,26 +769,16 @@ export function ChatPanel({ threadId, ownerName, onThreadCreated, variant = "ful
       </div>
 
       {/* Chat input - always at bottom, with safe area for notched devices */}
-      <div className={`${variant === "compact" ? "px-3 pb-3 pt-2" : "px-4 sm:px-6 pb-4 sm:pb-6 pt-3"} shrink-0 border-t border-glass-border bg-surface-base/78 backdrop-blur-xl keyboard-safe`}>
-        <div className="max-w-3xl mx-auto">
+      <div className={`${variant === "compact" ? "px-3 pb-3 pt-2" : "px-4 pb-4 pt-3 sm:px-6 sm:pb-6"} keyboard-safe shrink-0`}>
+        <div className="mx-auto max-w-[680px]">
           {readOnly ? (
-            <div className="rounded-2xl border border-glass-border bg-glass px-4 py-3 text-center">
-              <p className="text-[12px] leading-relaxed text-gray-muted">
-                This is a read-only demo.{" "}
-                <Link
-                  href="/access-request"
-                  className="font-medium text-accent hover:underline"
-                >
-                  Get your own site to chat with your AI
-                </Link>
-              </p>
-            </div>
+            <DashNote tone="quiet" links={[<Link key="own" href="/access-request" className="font-medium text-[var(--st-accent)] hover:underline">Get your own site</Link>]}>This is a demo you can look around. Asking is off here.</DashNote>
           ) : (
           <>
           {attachments.length > 0 && (
             <div className="mb-2 flex flex-wrap gap-1.5">
               {attachments.map((file) => (
-                <span key={file.url} className="rounded-full border border-warning/20 bg-warning/10 px-2 py-1 text-[11px] text-warning">
+                <span key={file.url} className="rounded-full bg-[var(--st-chip)] px-2.5 py-1 text-[13px] text-[var(--st-text-body)]">
                   {file.name}
                 </span>
               ))}
@@ -919,10 +792,10 @@ export function ChatPanel({ threadId, ownerName, onThreadCreated, variant = "ful
                 aria-pressed={isListening}
                 aria-label={isListening ? "Stop voice input" : "Start voice input"}
                 title={isListening ? "Stop voice input" : "Speak your message"}
-                className={`mb-0.5 inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border transition-colors ${
+                className={`mb-1.5 inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full transition-colors ${
                   isListening
-                    ? "animate-pulse border-accent/40 bg-accent/15 text-accent"
-                    : "border-gray-border bg-surface-raised text-gray-muted hover:border-accent/35 hover:text-warm-black"
+                    ? "bg-[var(--st-tint)] text-[var(--st-accent)]"
+                    : "bg-[var(--st-surface)] text-[var(--st-text-2)] shadow-[0_1px_2px_#0000000f] hover:text-[var(--st-text)]"
                 }`}
               >
                 {isListening ? (
@@ -944,16 +817,14 @@ export function ChatPanel({ threadId, ownerName, onThreadCreated, variant = "ful
                 placeholder={
                   variant === "compact" && selectedObjectLabel
                     ? `Ask Strelva about ${selectedObjectLabel}`
-                    : "Tell me what you need..."
+                    : "Ask Strelva for a change to your site"
                 }
                 quickActions={INPUT_QUICK_ACTIONS}
                 className={variant === "compact" ? "rounded-2xl" : undefined}
               />
             </div>
           </div>
-          <p className={`${variant === "compact" ? "hidden" : ""} text-[11px] text-gray-subtle text-center mt-2`}>
-            Update your site, write content, check analytics
-          </p>
+
           </>
           )}
         </div>
@@ -962,29 +833,18 @@ export function ChatPanel({ threadId, ownerName, onThreadCreated, variant = "ful
         <>
           <button
             type="button"
-            className="absolute inset-0 z-30 bg-[rgba(8,8,10,0.36)]"
+            className="absolute inset-0 z-30 bg-[#1617155c]"
             onClick={() => setNeedsDrawerOpen(false)}
-            aria-label="Close Needs You"
+            aria-label="Close Needs you"
           />
           <aside
             role="dialog"
             aria-modal="true"
-            aria-label="Needs You"
-            className="absolute inset-y-0 right-0 z-40 w-full max-w-[520px] border-l border-glass-border bg-surface-base shadow-[0_24px_80px_rgba(0,0,0,0.38)] animate-overlay-enter"
+            aria-label="Needs you"
+            className="absolute inset-y-0 right-0 z-40 flex w-full max-w-[560px] flex-col overflow-y-auto bg-[var(--st-canvas)] px-5 pb-8 pt-4 shadow-[var(--st-shadow-lg)] animate-overlay-enter"
           >
-            <div className="flex h-12 items-center justify-between border-b border-glass-border px-4">
-              <div className="flex min-w-0 items-center gap-2">
-                <Inbox className="h-4 w-4 text-gray-muted" strokeWidth={1.5} />
-                <span className="truncate text-[13px] font-medium text-warm-black">Needs You</span>
-              </div>
-              <button
-                type="button"
-                onClick={() => setNeedsDrawerOpen(false)}
-                className="flex h-8 w-8 items-center justify-center rounded-md text-gray-muted transition-colors hover:bg-gray-bg hover:text-warm-black"
-                aria-label="Close Needs You"
-              >
-                <X className="h-4 w-4" strokeWidth={1.5} />
-              </button>
+            <div className="flex justify-end">
+              <XaIconButton label="Close Needs you" tone="plain" onClick={() => setNeedsDrawerOpen(false)}><X className="h-4 w-4" strokeWidth={1.7} /></XaIconButton>
             </div>
             <QueuePage
               initialPending={needsYou.pending}

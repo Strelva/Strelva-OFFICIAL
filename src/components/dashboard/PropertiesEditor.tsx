@@ -211,7 +211,7 @@ const SECTION_FIELDS: Record<string, FieldDef[]> = {
     { key: "accentText", label: "Subtitle", type: "text", placeholder: "Short accent..." },
     { key: "statement", label: "Your mission", type: "textarea", placeholder: "What drives your work..." },
     { key: "quote", label: "Featured quote", type: "textarea", placeholder: "A quote that represents you..." },
-    { key: "quoteAttribution", label: "Quote by", type: "text", placeholder: "— Name" },
+    { key: "quoteAttribution", label: "Quote by", type: "text", placeholder: "Their name" },
   ],
   contact: [
     { key: "phone", label: "Phone number", type: "tel", placeholder: "(555) 555-0000" },
@@ -515,15 +515,12 @@ export function PropertiesEditor({ activeSection }: PropertiesEditorProps) {
     return (
       <div className="flex flex-col h-full bg-surface">
         <div className="px-4 py-2.5 border-b border-gray-border bg-gray-bg-alt shrink-0">
-          <span className="text-[11px] uppercase tracking-wider text-gray-muted">Viewing</span>
+          <span className="text-[13px] text-gray-muted">Viewing</span>
           <h3 className="text-[13px] font-medium text-warm-black mt-0.5">{info.label}</h3>
         </div>
         <div className="flex flex-col items-center justify-center flex-1 px-6 text-center">
-          <div className="w-10 h-10 rounded-lg bg-sage/[0.08] flex items-center justify-center mb-3">
-            <MessageCircle className="w-[18px] h-[18px] text-sage" strokeWidth={1.5} />
-          </div>
           <p className="text-[12px] text-gray-fg mb-1">This section pulls from <span className="font-medium">{info.sources}</span></p>
-          <p className="text-[11px] text-gray-muted mb-4">Ask Strelva to make changes</p>
+          <p className="text-[12px] text-gray-muted mb-4">Ask Strelva to make changes</p>
           <Button
             variant="secondary"
             size="sm"
@@ -555,16 +552,16 @@ export function PropertiesEditor({ activeSection }: PropertiesEditorProps) {
       <div className="px-4 py-3 border-b border-gray-border bg-surface shrink-0">
         <div className="flex items-center justify-between gap-2">
           <div className="min-w-0">
-            <h3 className="truncate text-[15px] font-semibold text-warm-white">
+            <h3 className="truncate text-[15px] font-semibold text-warm-black">
               {SECTION_LABELS[activeSection] || activeSection}
             </h3>
           </div>
           <button
             onClick={() => setTab(tab === "versions" ? "edit" : "versions")}
-            className={`flex shrink-0 items-center gap-1 rounded-md px-2 h-7 text-[11px] font-medium transition-colors ${
+            className={`flex shrink-0 items-center gap-1 rounded-md px-2 h-7 text-[12px] font-medium transition-colors ${
               tab === "versions"
-                ? "bg-surface-raised text-warm-white"
-                : "text-gray-faint hover:text-warm-white"
+                ? "bg-surface-raised text-warm-black"
+                : "text-gray-faint hover:text-warm-black"
             }`}
           >
             <History className="w-3 h-3" strokeWidth={1.5} />
@@ -597,7 +594,7 @@ export function PropertiesEditor({ activeSection }: PropertiesEditorProps) {
       {/* Auto-save status — edits commit to the draft on their own */}
       {hasChanges && (
         <div className="flex items-center justify-between px-4 py-2 border-b border-gray-border bg-surface shrink-0 animate-fade-in-up">
-          <span className="flex items-center gap-1.5 text-[11px] font-medium text-gray-muted">
+          <span className="flex items-center gap-1.5 text-[12px] font-medium text-gray-muted">
             <span className="h-1.5 w-1.5 rounded-full bg-accent animate-pulse" />
             Saving changes…
           </span>
@@ -631,11 +628,11 @@ export function PropertiesEditor({ activeSection }: PropertiesEditorProps) {
         <div className="flex items-center justify-between px-4 py-2 border-b border-gray-border bg-critical0/[0.04] shrink-0 animate-fade-in-up">
           <div className="flex items-center gap-2">
             <AlertCircle className="w-3 h-3 text-critical0" strokeWidth={1.5} />
-            <span className="text-[11px] text-critical">Couldn&apos;t save. Try again</span>
+            <span className="text-[12px] text-critical">Couldn&apos;t save. Try again</span>
           </div>
           <button
             onClick={handleSave}
-            className="text-[11px] font-medium text-critical hover:text-critical transition-colors"
+            className="text-[12px] font-medium text-critical hover:text-critical transition-colors"
           >
             Retry
           </button>
@@ -649,10 +646,10 @@ export function PropertiesEditor({ activeSection }: PropertiesEditorProps) {
           <div className="mx-4 mt-3 rounded-lg border border-accent/25 bg-accent/5 px-3 py-2">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
-                <p className="text-[11px] font-medium text-accent">
+                <p className="text-[12px] font-medium text-accent">
                   Selected {selectedNode.nodeType === "image" ? "image" : selectedNode.nodeType === "link" ? "link" : "field"}
                 </p>
-                <p className="mt-0.5 break-all text-[11px] text-gray-muted">
+                <p className="mt-0.5 break-all text-[12px] text-gray-muted">
                   {selectedNode.label || selectedNode.field}
                 </p>
               </div>
@@ -697,7 +694,7 @@ export function PropertiesEditor({ activeSection }: PropertiesEditorProps) {
                 const hex = (getNestedValue(data, field.key) as string) || "#000000";
                 return (
                   <div>
-                    <label className="block text-[11px] text-gray-muted mb-0.5">
+                    <label className="block text-[12px] text-gray-muted mb-0.5">
                       {field.label}
                     </label>
                     <div className="flex items-center gap-2">
@@ -712,7 +709,7 @@ export function PropertiesEditor({ activeSection }: PropertiesEditorProps) {
                         value={hex}
                         onChange={(e) => handleFieldChange(field.key, e.target.value)}
                         placeholder="#000000"
-                        className="w-28 rounded-lg border-0 bg-surface-inset px-3 py-2 text-[13px] text-warm-black font-mono"
+                        className="w-28 rounded-lg border-0 bg-surface-inset px-3 py-2 text-[13px] text-warm-black"
                       />
                     </div>
                   </div>
@@ -724,7 +721,7 @@ export function PropertiesEditor({ activeSection }: PropertiesEditorProps) {
                 const opts = field.options ?? [];
                 return (
                   <div>
-                    <label className="block text-[11px] text-gray-muted mb-0.5">
+                    <label className="block text-[12px] text-gray-muted mb-0.5">
                       {field.label}
                     </label>
                     <select

@@ -1,4 +1,5 @@
-import { ShoppingBag, TrendingUp, Package, Receipt, Tag } from "lucide-react";
+import { XaRow, XaRows, XaSystemTile } from "@/components/ui/strelva/Xa";
+import { DashPage, DashSection } from "./xa/DashboardXa";
 import { formatMoney, buildStoreVerdict, type OrderRecord, type OrderSummary } from "@/lib/orders";
 import { sanitizePromptValue } from "@/lib/capabilities";
 import type { Product } from "@/lib/products";
@@ -55,131 +56,58 @@ export function StorePanel({
 }) {
   const verdict = buildStoreVerdict(summary);
   const revenueSeries = dailyRevenueSeries(orders);
+  const revenue = formatMoney(summary?.revenueCents ?? 0, summary?.currency ?? "USD");
+  const orderCount = summary?.orderCount ?? 0;
 
   return (
-    <div className="mx-auto w-full max-w-3xl px-4 py-8">
-      <div className="flex items-center gap-2 text-[11px] font-medium uppercase tracking-[0.16em] text-gray-muted">
-        <ShoppingBag className="h-3.5 w-3.5" strokeWidth={1.7} />
-        Store
-      </div>
+    <DashPage
+      title={verdict.headline}
+      quiet={verdict.detail || undefined}
+      lead={<XaSystemTile kind="payments" size={48} label="Store" />}
+      label="Store"
+    >
+      {revenueSeries.length > 1 ? (
+        <figure className="m-0 flex max-w-[560px] flex-col gap-2" aria-label={`Money from orders by day, last 30 days: ${revenue} in all`}>
+          <figcaption className="text-[13px] font-medium text-[var(--st-text-3)]">Money from orders by day, last 30 days</figcaption>
+          <Sparkline series={revenueSeries} className="h-16" />
+        </figure>
+      ) : orderCount === 0 ? null : <p className="m-0 text-[15px] text-[var(--st-text-2)]"><span className="tabular-nums">{revenue}</span> from <span className="tabular-nums">{orderCount}</span> {orderCount === 1 ? "order" : "orders"} in the last 30 days.</p>}
 
-      {/* Verdict — the one honest sentence before any metric */}
-      <h1 className="mt-2 font-display text-[28px] font-normal leading-tight text-warm-black">
-        {verdict.headline}
-      </h1>
-      {verdict.detail && (
-        <p className="mt-2 max-w-[560px] text-[14px] leading-relaxed text-gray-muted">{verdict.detail}</p>
-      )}
-
-      {/* Supporting metrics */}
-      <div className="mt-6 grid gap-3 sm:grid-cols-2">
-        <div className="rounded-xl border border-glass-border bg-glass p-4">
-          <div className="mb-2 flex items-center gap-2 text-gray-muted">
-            <TrendingUp className="h-4 w-4" strokeWidth={1.5} />
-            <span className="text-[11px] font-medium uppercase tracking-[0.12em]">Revenue · 30 days</span>
-          </div>
-          <p className="text-[26px] font-semibold leading-none text-warm-black">
-            {formatMoney(summary?.revenueCents ?? 0, summary?.currency ?? "USD")}
-          </p>
-          {revenueSeries.length > 1 && (
-            <div className="mt-3">
-              <Sparkline series={revenueSeries} />
-            </div>
-          )}
-        </div>
-        <div className="rounded-xl border border-glass-border bg-glass p-4">
-          <div className="mb-2 flex items-center gap-2 text-gray-muted">
-            <Receipt className="h-4 w-4" strokeWidth={1.5} />
-            <span className="text-[11px] font-medium uppercase tracking-[0.12em]">Orders · 30 days</span>
-          </div>
-          <p className="text-[26px] font-semibold leading-none text-warm-black">{summary?.orderCount ?? 0}</p>
-        </div>
-      </div>
-
-      {/* Best sellers */}
       {summary && summary.topProducts.length > 0 && (
-        <section className="mt-4 rounded-xl border border-glass-border bg-surface-raised p-5">
-          <div className="flex items-center gap-2">
-            <Package className="h-4 w-4 text-gray-muted" strokeWidth={1.6} />
-            <h2 className="text-[14px] font-medium text-warm-black">Best sellers</h2>
-          </div>
-          <ul className="mt-3 space-y-1.5">
-            {summary.topProducts.map((p) => (
-              <li key={p.name} className="flex items-center justify-between text-[13px]">
-                <span className="truncate text-warm-black">{p.name}</span>
-                <span className="shrink-0 text-gray-muted">{p.quantity} sold</span>
-              </li>
-            ))}
-          </ul>
-        </section>
+        <DashSection label="Best sellers">
+          <XaRows label="Best sellers">
+            {summary.topProducts.map((p) => <XaRow key={p.name} title={p.name} meta={`${p.quantity} sold`} />)}
+          </XaRows>
+        </DashSection>
       )}
 
-      {/* Products — read-only; Strelva manages them, so say so plainly */}
-      <section className="mt-4 rounded-xl border border-glass-border bg-surface-raised p-5">
-        <div className="flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
-            <Tag className="h-4 w-4 text-gray-muted" strokeWidth={1.6} />
-            <h2 className="text-[14px] font-medium text-warm-black">Products</h2>
-          </div>
-          {products.length > 0 && <span className="text-[12px] text-gray-muted">{products.length}</span>}
-        </div>
-
+      <DashSection label={products.length ? `Products · ${products.length}` : "Products"} aside={<StoreChatButton prompt={PRODUCT_PROMPT} label="Ask to add or change one" />}>
         {products.length > 0 ? (
-          <ul className="mt-3 divide-y divide-gray-border/60">
+          <XaRows label="Products">
             {products.map((p, i) => (
-              <li key={`${p.name}-${i}`} className="flex items-center justify-between gap-3 py-2.5 text-[13px]">
-                <div className="flex min-w-0 items-center gap-2">
-                  <span className="truncate text-warm-black">{p.name}</span>
-                  {!p.inStock && (
-                    <span className="shrink-0 rounded-full border border-gray-border px-1.5 py-0.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-gray-faint">
-                      Sold out
-                    </span>
-                  )}
-                </div>
-                <span className="shrink-0 text-gray-muted">
-                  {p.priceCents != null ? formatMoney(p.priceCents, p.currency) : "—"}
-                </span>
-              </li>
+              <XaRow key={`${p.name}-${i}`} title={p.name} detail={p.inStock ? undefined : "Sold out"} tone={p.inStock ? undefined : "waits"}
+                meta={p.priceCents != null ? formatMoney(p.priceCents, p.currency) : "No price yet"} />
             ))}
-          </ul>
+          </XaRows>
         ) : (
-          <p className="mt-2 text-[13px] leading-relaxed text-gray-muted">
-            No products listed yet.
-          </p>
+          <p className="m-0 text-[15px] text-[var(--st-text-2)]">No products listed yet. Strelva manages them for you; ask to add one.</p>
         )}
+      </DashSection>
 
-        <div className="mt-4 flex flex-col gap-2.5 border-t border-gray-border/60 pt-4 sm:flex-row sm:items-center sm:justify-between">
-          <p className="text-[12px] leading-relaxed text-gray-muted">
-            Your products are managed by Strelva. Ask in chat to add or change one.
-          </p>
-          <StoreChatButton prompt={PRODUCT_PROMPT} label="Ask Strelva" />
-        </div>
-      </section>
-
-      {/* Recent orders — each one turns into a retention action */}
-      <section className="mt-4 rounded-xl border border-glass-border bg-surface-raised p-5">
-        <h2 className="text-[14px] font-medium text-warm-black">Recent orders</h2>
+      <DashSection label="Recent orders">
         {orders.length ? (
-          <ul className="mt-3 divide-y divide-gray-border/60">
+          <XaRows label="Recent orders">
             {orders.map((o) => (
-              <li key={o.id} className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 py-2.5 text-[13px]">
-                <div className="min-w-0">
-                  <span className="font-medium text-warm-black">{formatMoney(o.amountCents, o.currency)}</span>
-                  {o.itemCount > 0 && (
-                    <span className="ml-2 text-gray-muted">{o.itemCount} {o.itemCount === 1 ? "item" : "items"}</span>
-                  )}
-                  <span className="ml-2 text-[11px] text-gray-faint">{new Date(o.createdAt).toLocaleDateString()}</span>
-                </div>
-                <StoreChatButton prompt={reviewPrompt(o)} label="Ask Strelva to request a review" />
-              </li>
+              <XaRow key={o.id}
+                title={formatMoney(o.amountCents, o.currency)}
+                detail={`${o.itemCount > 0 ? `${o.itemCount} ${o.itemCount === 1 ? "item" : "items"} · ` : ""}${new Date(o.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}`}
+                action={<StoreChatButton prompt={reviewPrompt(o)} label="Ask for a review" />} />
             ))}
-          </ul>
+          </XaRows>
         ) : (
-          <p className="mt-2 text-[13px] leading-relaxed text-gray-muted">
-            No orders yet. They&apos;ll appear here in real time as customers check out.
-          </p>
+          <p className="m-0 text-[15px] text-[var(--st-text-2)]">No orders yet. They appear here as customers check out.</p>
         )}
-      </section>
-    </div>
+      </DashSection>
+    </DashPage>
   );
 }

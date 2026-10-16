@@ -88,7 +88,7 @@ export function ArrayItemEditor({
       {/* Divider with count */}
       <div className="flex items-center gap-2 mb-2">
         <div className="h-px flex-1 bg-gray-border" />
-        <span className="text-[11px] text-gray-faint shrink-0">
+        <span className="text-[12px] text-gray-faint shrink-0">
           {items.length} {items.length === 1 ? "item" : "items"}
         </span>
       </div>
@@ -114,7 +114,7 @@ export function ArrayItemEditor({
       <button
         type="button"
         onClick={handleAdd}
-        className="mt-2 w-full flex items-center justify-center gap-1 px-3 py-2 rounded-lg text-[11px] text-sage font-medium hover:bg-sage/[0.06] transition-colors duration-150"
+        className="mt-2 w-full flex items-center justify-center gap-1 px-3 py-2 rounded-lg text-[12px] text-sage font-medium hover:bg-sage/[0.06] transition-colors duration-150"
       >
         <Plus className="w-3 h-3" strokeWidth={2} />
         {resolvedConfig.addLabel}

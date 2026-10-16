@@ -8,9 +8,11 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ImageIcon, Plus, Trash2 } from "lucide-react";
-import { StEmpty, StHead, StHold, StMono, StNotice, StPage, StPill, StRow, StRows, StSegmented, StSkeleton, StState, StSurface, StTextButton } from "@/components/ui/strelva/Kit";
-import styles from "./website-library.module.css";
+import { ImageIcon, Plus } from "lucide-react";
+import { StSkeleton } from "@/components/ui/strelva/Kit";
+import { XaButton, XaSegmented, XaTextLink, XaYes } from "@/components/ui/strelva/Xa";
+import { ConfirmDialog } from "./ConfirmDialog";
+import { DashNote, DashPage, dashStyles as dash } from "./xa/DashboardXa";
 import { useDashboardOptional } from "./DashboardContext";
 import { AssetPickerModal } from "./AssetPickerModal";
 
@@ -117,7 +119,7 @@ function validateEntry(type: CollectionType, data: Record<string, unknown>): Rec
   return errors;
 }
 
-const TYPE_LABEL: Record<CollectionType, string> = { blog: "Blog", video: "Video", product: "Products" };
+const TYPE_LABEL: Record<CollectionType, string> = { blog: "Blog posts", video: "Videos", product: "Products" };
 
 function emptyData(type: CollectionType): Record<string, unknown> {
   const d: Record<string, unknown> = {};
@@ -153,6 +155,7 @@ export function CollectionsManager({
   const [savedAction, setSavedAction] = useState<"published" | "draft" | null>(null);
   // The image field currently choosing from the media library (null = closed).
   const [pickingField, setPickingField] = useState<FieldDef | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
 
   // Insert a chosen photo URL into the active field: replace for a single URL
   // field, append for an image list (product photos). Clears any stale error.
@@ -241,7 +244,6 @@ export function CollectionsManager({
   }
 
   async function remove(slug: string) {
-    if (!confirm(`Delete "${slug}"? This cannot be undone.`)) return;
     setError(null); setLiveNotice(null);
     const res = await fetch(apiPath(`/api/collections/${type}?slug=${encodeURIComponent(slug)}`), { method: "DELETE" });
     const json = await res.json().catch(() => ({}));
@@ -253,19 +255,26 @@ export function CollectionsManager({
     if (json.liveSite?.status === "failed") setLiveNotice("Deleted. Your live site did not refresh yet; it will pick this up within a few minutes.");
   }
 
-  return <StPage>
-      <StHead title={type === "blog" ? "Articles" : TYPE_LABEL[type]} meta="Content on your website. Open an entry to edit it or prepare a draft." actions={!readOnly ? <StPill variant={editing ? "soft" : "primary"} onClick={() => { setFieldErrors({}); setError(null); setLiveNotice(null); setEditing({ data: emptyData(type) }); }}><Plus size={16} aria-hidden="true" />New {TYPE_LABEL[type].replace(/s$/, "")}</StPill> : undefined} />
-      {savedAction ? <span role="status"><StState kind="live">{savedAction === "published" ? "Published" : "Saved"}</StState></span> : null}
-      {readOnly ? <StNotice>You can read these entries. Only an owner or admin can save, publish or delete them.</StNotice> : null}
-      {types.length > 1 ? <StSegmented value={type} label="Content type" options={types.map(value => ({ value, label: TYPE_LABEL[value] }))} onChange={value => { setType(value); setEditing(null); setFieldErrors({}); setError(null); setLiveNotice(null); }} /> : null}
-      {error ? <StNotice tone="critical">{error}</StNotice> : null}
-      {liveNotice ? <StNotice>{liveNotice}</StNotice> : null}
-      {editing ? <StSurface label="Website content entry"><div className={styles.brandFields}>
+  const singular = TYPE_LABEL[type].replace(/s$/, "");
+  const closeEditor = () => { setEditing(null); setFieldErrors({}); setError(null); setLiveNotice(null); };
+  const deleting = entries.find((entry) => entry.slug === confirmDelete) ?? null;
+
+  return <DashPage
+      title={`${TYPE_LABEL[type]}.`}
+      quiet="Lists on your website. Open one to change it, or start a new one."
+      actions={!readOnly && !editing ? <XaButton onClick={() => { setFieldErrors({}); setError(null); setLiveNotice(null); setEditing({ data: emptyData(type) }); }}><Plus size={15} aria-hidden="true" />New {singular}</XaButton> : undefined}
+      label="Lists"
+    >
+      {readOnly ? <DashNote tone="quiet">You can read these. Only an owner or admin can save, put live or delete them.</DashNote> : null}
+      {types.length > 1 ? <div><XaSegmented value={type} label="Which list" options={types.map(value => ({ value, label: TYPE_LABEL[value] }))} onChange={value => { setType(value); closeEditor(); }} /></div> : null}
+      {savedAction ? <DashNote tone="live" role="status">{savedAction === "published" ? "Live on your site." : "Saved as a draft. It isn't on your site yet."}</DashNote> : null}
+      {error ? <DashNote tone="down" role="alert">{error}</DashNote> : null}
+      {liveNotice ? <DashNote tone="quiet">{liveNotice}</DashNote> : null}
+      {editing ? <section className="flex max-w-[640px] flex-col gap-5" aria-label={editing.slug ? `Edit ${singular.toLowerCase()}` : `New ${singular.toLowerCase()}`}>
           {FIELDS[type].map((f) => (
-            <label key={f.name} className="mb-3 block text-sm">
-              <span className="mb-1 block font-medium text-warm-black">
-                {f.label}
-                {f.required && <span className="ml-1 text-critical">*</span>}
+            <label key={f.name} className="flex flex-col gap-2">
+              <span className="text-[13px] font-medium text-[var(--st-text-body)]">
+                {f.label}{f.required ? <span className="text-[var(--st-text-3)]"> (needed)</span> : null}
               </span>
               <FieldInput
                 field={f}
@@ -284,23 +293,32 @@ export function CollectionsManager({
                   }
                 }}
               />
-              {fieldErrors[f.name] && (
-                <span className="mt-1 block text-[12px] text-critical">{fieldErrors[f.name]}</span>
-              )}
+              {fieldErrors[f.name] ? <span className="text-[13px] text-[var(--st-critical)]" role="alert">{fieldErrors[f.name]}</span> : null}
             </label>
           ))}
-          <div className={styles.actions}>
-            {!readOnly ? <><StHold disabled={saving} label={saving ? "Saving…" : "Hold to make it live"} onAccept={() => void save("published")} /><StPill variant="soft" disabled={saving} onClick={() => void save("draft")}>Save draft</StPill></> : null}
-            <StTextButton onClick={() => { setEditing(null); setFieldErrors({}); setError(null); setLiveNotice(null); }}>Cancel</StTextButton>
+          {!readOnly ? <XaYes state={saving ? "going" : "waiting"} yesLabel="Make it live" onYes={() => void save("published")} block={false} shortcut={false} /> : null}
+          <div className="flex flex-wrap items-center gap-4">
+            {!readOnly ? <XaButton disabled={saving} onClick={() => void save("draft")}>Save draft</XaButton> : null}
+            <XaTextLink onClick={closeEditor}>Cancel</XaTextLink>
           </div>
-        </div></StSurface> : loading ? <section className={styles.stack} aria-busy="true" aria-label="Loading entries"><StSkeleton /><StSkeleton width="70%" /></section> : entries.length === 0 ? <StEmpty>No {TYPE_LABEL[type].toLowerCase()} entries yet.</StEmpty> : <StRows label={TYPE_LABEL[type]}>{entries.map(entry => <StRow key={entry.slug} title={<StTextButton onClick={() => { setFieldErrors({}); setError(null); setLiveNotice(null); setEditing({ slug: entry.slug, data: entry.data }); }}>{String(entry.data.title ?? entry.data.name ?? entry.slug)}</StTextButton>} detail={<StState kind={entry.status === "published" ? "live" : "draft"}>{entry.status === "published" ? "Published" : "Draft"}</StState>} end={<>{entry.updatedAt ? <StMono as="time" dateTime={entry.updatedAt}>{new Date(entry.updatedAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })}</StMono> : null}{!readOnly ? <StTextButton tone="danger" onClick={() => void remove(entry.slug)} aria-label="Delete"><Trash2 size={16} aria-hidden="true" /></StTextButton> : null}</>} />)}</StRows>}
+        </section> : loading ? <section className="flex flex-col gap-3" aria-busy="true" aria-label="Loading entries"><StSkeleton /><StSkeleton width="70%" /></section>
+        : entries.length === 0 ? <p className="m-0 text-[15px] text-[var(--st-text-2)]">No {TYPE_LABEL[type].toLowerCase()} yet. {readOnly ? "" : `Start one with New ${singular.toLowerCase()}.`}</p>
+        : <ul className={dash.list} aria-label={TYPE_LABEL[type]}>{entries.map(entry => <li key={entry.slug}>
+            <div className={dash.listText}>
+              <button type="button" className="border-0 bg-transparent p-0 text-left text-[15px] font-medium text-[var(--st-text)] hover:underline" onClick={() => { setFieldErrors({}); setError(null); setLiveNotice(null); setEditing({ slug: entry.slug, data: entry.data }); }}>{String(entry.data.title ?? entry.data.name ?? entry.slug)}</button>
+              <span className={dash.listDetail}>{entry.status === "published" ? "Live" : "Draft, not on your site"}{entry.updatedAt ? ` · changed ${new Date(entry.updatedAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })}` : ""}</span>
+            </div>
+            {!readOnly ? <div className={dash.listEnd}><XaTextLink onClick={() => setConfirmDelete(entry.slug)} aria-label={`Delete ${String(entry.data.title ?? entry.data.name ?? entry.slug)}`}>Delete</XaTextLink></div> : null}
+          </li>)}</ul>}
 
+      <ConfirmDialog open={Boolean(deleting)} destructive title={`Delete ${String(deleting?.data.title ?? deleting?.data.name ?? deleting?.slug ?? "this")}?`} confirmLabel="Delete it" cancelLabel="Keep it"
+        message="It comes off your site and can't be brought back from here." onCancel={() => setConfirmDelete(null)} onConfirm={() => { const slug = confirmDelete; setConfirmDelete(null); if (slug) void remove(slug); }} />
       <AssetPickerModal
         open={pickingField !== null}
         onClose={() => setPickingField(null)}
         onSelect={onPickImage}
       />
-    </StPage>;
+    </DashPage>;
 }
 
 function FieldInput({
@@ -319,11 +337,11 @@ function FieldInput({
   onPickImage?: () => void;
   onChange: (v: unknown) => void;
 }) {
-  const base = `w-full rounded-md border px-3 py-1.5 text-sm ${invalid ? "border-critical/50" : "border-gray-border"}`;
+  const base = `min-h-[44px] w-full rounded-[12px] border bg-[var(--st-surface)] px-3 py-2 text-[15px] text-[var(--st-text)] outline-none focus-visible:border-[var(--st-accent)] disabled:opacity-60 ${invalid ? "border-[var(--st-critical)]" : "border-[var(--st-line)]"}`;
 
   // "Choose from your photos" — so an owner inserts an uploaded image URL instead
   // of pasting one. Shared by the single-URL image fields and the image list.
-  const pickButton = onPickImage && !readOnly && <StTextButton onClick={onPickImage}><ImageIcon size={16} aria-hidden="true" />Choose from your photos</StTextButton>;
+  const pickButton = onPickImage && !readOnly && <button type="button" className="inline-flex items-center gap-1.5 self-start border-0 bg-transparent p-0 text-[14px] font-medium text-[var(--st-accent)] hover:underline" onClick={onPickImage}><ImageIcon size={15} aria-hidden="true" />Choose from your photos</button>;
 
   if (field.kind === "textarea") {
     return <textarea disabled={readOnly} rows={6} className={base} value={String(value ?? "")} onChange={(e) => onChange(e.target.value)} />;
@@ -340,7 +358,7 @@ function FieldInput({
           type="checkbox"
           checked={Boolean(value)}
           onChange={(e) => onChange(e.target.checked)}
-          className="h-4 w-4 rounded border-gray-border accent-accent"
+          className="h-4 w-4 accent-[var(--st-accent)]"
         />
         <span className="text-sm text-gray-muted">{Boolean(value) ? "In stock" : "Out of stock"}</span>
       </span>

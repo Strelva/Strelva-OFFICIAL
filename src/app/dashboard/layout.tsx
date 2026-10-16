@@ -5,6 +5,8 @@ import Link from "next/link";
 import { headers } from "next/headers";
 import { DashboardProvider } from "@/components/dashboard/DashboardContext";
 import { BillingBanner } from "@/components/dashboard/BillingBanner";
+import { DashNote } from "@/components/dashboard/xa/DashboardXa";
+import { XaButtonLink, XaHeadline, XaLede, XaMark } from "@/components/ui/strelva/Xa";
 import { SessionKeeper } from "@/components/dashboard/SessionKeeper";
 import { DashboardSurfacesProvider } from "@/components/dashboard/DashboardSurfacesContext";
 import { getTenantFromHeaders } from "@/lib/tenant";
@@ -202,19 +204,7 @@ export default async function DashboardLayout({
         >
           Skip to content
         </a>
-        {isDemo && !devAccessBypass && (
-          <div className="flex items-center justify-center gap-2 border-b border-accent/30 bg-accent-dim px-4 py-2 text-center text-[12px] text-warm-black">
-            <span className="font-medium">You&apos;re viewing a read-only live demo &mdash; editing is off.</span>
-            <Link href="/access-request" className="font-semibold text-accent underline-offset-2 hover:underline">
-              Get your own site &rarr;
-            </Link>
-          </div>
-        )}
-        {ownerEntry.kind === "render-with-back" && (
-          <DashboardBackBar businessName={siteName} homeHref={ownerEntry.homeHref} route={ownerEntry.route} />
-        )}
         {!isDemo && <SessionKeeper />}
-        <BillingBanner subscriptionStatus={subscriptionStatus} />
         <ConversationShell
           appBase={appBase}
           signedIn={Boolean(userId) || devAccessBypass}
@@ -228,6 +218,11 @@ export default async function DashboardLayout({
           inspect={inspect}
           inspectTenantName={siteName}
           inspectExitHref={`/api/admin/inspect?on=0&to=${encodeURIComponent(`/admin/clients/${tenant}`)}`}
+          notes={<>
+            {isDemo && !devAccessBypass ? <DashNote tone="quiet" links={[<Link key="own" href="/access-request" className="font-medium text-[var(--st-accent)] hover:underline">Get your own site</Link>]}>This is a live demo you can look around. Editing is off.</DashNote> : null}
+            {ownerEntry.kind === "render-with-back" ? <DashboardBackBar businessName={siteName} homeHref={ownerEntry.homeHref} route={ownerEntry.route} /> : null}
+            <BillingBanner subscriptionStatus={subscriptionStatus} />
+          </>}
         >
           {children}
         </ConversationShell>
@@ -238,21 +233,12 @@ export default async function DashboardLayout({
 
 function TenantSuspended({ siteName }: { siteName: string }) {
   return (
-    <main className="marketing-root flex min-h-dvh items-center justify-center px-6">
-      <div className="max-w-md text-center">
-        <h1 className="font-display text-[24px] font-normal text-m-text">
-          {siteName} is paused
-        </h1>
-        <p className="mt-3 text-[15px] leading-relaxed text-m-text-2">
-          This dashboard is on hold. Your site and data are safe. Reach out and
-          we will get it switched back on.
-        </p>
-        <a
-          href="mailto:hello@strelva.com?subject=Dashboard%20access"
-          className="marketing-button-primary mt-6 inline-flex h-11 px-5 text-[14px]"
-        >
-          Contact Strelva
-        </a>
+    <main data-workspace-theme="linen" className="flex min-h-dvh items-center bg-[var(--st-canvas)] px-6">
+      <div data-dashboard className="mx-auto flex w-full max-w-[460px] flex-col items-start gap-5 bg-transparent">
+        <XaMark size={36} />
+        <XaHeadline size="sm" quiet="Your site and records are safe.">{siteName} is paused.</XaHeadline>
+        <XaLede>This dashboard is on hold. Write to Strelva and it gets switched back on.</XaLede>
+        <XaButtonLink variant="primary" href="mailto:hello@strelva.com?subject=Dashboard%20access">Write to Strelva</XaButtonLink>
       </div>
     </main>
   );

@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef, useCallback, type ReactNode } from "react";
 import Link from "next/link";
-import { AlertTriangle, Code2, Download, ExternalLink, Image as ImageIcon, Link2, Plus, Sparkles, Trash2 } from "lucide-react";
+import { AlertTriangle, Code2, ExternalLink, Plus, Trash2 } from "lucide-react";
 
 import { useDashboardOptional } from "@/components/dashboard/DashboardContext";
 import { getCurrentPlanDisplay } from "@/components/dashboard/billing-display";
@@ -12,6 +12,9 @@ import { ContentAutonomyPanel } from "@/components/dashboard/ContentAutonomyPane
 import { SkeletonLine } from "@/components/ui/Skeleton";
 import { DomainsClient } from "./DomainsClient";
 import { DashSelect, FormRow } from "@/components/dashboard/ui";
+import { StSkeleton } from "@/components/ui/strelva/Kit";
+import { XaButton, XaHeadline, XaSegmented, XaStatus } from "@/components/ui/strelva/Xa";
+import { DashEmpty, dashStyles as dash } from "@/components/dashboard/xa/DashboardXa";
 import type { CustomRepoExternalDependency } from "@/lib/types";
 
 // ---------------------------------------------------------------------------
@@ -92,7 +95,7 @@ const BUSINESS_FIELDS: readonly IdentityField[] = [
     ],
   },
   { key: "siteTagline", label: "Tagline", description: "Search results & header" },
-  { key: "siteDescription", label: "Description", description: "SEO description", multiline: true },
+  { key: "siteDescription", label: "Description", description: "How you show up in search results", multiline: true },
   { key: "bookingUrl", label: "Main button link", description: "Where your site's main button sends people", mono: true },
   { key: "footerTagline", label: "Footer tagline", description: "Bottom of your site" },
   { key: "copyrightText", label: "Copyright", description: "Legal text in footer" },
@@ -175,8 +178,8 @@ function setNestedValue(
 // Ownership — now live as labeled in-page sections inside "Business".
 const SETTINGS_SECTIONS = [
   { id: "business", label: "Business" },
-  { id: "account", label: "Account" },
-  { id: "domains", label: "Domains" },
+  { id: "account", label: "You" },
+  { id: "domains", label: "Web addresses" },
   { id: "plan", label: "Plan" },
 ] as const;
 
@@ -207,22 +210,12 @@ const LEGACY_HASH_TO_SECTION: Record<string, string> = {
 type SaveStatus = "idle" | "dirty" | "saving" | "saved" | "error";
 
 function SaveStatusPill({ status }: { status: SaveStatus }) {
-  // Nothing has happened yet at rest, so don't show a "Saved" pill before the
-  // owner has edited anything — it reads as a save that never occurred.
+  // Nothing has happened yet at rest, so no "Saved" before the owner edits anything.
   if (status === "idle") return null;
-  const copy: Record<SaveStatus, { label: string; className: string }> = {
-    idle: { label: "Saved", className: "border-glass-border text-gray-faint" },
-    dirty: { label: "Unsaved changes", className: "border-warning/30 bg-warning/10 text-warning" },
-    saving: { label: "Saving...", className: "border-accent/30 bg-accent-dim text-accent" },
-    saved: { label: "Saved", className: "border-positive/30 bg-positive/10 text-positive" },
-    error: { label: "Could not save", className: "border-critical/30 bg-critical/10 text-critical" },
-  };
-  const item = copy[status];
-  return (
-    <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-medium ${item.className}`}>
-      {item.label}
-    </span>
-  );
+  if (status === "dirty") return <XaStatus kind="waits" size="sm">Not saved yet</XaStatus>;
+  if (status === "saving") return <XaStatus kind="working" size="sm">Saving</XaStatus>;
+  if (status === "saved") return <XaStatus kind="live" size="sm">Saved</XaStatus>;
+  return <XaStatus kind="down" size="sm">Didn&apos;t save</XaStatus>;
 }
 
 // ---------------------------------------------------------------------------
@@ -310,12 +303,12 @@ function ProfileSection({
     <>
       <div className="mb-4 flex items-center justify-end gap-3">
         {readOnly && (
-          <span className="text-[11px] text-gray-muted">Editing is disabled in the demo</span>
+          <span className="text-[12px] text-gray-muted">Editing is disabled in the demo</span>
         )}
         <SaveStatusPill status={saveStatus} />
       </div>
 
-      <div className="rounded-lg border border-glass-border overflow-hidden">
+      <div className="border-y border-[var(--st-line)]">
         {fields.map((field, i) => (
           <FormRow
             key={field.key}
@@ -340,7 +333,7 @@ function ProfileSection({
                 onBlur={() => handleBlurSave(field.key)}
                 disabled={readOnly}
                 rows={3}
-                className="w-full bg-surface-base border border-glass-border rounded-lg px-3 py-2 text-[13px] text-warm-white outline-none resize-y min-h-[64px] focus:border-accent/40 transition-colors disabled:opacity-60"
+                className="w-full bg-[var(--st-surface)] border border-[var(--st-line)] rounded-[12px] px-3 py-2.5 text-[15px] text-warm-black outline-none resize-y min-h-[64px] focus-visible:border-[var(--st-accent)] transition-colors disabled:opacity-60"
               />
             ) : (
               <input
@@ -352,17 +345,17 @@ function ProfileSection({
                   if (e.key === "Enter") (e.target as HTMLElement).blur();
                 }}
                 disabled={readOnly}
-                className={`w-full bg-surface-base border rounded-lg px-3 py-2 text-[13px] outline-none focus:border-accent/40 transition-colors disabled:opacity-60 ${
+                className={`w-full bg-[var(--st-surface)] border border-[var(--st-line)] rounded-[12px] px-3 py-2.5 text-[15px] outline-none focus-visible:border-[var(--st-accent)] transition-colors disabled:opacity-60 ${
                   fieldErrors[field.key] ? "border-critical/50" : "border-glass-border"
                 } ${
                   field.mono
                     ? "text-accent text-[12px]"
-                    : "text-warm-white"
+                    : "text-warm-black"
                 }`}
               />
             )}
             {fieldErrors[field.key] && (
-              <p className="mt-1.5 text-[11px] text-critical">{fieldErrors[field.key]}</p>
+              <p className="mt-1.5 text-[12px] text-critical">{fieldErrors[field.key]}</p>
             )}
           </FormRow>
         ))}
@@ -382,16 +375,16 @@ function AccountSection() {
   const isAdmin = dashboard?.impersonation.isSuperAdmin ?? false;
 
   return (
-    <div className="rounded-xl border border-glass-border bg-glass p-5">
+    <div className="border-t border-[var(--st-line)] pt-4">
       <div className="flex items-center gap-3">
-        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-accent-dim text-[15px] font-semibold text-accent">
+        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-[15px] font-semibold text-accent">
           {(name[0] || "U").toUpperCase()}
         </div>
         <div className="min-w-0">
           <div className="flex items-center gap-2">
-            <p className="truncate text-[14px] font-semibold tracking-[-0.01em] text-warm-white">{name}</p>
+            <p className="truncate text-[14px] font-semibold tracking-[-0.01em] text-warm-black">{name}</p>
             {isAdmin && (
-              <span className="shrink-0 rounded-full bg-accent-dim px-1.5 py-0.5 text-[11px] font-semibold uppercase tracking-[0.06em] text-accent">
+              <span className="shrink-0 rounded-full bg-accent-dim px-1.5 py-0.5 text-[13px] font-semibold text-accent">
                 Strelva Admin
               </span>
             )}
@@ -402,7 +395,7 @@ function AccountSection() {
       <p className="mt-4 text-[12px] leading-relaxed text-gray-muted">
         This is the account you&apos;re signed in with. It stays the same across every
         business you can access. Your business&apos;s public details live in{" "}
-        <span className="text-warm-white">Business info</span>.
+        <span className="text-warm-black">Business info</span>.
       </p>
     </div>
   );
@@ -496,7 +489,7 @@ function BrandSection({ readOnly = false }: { readOnly?: boolean }) {
     <>
       <div className="mb-4 flex items-center justify-between gap-3">
         {readOnly ? (
-          <span className="text-[11px] text-gray-muted">Editing is disabled in the demo</span>
+          <span className="text-[12px] text-gray-muted">Editing is disabled in the demo</span>
         ) : (
           <p className="text-[12px] text-gray-muted">Changes save as you go and apply to your live site.</p>
         )}
@@ -505,10 +498,10 @@ function BrandSection({ readOnly = false }: { readOnly?: boolean }) {
 
       {/* Brand at a glance — the display face over the color set, so the brand
           reads as a whole before you edit any single token. */}
-      <div className="mb-6 rounded-xl border border-glass-border bg-glass p-5">
-        <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-gray-muted">Brand at a glance</p>
+      <div className="mb-6 border-t border-[var(--st-line)] pt-4">
+        <p className="text-[13px] font-medium text-gray-muted">Brand at a glance</p>
         <p
-          className="mt-2 text-[24px] leading-tight text-warm-white"
+          className="mt-2 text-[24px] leading-tight text-warm-black"
           style={displayFont ? { fontFamily: `"${displayFont}", serif` } : undefined}
         >
           {displayFont || "Your display font"}
@@ -520,15 +513,15 @@ function BrandSection({ readOnly = false }: { readOnly?: boolean }) {
               className="flex items-center gap-2 rounded-lg border border-glass-border bg-surface-base px-2.5 py-1.5"
             >
               <span className="h-4 w-4 rounded-full border border-glass-border" style={{ backgroundColor: s.hex }} />
-              <span className="text-[11px] text-gray-muted">{s.label}</span>
+              <span className="text-[12px] text-gray-muted">{s.label}</span>
             </div>
           ))}
         </div>
       </div>
 
       {/* Typography */}
-      <h2 className="mb-2 text-[13px] font-medium text-warm-white">Typography</h2>
-      <div className="rounded-lg border border-glass-border overflow-hidden mb-6">
+      <h2 className="mb-2 text-[13px] font-medium text-warm-black">Typography</h2>
+      <div className="border-y border-[var(--st-line)] mb-6">
         {THEME_FONT_FIELDS.map((field, i) => {
           const current = (getNestedValue(theme, field.key) as string) || "";
           return (
@@ -561,8 +554,8 @@ function BrandSection({ readOnly = false }: { readOnly?: boolean }) {
       </div>
 
       {/* Brand colors */}
-      <h2 className="mb-2 text-[13px] font-medium text-warm-white">Brand colors</h2>
-      <div className="rounded-lg border border-glass-border overflow-hidden">
+      <h2 className="mb-2 text-[13px] font-medium text-warm-black">Brand colors</h2>
+      <div className="border-y border-[var(--st-line)]">
         {THEME_COLOR_FIELDS.map((field, i) => {
           const hex = (getNestedValue(theme, field.key) as string) || "#000000";
           return (
@@ -590,7 +583,7 @@ function BrandSection({ readOnly = false }: { readOnly?: boolean }) {
                     if (e.key === "Enter") (e.target as HTMLElement).blur();
                   }}
                   disabled={readOnly}
-                  className="w-28 bg-surface-base border border-glass-border rounded-lg px-3 py-2 text-[12px] text-warm-white outline-none focus:border-accent/40 transition-colors disabled:opacity-60"
+                  className="w-28 bg-surface-base border border-glass-border rounded-lg px-3 py-2 text-[12px] text-warm-black outline-none focus-visible:border-[var(--st-accent)] transition-colors disabled:opacity-60"
                 />
               </div>
             </FormRow>
@@ -624,59 +617,23 @@ function DomainsSection() {
 function UtilitiesSection() {
   const dashboard = useDashboardOptional();
   const dashboardHref = dashboard?.dashboardHref ?? ((path: string) => path);
-
-  const utilities = [
-    {
-      title: "Brand Kit",
-      description: "Tell Strelva about your business: what you do, your voice, and your media.",
-      href: "/dashboard/brand-kit",
-      icon: Sparkles,
-    },
-    {
-      title: "Connections",
-      description: "Connect the accounts Strelva manages: Google Business, reviews, booking.",
-      href: "/dashboard/integrations",
-      icon: Link2,
-    },
-    {
-      title: "Photo library",
-      description: "Upload and reuse real photos, logos, and files Strelva can reference in chat.",
-      href: "/dashboard/assets",
-      icon: ImageIcon,
-    },
-    {
-      title: "Ownership & handoff",
-      description: "Export your content and assets, request your site files, and offboard cleanly, all in the Ownership section below.",
-      href: "/dashboard/settings#ownership",
-      icon: Download,
-    },
+  const links = [
+    { title: "Your website's voice", href: "/dashboard/brand-kit" },
+    { title: "Connections", href: "/dashboard/integrations" },
+    { title: "Photos", href: "/dashboard/assets" },
+    { title: "What you own, and leaving", href: "/dashboard/settings#ownership" },
   ];
-
+  // One sentence with places to go, not a stack of icon cards.
   return (
-    <div className="grid gap-3">
-      {utilities.map((item) => {
-        const Icon = item.icon;
-        return (
-          <Link
-            key={item.href}
-            href={dashboardHref(item.href)}
-            className="group flex items-start gap-4 rounded-xl border border-glass-border bg-glass px-4 py-4 transition-colors hover:border-accent/35"
-          >
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-accent-dim text-accent">
-              <Icon className="h-4 w-4" strokeWidth={1.5} />
-            </span>
-            <span className="min-w-0">
-              <span className="block text-[14px] font-medium text-warm-white group-hover:text-white">
-                {item.title}
-              </span>
-              <span className="mt-1 block text-[12px] leading-relaxed text-gray-muted">
-                {item.description}
-              </span>
-            </span>
-          </Link>
-        );
-      })}
-    </div>
+    <p className="m-0 text-[15px] leading-[1.6] text-[var(--st-text-body)]">
+      Also yours to change:{" "}
+      {links.map((item, index) => (
+        <span key={item.href}>
+          {index ? " · " : ""}
+          <Link href={dashboardHref(item.href)} className="font-medium text-[var(--st-accent)] hover:underline">{item.title}</Link>
+        </span>
+      ))}
+    </p>
   );
 }
 
@@ -706,8 +663,8 @@ function SiteConfigSection({ readOnly = false }: { readOnly?: boolean }) {
             onClick={() => setTab(item)}
             className={`h-8 rounded-lg border px-3 text-[12px] capitalize transition-colors ${
               tab === item
-                ? "border-accent/40 bg-accent/15 text-warm-white"
-                : "border-glass-border text-gray-muted hover:text-warm-white"
+                ? "border-accent/40 bg-accent/15 text-warm-black"
+                : "border-glass-border text-gray-muted hover:text-warm-black"
             }`}
           >
             {item}
@@ -760,8 +717,8 @@ function NavigationFooterSection({ readOnly = false }: { readOnly?: boolean }) {
 
   if (!navigation || !footer) {
     return (
-      <div className="rounded-lg border border-glass-border bg-glass px-5 py-6 text-center">
-        <p className="text-[13px] font-medium text-warm-white">Navigation &amp; footer aren&apos;t editable here</p>
+      <div className="py-2 text-left">
+        <p className="text-[13px] font-medium text-warm-black">Navigation &amp; footer aren&apos;t editable here</p>
         <p className="mx-auto mt-1 max-w-md text-[12px] leading-relaxed text-gray-muted">
           This site&apos;s menu and footer are managed in its code. Ask Strelva in chat to change a
           link or label and we&apos;ll handle it.
@@ -783,13 +740,13 @@ function NavigationFooterSection({ readOnly = false }: { readOnly?: boolean }) {
     <div className="space-y-6">
       <div className="flex items-center justify-end gap-3">
         {readOnly && (
-          <span className="text-[11px] text-gray-muted">Editing is disabled in the demo</span>
+          <span className="text-[12px] text-gray-muted">Editing is disabled in the demo</span>
         )}
         <SaveStatusPill status={saveStatus} />
       </div>
-      <div className="rounded-lg border border-glass-border overflow-hidden">
+      <div className="border-y border-[var(--st-line)]">
         <div className="border-b border-glass-border px-5 py-3">
-          <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-gray-muted">Navigation</p>
+          <p className="text-[13px] font-medium text-gray-muted">Navigation</p>
         </div>
         {navigation.menuItems.map((item, index) => (
           <div key={`${item.label}-${index}`} className="grid grid-cols-1 gap-2 border-b border-glass-border/50 px-5 py-3 sm:grid-cols-[1fr_1fr_auto]">
@@ -798,14 +755,14 @@ function NavigationFooterSection({ readOnly = false }: { readOnly?: boolean }) {
               onChange={(event) => updateNavItem(index, "label", event.target.value)}
               onBlur={() => saveContent("navigation", navigation)}
               disabled={readOnly}
-              className="rounded-lg border border-glass-border bg-surface-base px-3 py-2 text-[12px] text-warm-white outline-none disabled:opacity-60"
+              className="min-h-[40px] rounded-[12px] border border-[var(--st-line)] bg-[var(--st-surface)] px-3 py-2 text-[15px] text-warm-black outline-none disabled:opacity-60"
             />
             <input
               value={item.href}
               onChange={(event) => updateNavItem(index, "href", event.target.value)}
               onBlur={() => saveContent("navigation", navigation)}
               disabled={readOnly}
-              className="rounded-lg border border-glass-border bg-surface-base px-3 py-2 text-[12px] text-accent outline-none disabled:opacity-60"
+              className="min-h-[40px] rounded-[12px] border border-[var(--st-line)] bg-[var(--st-surface)] px-3 py-2 text-[15px] text-accent outline-none disabled:opacity-60"
             />
             <button
               type="button"
@@ -831,7 +788,7 @@ function NavigationFooterSection({ readOnly = false }: { readOnly?: boolean }) {
               saveContent("navigation", next);
             }}
             disabled={readOnly}
-            className="inline-flex items-center gap-2 rounded-lg border border-glass-border px-3 py-2 text-[12px] text-gray-muted hover:text-warm-white disabled:opacity-60 disabled:cursor-not-allowed"
+            className="inline-flex min-h-[40px] items-center gap-2 rounded-full bg-[var(--st-surface)] px-4 text-[14px] font-medium text-warm-black shadow-[0_1px_2px_#0000000f] hover:bg-[var(--st-hover)] disabled:opacity-60 disabled:cursor-not-allowed"
           >
             <Plus className="h-3.5 w-3.5" strokeWidth={1.5} />
             Add link
@@ -847,7 +804,7 @@ function NavigationFooterSection({ readOnly = false }: { readOnly?: boolean }) {
               onBlur={() => saveContent("navigation", navigation)}
               disabled={readOnly}
               placeholder="CTA label"
-              className="rounded-lg border border-glass-border bg-surface-base px-3 py-2 text-[12px] text-warm-white outline-none disabled:opacity-60"
+              className="min-h-[40px] rounded-[12px] border border-[var(--st-line)] bg-[var(--st-surface)] px-3 py-2 text-[15px] text-warm-black outline-none disabled:opacity-60"
             />
             <input
               value={navigation.ctaHref}
@@ -859,13 +816,13 @@ function NavigationFooterSection({ readOnly = false }: { readOnly?: boolean }) {
               onBlur={() => saveContent("navigation", navigation)}
               disabled={readOnly}
               placeholder="CTA href"
-              className="rounded-lg border border-glass-border bg-surface-base px-3 py-2 text-[12px] text-accent outline-none disabled:opacity-60"
+              className="min-h-[40px] rounded-[12px] border border-[var(--st-line)] bg-[var(--st-surface)] px-3 py-2 text-[15px] text-accent outline-none disabled:opacity-60"
             />
           </div>
         </div>
       </div>
 
-      <div className="rounded-lg border border-glass-border overflow-hidden">
+      <div className="border-y border-[var(--st-line)]">
         <FormRow label="Footer tagline" description="Short footer copy">
           <textarea
             value={footer.tagline}
@@ -876,7 +833,7 @@ function NavigationFooterSection({ readOnly = false }: { readOnly?: boolean }) {
             onBlur={() => saveContent("footer", footer)}
             disabled={readOnly}
             rows={2}
-            className="w-full resize-none rounded-lg border border-glass-border bg-surface-base px-3 py-2 text-[12px] text-warm-white outline-none disabled:opacity-60"
+            className="w-full resize-none min-h-[40px] rounded-[12px] border border-[var(--st-line)] bg-[var(--st-surface)] px-3 py-2 text-[15px] text-warm-black outline-none disabled:opacity-60"
           />
         </FormRow>
         <FormRow label="Copyright" description="Bottom legal line" last>
@@ -888,7 +845,7 @@ function NavigationFooterSection({ readOnly = false }: { readOnly?: boolean }) {
             }}
             onBlur={() => saveContent("footer", footer)}
             disabled={readOnly}
-            className="w-full rounded-lg border border-glass-border bg-surface-base px-3 py-2 text-[12px] text-warm-white outline-none disabled:opacity-60"
+            className="w-full min-h-[40px] rounded-[12px] border border-[var(--st-line)] bg-[var(--st-surface)] px-3 py-2 text-[15px] text-warm-black outline-none disabled:opacity-60"
           />
         </FormRow>
       </div>
@@ -938,8 +895,8 @@ function CapabilitiesSection() {
   if (loading) return <SkeletonLine width="w-full" height="h-20" />;
   if (!capabilities) {
     return (
-      <div className="rounded-lg border border-glass-border bg-glass px-5 py-6 text-center">
-        <p className="text-[13px] font-medium text-warm-white">Couldn&apos;t load site capabilities</p>
+      <div className="py-2 text-left">
+        <p className="text-[13px] font-medium text-warm-black">Couldn&apos;t load site capabilities</p>
         <p className="mx-auto mt-1 max-w-md text-[12px] leading-relaxed text-gray-muted">
           Refresh the page to try again.
         </p>
@@ -959,14 +916,14 @@ function CapabilitiesSection() {
     <div className="space-y-4">
       <div className="flex items-center justify-end gap-3">
         {readOnly && (
-          <span className="text-[11px] text-gray-muted">Editing is disabled in the demo</span>
+          <span className="text-[12px] text-gray-muted">Editing is disabled in the demo</span>
         )}
         <SaveStatusPill status={saveStatus} />
       </div>
       <div className="grid gap-3 sm:grid-cols-2">
         {toggles.map(([key, label]) => (
-          <label key={key} className="flex items-center justify-between rounded-lg border border-glass-border bg-glass px-4 py-3">
-            <span className="text-[13px] text-warm-white">{label}</span>
+          <label key={key} className="flex items-center justify-between border-b border-[var(--st-line)] py-3">
+            <span className="text-[13px] text-warm-black">{label}</span>
             <input
               type="checkbox"
               checked={Boolean(capabilities[key])}
@@ -981,8 +938,8 @@ function CapabilitiesSection() {
           </label>
         ))}
       </div>
-      <div className="rounded-lg border border-glass-border p-4">
-        <label className="text-[11px] uppercase tracking-[0.14em] text-gray-muted">Custom-only features</label>
+      <div className="border-t border-[var(--st-line)] pt-4">
+        <label className="text-[13px] text-gray-muted">Custom-only features</label>
         <input
           value={(capabilities.customOnlyFeatures || []).join(", ")}
           disabled={readOnly}
@@ -996,7 +953,7 @@ function CapabilitiesSection() {
           }}
           onBlur={() => saveCapabilities(capabilities)}
           placeholder="cart, rewards, booking-flow"
-          className="mt-2 w-full rounded-lg border border-glass-border bg-surface-base px-3 py-2 text-[12px] text-warm-white outline-none disabled:opacity-60"
+          className="mt-2 w-full min-h-[40px] rounded-[12px] border border-[var(--st-line)] bg-[var(--st-surface)] px-3 py-2 text-[15px] text-warm-black outline-none disabled:opacity-60"
         />
       </div>
     </div>
@@ -1055,8 +1012,8 @@ function CustomComponentsSection() {
       {error && <p className="rounded-lg border border-warning/20 bg-warning/10 px-3 py-2 text-[12px] text-warning">{error}</p>}
       <div className="space-y-3">
         {components.map((component, index) => (
-          <div key={`${component.id}-${index}`} className="rounded-lg border border-glass-border bg-glass p-4">
-            <div className="mb-3 flex items-center justify-between gap-2 text-[11px] text-gray-faint">
+          <div key={`${component.id}-${index}`} className="border-t border-[var(--st-line)] pt-4">
+            <div className="mb-3 flex items-center justify-between gap-2 text-[12px] text-gray-faint">
               <span className="flex items-center gap-2">
                 <Code2 className="h-3.5 w-3.5" strokeWidth={1.5} />
                 Admin component
@@ -1080,7 +1037,7 @@ function CustomComponentsSection() {
                 }}
                 onBlur={() => saveComponents(components)}
                 placeholder="component-id"
-                className="rounded-lg border border-glass-border bg-surface-base px-3 py-2 text-[12px] text-accent outline-none"
+                className="min-h-[40px] rounded-[12px] border border-[var(--st-line)] bg-[var(--st-surface)] px-3 py-2 text-[15px] text-accent outline-none"
               />
               <input
                 value={component.label}
@@ -1091,7 +1048,7 @@ function CustomComponentsSection() {
                 }}
                 onBlur={() => saveComponents(components)}
                 placeholder="Display label"
-                className="rounded-lg border border-glass-border bg-surface-base px-3 py-2 text-[12px] text-warm-white outline-none"
+                className="min-h-[40px] rounded-[12px] border border-[var(--st-line)] bg-[var(--st-surface)] px-3 py-2 text-[15px] text-warm-black outline-none"
               />
             </div>
           </div>
@@ -1104,7 +1061,7 @@ function CustomComponentsSection() {
           setComponents(next);
           saveComponents(next);
         }}
-        className="inline-flex items-center gap-2 rounded-lg border border-glass-border px-3 py-2 text-[12px] text-gray-muted hover:text-warm-white"
+        className="inline-flex min-h-[40px] items-center gap-2 rounded-full bg-[var(--st-surface)] px-4 text-[14px] font-medium text-warm-black shadow-[0_1px_2px_#0000000f] hover:bg-[var(--st-hover)]"
       >
         <Plus className="h-3.5 w-3.5" strokeWidth={1.5} />
         Add component
@@ -1141,7 +1098,7 @@ const DEPENDENCY_STATUS_COPY: Record<string, { label: string; className: string 
 function DependencyStatusPill({ status }: { status: string }) {
   const copy = DEPENDENCY_STATUS_COPY[status] ?? DEPENDENCY_STATUS_COPY["unknown"]!;
   return (
-    <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-medium ${copy.className}`}>
+    <span className={`inline-flex items-center gap-1.5 text-[13px] font-medium before:inline-block before:h-[7px] before:w-[7px] before:rounded-full before:content-[''] ${copy.className}`}>
       {copy.label}
     </span>
   );
@@ -1182,8 +1139,8 @@ function DependencyHealthSection() {
 
   if (data.deliveryModel !== "custom_repo") {
     return (
-      <div className="rounded-lg border border-glass-border bg-glass p-4">
-        <p className="text-[13px] text-warm-white">No connected services to monitor</p>
+      <div className="border-t border-[var(--st-line)] pt-4">
+        <p className="text-[13px] text-warm-black">No connected services to monitor</p>
         <p className="mt-1 text-[12px] leading-relaxed text-gray-muted">
           This site doesn&apos;t rely on any outside services we need to keep an eye on.
         </p>
@@ -1212,8 +1169,8 @@ function DependencyHealthSection() {
       )}
 
       {!hasDependencies && (
-        <div className="rounded-lg border border-glass-border bg-glass p-4">
-          <p className="text-[13px] text-warm-white">No external dependencies recorded</p>
+        <div className="border-t border-[var(--st-line)] pt-4">
+          <p className="text-[13px] text-warm-black">No external dependencies recorded</p>
           <p className="mt-1 text-[12px] leading-relaxed text-gray-muted">
             No outside services are being tracked for your site yet.
           </p>
@@ -1222,16 +1179,16 @@ function DependencyHealthSection() {
 
       <div className="space-y-3">
         {data.dependencies.map((dependency) => (
-          <div key={dependency.id} className="rounded-lg border border-glass-border bg-glass p-4">
+          <div key={dependency.id} className="border-t border-[var(--st-line)] pt-4">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="min-w-0">
-                <p className="text-[14px] font-medium text-warm-white">{dependency.name}</p>
+                <p className="text-[14px] font-medium text-warm-black">{dependency.name}</p>
                 <p className="mt-1 text-[12px] text-gray-muted">{dependency.provider} · {dependency.purpose}</p>
               </div>
               <DependencyStatusPill status={dependency.status} />
             </div>
             {(dependency.source || dependency.detectedAt) && (
-              <p className="mt-3 text-[11px] uppercase tracking-[0.12em] text-gray-faint">
+              <p className="mt-3 text-[13px] text-gray-faint">
                 {dependency.source || "Recorded dependency"}{dependency.detectedAt ? ` · ${dependency.detectedAt}` : ""}
               </p>
             )}
@@ -1263,34 +1220,34 @@ function DependencyHealthSection() {
 const BILLING_STATUS_COPY: Record<SubscriptionStatus, { label: string; className: string; note: string }> = {
   active: {
     label: "Active",
-    className: "bg-positive/10 text-positive",
+    className: "text-[var(--st-text-2)] before:bg-[var(--st-live)]",
     note: "Everything included. Cancel anytime.",
   },
   trialing: {
     label: "Trialing",
-    className: "bg-accent/10 text-accent",
+    className: "text-[var(--st-text-2)] before:bg-[var(--st-live)]",
     note: "Trial access is active.",
   },
   past_due: {
     label: "Past due",
-    className: "bg-warning/10 text-warning",
+    className: "text-[var(--st-need)] before:bg-[var(--st-need-dot)]",
     note: "Payment needs attention to keep the dashboard fully available.",
   },
   cancelled: {
     label: "Canceled",
-    className: "bg-critical/10 text-critical",
+    className: "text-[var(--st-critical)] before:bg-[var(--st-critical)]",
     note: "This subscription is canceled.",
   },
   none: {
     label: "Not set up",
-    className: "bg-gray-border text-gray-muted",
+    className: "text-[var(--st-text-3)] before:bg-[var(--st-draft-dot)]",
     note: "No subscription is connected yet.",
   },
 };
 
 const FOUNDER_COMP_COPY = {
   label: "Founder comp",
-  className: "bg-warning/12 text-warning",
+  className: "text-[var(--st-need)] before:bg-[var(--st-need-dot)]",
   note: "Full access is comped for this founder account. No billing is due.",
 };
 
@@ -1310,17 +1267,17 @@ function BillingSection() {
   });
 
   return (
-    <div className="rounded-lg border border-glass-border overflow-hidden">
+    <div className="border-y border-[var(--st-line)]">
       <div className="flex flex-col gap-4 px-5 py-5 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0">
-          <div className="text-[11px] font-medium tracking-[0.14em] uppercase text-gray-muted mb-2">
+          <div className="text-[13px] font-medium text-gray-muted mb-2">
             Current plan
           </div>
           <div className="flex items-center gap-2 mb-1">
-            <span className="text-[20px] font-medium text-warm-white">
+            <span className="text-[20px] font-medium text-warm-black">
               {currentPlan}
             </span>
-            <span className={`text-[11px] font-medium px-2 py-0.5 rounded ${copy.className}`}>
+            <span className={`inline-flex items-center gap-1.5 text-[13px] font-medium before:inline-block before:h-[7px] before:w-[7px] before:rounded-full before:content-[''] ${copy.className}`}>
               {copy.label}
             </span>
           </div>
@@ -1363,7 +1320,7 @@ function BillingSection() {
             }
           }}
           disabled={openingPortal || isFounderComp}
-          className="min-h-[38px] w-full rounded-lg border border-glass-border px-4 py-2 text-[12px] text-gray-muted transition-colors hover:bg-glass disabled:opacity-60 sm:w-auto"
+          className="min-h-[40px] w-full rounded-full bg-[var(--st-surface)] px-4 text-[14px] font-medium text-warm-black shadow-[0_1px_2px_#0000000f] transition-colors hover:bg-[var(--st-hover)] disabled:opacity-60 sm:w-auto"
         >
           {isFounderComp ? "No billing action" : openingPortal ? "Opening..." : "Manage billing"}
         </button>
@@ -1379,20 +1336,20 @@ function BillingSection() {
 
 const SECTION_META: Record<string, { title: string; description: string }> = {
   business: {
-    title: "Business",
-    description: "Everything about your site: details, branding, structure, connected services, and quick tools.",
+    title: "Said once, here.",
+    description: "Your site, your listing and Strelva all read these details, so nothing drifts.",
   },
   account: {
-    title: "Account",
-    description: "Your personal details on this dashboard, separate from the business you manage.",
+    title: "You.",
+    description: "Your own sign-in on this dashboard, separate from the business.",
   },
   domains: {
-    title: "Domain health",
-    description: "Your website and admin web addresses, plus how to fix them if something looks off.",
+    title: "Your web addresses.",
+    description: "Where your site and this dashboard live, and how to fix either if something looks off.",
   },
   plan: {
-    title: "Plan",
-    description: "One plan, one operating cost, no maintenance upsells.",
+    title: "Your plan.",
+    description: "One plan, one monthly cost, no upsells for upkeep.",
   },
 };
 
@@ -1423,12 +1380,12 @@ const BUSINESS_SECTION_META: { id: (typeof BUSINESS_ANCHORS)[number]; eyebrow: s
   },
   {
     id: "utilities",
-    eyebrow: "Shortcuts",
+    eyebrow: "Also here",
     description: "Useful tools that support Strelva, exports, and connection setup.",
   },
   {
     id: "ownership",
-    eyebrow: "Ownership & handoff",
+    eyebrow: "What you own, and leaving",
     description: "Know what the business owns, what Strelva manages, and how to leave cleanly.",
   },
 ];
@@ -1445,10 +1402,10 @@ function SettingsGroup({
   children: ReactNode;
 }) {
   return (
-    <section id={id} className="scroll-mt-8">
-      <div className="mb-5 border-b border-glass-border pb-3">
-        <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-gray-muted">{eyebrow}</p>
-        <p className="mt-1.5 text-[12px] leading-relaxed text-gray-faint">{description}</p>
+    <section id={id} className="flex scroll-mt-8 flex-col gap-4" aria-labelledby={`${id}-label`}>
+      <div className="flex flex-col gap-1">
+        <h2 id={`${id}-label`} className="m-0 text-[13px] font-medium text-[var(--st-text-3)]">{eyebrow}</h2>
+        <p className="m-0 text-[15px] leading-[1.5] text-[var(--st-text-2)]">{description}</p>
       </div>
       {children}
     </section>
@@ -1482,10 +1439,8 @@ function BusinessSettings({
             readOnly={readOnly}
           />
         ) : (
-          <div className="space-y-4 animate-pulse">
-            {[1, 2, 3, 4, 5].map((i) => (
-              <div key={i} className="h-12 bg-glass rounded-lg" />
-            ))}
+          <div className="flex flex-col gap-3" aria-busy="true">
+            {[72, 64, 80, 56].map((w) => <StSkeleton key={w} width={`${w}%`} label="Loading business details" />)}
           </div>
         )}
       </SettingsGroup>
@@ -1570,96 +1525,45 @@ export default function SettingsPage() {
     return () => window.removeEventListener("hashchange", applyHashSection);
   }, []);
 
+  const retry = () => {
+    setLoadError(false);
+    fetch(apiPath("/api/content/settings"), { credentials: "same-origin" })
+      .then((res) => {
+        if (!res.ok) throw new Error();
+        return res.json();
+      })
+      .then((data) => setSettings(data))
+      .catch(() => setLoadError(true));
+  };
+
   if (loadError) {
     return (
-      <div className="flex-1 flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-sm text-critical mb-3">Couldn&apos;t load settings</p>
-          <button
-            onClick={() => {
-              setLoadError(false);
-              fetch(apiPath("/api/content/settings"), { credentials: "same-origin" })
-                .then((res) => {
-                  if (!res.ok) throw new Error();
-                  return res.json();
-                })
-                .then((data) => setSettings(data))
-                .catch(() => setLoadError(true));
-            }}
-            className="px-4 py-2 rounded-lg border border-glass-border text-xs text-gray-muted hover:bg-glass transition-colors"
-          >
-            Try again
-          </button>
-        </div>
-      </div>
+      <DashEmpty pose="fixing" title="Your business details didn't load." job="Nothing about your business changed" action={<XaButton variant="primary" onClick={retry}>Try again</XaButton>}>
+        Strelva couldn&apos;t read them just now. Trying again usually fixes it.
+      </DashEmpty>
     );
   }
 
   const meta = SECTION_META[activeSection];
 
   return (
-    <div className="flex h-full min-w-0 flex-col md:flex-row">
-      {/* Settings nav */}
-      <nav className="w-[200px] shrink-0 border-r border-glass-border p-6 pt-8 space-y-1 hidden md:block">
-        <div className="text-[11px] font-medium tracking-[0.14em] uppercase text-gray-muted mb-3 px-3">
-          Settings
-        </div>
-        {SETTINGS_SECTIONS.map((item) => (
-          <button
-            key={item.id}
-            onClick={() => setSection(item.id)}
-            className={`mb-1 w-full rounded-lg border px-3 py-2 text-left text-[13px] transition-colors ${
-              activeSection === item.id
-                ? "border-glass-border bg-glass text-warm-white"
-                : "border-transparent text-gray-muted hover:border-glass-border/60 hover:bg-glass/50 hover:text-warm-white"
-            }`}
-          >
-            {item.label}
-          </button>
-        ))}
-      </nav>
+    <div className="h-full min-w-0 flex-1 overflow-y-auto">
+      <div className={dash.page}>
+        <div className={dash.column} style={{ maxWidth: activeSection === "business" ? 820 : 680 }}>
+          <header className="flex flex-col gap-6">
+            <div className="self-start"><XaSegmented label="Business details" value={activeSection as (typeof SETTINGS_SECTIONS)[number]["id"]} onChange={setSection}
+              options={SETTINGS_SECTIONS.map((item) => ({ value: item.id, label: item.label }))} /></div>
+            {meta ? <XaHeadline size="sm" quiet={meta.description}>{meta.title}</XaHeadline> : null}
+            {activeSection === "business" ? (
+              <nav aria-label="Parts of your business details" className="flex flex-wrap gap-x-4 gap-y-2 text-[14px]">
+                {BUSINESS_SECTION_META.map((sub) => (
+                  <button key={sub.id} type="button" className="border-0 bg-transparent p-0 font-medium text-[var(--st-accent)] hover:underline"
+                    onClick={() => document.getElementById(sub.id)?.scrollIntoView({ behavior: "smooth", block: "start" })}>{sub.eyebrow}</button>
+                ))}
+              </nav>
+            ) : null}
+          </header>
 
-      {/* Mobile section select */}
-      <div className="shrink-0 border-b border-glass-border px-4 py-3 md:hidden">
-        <DashSelect
-          value={activeSection}
-          onChange={(e) => setSection(e.target.value)}
-          options={SETTINGS_SECTIONS.map((item) => ({
-            value: item.id,
-            label: item.label,
-          }))}
-        />
-        {/* Sub-section jump row — only shown when the Business section is active */}
-        {activeSection === "business" && (
-          <div className="mt-2 flex gap-2 overflow-x-auto pb-1" style={{ scrollbarWidth: "none" }}>
-            {BUSINESS_SECTION_META.map((sub) => (
-              <button
-                key={sub.id}
-                type="button"
-                onClick={() => {
-                  document.getElementById(sub.id)?.scrollIntoView({ behavior: "smooth", block: "start" });
-                }}
-                className="shrink-0 rounded-full border border-glass-border bg-glass px-3 py-1 text-[11px] text-gray-muted whitespace-nowrap transition-colors hover:border-accent/35 hover:text-warm-white"
-              >
-                {sub.eyebrow}
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* Content */}
-      <div className="min-w-0 flex-1 overflow-y-auto p-4 pb-28 md:p-8 lg:p-10">
-        <div className={activeSection === "business" ? "max-w-3xl" : "max-w-2xl"}>
-          {/* Section header — each tab owns its own framing now (no generic banner). */}
-          {meta && (
-            <div className="mb-8">
-              <h1 className="font-display text-[28px] sm:text-[32px] font-medium text-warm-white">{meta.title}</h1>
-              <p className="text-[13px] leading-relaxed text-gray-muted mt-1.5">{meta.description}</p>
-            </div>
-          )}
-
-          {/* Section content */}
           {activeSection === "business" && (
             <BusinessSettings settings={settings} setSettings={setSettings} readOnly={readOnly} />
           )}

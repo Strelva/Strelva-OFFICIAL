@@ -102,7 +102,7 @@ export const FOOD_BRAND_SCHEMA: SiteModelEditorSchema = {
       { key: "accentText", label: "Caption under image", type: "text", placeholder: "From the shores of Lake Erie" },
       { key: "statement", label: "Opening statement", type: "textarea", placeholder: "One big sentence that sets the tone..." },
       { key: "quote", label: "Pull quote", type: "textarea", placeholder: "A memorable line..." },
-      { key: "quoteAttribution", label: "Quote attribution", type: "text", placeholder: "— Name" },
+      { key: "quoteAttribution", label: "Quote attribution", type: "text", placeholder: "Their name" },
       { key: "imageUrl", label: "Story image", type: "image" },
     ],
     products: [

@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
-import { CheckCircle2, Circle, X, ChevronRight } from "lucide-react";
+import { Check, ChevronRight } from "lucide-react";
+import { StSkeleton } from "@/components/ui/strelva/Kit";
+import { XaLabel, XaRow, XaRows, XaTextLink } from "@/components/ui/strelva/Xa";
 import { useDashboardOptional } from "./DashboardContext";
 
 interface Step {
@@ -80,78 +81,41 @@ export function OnboardingChecklist({
 
   if (hidden) return null;
 
-  // Day-one shell: server flagged this as a fresh client, so reserve the spot
-  // at the top of the overview while the real progress loads instead of
-  // flashing nothing.
+  // Day-one shell: reserve the spot while the real progress loads instead of flashing nothing.
   if (!steps) {
     if (!defaultOpen || loaded) return null;
     return (
-      <div className="rounded-xl border border-glass-border bg-glass p-5">
-        <p className="text-[15px] font-semibold text-warm-black">Get set up</p>
-        <p className="mt-0.5 text-[12px] text-gray-muted">A few quick wins to start.</p>
-        <div className="mt-4 space-y-2" aria-hidden="true">
-          <div className="h-7 rounded-lg bg-gray-bg/60" />
-          <div className="h-7 rounded-lg bg-gray-bg/60" />
-          <div className="h-7 rounded-lg bg-gray-bg/60" />
-        </div>
-      </div>
+      <section className="flex flex-col gap-3" aria-busy="true" aria-labelledby="getting-started-label">
+        <XaLabel id="getting-started-label">Getting started</XaLabel>
+        <StSkeleton width="70%" label="Loading getting started" />
+        <StSkeleton width="58%" label="Loading getting started" />
+        <StSkeleton width="64%" label="Loading getting started" />
+      </section>
     );
   }
 
   const doneCount = steps.filter((s) => s.done).length;
-  // The first not-yet-done step is THE next action — highlight it so a day-one
-  // owner knows exactly where to start, instead of four look-alike rows.
+  // The first not-yet-done step is THE next action.
   const nextIdx = steps.findIndex((s) => !s.done);
 
   return (
-    <div className="rounded-xl border border-glass-border bg-glass p-5">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <p className="text-[15px] font-semibold text-warm-black">Get set up</p>
-          <p className="mt-0.5 text-[12px] text-gray-muted">
-            {doneCount} of {steps.length} done: a few quick wins to start.
-          </p>
-        </div>
-        <button
-          onClick={dismiss}
-          aria-label="Dismiss"
-          className="text-gray-muted hover:text-warm-black transition-colors"
-        >
-          <X className="h-4 w-4" />
-        </button>
+    <section className="flex flex-col gap-2" aria-labelledby="getting-started-label">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <XaLabel id="getting-started-label">Getting started · {doneCount} of {steps.length} done</XaLabel>
+        <XaTextLink onClick={dismiss} aria-label="Hide getting started">Hide</XaTextLink>
       </div>
-
-      <ul className="mt-4 space-y-1.5">
-        {steps.map((s, i) => {
-          const isNext = i === nextIdx;
-          return (
-            <li key={s.key}>
-              <Link
-                href={s.href}
-                className={`group flex items-center gap-3 rounded-lg px-2.5 py-2 transition-colors ${
-                  isNext ? "border border-accent/25 bg-accent-dim/40 hover:bg-accent-dim/60" : "hover:bg-gray-bg"
-                }`}
-              >
-                {s.done ? (
-                  <CheckCircle2 className="h-4 w-4 shrink-0 text-positive0" strokeWidth={2} />
-                ) : (
-                  <Circle className={`h-4 w-4 shrink-0 ${isNext ? "text-accent" : "text-gray-muted"}`} strokeWidth={1.5} />
-                )}
-                <span className={`flex-1 text-[13px] ${s.done ? "text-gray-muted line-through" : isNext ? "font-medium text-warm-black" : "text-warm-black"}`}>
-                  {s.label}
-                </span>
-                {isNext ? (
-                  <span className="flex shrink-0 items-center gap-1 text-[12px] font-medium text-accent-text">
-                    Start <ChevronRight className="h-3.5 w-3.5" strokeWidth={2} />
-                  </span>
-                ) : !s.done ? (
-                  <ChevronRight className="h-3.5 w-3.5 shrink-0 text-gray-faint opacity-0 transition-opacity group-hover:opacity-100" strokeWidth={1.5} />
-                ) : null}
-              </Link>
-            </li>
-          );
-        })}
-      </ul>
-    </div>
+      <XaRows label="Getting started">
+        {steps.map((s, i) => (
+          <XaRow
+            key={s.key}
+            href={s.href}
+            lead={<span className={`grid h-6 w-6 shrink-0 place-items-center rounded-full ${s.done ? "bg-[var(--st-tint)] text-[var(--st-accent)]" : "border border-[var(--st-line-strong)] text-transparent"}`} aria-hidden="true"><Check size={13} strokeWidth={2.4} /></span>}
+            title={<span className={s.done ? "text-[var(--st-text-3)]" : undefined}>{s.label}</span>}
+            detail={s.done ? "Done" : i === nextIdx ? "Start here" : undefined}
+            meta={!s.done && i === nextIdx ? <ChevronRight size={16} aria-hidden="true" /> : undefined}
+          />
+        ))}
+      </XaRows>
+    </section>
   );
 }

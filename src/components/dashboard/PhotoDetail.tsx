@@ -1,9 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { X, Copy, Check, Trash2 } from "lucide-react";
-import { Button } from "@/components/ui/Button";
-import { IconButton } from "@/components/ui/Button";
+import { X } from "lucide-react";
+import { XaAnswers, XaButton, XaIconButton, XaTextLink } from "@/components/ui/strelva/Xa";
 import { ConfirmDialog } from "@/components/dashboard/ConfirmDialog";
 import type { MediaAsset } from "@/lib/media";
 import { formatFileSize } from "@/lib/media";
@@ -61,74 +60,22 @@ export function PhotoDetail({ asset, onClose, onDelete }: PhotoDetailProps) {
   if (!asset) return null;
 
   const detail = (
-    <>
-      {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-gray-border">
-        <p className="text-[13px] font-medium text-warm-black truncate pr-2">
-          {asset.filename}
-        </p>
-        <IconButton label="Close" size="sm" variant="ghost" onClick={onClose}>
-          <X className="w-4 h-4" strokeWidth={1.5} />
-        </IconButton>
+    <div className="flex flex-col gap-5 p-5">
+      <div className="flex items-start justify-between gap-3">
+        <p className="m-0 min-w-0 truncate text-[15px] font-medium text-[var(--st-text)]">{asset.filename}</p>
+        <XaIconButton label="Close photo" tone="plain" onClick={onClose}><X className="h-4 w-4" strokeWidth={1.7} /></XaIconButton>
       </div>
-
-      {/* Preview */}
-      <div className="px-4 py-4 border-b border-gray-border bg-gray-bg flex items-center justify-center">
-        <img
-          src={asset.url}
-          alt={asset.filename}
-          className="max-h-[300px] max-w-full object-contain rounded"
-        />
+      <img src={asset.url} alt={asset.filename} className="max-h-[300px] w-full rounded-[12px] object-contain" />
+      <XaAnswers labelWidth={96} rows={[
+        ["Size", asset.width && asset.height ? `${asset.width} × ${asset.height}, ${formatFileSize(asset.size)}` : formatFileSize(asset.size)],
+        ["Added", timeAgo(asset.createdAt)],
+      ]} />
+      <p className="m-0 text-[14px] text-[var(--st-text-2)]">Ask Strelva to put it on any part of your site, or copy its address.</p>
+      <div className="flex flex-wrap items-center gap-4">
+        <XaButton onClick={handleCopy}>{copied ? "Copied" : "Copy address"}</XaButton>
+        {onDelete ? <XaTextLink onClick={() => setConfirmingDelete(true)}>Delete photo</XaTextLink> : null}
       </div>
-
-      {/* Metadata */}
-      <div className="px-4 py-3 space-y-2.5">
-        <MetaRow label="Filename" value={asset.filename} />
-        <MetaRow
-          label="Dimensions"
-          value={
-            asset.width && asset.height
-              ? `${asset.width} x ${asset.height}`
-              : "Unknown"
-          }
-        />
-        <MetaRow label="File size" value={formatFileSize(asset.size)} />
-        <MetaRow label="Uploaded" value={timeAgo(asset.createdAt)} />
-      </div>
-
-      {/* Actions */}
-      <div className="px-4 py-3 border-t border-gray-border">
-        <Button
-          variant="secondary"
-          size="sm"
-          icon={
-            copied ? (
-              <Check className="w-3.5 h-3.5 text-positive" strokeWidth={1.5} />
-            ) : (
-              <Copy className="w-3.5 h-3.5" strokeWidth={1.5} />
-            )
-          }
-          onClick={handleCopy}
-          className="w-full"
-        >
-          {copied ? "Copied!" : "Copy URL"}
-        </Button>
-        {onDelete && (
-          <Button
-            variant="ghost"
-            size="sm"
-            icon={<Trash2 className="w-3.5 h-3.5" strokeWidth={1.5} />}
-            onClick={() => setConfirmingDelete(true)}
-            className="mt-2 w-full text-critical hover:bg-critical"
-          >
-            Delete photo
-          </Button>
-        )}
-        <p className="text-[11px] text-gray-subtle mt-2 text-center">
-          Use this photo in any section of your site
-        </p>
-      </div>
-    </>
+    </div>
   );
 
   return (
@@ -136,46 +83,28 @@ export function PhotoDetail({ asset, onClose, onDelete }: PhotoDetailProps) {
       <ConfirmDialog
         open={confirmingDelete}
         title="Delete this photo?"
-        message="This removes the photo from your library. Any site section still using it will lose the image."
-        confirmLabel="Delete"
+        message="It comes out of your photo library. Any part of your site still using it loses the image."
+        confirmLabel="Delete the photo"
         destructive
         busy={deleting}
         onConfirm={handleConfirmDelete}
         onCancel={() => setConfirmingDelete(false)}
       />
 
-      {/* Desktop: right side panel */}
-      <div className="hidden md:flex flex-col w-[320px] border-l border-gray-border bg-surface shrink-0 overflow-y-auto">
+      {/* Desktop: the photo opens beside the library */}
+      <div className="hidden w-[340px] shrink-0 flex-col overflow-y-auto border-l border-[var(--st-line)] bg-[var(--st-surface)] md:flex">
         {detail}
       </div>
 
       {/* Mobile: bottom sheet overlay */}
       <div className="md:hidden fixed inset-0 z-50 flex flex-col justify-end">
         {/* Backdrop */}
-        <div
-          className="absolute inset-0 bg-warm-black/30"
-          onClick={onClose}
-        />
+        <div className="absolute inset-0 bg-[#16171566]" onClick={onClose} />
         {/* Sheet */}
-        <div className="relative bg-surface rounded-t-xl max-h-[85vh] overflow-y-auto animate-fade-in-up">
-          {/* Drag handle */}
-          <div className="flex justify-center pt-2 pb-1">
-            <div className="w-8 h-1 rounded-full bg-gray-border" />
-          </div>
+        <div className="relative max-h-[85vh] overflow-y-auto rounded-t-[24px] bg-[var(--st-surface)] animate-fade-in-up">
           {detail}
         </div>
       </div>
     </>
-  );
-}
-
-function MetaRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex items-center justify-between gap-2">
-      <span className="text-[11px] text-gray-muted shrink-0">{label}</span>
-      <span className="text-[12px] text-warm-black truncate text-right">
-        {value}
-      </span>
-    </div>
   );
 }

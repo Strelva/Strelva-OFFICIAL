@@ -1,23 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import {
-  ChevronDown,
-  ChevronUp,
-  ExternalLink,
-  TrendingUp,
-  TrendingDown,
-  Minus,
-  Eye,
-  MousePointerClick,
-  Activity,
-  Layers,
-  Image as ImageIcon,
-  Link2,
-  CircleCheck,
-  Circle,
-  AlertCircle,
-} from "lucide-react";
+import { ChevronDown, ChevronUp, ExternalLink, Activity, Layers, Image as ImageIcon, Link2, CircleCheck, Circle, AlertCircle } from "lucide-react";
 import Image from "next/image";
 import { cn } from "@/lib/cn";
 import { useDashboardOptional } from "./DashboardContext";
@@ -145,10 +129,6 @@ function PendingState({ toolName }: { toolName: string }) {
 
 function ReportOutput({ data }: { data: ReportData }) {
   const [expanded, setExpanded] = useState(true);
-  const TrendIcon = data.trend?.direction === "up" ? TrendingUp :
-                    data.trend?.direction === "down" ? TrendingDown : Minus;
-  const trendColor = data.trend?.direction === "up" ? "text-success" :
-                     data.trend?.direction === "down" ? "text-terra" : "text-gray-muted";
 
   return (
     <div className="rounded-xl border border-gray-border bg-surface overflow-hidden">
@@ -159,9 +139,9 @@ function ReportOutput({ data }: { data: ReportData }) {
       >
         <div className="flex items-center gap-2">
           <Activity className="w-4 h-4 text-accent" strokeWidth={1.5} />
-          <span className="text-[12px] font-medium text-warm-black">Weekly Report</span>
+          <span className="text-[14px] font-medium text-warm-black">Weekly report</span>
           {data.weekLabel && (
-            <span className="text-[11px] text-gray-muted">({data.weekLabel})</span>
+            <span className="text-[13px] text-gray-muted">{data.weekLabel}</span>
           )}
         </div>
         {expanded ? (
@@ -175,63 +155,24 @@ function ReportOutput({ data }: { data: ReportData }) {
       {expanded && (
         <div className="p-4 animate-fade-in-up">
           {/* Headline */}
-          <p className="text-[14px] font-semibold tracking-[-0.01em] text-warm-black mb-4">
+          <p className="mb-2 text-[15px] font-medium text-warm-black">
             {data.pageViews.thisWeek > 0
               ? `${data.pageViews.thisWeek} people found you this week`
               : "No visitors yet this week"}
           </p>
 
-          {/* Stats grid */}
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-            {/* Visitors */}
-            <div className="rounded-lg bg-glass border border-glass-border p-3">
-              <div className="flex items-center gap-1.5 mb-2">
-                <Eye className="w-3 h-3 text-gray-muted" strokeWidth={1.5} />
-                <span className="text-[11px] font-mono uppercase tracking-wider text-gray-muted">Visitors</span>
-              </div>
-              <div className="text-[20px] font-medium text-warm-black tracking-tight">
-                {data.pageViews.thisWeek}
-              </div>
-              <div className="text-[11px] text-gray-muted mt-0.5">
-                {data.pageViews.total.toLocaleString()} all time
-              </div>
-            </div>
-
-            {/* Clicks */}
-            <div className="rounded-lg bg-glass border border-glass-border p-3">
-              <div className="flex items-center gap-1.5 mb-2">
-                <MousePointerClick className="w-3 h-3 text-gray-muted" strokeWidth={1.5} />
-                <span className="text-[11px] font-mono uppercase tracking-wider text-gray-muted">Clicks</span>
-              </div>
-              <div className="text-[20px] font-medium text-warm-black tracking-tight">
-                {data.bookingClicks.thisWeek}
-              </div>
-              <div className="text-[11px] text-gray-muted mt-0.5">
-                {data.bookingClicks.total.toLocaleString()} all time
-              </div>
-            </div>
-
-            {/* Score / Trend */}
-            <div className="rounded-lg bg-glass border border-glass-border p-3">
-              <div className="flex items-center gap-1.5 mb-2">
-                <TrendIcon className={cn("w-3 h-3", trendColor)} strokeWidth={1.5} />
-                <span className="text-[11px] font-mono uppercase tracking-wider text-gray-muted">Trend</span>
-              </div>
-              <div className={cn("text-[20px] font-medium tracking-tight", trendColor)}>
-                {data.trend?.percent ? `${data.trend.percent > 0 ? "+" : ""}${data.trend.percent}%` : "—"}
-              </div>
-              <div className="text-[11px] text-gray-muted mt-0.5">
-                vs last week
-              </div>
-            </div>
-          </div>
+          {/* The numbers as one sentence, never a row of tiles. */}
+          <p className="m-0 text-[14px] leading-[1.5] text-[var(--st-text-body)]">
+            {data.pageViews.total.toLocaleString()} all time. {data.bookingClicks.thisWeek.toLocaleString()} booked or called this week, {data.bookingClicks.total.toLocaleString()} all time.
+            {data.trend?.percent ? ` Visits are ${data.trend.percent > 0 ? "up" : "down"} ${Math.abs(data.trend.percent)}% on last week.` : ""}
+          </p>
 
           {/* Site score bar */}
           {data.siteScore !== undefined && (
             <div className="mt-4">
               <div className="flex items-center justify-between mb-1.5">
-                <span className="text-[11px] text-gray-muted">Site completeness</span>
-                <span className="text-[11px] font-mono text-warm-black">{data.siteScore}%</span>
+                <span className="text-[13px] text-gray-muted">Site completeness</span>
+                <span className="text-[13px] tabular-nums text-warm-black">{data.siteScore}%</span>
               </div>
               <div className="h-1.5 bg-gray-bg rounded-full overflow-hidden">
                 <div
@@ -280,7 +221,7 @@ function ContentOutput({ data }: { data: ContentData }) {
         <div className="flex items-center gap-2">
           <Layers className="w-4 h-4 text-accent" strokeWidth={1.5} />
           <span className="text-[12px] font-medium text-warm-black">Site Content</span>
-          <span className="text-[11px] text-gray-muted">
+          <span className="text-[13px] text-gray-muted">
             {liveSections}/{totalSections} sections live
           </span>
         </div>
@@ -307,7 +248,7 @@ function ContentOutput({ data }: { data: ContentData }) {
                   <ChevronDown className="w-3 h-3 text-gray-muted rotate-[-90deg]" strokeWidth={1.5} />
                 )}
                 <span className="text-[12px] font-medium text-warm-black">{page.label}</span>
-                <span className="text-[11px] font-mono text-gray-muted">
+                <span className="text-[13px] text-gray-muted">
                   {page.sections.length} sections
                 </span>
               </button>
@@ -333,10 +274,10 @@ function ContentOutput({ data }: { data: ContentData }) {
                       />
                       <span className="text-[12px] text-warm-black flex-1">{section.label}</span>
                       {section.itemCount !== undefined && (
-                        <span className="text-[11px] font-mono text-gray-muted">{section.itemCount}</span>
+                        <span className="text-[13px] text-gray-muted">{section.itemCount}</span>
                       )}
                       {!section.visible && (
-                        <span className="text-[11px] font-mono uppercase text-gray-muted">hidden</span>
+                        <span className="text-[13px] text-gray-muted">hidden</span>
                       )}
                     </div>
                   ))}
@@ -370,7 +311,7 @@ function PhotosOutput({ data }: { data: PhotoData }) {
         <div className="flex items-center gap-2">
           <ImageIcon className="w-4 h-4 text-accent" strokeWidth={1.5} />
           <span className="text-[12px] font-medium text-warm-black">Photos</span>
-          <span className="text-[11px] text-gray-muted">{data.total} total</span>
+          <span className="text-[13px] text-gray-muted">{data.total} total</span>
         </div>
         {expanded ? (
           <ChevronUp className="w-3.5 h-3.5 text-gray-muted" strokeWidth={1.5} />
@@ -448,7 +389,7 @@ function ConnectionsOutput({ data }: { data: ConnectionData }) {
         <div className="flex items-center gap-2">
           <Link2 className="w-4 h-4 text-accent" strokeWidth={1.5} />
           <span className="text-[12px] font-medium text-warm-black">Active integrations</span>
-          <span className="text-[11px] text-gray-muted">{usefulCount} usable now</span>
+          <span className="text-[13px] text-gray-muted">{usefulCount} usable now</span>
         </div>
         {expanded ? (
           <ChevronUp className="w-3.5 h-3.5 text-gray-muted" strokeWidth={1.5} />
@@ -466,25 +407,25 @@ function ConnectionsOutput({ data }: { data: ConnectionData }) {
           {data.connections.map((conn) => (
             <div
               key={conn.id}
-              className="flex items-start gap-3 px-3 py-2.5 rounded-lg bg-glass border border-glass-border"
+              className="flex items-start gap-3 px-3 py-2.5 rounded-lg border border-glass-border"
             >
-              <div className="w-8 h-8 rounded-lg bg-gray-bg flex items-center justify-center shrink-0">
-                <span className="text-[11px] font-bold text-gray-fg">{conn.icon}</span>
+              <div className="w-8 h-8 flex items-center justify-center shrink-0">
+                <span className="text-[12px] font-bold text-gray-fg">{conn.icon}</span>
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="text-[12px] font-medium text-warm-black block">{conn.name}</span>
                   {conn.status && (
-                    <span className="rounded-full bg-gray-bg px-2 py-0.5 text-[11px] font-medium text-gray-muted">
+                    <span className="rounded-full bg-gray-bg px-2 py-0.5 text-[12px] font-medium text-gray-muted">
                       {statusLabel[conn.status]}
                     </span>
                   )}
                 </div>
                 {conn.description && (
-                  <span className="text-[11px] text-gray-muted block leading-relaxed">{conn.description}</span>
+                  <span className="text-[13px] text-gray-muted block leading-relaxed">{conn.description}</span>
                 )}
                 {conn.sourceProof && (
-                  <span className="mt-1 text-[11px] text-gray-faint block">{conn.sourceProof}</span>
+                  <span className="mt-1 text-[12px] text-gray-faint block">{conn.sourceProof}</span>
                 )}
               </div>
               {conn.status === "ai_using_it" || conn.status === "can_act_here" ? (
@@ -520,7 +461,7 @@ function PreviewOutput({ data }: { data: PreviewData }) {
           <ExternalLink className="w-4 h-4 text-accent" strokeWidth={1.5} />
           <span className="text-[12px] font-medium text-warm-black">Site Preview</span>
           {data.siteName && (
-            <span className="text-[11px] text-gray-muted">{data.siteName}</span>
+            <span className="text-[13px] text-gray-muted">{data.siteName}</span>
           )}
         </div>
         {expanded ? (
@@ -577,7 +518,7 @@ function ErrorState({ message }: { message?: string }) {
       <AlertCircle className="w-4 h-4 text-terra shrink-0 mt-0.5" strokeWidth={1.5} />
       <div>
         <p className="text-[12px] font-medium text-terra">Something went wrong</p>
-        {message && <p className="text-[11px] text-terra/80 mt-0.5">{message}</p>}
+        {message && <p className="text-[12px] text-terra/80 mt-0.5">{message}</p>}
       </div>
     </div>
   );
@@ -690,7 +631,7 @@ export function ToolOutput({ toolName, result, status, className }: ToolOutputPr
       {parsed.type === "preview" && <PreviewOutput data={parsed.data} />}
       {parsed.type === "unknown" && (
         <div className="rounded-xl border border-gray-border bg-surface p-4">
-          <pre className="text-[11px] font-mono text-gray-muted overflow-x-auto">
+          <pre className="text-[13px] text-gray-muted overflow-x-auto">
             {JSON.stringify(result, null, 2)}
           </pre>
         </div>

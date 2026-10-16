@@ -1,14 +1,31 @@
-.navigation { min-width:0; }
-.navigation h2 { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.navigation a svg,.navigation button svg { flex-shrink:0; }
-.navigation a>span { flex:1; min-width:0; }
-.navigation a>small { flex-shrink:0; font-size:12px; color:var(--gray-muted); }
-.navigation .count { margin-left:auto; font-size:12px; color:var(--accent-text); }
-.navigation .preview { color:var(--warning); }
-.operator { margin-top:16px; border-top:1px solid var(--gray-border); }
-.history { margin-top:16px; }
-.thread { display:flex; align-items:center; min-width:0; }
-.thread a { min-width:0; flex:1; }
-.thread strong,.thread small { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:400; }
-.thread small { font-size:12px; color:var(--gray-muted); }
-.navigation .thread .deleteThread { flex-shrink:0; width:40px; min-height:44px; padding:8px; justify-content:center; }
+/* The website dashboard's own places, drawn exactly like the XA sidebar (XA · O1). */
+.navigation { display: flex; min-width: 0; flex-direction: column; gap: 22px; margin-inline: -8px; }
+.list { display: flex; flex-direction: column; gap: 22px; }
+.group { display: flex; flex-direction: column; gap: 2px; }
+.head { margin: 0; padding: 0 8px 4px; color: var(--st-faint, var(--st-text-3)); font-size: 13px; font-weight: 400; line-height: 18px; }
+.item, .system {
+  position: relative; z-index: 1; box-sizing: border-box; display: flex; width: 100%; min-width: 0; align-items: center; gap: 10px;
+  border: 0; border-radius: var(--st-r-nav, 10px); background: transparent; color: var(--st-text-body, var(--st-text));
+  font: inherit; font-size: 15px; line-height: 20px; text-align: left; text-decoration: none; cursor: pointer;
+}
+.item { min-height: 36px; padding: 0 10px; }
+.system { min-height: 40px; padding: 0 8px; }
+.item svg { flex-shrink: 0; color: var(--st-text-2); }
+.item:hover:not([aria-current="page"]), .system:hover:not([aria-current="page"]) { background: var(--st-hover); }
+.item[aria-current="page"], .system[aria-current="page"] { color: var(--st-text); font-weight: 500; }
+.item[aria-current="page"] svg { color: var(--st-text); }
+.item:focus-visible, .system:focus-visible, .deleteThread:focus-visible { outline: 2px solid var(--st-accent); outline-offset: -2px; }
+.label { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.aside { flex-shrink: 0; color: var(--st-faint, var(--st-text-3)); font-size: 13px; line-height: 18px; white-space: nowrap; }
+.aside[data-tone="waits"] { color: var(--st-need); }
+.count { display: inline-flex; flex-shrink: 0; align-items: center; gap: 6px; color: var(--st-need); font-size: 13px; font-variant-numeric: tabular-nums; }
+.dot { display: inline-block; width: 7px; height: 7px; border-radius: 999px; background: var(--st-need-dot); }
+.quiet { margin: 0; padding: 4px 10px; color: var(--st-text-3); font-size: 13px; line-height: 18px; }
+.thread { display: flex; min-width: 0; align-items: center; }
+.thread .item { min-width: 0; flex: 1; padding-block: 6px; }
+.thread .item > span { display: flex; min-width: 0; flex-direction: column; }
+.thread strong, .thread small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 400; }
+.thread small { color: var(--st-text-3); font-size: 12px; }
+.deleteThread { display: grid; width: 32px; height: 32px; flex-shrink: 0; place-items: center; border: 0; border-radius: var(--st-r-nav, 10px); background: transparent; color: var(--st-text-3); cursor: pointer; }
+.deleteThread:hover { background: var(--st-hover); color: var(--st-text); }
+.deleteThread:disabled { cursor: not-allowed; opacity: 0.5; }

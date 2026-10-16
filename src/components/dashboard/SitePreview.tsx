@@ -474,7 +474,7 @@ export function SitePreview({
             isLivePreview ? "bg-accent" : "bg-warning"
           }`}
         />
-        <span className="shrink-0 text-[11px] font-medium text-gray-muted">{previewBadgeLabel}</span>
+        <span className="shrink-0 text-[12px] font-medium text-gray-muted">{previewBadgeLabel}</span>
 
         <div className="flex-1" />
 
@@ -507,10 +507,10 @@ export function SitePreview({
                     aria-pressed={active}
                     className={`h-7 rounded-md px-2.5 text-[12px] font-medium transition-colors ${
                       active
-                        ? "bg-surface text-warm-white shadow-sm"
+                        ? "bg-surface text-warm-black shadow-sm"
                         : disabled
                           ? "cursor-not-allowed text-gray-faint/60"
-                          : "text-gray-muted hover:text-warm-white"
+                          : "text-gray-muted hover:text-warm-black"
                     }`}
                   >
                     {source.label}
@@ -534,7 +534,7 @@ export function SitePreview({
                 aria-label={`${bp.label}${bp.width ? ` (${bp.width}px)` : ""}`}
                 title={bp.width ? `${bp.label} (${bp.width}px)` : bp.label}
                 className={`flex h-7 w-8 items-center justify-center rounded-md transition-colors ${
-                  active ? "bg-surface text-warm-white shadow-sm" : "text-gray-muted hover:text-warm-white"
+                  active ? "bg-surface text-warm-black shadow-sm" : "text-gray-muted hover:text-warm-black"
                 }`}
               >
                 <bp.icon className="h-[13px] w-[13px]" strokeWidth={1.5} />
@@ -549,7 +549,7 @@ export function SitePreview({
           type="button"
           onClick={retryPreview}
           title="Refresh preview"
-          className="flex h-7 w-7 items-center justify-center rounded-md text-gray-muted transition-colors hover:bg-surface-raised hover:text-warm-white"
+          className="flex h-7 w-7 items-center justify-center rounded-md text-gray-muted transition-colors hover:bg-surface-raised hover:text-warm-black"
         >
           <RefreshCw className="h-[13px] w-[13px]" strokeWidth={1.5} />
         </button>
@@ -559,7 +559,7 @@ export function SitePreview({
             target="_blank"
             rel="noopener noreferrer"
             title="Open live site"
-            className="flex h-7 w-7 items-center justify-center rounded-md text-gray-muted transition-colors hover:bg-surface-raised hover:text-warm-white"
+            className="flex h-7 w-7 items-center justify-center rounded-md text-gray-muted transition-colors hover:bg-surface-raised hover:text-warm-black"
           >
             <ExternalLink className="h-[13px] w-[13px]" strokeWidth={1.5} />
           </a>
@@ -571,8 +571,8 @@ export function SitePreview({
           onClick={onToggleEdit}
           className={
             isEditing
-              ? "flex h-7 items-center gap-1.5 rounded-md border border-gray-border px-3 text-[12px] font-medium text-gray-muted transition-colors hover:bg-surface-raised hover:text-warm-white"
-              : "flex h-7 items-center gap-1.5 rounded-md bg-accent px-3 text-[12px] font-semibold text-on-accent transition-colors hover:bg-accent/85"
+              ? "flex h-7 items-center gap-1.5 rounded-md border border-gray-border px-3 text-[12px] font-medium text-gray-muted transition-colors hover:bg-surface-raised hover:text-warm-black"
+              : "flex h-7 items-center gap-1.5 rounded-full bg-surface border border-gray-border px-3 text-[12px] font-semibold text-warm-black transition-colors hover:bg-surface-inset"
           }
         >
           {isEditing ? (
@@ -592,12 +592,12 @@ export function SitePreview({
       {/* Canvas — a recessed well the document floats in */}
       <div
         ref={canvasRef}
-        className="relative flex flex-1 justify-center overflow-hidden bg-surface-base p-4 shadow-[inset_0_2px_6px_rgba(0,0,0,0.45)] xl:p-7"
+        className="relative flex flex-1 justify-center overflow-hidden bg-surface-base p-4 xl:p-7"
       >
 
         <div
           key={`flash-${refreshKey}`}
-          className={`relative h-full w-full shrink-0 overflow-hidden rounded-xl bg-surface shadow-[0_0_0_1px_rgba(255,255,255,0.06),0_24px_60px_-16px_rgba(0,0,0,0.75),0_8px_20px_-8px_rgba(0,0,0,0.5)] transition-[max-width] duration-200 ease-out xl:rounded-2xl ${refreshKey > 0 ? "preview-flash" : ""}`}
+          className={`relative h-full w-full shrink-0 overflow-hidden rounded-xl bg-surface transition-[max-width] duration-200 ease-out xl:rounded-2xl ${refreshKey > 0 ? "preview-flash" : ""}`}
           style={{
             width: breakpoint.width ? `${breakpoint.width}px` : "100%",
             maxWidth: breakpoint.width ? undefined : "100%",
@@ -619,7 +619,7 @@ export function SitePreview({
             <div className="absolute inset-0 flex items-center justify-center bg-gray-bg-alt">
               <div className="flex max-w-sm flex-col items-center gap-2 px-6 text-center">
                 <Loader2 className="w-5 h-5 text-gray-muted animate-spin" strokeWidth={1.5} />
-                <span className="text-[11px] text-gray-muted">
+                <span className="text-[12px] text-gray-muted">
                   Loading {isLivePreview ? "your live site" : "your site"}
                 </span>
               </div>
@@ -627,9 +627,9 @@ export function SitePreview({
           )}
           {previewStatus === "error" && !previewErrorDismissed && (
             <div className="absolute inset-0 flex items-center justify-center bg-gray-bg-alt p-6">
-              <div className="max-w-md rounded-xl border border-gray-border bg-surface px-5 py-4 text-center shadow-xl">
+              <div className="max-w-md rounded-xl border border-gray-border bg-surface px-5 py-4 text-center">
                 <AlertCircle className="mx-auto mb-3 h-5 w-5 text-warning" strokeWidth={1.5} />
-                <p className="text-sm font-medium text-warm-white">Your preview is taking longer than expected</p>
+                <p className="text-sm font-medium text-warm-black">Your preview is taking longer than expected</p>
                 <p className="mt-2 text-xs leading-5 text-gray-muted">
                   This is usually a brief network hiccup. You can still edit the selected section on the right, retry, or open your live site directly.
                 </p>
@@ -645,14 +645,14 @@ export function SitePreview({
                     href={siteUrl || "/"}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="rounded-md border border-gray-border px-3 py-2 text-xs text-gray-muted hover:text-warm-white"
+                    className="rounded-md border border-gray-border px-3 py-2 text-xs text-gray-muted hover:text-warm-black"
                   >
                     Open live site
                   </a>
                   <button
                     type="button"
                     onClick={() => setPreviewErrorDismissed(true)}
-                    className="rounded-md border border-gray-border px-3 py-2 text-xs text-gray-muted hover:text-warm-white"
+                    className="rounded-md border border-gray-border px-3 py-2 text-xs text-gray-muted hover:text-warm-black"
                   >
                     Continue editing
                   </button>
@@ -665,8 +665,8 @@ export function SitePreview({
         {/* Floating selection bar — contextual action for the selected section */}
         {isEditing && activeSectionLabel && previewStatus === "ready" && (
           <div className="pointer-events-none absolute inset-x-0 bottom-5 z-20 flex justify-center px-4">
-            <div className="pointer-events-auto flex items-center gap-2 rounded-full border border-white/10 bg-[rgba(10,10,12,0.82)] py-1.5 pl-3.5 pr-1.5 text-white shadow-[0_18px_50px_rgba(0,0,0,0.5)] backdrop-blur-xl animate-overlay-enter">
-              <span className="flex items-center gap-1.5 text-[11px] font-medium">
+            <div className="pointer-events-auto flex items-center gap-2 rounded-full border border-white/10 bg-[rgba(10,10,12,0.82)] py-1.5 pl-3.5 pr-1.5 text-warm-black animate-overlay-enter">
+              <span className="flex items-center gap-1.5 text-[12px] font-medium">
                 <span className="h-1.5 w-1.5 rounded-full bg-accent" />
                 <span className="max-w-[180px] truncate">{activeSectionLabel}</span>
               </span>
@@ -674,7 +674,7 @@ export function SitePreview({
               <button
                 type="button"
                 onClick={askAIForActiveSection}
-                className="flex items-center gap-1.5 rounded-full bg-accent px-3 py-1 text-[11px] font-semibold text-on-accent transition-transform hover:scale-[1.03]"
+                className="flex items-center gap-1.5 rounded-full bg-surface border border-gray-border px-3 py-1 text-[12px] font-semibold text-warm-black transition-transform hover:scale-[1.03]"
               >
                 <Sparkles className="h-3.5 w-3.5" strokeWidth={1.8} />
                 Ask Strelva to change this
@@ -694,7 +694,7 @@ export function SitePreview({
             }}
           >
             <div className="px-3 py-2 border-b border-white/[0.06]">
-              <span className="text-[11px] font-medium text-white/90">{contextMenu.label}</span>
+              <span className="text-[12px] font-medium text-white/90">{contextMenu.label}</span>
             </div>
             <div className="py-1">
               <button
