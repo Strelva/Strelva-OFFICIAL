@@ -6,7 +6,8 @@ import { useCallback, useEffect, useId, useRef, useState, type FormEvent, type R
 import {
   XaButton, XaButtonLink, XaField, XaHeadline, XaInitial, XaLabel, XaPebbleScene, XaSegmented, XaStatus, XaTextLink, XaWorking,
 } from "@/components/ui/strelva/Xa";
-import { AgencyFrame } from "./AgencyFrame";
+import { AgencyFrame, useAgencyFrameClients } from "./AgencyFrame";
+import { clientColor } from "@/platform/presentation/client-color";
 import styles from "./agency-door.module.css";
 import type { AddAgencyClientInput, AddAgencyClientResult, AgencyClientListItem, ClientAiCheck, OwnerClaim } from "@/products/agency-clients/contracts";
 import { addAgencyClientInputSchema, agencyClientAdditionSchema, agencyClientListItemSchema, ownerClaimSchema } from "@/products/agency-clients/contracts";
@@ -142,6 +143,17 @@ export function AgencyAddClient({ agencyWorkspaceId, agencyName = "your agency",
       .catch((cause) => { if (!controller.signal.aborted) { setProspects([]); setProspectError(cause instanceof Error ? cause.message : "Your prospects couldn’t be loaded."); } });
     return () => controller.abort();
   }, [agencyWorkspaceId, prospecting, initialProspectId]);
+
+  // The sidebar lists the agency's added clients, and the one just added as the current, new one.
+  const reportClients = useAgencyFrameClients();
+  const justAdded = result?.client;
+  useEffect(() => {
+    if (!reportClients || (!clients && !justAdded)) return;
+    const rows = (clients ?? []).filter(client => client.seatActive).map(client => ({ id: client.customerWorkspaceId, name: client.name }));
+    if (justAdded && !rows.some(row => row.id === justAdded.customerWorkspaceId)) rows.push({ id: justAdded.customerWorkspaceId, name: justAdded.name });
+    reportClients(rows.map(row => ({ ...row, href: `/workspace?workspaceId=${encodeURIComponent(row.id)}`, color: clientColor(row.id),
+      ...(row.id === justAdded?.customerWorkspaceId ? { current: true, detail: "New" } : {}) })));
+  }, [reportClients, clients, justAdded]);
 
   const added = new Set((clients ?? []).map((client) => client.prospectId).filter(Boolean));
   const chosen = prospects?.find((prospect) => prospect.id === prospectId) ?? null;

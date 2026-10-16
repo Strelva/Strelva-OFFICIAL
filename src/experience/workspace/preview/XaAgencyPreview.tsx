@@ -12,13 +12,14 @@ import { AgencyHome } from "../AgencyHome";
 import { WorkspaceRequestContext } from "../WorkspaceRequest";
 import { useAgencyClientHome } from "../useAgencyClientHome";
 import { AgencyClientXa, useAgencyGrants } from "../agency/xa/AgencyClientXa";
+import { AgencyClientTools } from "../agency/xa/AgencyClientTools";
 import { clientColor } from "../agency/xa/client-color";
 import { splitQueue } from "../agency/xa/agency-xa-model";
 import { AgencyWebsiteDocumentDraftExperience, type AgencyDocumentTransport } from "@/experience/agency-website/AgencyWebsiteDocumentDraftExperience";
 import { agencyDocumentFixture } from "@/experience/agency-website/agency-document-fixture";
 import { XA_AGENCY, XA_CLIENT, XA_MINUTES, xaAgencyClients, xaAgencyLibrary, xaAgencySnapshot, xaClientSystems, xaHarborSystems, type XaAgencyScreen, type XaAgencyState } from "./xa-agency-fixture";
 import styles from "./xa-foundation-preview.module.css";
-import { XA_CLIENTS, XA_NORTH, xaClient, type XaClientKey, xaSearchItems } from "./xa-day";
+import { XA_CLIENTS, XA_DAY, XA_NORTH, xaClient, type XaClientKey, xaSearchItems } from "./xa-day";
 
 
 const BASE = "/preview/strelva/xa/xa6-agency";
@@ -117,6 +118,7 @@ export function XaAgencyPreview({ screen, state, mode, client = "harbor" }: { sc
   ...XA_CLIENTS.map(entry => ({ id: XA_CLIENT[entry.key], name: entry.name, href: previewHref("client", mode, undefined, entry.key), current: (screen === "client" && client === entry.key) || (screen === "prepare" && entry.key === "harbor") })),
   ].map(link => ({ ...link, color: clientColor(link.id), waits: waiting.has(link.id) || undefined }));
   const agencyView = screen === "today" ? "home" : screen === "queue" ? "queue" : screen === "library" ? "library" : screen === "minutes" ? "minutes" : "clients";
+  const openClient = (workspaceId: string) => window.location.assign(previewHref("client", mode, undefined, XA_CLIENTS.find(entry => XA_CLIENT[entry.key] === workspaceId)?.key));
   const insideClient = screen === "client" || screen === "prepare";
   const shell = {
     appBase: "/preview/strelva", signOut: null, systemsReleased: true, mode,
@@ -124,17 +126,17 @@ export function XaAgencyPreview({ screen, state, mode, client = "harbor" }: { sc
     workspaceName: XA_NORTH.name, accountName: XA_NORTH.person,
     agencyNavigation: {
       active: agencyView, queueCount: state === "loading" || state === "error" ? null : you.length, clients, agencyWorkspaceId: insideClient ? XA_AGENCY : undefined,
-      hrefs: { home: previewHref("today", mode), queue: previewHref("queue", mode), library: previewHref("library", mode), minutes: previewHref("minutes", mode), clients: previewHref("client", mode) },
+      hrefs: { home: previewHref("today", mode), queue: previewHref("queue", mode), library: previewHref("library", mode), minutes: previewHref("minutes", mode), clients: previewHref("clients", mode) },
     },
   } as const;
-  const title = screen === "today" ? "Home" : screen === "queue" ? "Queue" : screen === "library" ? "Library" : screen === "minutes" ? "Time this month" : xaClient(client).name;
+  const title = screen === "today" ? "Home" : screen === "clients" ? "Clients" : screen === "queue" ? "Queue" : screen === "library" ? "Library" : screen === "minutes" ? "Time this month" : xaClient(client).name;
 
   return <WorkspaceRequestContext.Provider value={request}>
     <StrelvaShell searchItems={xaSearchItems("agency")} {...shell} title={title} active="home">
       {screen === "client" ? <ClientScreen state={state} client={client} />
         : screen === "prepare" ? <PrepareScreen state={state} />
-          : <AgencyHome key={`${screen}:${state}`} view={agencyView} onViewChange={() => undefined} snapshot={snapshot} busy={false}
-            onWorkspace={() => window.location.assign(previewHref("client", mode))} onOpenClientWork={() => window.location.assign(previewHref("prepare", mode))} onOpenWork={() => undefined} onStart={() => undefined} />}
+          : <AgencyHome key={`${screen}:${state}`} now={XA_DAY.now} view={agencyView} onViewChange={() => undefined} snapshot={snapshot} busy={false}
+            onWorkspace={openClient} onOpenSystem={openClient} onOpenClientWork={() => window.location.assign(previewHref("prepare", mode))} onOpenWork={() => undefined} onStart={() => undefined} />}
     </StrelvaShell>
   </WorkspaceRequestContext.Provider>;
 }
@@ -149,7 +151,8 @@ function ClientScreen({ state, client }: { state: XaAgencyState; client: XaClien
   // No agency-readable owner name exists yet, so the preview names the business the way the app does.
   return <AgencyClientXa clientName={xaClient(client).name} workspaceId={workspaceId} agencyName={XA_NORTH.name} agencyHref={previewHref("today", "light")}
     systems={state === "empty" ? [] : systems} systemsLoading={state === "loading"} grants={grants} shared={shared.state}
-    systemHref={() => previewHref("prepare", "light")} onRetryShared={shared.refresh} onAsk={() => undefined} />;
+    systemHref={() => previewHref("prepare", "light")} onRetryShared={shared.refresh} onAsk={() => undefined}
+    tools={<AgencyClientTools workspaceId={workspaceId} clientName={xaClient(client).name} agencyWorkspaceId={XA_AGENCY} agencyName={XA_NORTH.name} viewerEmail={XA_NORTH.email} canManage request={request} />} />;
 }
 
 const HOURS_NODE = "service-one";
@@ -161,11 +164,24 @@ function PrepareScreen({ state }: { state: XaAgencyState }) {
       fixture.website.rebuild.title = "Harbor Dental website";
       const nodes = fixture.website.rebuild.candidate!.document.nodes;
       nodes[HOURS_NODE]!.props = { title: "Hours", body: "Mon to Fri 8 to 5. Sat 9 to 1. 1180 Elmwood Ave, Buffalo." };
-      nodes["service-two"]!.props = { title: "Cleanings and exams", body: "Cleanings $120. New patient exams $95." };
+      nodes["service-two"]!.props = { title: "Cleanings and exams", body: "Cleanings, exams and X-rays for the whole family. New patients welcome." };
     }
     return {
       read: () => state === "loading" ? new Promise(() => undefined) : Promise.resolve(structuredClone(fixture)),
-      save: async (_binding, website) => { await new Promise(resolve => setTimeout(resolve, 600)); return { website: { ...website, rebuild: { ...website.rebuild, candidate: { ...website.rebuild.candidate!, revision: 2 } } } }; },
+      // Applies the sent lines the way the server does, so the page reads back what was sent (and what Undo put back).
+      save: async (_binding, website, _section, ops) => {
+        await new Promise(resolve => setTimeout(resolve, 600));
+        const next = structuredClone(website);
+        const candidate = next.rebuild.candidate!;
+        for (const op of ops) {
+          const [, , id, field] = op.path.split("/");
+          const node = candidate.document.nodes[id!.replace(/~1/g, "/").replace(/~0/g, "~")];
+          if (node && field === "props") node.props = op.value as typeof node.props;
+          if (node && field === "children") node.children = op.value as string[];
+        }
+        candidate.revision += 1;
+        return { website: next };
+      },
     };
   }, [state]);
   const edits = state === "ready" || state === "done" || state === "waiting" ? { [HOURS_NODE]: { props: JSON.stringify({ title: "Thanksgiving week hours", body: "Wed, Nov 25: 8 to 1. Thu, Nov 26 and Fri, Nov 27: closed. Sat 9 to 1. 1180 Elmwood Ave, Buffalo." }, null, 2), children: [] } } : undefined;

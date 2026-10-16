@@ -35,8 +35,8 @@ export interface CareReportMailInput {
   agencyNote?: string | null;
 }
 
-/** Pebble and the Systems, as a PNG served next to the app (public/xa/email). */
-export const CARE_REPORT_MAIL_ART = "/xa/email/pebble-lineup.png";
+/** Pebble and the Systems, as a PNG served next to the app (public/xa/email-lineup.png, the same art the website report email uses). */
+export const CARE_REPORT_MAIL_ART = "/xa/email-lineup.png";
 
 export interface CareReportMail { subject: string; preheader: string; html: string; text: string }
 

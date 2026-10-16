@@ -41,6 +41,7 @@ import { firstNameFromEmail, splitQueue } from "./agency/xa/agency-xa-model";
 import { AgencyFold } from "./agency/xa/AgencyFold";
 import type { AgencyQueueItem } from "./agency-clients";
 import xaStyles from "./agency/xa/agency-xa.module.css";
+import { workspaceLocationHref } from "@/platform/workspaces/location";
 
 type ClientsState =
   | { status: "loading" }
@@ -91,6 +92,8 @@ export function AgencyHome({
   view: controlledView,
   onViewChange,
   onQueueSummary,
+  onOpenSystem,
+  now: fixedNow,
 }: {
   snapshot: WorkspaceSnapshot;
   busy: boolean;
@@ -102,6 +105,10 @@ export function AgencyHome({
   onViewChange?: (view: AgencyView) => void;
   /** The sidebar's Queue count and the clients that wait on the agency, from this same batched read. */
   onQueueSummary?: (summary: { count: number; waiting: ReadonlySet<string> } | null) => void;
+  /** Opens one System inside a client (the Queue's "Reconnect …" and "Open the System"). Defaults to the client's System page. */
+  onOpenSystem?: (workspaceId: string, systemId: string) => void;
+  /** Preview harnesses only: the fixture day's clock, so "since" and "last change" read against it. */
+  now?: number;
 }) {
   const request = useWorkspaceRequest();
   const id = useId().replace(/:/g, "");
@@ -112,7 +119,7 @@ export function AgencyHome({
   // Clients, Queue, Library and Team are the Systems model (STRELVA_SYSTEMS_RELEASE).
   // Off, the page reads as it did, with clients from the same batched read.
   const released = systemsReleased(snapshot);
-  const [now] = useState(() => Date.now());
+  const [now] = useState(() => fixedNow ?? Date.now());
   const [localView, setView] = useState<AgencyView>(() => {
     if (typeof window === "undefined") return "home";
     const selected = new URLSearchParams(window.location.search).get("agencyView");
@@ -160,8 +167,8 @@ export function AgencyHome({
   const readyPages = clients.status === "ready" ? clients.pages : null;
   const combined = useMemo(() => readyPages ? combineAgencyPages(readyPages) : null, [readyPages]);
   // XA (AG1, AG2, AG5, AG6) is the screen the real sidebar opens; standalone embeds keep the tabs below.
-  const xaView = released && canUseTools && (controlledView ? view === "home" || view === "queue" || view === "library" || view === "minutes" : view === "minutes");
-  const minutes = useAgencyMinutes(request, snapshot.workspaceId, combined?.clients ?? null, xaView && (view === "home" || view === "minutes"));
+  const xaView = released && canUseTools && (controlledView ? view === "home" || view === "clients" || view === "queue" || view === "library" || view === "minutes" : view === "minutes");
+  const minutes = useAgencyMinutes(request, snapshot.workspaceId, combined?.clients ?? null, xaView && (view === "home" || view === "clients" || view === "minutes"));
   const minutesByClient = minutes.state.status === "ready" ? new Map(minutes.state.rows.map(row => [row.workspaceId, row.minutes])) : null;
   const [providerCount, setProviderCount] = useState<number | null>(null);
   const [requestCount, setRequestCount] = useState<number | null>(null);
@@ -286,6 +293,9 @@ export function AgencyHome({
         onRetryPage={retryPage}
         onMore={loadMore}
         addClientHref={addClientHref}
+        minutes={xaView ? minutesByClient : undefined}
+        onBuild={xaView && canManage ? () => { setView("build"); onViewChange?.("build"); } : undefined}
+        importHref={xaView && snapshot.releases?.agencyImportClients && canManage ? `/workspace/agency/clients/import?workspaceId=${encodeURIComponent(snapshot.workspaceId)}` : null}
       />;
 
   const queueList = clients.status === "loading" ? <p role="status" className="border-y border-gray-border py-5 text-[13px] text-gray-muted">Checking work across clients…</p>
@@ -343,6 +353,12 @@ export function AgencyHome({
 
   const openItem = (item: AgencyQueueItem) => {
     if (item.href) { window.location.assign(item.href); return; }
+    // Something broke in one System: its page holds the connection to reconnect, so the Queue opens it, not the client's Home.
+    if (item.kind === "health" && item.systemId) {
+      if (onOpenSystem) onOpenSystem(item.workspaceId, item.systemId);
+      else window.location.assign(workspaceLocationHref("/workspace", { workspaceId: item.workspaceId, view: "system", system: item.systemId }));
+      return;
+    }
     if (item.workId) onOpenClientWork(item.workspaceId, item.workId); else onWorkspace(item.workspaceId);
   };
   const go = (next: AgencyView) => { setView(next); onViewChange?.(next); };
@@ -388,8 +404,15 @@ export function AgencyHome({
   </section></div>;
 
   if (xaView && view === "minutes") return <div aria-busy={busy || minutes.state.status === "loading" || undefined}><section aria-label="Minutes">
-    <AgencyMinutes agencyName={agencyName} state={clients.status === "error" ? { status: "clients-error" } : clients.status === "loading" ? { status: "loading" } : minutes.state} onOpenClient={onWorkspace} onRetry={clients.status === "error" ? retry : minutes.retry} />
+    <AgencyMinutes agencyName={agencyName} now={new Date(now)} state={clients.status === "error" ? { status: "clients-error" } : clients.status === "loading" ? { status: "loading" } : minutes.state} onOpenClient={onWorkspace} onRetry={clients.status === "error" ? retry : minutes.retry} />
   </section></div>;
+
+  // XA · A6: every client in one table, the agency's composer under it.
+  if (xaView && view === "clients") return <div aria-busy={busy || clients.status === "loading" || undefined}><section aria-label="Clients" className={xaStyles.every}>
+    {clientList}
+    {clients.status === "ready" ? <AgencyCareReports agencyWorkspaceId={snapshot.workspaceId} agencyName={agencyName} request={request} /> : null}
+    {snapshot.releases?.keepYourSite ? <AgencyClientSites agencyWorkspaceId={snapshot.workspaceId} request={request} /> : null}
+  </section><XaComposerDock><div className={xaStyles.columnDock}><XaComposer value={ask} onChange={setAsk} onSubmit={() => { onStart(ask); setAsk(""); }} placeholder="Ask Strelva about any client" inputLabel={`Ask Strelva about ${agencyName}'s clients`} /></div></XaComposerDock></div>;
 
   const tab = (value: AgencyView) => ({ id: `${id}-${value}-tab`, panelId: `${id}-${value}-panel` });
   const choose = (value: string) => {

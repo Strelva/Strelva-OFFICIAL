@@ -54,6 +54,8 @@ export const agencyClientRowSchema = z.object({
   systems: z.array(agencyClientSystemSchema).max(500),
   needsYou: z.object({ count: z.number().int().min(0), oldestAt: iso.nullable() }).strict(),
   ownerClaimWaiting: z.boolean().optional(),
+  /** This agency added the client and its owner has claimed it. Absent when the agency didn't add it or claims weren't read. */
+  ownerClaimed: z.boolean().optional(),
   openRequests: z.number().int().min(0),
   improvementsWaiting: z.number().int().min(0),
   /** Qualified comparison availability, independent of the client/service read. */

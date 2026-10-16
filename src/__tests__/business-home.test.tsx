@@ -73,7 +73,8 @@ describe("business home", () => {
       const html = renderToStaticMarkup(createElement(BusinessHome, { snapshot: shared, sites: [], unassignedSites: [], siteAssignmentsKnown: true, offerings: offeringState, busy: false, systemsReleased: true, view, onOpen: noop, onStart: noop, onNavigate: noop, onWorkspace: noop, onOfferings: noop, accountHref: "/workspace/account" }));
       expect(html).toContain("North Studio"); expect(html).toContain("Runs on Strelva");
       expect(html).toContain("All clients"); expect(html).toContain("Waiting on Harbor Dental");
-      expect(html).toContain("Checking shared decision status");
+      // AG3 (Home) names whose yes it is checking; the Needs you place keeps its shared status line.
+      expect(html).toMatch(view === "home" ? /Checking what waits on Harbor Dental’s owner/ : /Checking shared decision status/);
       expect(html).not.toContain("Decisions only you can make");
       expect(html).not.toContain("Hold to approve");
     }

@@ -82,6 +82,9 @@ describe("agency door end to end (email held)", () => {
     expect((await acceptOwnerClaim(ownerActor, TOKEN, deps)).status).toBe("accepted");
     const claimed = await addAgencyClaimQueue(agencyActor, page(), { rpc: vi.fn(async () => ({ data: [addition({ ownerClaimed: true })], error: null })) }, true, NOW);
     expect(claimed.queue.filter((item) => item.kind === "owner_claim")).toEqual([]);
+    // Every client's owner column reads "Claimed" from the same read; the waiting one never does.
+    expect(claimed.clients.find(client => client.workspaceId === CLIENT)).toMatchObject({ ownerClaimWaiting: false, ownerClaimed: true });
+    expect(waiting.clients.find(client => client.workspaceId === CLIENT)?.ownerClaimed).toBeUndefined();
 
     // 5) After the owner decides, the agency reads the outcome in the client's Home.
     const html = renderToStaticMarkup(createElement(AgencyClientDecisionStatus, { businessName: "Door Bakery", workspaceId: CLIENT, onRetry: vi.fn(),

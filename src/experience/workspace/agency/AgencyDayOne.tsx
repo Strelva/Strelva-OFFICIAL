@@ -69,8 +69,8 @@ export function AgencyDayOne({ agencyName, viewerFirstName, clients, addClientHr
         {!first && addClientHref ? <XaTextLink href={addClientHref}>Add a client</XaTextLink> : null}
       </div>
       <ul className={styles.after} aria-label="After this">
-        <li>{verifiedAll ? <>{agencyName} is verified for all {verification.total} kinds of client work.</> : <>Before you publish to a client’s domain, {verification.href || verification.onOpen
-          ? <XaTextLink href={verification.href} onClick={verification.onOpen} aria-label={verification.open ? "Hide verification" : undefined}>get verified for client work</XaTextLink> : "get verified for client work"}.{counted ? ` ${agencyName} is verified for ${verification.verified} of ${verification.total} kinds of client work.` : ""}</>}</li>
+        <li>{verifiedAll ? <>{agencyName} is verified for client work.</> : <>Before you publish to a client’s domain, {verification.href || verification.onOpen
+          ? <XaTextLink href={verification.href} onClick={verification.onOpen} aria-label={verification.open ? "Hide verification" : undefined}>get verified for client work</XaTextLink> : "get verified for client work"}.{counted ? verification.verified ? ` ${verification.verified} of ${verification.total} checks done.` : " Nothing is verified yet." : ""}</>}</li>
         <li>{team.members === undefined ? `People who work on clients with you join ${agencyName}. ` : team.members > 1 || team.pending ? <>{team.members} {team.members === 1 ? "person" : "people"} at {agencyName}{team.pending ? `, ${team.pending} invited` : ""}. </> : "Just you so far. "}
           {team.inviteHref ? <XaTextLink href={team.inviteHref}>Invite a teammate</XaTextLink> : team.ownerOnly ?? null}</li>
         {brandHref ? <li>Clients see {agencyName} on every change you prepare. <XaTextLink href={brandHref}>Edit how it looks</XaTextLink></li> : null}

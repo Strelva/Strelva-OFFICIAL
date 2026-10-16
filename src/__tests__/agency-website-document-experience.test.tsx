@@ -39,6 +39,31 @@ describe("agency v2 document drafts", () => {
     ]);
     expect(container.textContent).toContain("The client can now review it");
   });
+  it("stays on what it sent, then Undo sends the exact inverse and hands the edits back",async()=>{
+    const initial=agencyDocumentFixture();
+    const original=initial.website!.rebuild.candidate!.document.nodes["service-two"]!.props;
+    // The server answers each save with the draft it now holds.
+    const save=vi.fn(async (_binding:string,record:NonNullable<typeof initial.website>,_section:string,ops:{path:string;value:unknown}[]) => {
+      const next=structuredClone(record); for (const op of ops) { const id=op.path.split("/")[2]!; next.rebuild.candidate!.document.nodes[id]!.props=op.value as never; }
+      next.rebuild.candidate!.revision+=1; return {website:next};
+    });
+    await mount({read:async()=>initial,save});
+    const select=[...container.querySelectorAll("select")].find(item=>item.querySelector('option[value="service-two"]'))!;
+    await act(async()=>{Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype,"value")!.set!.call(select,"service-two");select.dispatchEvent(new Event("change",{bubbles:true}));});
+    await change(container.querySelector("textarea")!,"[Second service, renamed]");
+    await act(async()=>button("Send to the client").click());
+    // The page does not swap to another part of the site: the sent title and lines stay, waiting on the client.
+    expect(container.querySelector("h1")!.textContent).toBe("[Second service, renamed]. Waiting on the client.");
+    expect(container.querySelector("textarea")!.value).toBe("[Second service, renamed]");
+    expect(container.textContent).toContain("Sent · waiting on the client");
+    await act(async()=>button("Undo").click());
+    expect(save).toHaveBeenCalledTimes(2);
+    expect(save.mock.calls[1]![3]).toEqual([{op:"replace",path:"/nodes/service-two/props",value:original}]);
+    expect(save.mock.calls[1]![1].rebuild.candidate!.revision).toBe(initial.website!.rebuild.candidate!.revision+1);
+    expect(container.textContent).toContain("Taken back.");
+    expect(container.querySelector("textarea")!.value).toBe("[Second service, renamed]");
+    expect(button("Send to the client")).toBeDefined();
+  });
   it.each(["agency-expired","agency-revoked","agency-no-permission"])("withholds editing for %s",async scenario=>{
     const initial=agencyDocumentFixture(scenario); const save=vi.fn();
     await mount({read:async()=>initial,save});

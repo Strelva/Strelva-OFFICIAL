@@ -65,15 +65,6 @@ async function render(request: typeof fetch, systems = true, onWorkspace = vi.fn
   await settle();
   return { node, onWorkspace };
 }
-/** A6 keeps per-client detail in one place under the table: pick the client to look closer at. */
-async function lookCloser(node: HTMLElement, name: string) {
-  const select = node.querySelector<HTMLSelectElement>('section[aria-label="Look closer at one client"] select')!;
-  const option = [...select.options].find(item => item.textContent === name)!;
-  await act(async () => {
-    Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value")!.set!.call(select, option.value);
-    select.dispatchEvent(new Event("change", { bubbles: true }));
-  });
-}
 async function settle() { await act(async () => { await new Promise((resolve) => setTimeout(resolve, 10)); }); }
 const clientCalls = (request: ReturnType<typeof vi.fn>) => request.mock.calls.filter(([input]) => String(input).startsWith("/api/workspace/agency-clients"));
 const button = (node: HTMLElement, name: string | RegExp) => [...node.querySelectorAll("button")].find((item) => typeof name === "string" ? item.textContent?.trim() === name || item.getAttribute("aria-label") === name : name.test(item.textContent || ""))!;
@@ -112,8 +103,8 @@ describe("agency home on the batched read", () => {
     })) });
     const { node } = await render(request);
     expect(node.textContent).toContain("You · Client website not working");
-    await lookCloser(node, "Client 1");
-    expect(node.textContent).toContain("Client website · Live · Not working");
+    // A6 has no second picker under the table: the client's own page holds its detail.
+    expect(node.querySelector('section[aria-label="Look closer at one client"]')).toBeNull();
     await act(async () => button(node, "Queue").click());
     expect(node.textContent).toContain("Owner email bounced: new booking flow");
     expect(node.querySelector('[role="alert"]')?.textContent).toContain("This Queue is incomplete");
@@ -146,8 +137,6 @@ describe("agency home on the batched read", () => {
     const { node, onWorkspace } = await render(request);
     expect(node.textContent).toContain("McClear’s could not be loaded.");
     expect(node.textContent).toContain("Twin Trees");
-    await lookCloser(node, "Twin Trees");
-    expect(node.textContent).toContain("Operated by Strelva");
     expect(node.textContent).toContain("Client 3");
     await act(async () => { button(node, "Retry loading McClear’s").click(); });
     await settle();
@@ -266,15 +255,12 @@ describe("agency home on the batched read", () => {
 });
 
 
-it("opens agent bookings for the selected client without nesting a link in the client button", async () => {
+it("leaves the assistant-bookings filter to the client's own Bookings page", async () => {
   const request = router({ clients: () => Response.json(page([row(1, { agentBookings: true }), row(2)])) });
   const { node } = await render(request);
+  // WorkspaceBookings carries "Booked through assistants"; the client table never repeats a link per row.
   expect(node.querySelectorAll('a[href*="/workspace/bookings"]')).toHaveLength(0);
-  await lookCloser(node, "Client 1");
-  const links = [...node.querySelectorAll<HTMLAnchorElement>('a[href*="/workspace/bookings"]')];
-  expect(links).toHaveLength(1);
-  expect(links[0]?.getAttribute("href")).toBe(`/workspace/bookings?workspaceId=${row(1).workspaceId}&view=week&source=agent`);
-  expect(links[0]?.closest("button")).toBeNull();
+  expect(node.querySelector("select")).toBeNull();
 });
 
 describe("Import clients entry (flagged)", () => {
@@ -312,7 +298,9 @@ it("lets the real sidebar own navigation and keeps Build accessible beside the p
   expect(node.querySelector('[role="tablist"]')).toBeNull();
   expect(node.querySelector('[role="tabpanel"]')).toBeNull();
   expect(button(node, "Build for a client")).toBeDefined();
-  expect(node.querySelector('h1')?.textContent).toBe("Clients");
+  // XA · A6: the headline counts the clients and what waits; the table is the page.
+  expect(node.querySelector('h1')?.textContent).toMatch(/^Two clients\. Nothing waits on you\./);
+  expect(node.querySelector('section[aria-label="Clients"] table[aria-label="Clients"]')).not.toBeNull();
   expect(node.textContent).toContain("2 clients");
   expect(request.mock.calls.some(([url]) => String(url).includes("agency-proposals"))).toBe(false);
 });

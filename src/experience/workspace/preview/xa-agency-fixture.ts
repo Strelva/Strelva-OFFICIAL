@@ -22,8 +22,8 @@ export const XA_CLIENT = {
 const sys = (n: number) => `b0000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
 
 export type XaAgencyState = "ready" | "empty" | "loading" | "error" | "waiting" | "done";
-export type XaAgencyScreen = "today" | "queue" | "client" | "prepare" | "library" | "minutes";
-export const XA_AGENCY_SCREENS: readonly XaAgencyScreen[] = ["today", "queue", "client", "prepare", "library", "minutes"];
+export type XaAgencyScreen = "today" | "clients" | "queue" | "client" | "prepare" | "library" | "minutes";
+export const XA_AGENCY_SCREENS: readonly XaAgencyScreen[] = ["today", "clients", "queue", "client", "prepare", "library", "minutes"];
 export const XA_AGENCY_STATES: readonly XaAgencyState[] = ["ready", "empty", "loading", "error", "waiting", "done"];
 
 const hoursAgo = (hours: number, now: number) => new Date(now - hours * 3_600_000).toISOString();
@@ -43,7 +43,8 @@ export function xaAgencySnapshot(): WorkspaceSnapshot {
 }
 
 function client(id: string, name: string, systems: AgencyClientRow["systems"], extra: Partial<AgencyClientRow> = {}): AgencyClientRow {
-  return { workspaceId: id, name, reach: "agency", role: "agency", provider: true, status: "ready", systems, needsYou: { count: 0, oldestAt: null }, openRequests: 0, improvementsWaiting: 0, lastReceiptAt: null, ...extra };
+  // Every fixture client was added by North Studio and claimed by its owner.
+  return { workspaceId: id, name, reach: "agency", role: "agency", provider: true, status: "ready", systems, needsYou: { count: 0, oldestAt: null }, openRequests: 0, improvementsWaiting: 0, lastReceiptAt: null, ownerClaimWaiting: false, ownerClaimed: true, ...extra };
 }
 
 const healthy = (at: string) => ({ status: "healthy" as const, summary: "Passed its last check", lastVerifiedAt: at });
@@ -58,18 +59,18 @@ export function xaAgencyClients(state: XaAgencyState, now: number = XA_DAY.now):
       { id: sys(1), name: "harbordental.com", kind: "website", lifecycle: "live", versionContext: null, health: healthy(checked) },
       { id: sys(2), name: "Bookings", kind: "bookings", lifecycle: "live", versionContext: null, health: healthy(checked) },
       { id: sys(3), name: "Inquiries", kind: "inquiries", lifecycle: "live", versionContext: null, health: healthy(checked) },
-    ], { needsYou: { count: 1, oldestAt: hoursAgo(30, now) } }),
+    ], { needsYou: { count: 1, oldestAt: hoursAgo(30, now) }, lastReceiptAt: hoursAgo(64, now) }),
     client(XA_CLIENT.north, "North Coast Realty", [
       { id: sys(4), name: "Showings calendar", kind: "bookings", lifecycle: "live", versionContext: null, health: fixed ? healthy(checked) : { status: "blocked", summary: "Google signed North Studio out at 6:14 am. Showing requests are being saved.", lastVerifiedAt: hoursAgo(3, now) } },
       { id: sys(5), name: "northcoastrealty.com", kind: "website", lifecycle: "live", versionContext: null, health: healthy(checked) },
-    ]),
+    ], { lastReceiptAt: hoursAgo(20, now) }),
     client(XA_CLIENT.fieldwork, "Fieldwork Studio", [
       { id: sys(6), name: "Intake form", kind: "onboarding", lifecycle: "draft", versionContext: null, health: healthy(checked) },
       { id: sys(7), name: "fieldwork.studio", kind: "website", lifecycle: "live", versionContext: null, health: healthy(checked) },
-    ], { needsYou: { count: 1, oldestAt: hoursAgo(18, now) } }),
+    ], { needsYou: { count: 1, oldestAt: hoursAgo(18, now) }, lastReceiptAt: hoursAgo(90, now) }),
     client(XA_CLIENT.lakeview, "Lakeview Mediation", [
       { id: sys(8), name: "lakeviewmediation.com", kind: "website", lifecycle: "live", versionContext: null, health: healthy(checked) },
-    ], fixed ? {} : { openRequests: 1 }),
+    ], fixed ? { lastReceiptAt: hoursAgo(30, now) } : { openRequests: 1, lastReceiptAt: hoursAgo(30, now) }),
   ];
   const queue: AgencyQueueItem[] = [
     ...(fixed ? [] : [{ id: "health:north", kind: "health" as const, workspaceId: XA_CLIENT.north, clientName: "North Coast Realty", title: "Showings calendar stopped syncing with Google Calendar", systemId: sys(4), workId: null, since: hoursAgo(3, now), label: "Google signed North Studio out" }]),

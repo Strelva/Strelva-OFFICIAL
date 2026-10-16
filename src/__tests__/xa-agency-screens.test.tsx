@@ -133,11 +133,20 @@ describe("XA-6 screens", () => {
     const shared = { status: "ready" as const, data: { workspaceId: XA_CLIENT.harbor, decisions: [{ id: "f0000000-0000-4000-8000-000000000001", title: "New cleaning prices", systemId: null, since: "2026-10-13T14:42:00.000Z", state: "open" as const }], changes: [], deliveryChecks: [], deliveries: [] } };
     const props = { clientName: "Harbor Dental", workspaceId: XA_CLIENT.harbor, agencyName: "North Studio", agencyHref: "/workspace", ownerName: "Dr. Lin", systems: xaHarborSystems(), shared, systemHref: (id: string) => `/s/${id}`, onRetryShared: () => undefined };
     const read = await mount(createElement(AgencyClientXa, { ...props, grants: { status: "ready", levels: { website: { level: "prepare", proposed: false }, inquiries: { level: "full_control", proposed: false } } } }));
-    expect(read.textContent).toContain("What North Studio can do here, set by Dr. Lin");
-    expect(read.textContent).toContain("You build and stage changes. Dr. Lin puts them live.");
-    // The sentence carries the level; only the area the owner kept gets a mark.
-    expect([...read.querySelectorAll("[data-level]")].map(item => item.textContent)).toEqual(["Not given", "Not given", "Not given"]);
-    expect(read.textContent).toContain("Waiting on Harbor Dental");
+    // One column, no cards: what waits first, then the levels labelled in place, then one sentence for what only the owner can do.
+    expect([...read.querySelectorAll("h2")].map(item => item.textContent)).toEqual(["Waiting on Harbor Dental", "Who makes each change live"]);
+    const levels = [...read.querySelectorAll("dl > div")].map(item => ({ level: item.getAttribute("data-level"), title: item.querySelector("dt")?.textContent, systems: [...item.querySelectorAll("dd li")].map(li => li.textContent) }));
+    expect(levels).toEqual([
+      { level: "full_control", title: "Full control", systems: ["Inquiries"] },
+      { level: "prepare", title: "Prepare", systems: ["Website"] },
+      { level: "kept", title: "Dr. Lin keeps", systems: ["Bookings", "Google listing", "Patient recall tracker"] },
+    ]);
+    expect(read.textContent).toContain("You build and stage changes. Dr. Lin makes them live.");
+    expect(read.textContent).toContain("Only Dr. Lin can pay for Strelva, add or end an agency, or take the business and its data elsewhere.");
+    // No legend for labels that aren't on screen, no lock list, no second card.
+    expect(read.textContent).not.toContain("Prepare means");
+    expect(read.querySelector("aside")).toBeNull();
+    expect(read.querySelector('a[href="/s/' + xaHarborSystems()[0]!.id + '"]')?.textContent).toBe("Website");
     const seeIt = [...read.querySelectorAll("a")].find(link => link.textContent === "See it")!;
     expect(seeIt.getAttribute("href")).toContain("f0000000-0000-4000-8000-000000000001");
     const ask = vi.fn();
@@ -145,15 +154,22 @@ describe("XA-6 screens", () => {
     const askButton = [...withAsk.querySelectorAll("button")].find(item => item.textContent === "Ask about Harbor Dental")!;
     await act(async () => askButton.click());
     expect(ask).toHaveBeenCalledTimes(1);
-    const unread = await mount(createElement(AgencyClientXa, { ...props, grants: { status: "unreadable" } }));
-    expect(unread.querySelector("[data-level]")).toBeNull();
+    const unread = await mount(createElement(AgencyClientXa, { ...props, ownerName: null, grants: { status: "unreadable" } }));
+    expect([...unread.querySelectorAll("[data-level]")].map(item => item.getAttribute("data-level"))).toEqual(["shared"]);
     expect(unread.textContent).toContain("isn't shared with agencies on this page yet");
+    // Without a shared owner name, the page names the business's owner rather than "the owner".
+    expect(unread.textContent).toContain("Only Harbor Dental’s owner can");
   });
 
   it("the send panel holds the one ink pill and only sends with a change in it", async () => {
     const send = vi.fn();
     const empty = await mount(createElement(AgencySendPanel, { clientName: "Harbor Dental", address: "/hours", changes: [], sending: false, onSend: send, onKeepEditing: () => undefined }));
-    expect((empty.querySelector("[data-xa-primary]") as HTMLButtonElement).disabled).toBe(true);
+    // Nothing to send: no grey pill, a sentence that says what unblocks it.
+    expect(empty.querySelector("[data-xa-primary]")).toBeNull();
+    expect(empty.textContent).toContain("Edit a section on the left.");
+    const blocked = await mount(createElement(AgencySendPanel, { clientName: "Harbor Dental", address: "/hours", changes: [{ id: "a", label: "Text", before: "a", after: "b" }], blocked: "One part's fields don't read right. Fix them before sending.", sending: false, onSend: send, onKeepEditing: () => undefined }));
+    expect(blocked.querySelector("[data-xa-primary]")).toBeNull();
+    expect(blocked.textContent).toContain("Fix them before sending.");
     const filled = await mount(createElement(AgencySendPanel, { clientName: "Harbor Dental", address: "/hours", changes: [{ id: "a", label: "Hours · body", before: "Mon to Fri 8 to 5", after: "Thu and Fri closed" }], sending: false, onSend: send, onKeepEditing: () => undefined }));
     const pill = filled.querySelector("[data-xa-primary]") as HTMLButtonElement;
     expect(pill.textContent).toBe("Send to Harbor Dental");

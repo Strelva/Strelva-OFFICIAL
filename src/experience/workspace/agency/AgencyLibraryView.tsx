@@ -146,7 +146,7 @@ export function AgencyLibraryView({
     </div>
     <div>
       {selectedSource ? <LibrarySource key={selectedSource.systemId} request={request} source={selectedSource} review={reviews[selectedSource.systemId]} reviewEnabled={state.library.reviewEnabled === true} held={refreshing || Boolean(refreshError) || state.library.reviewEnabled !== true} tools={tools} onChanged={() => void refresh()} onReview={ids => void review(selectedSource, ids)} />
-        : <AgencyFold label="Releases and packaging" open>{tools}</AgencyFold>}
+        : <AgencyFold label="Releases" open>{tools}</AgencyFold>}
       {!provider ? <InquiryLibraryVersions library={state.library} /> : null}
     </div>
   </div>;
@@ -216,7 +216,7 @@ function LibrarySource({ request, source, review, onReview, held, onChanged, rev
     </div> : null}
     {review ? <ReviewResult reviewEnabled={reviewEnabled} source={source} review={review} /> : null}
     <XaSays>Pebble checks each client&apos;s setup before anything is offered.</XaSays>
-    <AgencyFold label="Releases and packaging" count={source.revisions.length || null}>
+    <AgencyFold label="Releases" count={source.revisions.length || null}>
       {tools}
       <SystemCreator requestOverride={request} workspaceId={source.workspaceId} systemId={source.systemId} />
       {source.revisions.length ? <XaRows label={`Releases of ${source.name}`}>{[...source.revisions].sort((a, b) => b.number - a.number).map(revision => <XaRow key={revision.number} title={revision.summary || revision.label || "No summary"} detail={`Shared ${new Date(revision.publishedAt).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" })}`} meta={source.versions.some(version => version.baselineRevision === revision.number) ? "In use" : undefined} />)}</XaRows> : <p className={xa.note}>Nothing shared yet.</p>}

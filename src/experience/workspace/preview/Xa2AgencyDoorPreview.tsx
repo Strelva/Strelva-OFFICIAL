@@ -22,7 +22,8 @@ import type { AgencyOnboarding } from "@/platform/workspaces/agency-onboarding";
 import type { AddAgencyClientResult, AgencyClientListItem, ClaimReview, ClaimReviewAccepted, OwnerClaimPreview } from "@/products/agency-clients/contracts";
 
 import type { Xa2Screen } from "./xa2-screens";
-import { XA_DAY, xaHoursAgo } from "./xa-day";
+import { XA_CLIENTS, XA_DAY, xaHoursAgo } from "./xa-day";
+import xaStyles from "@/experience/workspace/agency/xa/agency-xa.module.css";
 
 const BASE = "/preview/strelva/xa/xa2-agency-door";
 const AGENCY = "00000000-0000-4000-8000-0000000000a2";
@@ -99,11 +100,11 @@ function row(index: number, name: string, over: Partial<AgencyClientRow> = {}): 
 }
 function everyClientRows(state: string): (AgencyClientRow & { pageIndex: number })[] {
   const harbor = row(1, "Harbor Dental", { ownerClaimWaiting: true, lastReceiptAt: null, systems: [{ id: "00000000-0000-4000-8000-000000000201", name: "harbordental.com", kind: "website", lifecycle: "draft", versionContext: null }] });
-  const north = row(2, "North Coast Realty", { needsYou: { count: 1, oldestAt: ago(26) }, systems: [
+  const north = row(2, "North Coast Realty", { ownerClaimed: true, needsYou: { count: 1, oldestAt: ago(26) }, systems: [
     { id: "00000000-0000-4000-8000-000000000202", name: "northcoastrealty.com", kind: "website", lifecycle: "live", versionContext: null, health: { status: "healthy", summary: "Passed", lastVerifiedAt: ago(1.2) } },
     { id: "00000000-0000-4000-8000-000000000212", name: "Showings", kind: "bookings", lifecycle: "live", versionContext: null, health: state === "down" ? { status: "blocked", summary: "Calendar sync stopped", lastVerifiedAt: ago(0.3) } : { status: "healthy", summary: "Passed", lastVerifiedAt: ago(1.2) } }] });
-  const lakeview = row(3, "Lakeview Mediation", { openRequests: 1 });
-  const fieldwork = row(4, "Fieldwork Studio", { lastReceiptAt: ago(80) });
+  const lakeview = row(3, "Lakeview Mediation", { openRequests: 1, ownerClaimed: true });
+  const fieldwork = row(4, "Fieldwork Studio", { lastReceiptAt: ago(80), ownerClaimed: true });
   const rows = [harbor, north, lakeview, fieldwork];
   if (state === "stale") rows[3] = { ...fieldwork, status: "unavailable", systems: [] };
   return rows;
@@ -143,7 +144,8 @@ export function Xa2AgencyDoorPreview({ screen, state, mode }: { screen: Xa2Scree
       preview={{ ...frame, addClientHref: `${BASE}/a4-add-client?state=ready${mode === "dark" ? "&mode=dark" : ""}` }} />;
   }
 
-  if (screen === "a4-add-client") return <AgencyFrame agencyName="North Studio" title="Add a client" {...frame} clients={sidebarClients(mode).slice(3)} signOut={null} active="clients">
+  // The sidebar lists what the page reads (Fieldwork Studio, added earlier), then the client just added.
+  if (screen === "a4-add-client") return <AgencyFrame agencyName="North Studio" title="Add a client" {...frame} signOut={null} active="clients">
     <AgencyAddClient agencyWorkspaceId={AGENCY} agencyName="North Studio" prospecting={state === "prospect"} initialProspectId={null} />
   </AgencyFrame>;
 
@@ -161,11 +163,12 @@ export function Xa2AgencyDoorPreview({ screen, state, mode }: { screen: Xa2Scree
   if (screen === "a6-every-client") {
     const rows = state === "empty" ? [] : everyClientRows(state);
     const body = state === "loading" ? <AgencyEveryClientLoading /> : state === "error" ? <AgencyEveryClientError onRetry={() => undefined} />
-      : <AgencyEveryClient clients={rows} total={rows.length} agencyName="North Studio" hasMore={false} loadingMore={false} moreError={false} retrying={new Set()} now={now}
+      : <AgencyEveryClient clients={rows} total={rows.length} agencyName="North Studio" minutes={new Map(rows.map((item, index) => [item.workspaceId, XA_CLIENTS[index]!.minutes]))} hasMore={false} loadingMore={false} moreError={false} retrying={new Set()} now={now}
         onOpen={() => undefined} onRetryPage={() => undefined} onMore={() => undefined} addClientHref={`${BASE}/a4-add-client?state=ready`}
         lastGoodReads={state === "stale" ? new Map([[rows[3]!.workspaceId, { client: everyClientRows("ready")[3]!, readAt: ago(0.5) }]]) : undefined} />;
     return <AgencyFrame agencyName="North Studio" title="Clients" {...frame} clients={state === "empty" ? [] : sidebarClients(mode)} signOut={null} active="clients">
-      <div style={{ boxSizing: "border-box", maxWidth: 1080, margin: "0 auto", padding: "clamp(24px, 6vw, 72px) clamp(16px, 3vw, 40px) 160px" }}>{body}</div>
+      {/* The same column AgencyHome gives the client table. */}
+      <section aria-label="Clients" className={xaStyles.every}>{body}</section>
       {/* The agency's composer, as AgencyHome docks it under the client table. */}
       {state !== "empty" ? <XaComposerDock><XaComposer value={ask} onChange={setAsk} onSubmit={() => setAsk("")} onAdd={() => undefined} placeholder="Ask Strelva about any client" /></XaComposerDock> : null}
     </AgencyFrame>;
