@@ -267,9 +267,10 @@ describe("the pages that moved (owner-entry spec §5)", () => {
     expect(route("/dashboard/analytics")).toMatchObject({ kind: "redirect", location: `/workspace/results?workspaceId=${WS}` });
   });
 
-  it("retains Settings at launch while ownership has its own workspace home", () => {
-    expect(DASHBOARD_DISPOSITIONS.find((item) => item.route === "/settings")!.state).toBe("stay");
-    expect(route("/dashboard/settings").kind).not.toBe("redirect");
+  it("retires Settings to Business details, and ownership has its own workspace home (October 16)", () => {
+    expect(DASHBOARD_DISPOSITIONS.find((item) => item.route === "/settings")!.state).toBe("ready");
+    expect(route("/dashboard/settings")).toMatchObject({ kind: "redirect", location: `/workspace/business-details?workspaceId=${WS}` });
+    expect(route("/dashboard/settings?checkout=success")).toMatchObject({ kind: "redirect", location: `/workspace?view=settings&workspaceId=${WS}` });
     expect(route("/dashboard/ownership")).toMatchObject({ kind: "redirect", location: `/workspace/business-details?workspaceId=${WS}#ownership` });
     expect(pagesBlockingOwnerEntry(new Set(["always", "local"]))).toEqual([]);
   });
@@ -282,7 +283,7 @@ describe("the pages that moved (owner-entry spec §5)", () => {
     expect(route("/dashboard?checkout=success", ["needs_you"])).toMatchObject({ location: `/workspace?view=settings&workspaceId=${WS}` });
   });
 
-  it("moves Today and the approval queue only while Needs you is on", () => {
+  it("moves Today and the approval queue only while Needs you is on; off, the restyled page stays with a way back", () => {
     expect(route("/dashboard")).toMatchObject({ kind: "render-with-back", route: "/" });
     expect(route("/dashboard/review")).toMatchObject({ kind: "render-with-back", route: "/review" });
     expect(route("/dashboard", ["needs_you"])).toEqual({ kind: "redirect", location: `/workspace?workspaceId=${WS}`, route: "/" });
@@ -292,7 +293,8 @@ describe("the pages that moved (owner-entry spec §5)", () => {
   it("routes /chat through the same gate type as needs_you (ask)", () => {
     const only = (gate: string) => (flag: string) => flag === gate;
     expect(routeDashboardRequest({ decision: moved, pathWithSearch: "/dashboard/chat", flagOn: only("ask") })).toMatchObject({ kind: "redirect", location: `/workspace?view=ask&workspaceId=${WS}` });
-    expect(routeDashboardRequest({ decision: moved, pathWithSearch: "/dashboard/chat", flagOn: only("needs_you") }).kind).toBe("render-with-back");
+    // Ask off for this business: Home has no chat, so the restyled chat stays with a way back.
+    expect(routeDashboardRequest({ decision: moved, pathWithSearch: "/dashboard/chat", flagOn: only("needs_you") })).toMatchObject({ kind: "render-with-back", route: "/chat" });
   });
 
   it("lets an operator keep the old page, and keeps everyone else on /dashboard when not moved", () => {
@@ -300,11 +302,12 @@ describe("the pages that moved (owner-entry spec §5)", () => {
     expect(routeDashboardRequest({ decision: { kind: "dashboard", reason: "entry_off" }, pathWithSearch: "/dashboard/leads" })).toEqual({ kind: "render" });
   });
 
-  it("no longer blocks owner entry; Settings is explicitly retained", () => {
+  it("no longer blocks owner entry; nothing is retained on /dashboard", () => {
     const blocking = pagesBlockingOwnerEntry(new Set(["always", "local"])).map((entry) => entry.route);
     for (const path of ["/", "/review", "/leads", "/reviews", "/analytics", "/health", "/site"]) expect(blocking, path).not.toContain(path);
     expect(blocking).toEqual([]);
-    expect(effectiveDisposition("/settings")).toMatchObject({ state: "stay", retainedAtLaunch: true });
+    expect(effectiveDisposition("/settings").state).toBe("ready");
+    expect(DASHBOARD_DISPOSITIONS.every((entry) => entry.state === "ready")).toBe(true);
     expect(effectiveDisposition("/health").route).toBe("/health");
   });
 

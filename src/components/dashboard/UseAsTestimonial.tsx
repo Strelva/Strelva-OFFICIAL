@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback, useEffect, useMemo } from "react";
-import { XaButton, XaField, XaSheet, XaTextArea } from "@/components/ui/strelva/Xa";
+import { XaField, XaTextArea, XaYes } from "@/components/ui/strelva/Xa";
 import { useDashboardOptional } from "./DashboardContext";
 
 interface ReviewData {
@@ -12,19 +12,22 @@ interface ReviewData {
   rating: number;
 }
 
-interface UseAsTestimonialModalProps {
-  open: boolean;
+interface UseAsTestimonialProps {
   onClose: () => void;
   review: ReviewData | null;
   onSuccess?: () => void;
 }
 
-export function UseAsTestimonialModal({
-  open,
+/**
+ * Putting a review on the site, asked in place inside the open decision
+ * (October 16: no sheet over the page). The words are editable right here,
+ * then the one yes adds it.
+ */
+export function UseAsTestimonial({
   onClose,
   review,
   onSuccess,
-}: UseAsTestimonialModalProps) {
+}: UseAsTestimonialProps) {
   const dashboard = useDashboardOptional();
   const dashboardHref = useMemo(
     () => dashboard?.dashboardHref ?? ((path: string) => path),
@@ -87,25 +90,24 @@ export function UseAsTestimonialModal({
 
   if (!review) return null;
 
-  // A sheet: adding a review to the site is a change that deserves its own moment.
   return (
-    <XaSheet
-      open={open}
-      onClose={onClose}
-      title="Put this review on your site?"
-      actions={<>
-        <XaButton variant="primary" size="lg" block busy={saving} disabled={saved} onClick={handleSave}>{saved ? "Added to your reviews" : "Add it to your site"}</XaButton>
-        <XaButton variant="quiet" size="lg" onClick={onClose}>Cancel</XaButton>
-      </>}
-    >
+    <div className="flex flex-col gap-4">
       <p className="m-0 text-[14px] text-[var(--st-text-2)]">
         From {review.source === "google" ? "Google" : review.source === "yelp" ? "Yelp" : review.source}, {review.rating} {review.rating === 1 ? "star" : "stars"}. Change the words before it goes up if you want.
       </p>
-      <div className="flex flex-col gap-4">
-        <XaTextArea label="Quote" value={quote} rows={4} onChange={(e) => setQuote(e.target.value)} placeholder="What they said" />
-        <XaField label="Name" value={author} onChange={(e) => setAuthor(e.target.value)} placeholder="Customer name" />
-        <XaField label="Where it came from" value={location} onChange={(e) => setLocation(e.target.value)} placeholder="via Google" error={error ?? undefined} />
-      </div>
-    </XaSheet>
+      <XaTextArea label="Quote" value={quote} rows={4} onChange={(e) => setQuote(e.target.value)} placeholder="What they said" />
+      <XaField label="Name" value={author} onChange={(e) => setAuthor(e.target.value)} placeholder="Customer name" />
+      <XaField label="Where it came from" value={location} onChange={(e) => setLocation(e.target.value)} placeholder="via Google" error={error ?? undefined} />
+      {saved ? <p className="m-0 text-[15px] text-[var(--st-text-body)]" role="status">Added to the reviews on your site.</p> : <XaYes
+        state="waiting"
+        question="Put this review on your site?"
+        yesLabel="Add it to your site"
+        notYetLabel="Not yet"
+        onYes={() => void handleSave()}
+        onNotYet={onClose}
+        disabled={saving}
+        block={false}
+      />}
+    </div>
   );
 }

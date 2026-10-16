@@ -123,6 +123,8 @@ interface DashboardContextValue {
   // suspended tenant). Write controls disable themselves; the API layer is the
   // real backstop (a no-session demo viewer 401s on every mutation regardless).
   readOnly: boolean;
+  /** Preview harnesses only: the fixture day's clock, so relative times agree with fixture dates. Real pages leave it unset (the wall clock). */
+  fixtureNow?: number;
 }
 
 const DashboardContext = createContext<DashboardContextValue | null>(null);
@@ -167,6 +169,7 @@ export function DashboardProvider({
   impersonation,
   readOnly = false,
   resolveHref,
+  fixtureNow,
 }: {
   children: ReactNode;
   tenantId?: string;
@@ -191,6 +194,8 @@ export function DashboardProvider({
    * (src/lib/workspace-site-places.ts).
    */
   resolveHref?: (path: string) => string;
+  /** Preview harnesses only (see DashboardContextValue.fixtureNow). */
+  fixtureNow?: number;
 }) {
   const [activePanel, setActivePanel] = useState<Panel>("content");
   const [chatPrompt, setChatPromptState] = useState("");
@@ -381,6 +386,7 @@ export function DashboardProvider({
       relationship,
       impersonation: impersonation || { isActive: false, actorEmail: null, actorName: null, isSuperAdmin: false, tenantId },
       readOnly,
+      fixtureNow,
     }),
     [
       activePanel, setActivePanel, chatPrompt, setChatPrompt, activeSection, setActiveSection,
@@ -391,7 +397,7 @@ export function DashboardProvider({
       editReceipts, addEditReceipts, markDraftReceipts, tenantId, siteUrl, previewUrl,
       liveSyncEnabled, dashboardBasePath, dashboardHref, siteModel, autoPublish, subscriptionStatus,
       hasStripeCustomer, planOverride, commercialPlanLabel, commercialPlanMonthlyCents, impersonation, readOnly,
-      relationship,
+      relationship, fixtureNow,
     ],
   );
 

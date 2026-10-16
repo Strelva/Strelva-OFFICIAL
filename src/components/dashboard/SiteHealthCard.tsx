@@ -111,6 +111,7 @@ export function SiteHealthCard() {
           { credentials: "same-origin" }
         );
         if (res.status === 404) {
+          await res.text().catch(() => ""); // end the request; no check yet is not an error
           setState("empty");
           return;
         }

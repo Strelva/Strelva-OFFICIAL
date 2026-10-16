@@ -4,7 +4,8 @@
  * They hold layout and words only; every page keeps its own data loading,
  * permissions and writes.
  */
-import type { ReactNode } from "react";
+import { useSyncExternalStore, type ReactNode } from "react";
+import { greetingName, todayGreeting } from "@/experience/workspace/today/today-model";
 import { StSkeleton } from "@/components/ui/strelva/Kit";
 import { XaEmpty, XaHeadline, XaLede } from "@/components/ui/strelva/Xa";
 import type { XaPose } from "@/components/ui/strelva/Xa";
@@ -86,3 +87,32 @@ export function DashEmpty({ pose, job, title, children, action, secondary }: { p
 }
 
 export const dashStyles = styles;
+
+/**
+ * One placeholder rule for both dashboard composers, the workspace's
+ * (OwnerToday, AskStrelva): Home asks "for anything"; a scoped Ask names what
+ * it is about ("Ask Strelva about your website").
+ */
+export function dashboardAskPlaceholder(about?: string): string {
+  return about ? `Ask Strelva about ${about}` : "Ask Strelva for anything";
+}
+
+/** The minute, on the client only; the server and hydration greet without a clock. */
+function subscribeMinute(onChange: () => void) {
+  const timer = window.setInterval(onChange, 30_000);
+  return () => window.clearInterval(timer);
+}
+const minuteNow = () => Math.floor(Date.now() / 60_000);
+const noMinute = () => null;
+
+/**
+ * Home's greeting, in the workspace's words (todayGreeting): "Good morning,
+ * Dr. Lin." by the reader's own clock. A business name or "there" in the
+ * name slot (old tenant records) greets without a name, never "Good morning, Great."
+ */
+export function DashGreeting({ name, businessName }: { name: string; businessName: string }) {
+  const minute = useSyncExternalStore(subscribeMinute, minuteNow, noMinute);
+  const raw = name.trim();
+  const who = raw && raw !== businessName.trim() && raw !== "there" ? greetingName(raw) : null;
+  return <XaHeadline size="lg">{todayGreeting(minute, who)}</XaHeadline>;
+}

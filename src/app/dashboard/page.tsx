@@ -157,6 +157,7 @@ async function DashboardHome() {
         retentionSignals={retentionSignals}
         hrefs={{
           reports: brief ? dashboardHref("/dashboard/reports") : undefined,
+          analytics: dashboardHref("/dashboard/analytics"),
           history: dashboardHref("/dashboard/history"),
           leads: dashboardHref("/dashboard/leads"),
           site: dashboardHref("/dashboard/site"),

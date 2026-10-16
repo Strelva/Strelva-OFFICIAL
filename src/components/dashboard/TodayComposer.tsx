@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { XaComposer } from "@/components/ui/strelva/Xa";
 import { useDashboard } from "./DashboardContext";
+import { dashboardAskPlaceholder } from "./xa/DashboardXa";
 
 /**
  * The owner Home composer (XA · O1). Typing here opens Ask Strelva with the
@@ -19,7 +20,7 @@ export function TodayComposer({ businessName }: { businessName: string }) {
     onChange={setValue}
     disabled={readOnly}
     onSubmit={() => { setChatPrompt(value.trim()); router.push(dashboardHref("/dashboard/chat")); }}
-    placeholder="Ask Strelva for anything"
+    placeholder={dashboardAskPlaceholder()}
     inputLabel={`Ask Strelva about ${businessName}`}
   />;
 }

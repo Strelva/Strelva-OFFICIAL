@@ -49,6 +49,17 @@ export type DashboardRouting =
  * What a `/dashboard` request does for this person. `pathWithSearch` is the
  * trusted path the proxy saw (`/dashboard/reports?view=monthly`). Operators
  * keep `?legacy=1` to stay on the old page; clients never get that.
+ *
+ * October 16, 2026: the legacy dashboard is retired as a second owner app.
+ * Once owner entry sends this person to the workspace, every `/dashboard`
+ * page whose exact workspace home is on for the workspace redirects there.
+ * A page whose equivalent is gated off (systems, needs_you or ask off for
+ * this business) renders the restyled page with a back link instead of
+ * landing on Home, because Home has no site editor, approvals or chat; the
+ * owner keeps every ability until the gate opens. An operator's `?legacy=1`
+ * also renders the old page. A person with no
+ * workspace membership is never moved (decideOwnerEntry), so no redirect
+ * sends anyone somewhere they cannot open.
  */
 export function routeDashboardRequest(input: {
   decision: OwnerEntryDecision;
@@ -68,13 +79,16 @@ export function routeDashboardRequest(input: {
   const gateOn = (flag: DispositionGate) => flag === "ask"
     ? input.askReleased ?? (input.flagOn ? input.flagOn(flag) === true : askReleaseEnabled())
     : input.flagOn?.(flag) === true;
+  if (legacy) return { kind: "render-with-back", homeHref, route, state: entry.state };
   const flagsReady = (entry.requires ?? []).every(gateOn);
-  if (entry.state === "ready" && flagsReady && !legacy) {
-    // A target that wouldn't survive sign-in is never a redirect.
-    const location = workspaceReturnTarget(entry.target(context));
-    if (location) return { kind: "redirect", location, route };
-  }
-  return { kind: "render-with-back", homeHref, route, state: entry.state };
+  // A page whose workspace equivalent is gated off for this business keeps
+  // rendering the restyled page with a way back, so a moved owner never loses
+  // an ability (the site editor, approvals, chat) they had the day before.
+  if (!flagsReady || entry.state === "stay" || entry.state === "frozen") return { kind: "render-with-back", homeHref, route, state: entry.state };
+  // A target that wouldn't survive sign-in is never a redirect either.
+  const location = workspaceReturnTarget(entry.target(context));
+  if (!location) return { kind: "render-with-back", homeHref, route, state: entry.state };
+  return { kind: "redirect", location, route };
 }
 
 /** Where sign-in, sign-up and the admin root send someone after auth. */

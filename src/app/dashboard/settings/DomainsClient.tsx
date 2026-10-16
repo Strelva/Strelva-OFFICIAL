@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef, useCallback, useMemo, type FormEvent } from "react";
 import { Globe, Plus, Trash2, CheckCircle2, Clock } from "lucide-react";
 import { useDashboardOptional } from "@/components/dashboard/DashboardContext";
-import { ConfirmDialog } from "@/components/dashboard/ConfirmDialog";
+import { ConfirmInPlace } from "@/components/dashboard/ConfirmInPlace";
 
 const DOMAINS_API = "/api/tenant/domains";
 
@@ -365,6 +365,16 @@ export function DomainsClient({ initialDomains }: Props) {
                   <Trash2 className="w-3.5 h-3.5" strokeWidth={1.5} />
                 </button>
               </div>
+              {confirmingRemove === entry.domain ? <div className="mt-3"><ConfirmInPlace
+                open
+                title={`Remove ${entry.domain}?`}
+                message="It stops pointing to your site, so visitors who use it can't reach you there."
+                confirmLabel="Remove it"
+                cancelLabel="Keep it"
+                busy={removing !== null}
+                onConfirm={() => handleRemove(entry.domain)}
+                onCancel={() => setConfirmingRemove(null)}
+              /></div> : null}
             </div>
           ))
         )}
@@ -375,22 +385,6 @@ export function DomainsClient({ initialDomains }: Props) {
         issued automatically once DNS resolves.
       </p>
 
-      <ConfirmDialog
-        open={confirmingRemove !== null}
-        title="Remove this domain?"
-        message={
-          confirmingRemove
-            ? `${confirmingRemove} will stop pointing to your site. This may affect your live site if visitors use this domain.`
-            : "This may affect your live site if visitors use this domain."
-        }
-        confirmLabel="Remove"
-        destructive
-        busy={removing !== null}
-        onConfirm={() => {
-          if (confirmingRemove) handleRemove(confirmingRemove);
-        }}
-        onCancel={() => setConfirmingRemove(null)}
-      />
     </div>
   );
 }

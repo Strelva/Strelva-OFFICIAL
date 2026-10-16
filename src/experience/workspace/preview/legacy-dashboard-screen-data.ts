@@ -10,6 +10,7 @@ import type { Product } from "@/lib/products";
 import type { ReplyVoice } from "@/lib/reviews/reply-voice";
 import type { GbpState } from "@/lib/gbp-management";
 import type { DailyMetric } from "@/lib/storage/analytics-store";
+import { xaDaysAgo } from "./xa-day";
 import type { SiteSnapshotSummary } from "@/lib/storage";
 import type { ScanHistoryPoint, ScanSummary } from "@/lib/scan-store";
 import type { PeriodStats } from "@/lib/analytics/period";
@@ -32,7 +33,8 @@ import { LEGACY_TENANT, ago } from "./legacy-dashboard-fixtures";
  */
 export const WEEK = { people: 412, peoplePrior: 358, booked: 29, bookedPrior: 25, called: 12, calledPrior: 9, sinceLaunch: 5820 } as const;
 
-const day = (offset: number) => { const d = new Date(); d.setDate(d.getDate() + offset); return d.toISOString().slice(0, 10); };
+// Dates count from the shared fixture day (Monday, November 23, 2026), never the wall clock.
+const day = (offset: number) => xaDaysAgo(-offset);
 export const LEGACY_TODAY = day(0);
 
 export function series(days: number, base = 40): DailyMetric[] {
@@ -166,8 +168,8 @@ export function leads(state: LegacyState): LeadRecord[] {
 
 export function members(state: LegacyState): Member[] {
   if (state === "empty") return [];
-  const m = (email: string, name: string, available: number, lifetime: number, tier: Member["tier"]) => ({ email, displayName: name, starsAvailable: available, starsLifetime: lifetime, tier, tierOverride: null, birthday: null, favoriteFruit: null, badges: [], subscriptionBonusClaimed: false } as unknown as Member);
-  return [m("ana@example.com", "Ana Ruiz", 420, 860, "super-snapper"), m("jordan@example.com", "Jordan Pierce", 120, 240, "snapper"), m("mia@example.com", "Mia Chen", 60, 60, "snapper")];
+  const m = (email: string, name: string, available: number, lifetime: number, tier: Member["tier"], joinedDaysAgo: number) => ({ email, displayName: name, starsAvailable: available, starsLifetime: lifetime, tier, tierOverride: null, birthday: null, favoriteFruit: null, badges: [], subscriptionBonusClaimed: false, createdAt: `${day(-joinedDaysAgo)}T15:00:00.000Z` } as unknown as Member);
+  return [m("ana@example.com", "Ana Ruiz", 420, 860, "super-snapper", 2), m("jordan@example.com", "Jordan Pierce", 120, 240, "snapper", 19), m("mia@example.com", "Mia Chen", 60, 60, "snapper", 41)];
 }
 
 export function store(state: LegacyState): { summary: OrderSummary | null; orders: OrderRecord[]; products: Product[] } {

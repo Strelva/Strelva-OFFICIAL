@@ -1,7 +1,7 @@
 import type { ActivityEntry } from "@/lib/storage/activity-store";
 import type { OwnerRetentionSignals } from "@/lib/retention";
 import type { UnifiedEvent } from "@/lib/types";
-import { XaAnswers, XaHeadline, XaInitial, XaLabel, XaLede, XaMark, XaRow, XaRows, XaTextLink } from "@/components/ui/strelva/Xa";
+import { XaAnswers, XaInitial, XaLabel, XaLede, XaMark, XaRow, XaRows, XaTextLink } from "@/components/ui/strelva/Xa";
 import { BillingBanner } from "./BillingBanner";
 import { ActivityFeed } from "./ActivityFeed";
 import { DoThisNextCard } from "./DoThisNextCard";
@@ -10,6 +10,7 @@ import { OnboardingWizard } from "./OnboardingWizard";
 import { QueuePage } from "./QueuePage";
 import { RetentionPanel } from "./RetentionPanel";
 import { TodayComposer } from "./TodayComposer";
+import { DashGreeting } from "./xa/DashboardXa";
 import styles from "./xa/dashboard-xa.module.css";
 
 export interface DashboardTodayProps {
@@ -25,15 +26,9 @@ export interface DashboardTodayProps {
   suggestion: { title: string; prompt: string } | null;
   leads: { count: number; recent: { id: string; name: string; email?: string | null; message?: string | null; createdAt: string }[] };
   retentionSignals: OwnerRetentionSignals;
-  hrefs: { reports?: string; history: string; leads: string; site: string; live?: string | null };
-}
-
-/** "Dr. Amy Lin" greets as "Dr. Lin"; everyone else by first name. */
-export function greetingName(name: string): string {
-  const parts = name.trim().split(/\s+/).filter(Boolean);
-  if (!parts.length) return "there";
-  if (/^(dr|mr|mrs|ms)\.?$/i.test(parts[0]!) && parts.length > 1) return `${parts[0]!.replace(/\.?$/, ".")} ${parts[parts.length - 1]}`;
-  return parts[0]!;
+  hrefs: { reports?: string; analytics?: string; history: string; leads: string; site: string; live?: string | null };
+  /** Preview harnesses only: the fixture day's clock. Real pages use the wall clock. */
+  now?: number;
 }
 
 function plural(n: number, one: string, many: string) { return `${n.toLocaleString()} ${n === 1 ? one : many}`; }
@@ -59,8 +54,7 @@ export function DashboardToday(props: DashboardTodayProps) {
         <div className={styles.splitLead}>
           <XaMark size={40} />
           <div className={styles.greeting}>
-            {/* A business name in the owner slot (old tenant records) greets plainly, never "Hello, Great." */}
-            <XaHeadline size="lg">{ownerName.trim() && ownerName.trim() !== businessName.trim() && ownerName.trim() !== "there" ? `Hello, ${greetingName(ownerName)}.` : "Hello."}</XaHeadline>
+            <DashGreeting name={ownerName} businessName={businessName} />
             <XaLede>{lede}</XaLede>
           </div>
           <BillingBanner />
@@ -82,7 +76,10 @@ export function DashboardToday(props: DashboardTodayProps) {
           {numbersLine ? <section className="flex flex-col gap-3" aria-labelledby="found-label">
             <XaLabel id="found-label">Who found you</XaLabel>
             <p className="m-0 max-w-[560px] text-[15px] leading-[1.5] text-[var(--st-text-body)]">{numbersLine}</p>
-            {hrefs.reports ? <p className="m-0 text-[14px]"><XaTextLink href={hrefs.reports}>Read this week&apos;s report</XaTextLink></p> : null}
+            {hrefs.analytics || hrefs.reports ? <p className="m-0 flex flex-wrap gap-x-4 gap-y-1 text-[14px]">
+              {hrefs.analytics ? <XaTextLink href={hrefs.analytics}>See visits and searches</XaTextLink> : null}
+              {hrefs.reports ? <XaTextLink href={hrefs.reports}>Read this week&apos;s recap</XaTextLink> : null}
+            </p> : null}
           </section> : null}
         </div>
 
@@ -92,12 +89,12 @@ export function DashboardToday(props: DashboardTodayProps) {
               <XaLabel id="next-label">What happens next</XaLabel>
               <XaAnswers labelWidth={112} rows={[
                 ["This week", "Strelva keeps your site and Google listing healthy. Nothing for you to do."],
-                ["First report", "In about a week, here: who found you and what changed."],
-                ["Any time", "Ask Strelva in plain words. Bigger changes wait in Needs you for your yes."],
+                ["First recap", "In about a week, here: who found you and what changed."],
+                ["Any time", "Ask Strelva in plain words. Bigger changes wait here on Home for your yes."],
               ]} />
             </section>
           ) : (
-            <ActivityFeed activity={strelvaWork} historyHref={hrefs.history} limit={4} />
+            <ActivityFeed activity={strelvaWork} historyHref={hrefs.history} limit={4} now={props.now} />
           )}
           {leads.recent.length > 0 ? (
             <section className="flex flex-col gap-2" aria-labelledby="leads-label">

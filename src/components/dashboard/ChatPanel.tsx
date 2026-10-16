@@ -6,7 +6,7 @@ import ReactMarkdown from "react-markdown";
 import { timeAgo } from "@/lib/utils";
 import { ShiningText } from "@/components/ui/shining-text";
 import { XaComposer, XaPebbleAvatar, XaRow, XaRows, XaSays, XaTextLink, XaWorking } from "@/components/ui/strelva/Xa";
-import { DashNote } from "./xa/DashboardXa";
+import { DashNote, dashboardAskPlaceholder } from "./xa/DashboardXa";
 import { useDashboardOptional } from "./DashboardContext";
 import { ToolOutput } from "./ToolOutput";
 import { SectionErrorBoundary } from "@/components/public/SectionErrorBoundary";
@@ -166,6 +166,7 @@ export function ChatPanel({ threadId, ownerName, onThreadCreated, variant = "ful
   const shouldStickToBottomRef = useRef(true);
 
   const dashCtx = useDashboardOptional();
+  const clockNow = dashCtx?.fixtureNow;
   const readOnly = dashCtx?.readOnly ?? false;
   const contextDashboardHref = dashCtx?.dashboardHref;
   const dashboardHref = useCallback(
@@ -695,7 +696,7 @@ export function ChatPanel({ threadId, ownerName, onThreadCreated, variant = "ful
               message.role === "user" ? (
                 <div key={message.id} className="flex flex-col items-end gap-1">
                   <p className={`m-0 max-w-[86%] whitespace-pre-wrap rounded-[var(--st-r-lg)] bg-[var(--st-inset)] px-4 py-2.5 ${compact ? "text-[14px]" : "text-[15px]"} leading-[1.5] text-[var(--st-text)]`}>{message.content}</p>
-                  <span className="px-1 text-[12px] text-[var(--st-text-3)]">You · {timeAgo(message.timestamp)}</span>
+                  <span className="px-1 text-[12px] text-[var(--st-text-3)]">You · {timeAgo(message.timestamp, clockNow)}</span>
                 </div>
               ) : (
                 <div key={message.id} className="flex items-start gap-3">
@@ -708,7 +709,7 @@ export function ChatPanel({ threadId, ownerName, onThreadCreated, variant = "ful
                     ) : (
                       <ShiningText text={toolStatus || "Strelva is thinking"} className="text-[14px] font-medium" />
                     )}
-                    <span className="mt-1 block text-[12px] text-[var(--st-text-3)]">Strelva · {timeAgo(message.timestamp)}</span>
+                    <span className="mt-1 block text-[12px] text-[var(--st-text-3)]">Strelva · {timeAgo(message.timestamp, clockNow)}</span>
                   </div>
                 </div>
               )
@@ -735,7 +736,7 @@ export function ChatPanel({ threadId, ownerName, onThreadCreated, variant = "ful
             {drafted && !isLoading ? (
               <div className={compact ? "" : "pl-10"}>
                 <XaRows label="What this made">
-                  <XaRow lead={queueLead(drafted, 32)} title={drafted.title} detail="Waits for your yes in Needs you" tone="waits"
+                  <XaRow lead={queueLead(drafted, 32)} title={drafted.title} detail="Waits for your yes on Home" tone="waits"
                     action={<XaTextLink href={needsYouHref} aria-label={`See it: ${drafted.title}`}>See it</XaTextLink>} />
                 </XaRows>
               </div>
@@ -768,10 +769,9 @@ export function ChatPanel({ threadId, ownerName, onThreadCreated, variant = "ful
                   {attachments.map((file) => <span key={file.url} className="rounded-full bg-[var(--st-chip)] px-2.5 py-1 text-[var(--st-text-body)]">{file.name}</span>)}
                 </p>
               ) : null}
-              <p className="m-0 flex flex-wrap gap-x-3 text-[13px] text-[var(--st-text-2)]">
-                {isLoading ? <span>{toolStatus || "Strelva is working"} · <XaTextLink onClick={handleStop}>Stop</XaTextLink></span>
-                  : <XaTextLink onClick={() => fileInputRef.current?.click()}>{uploading ? "Adding your photo" : "Add a photo"}</XaTextLink>}
-              </p>
+              {isLoading || uploading ? <p className="m-0 flex flex-wrap gap-x-3 text-[13px] text-[var(--st-text-2)]" role="status">
+                {isLoading ? <span>{toolStatus || "Strelva is working"} · <XaTextLink onClick={handleStop}>Stop</XaTextLink></span> : <span>Adding your photo</span>}
+              </p> : null}
               {isListening ? <p className="m-0 text-[13px] text-[var(--st-text-2)]" role="status">Listening. Press the microphone again to stop.</p> : null}
               <input ref={fileInputRef} type="file" accept="image/*,application/pdf" multiple className="hidden" onChange={(event) => void uploadFiles(event.target.files)} aria-hidden="true" tabIndex={-1} />
               <XaComposer
@@ -780,8 +780,9 @@ export function ChatPanel({ threadId, ownerName, onThreadCreated, variant = "ful
                 onSubmit={() => void sendChat(input)}
                 inputRef={inputRef}
                 busy={isLoading}
-                placeholder={compact && selectedObjectLabel ? `Ask Strelva about ${selectedObjectLabel}` : "Ask Strelva for a change to your site"}
+                placeholder={dashboardAskPlaceholder(compact && selectedObjectLabel ? selectedObjectLabel : "your website")}
                 scope={compact ? undefined : { label: "Your website" }}
+                onAdd={() => fileInputRef.current?.click()}
                 onVoice={micSupported ? toggleListening : undefined}
               />
             </>

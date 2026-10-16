@@ -42,7 +42,7 @@ describe("QueuePage approval-with-diff", () => {
       ]),
     );
 
-    expect(html).toContain("What changed");
+    expect(html).toContain("The change");
     // changed → both sides shown
     expect(html).toContain("Old headline");
     expect(html).toContain("New headline");
@@ -58,7 +58,7 @@ describe("QueuePage approval-with-diff", () => {
 
   it("does not render a diff block when the event carries no diffs", () => {
     const html = render(contentEvent([]));
-    expect(html).not.toContain("What changed");
+    expect(html).not.toContain("The change");
   });
 
   it("caps the visible rows and reports the overflow count", () => {
@@ -69,7 +69,7 @@ describe("QueuePage approval-with-diff", () => {
       type: "changed" as const,
     }));
     const html = render(contentEvent(many));
-    expect(html).toContain("What changed");
+    expect(html).toContain("The change");
     // 9 changes, 6 shown → "+3 more fields changed"
     expect(html).toContain("more field");
   });
@@ -105,9 +105,9 @@ describe("QueuePage approval-with-GBP-content", () => {
         "Google post draft",
       ),
     );
-    expect(html).toContain("What will be posted to Google");
+    expect(html).toContain("What will be posted on your Google listing");
     expect(html).toContain("Fall sale — 20% off every service through Sunday!");
-    expect(html).toContain("https://book.example.com/fall");
+    expect(html).toContain("button opens book.example.com/fall");
   });
 
   it("renders a Google post with no CTA and omits the button line", () => {
@@ -117,9 +117,9 @@ describe("QueuePage approval-with-GBP-content", () => {
         "Google post draft",
       ),
     );
-    expect(html).toContain("What will be posted to Google");
+    expect(html).toContain("What will be posted on your Google listing");
     expect(html).toContain("We&#x27;re open Labor Day, come say hi.");
-    expect(html).not.toContain("Button link");
+    expect(html).not.toContain("button opens");
   });
 
   it("renders the proposed Google hours in owner-friendly 12h time", () => {
@@ -135,7 +135,7 @@ describe("QueuePage approval-with-GBP-content", () => {
         "Google hours update",
       ),
     );
-    expect(html).toContain("New hours for Google");
+    expect(html).toContain("New hours on your Google listing");
     expect(html).toContain("Monday");
     expect(html).toContain("9:00 AM");
     expect(html).toContain("5:00 PM");

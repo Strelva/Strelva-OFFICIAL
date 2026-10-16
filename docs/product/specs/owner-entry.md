@@ -22,7 +22,22 @@ Status: implemented locally on `w6/owner-ask`, October 7, 2026. Not
 migrated or deployed; release and email flags remain off. Current proof and
 production stop points are in [the stream handoff](../streams/w6-owner-ask.md).
 
-- All 25 dashboard page files have dispositions: 24 `ready`, and Settings
+- **October 16, 2026 (XA build, lane legacy-dashboard): `/dashboard` is
+  retired as a second owner app.** Once owner entry moves a person (linked
+  workspace, membership, `STRELVA_OWNER_ENTRY` and the workspace row), every
+  `/dashboard` page whose exact workspace home is on redirects there. A page
+  whose home is gated off for the business (`systems`, `needs_you`, `ask`)
+  keeps rendering the restyled page with a back link, so a moved owner never
+  loses the site editor, approvals or chat before the workspace can do them
+  (a same-day correction: an earlier draft sent those pages to Home, which
+  has none of them). An operator's `?legacy=1` also renders the old page. Settings is
+  `ready` (Business details). Tenants with no workspace, and people with no
+  membership in the linked workspace, keep `/dashboard`, which now uses the
+  workspace's words (New request, Home, What changed, Not yet, the
+  workspace greeting). The decision layering below is unchanged; the
+  cutover's `STRELVA_OWNER_ENTRY=1` is what makes it reach every business.
+  Proof: `src/__tests__/legacy-dashboard-retirement.test.ts`.
+- Until October 16: all 25 dashboard page files had dispositions: 24 `ready`, and Settings
   intentionally retained on `/dashboard`. Content, Sources, Health,
   Ownership, Members and Store now have exact workspace destinations.
   Store and Members reuse the existing evidence panels; checkout and
@@ -267,7 +282,7 @@ since the catalog gives those pages no workspace home at 1.0.0.
 ## 5. Every /dashboard page
 
 **Current count (October 7, `w6/owner-ask`).** 24 route pages plus
-`[...notFound]`: **24 ready, 1 intentionally retained Settings page**.
+`[...notFound]`: **24 ready, 1 intentionally retained Settings page**. October 16: **25 ready**; Settings moved to Business details; a page whose gate is off renders with a back link.
 The four former redirect stubs now redirect directly to their own workspace
 place. Store and Members move as existing read-only evidence Connections,
 without activating checkout, points, rewards or membership actions.

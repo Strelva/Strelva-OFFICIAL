@@ -170,22 +170,24 @@ describe("routing a /dashboard request", () => {
     expect(routeDashboardRequest({ decision: moved, pathWithSearch: "/dashboard/content", flagOn: on })).toMatchObject({ kind: "redirect", route: "/content", location: `/workspace/site?workspaceId=${WS}&system=${system}` });
     expect(routeDashboardRequest({ decision: moved, pathWithSearch: "/dashboard/sources/google", flagOn: on })).toMatchObject({ kind: "redirect", location: `/workspace/site?workspaceId=${WS}&system=${system}&tab=source&source=google` });
     expect(routeDashboardRequest({ decision: moved, pathWithSearch: "/dashboard/sources", flagOn: on })).toMatchObject({ kind: "redirect", location: `/workspace/site?workspaceId=${WS}&system=${system}&tab=connections` });
+    // Systems off: the exact home is not on, so the restyled page stays (Home has no editor, photos or history).
     for (const path of ["/dashboard/site", "/dashboard/assets", "/dashboard/history", "/dashboard/integrations", "/dashboard/google"]) {
-      expect(routeDashboardRequest({ decision: moved, pathWithSearch: path, flagOn: () => false }).kind, path).toBe("render-with-back");
+      expect(routeDashboardRequest({ decision: moved, pathWithSearch: path, flagOn: () => false }), path).toMatchObject({ kind: "render-with-back", homeHref: `/workspace?workspaceId=${WS}` });
     }
   });
 
   it("moves /dashboard/chat only while Ask Strelva is released", () => {
     expect(routeDashboardRequest({ decision: moved, pathWithSearch: "/dashboard/chat", askReleased: true })).toEqual({ kind: "redirect", location: `/workspace?view=ask&workspaceId=${WS}`, route: "/chat" });
-    expect(routeDashboardRequest({ decision: moved, pathWithSearch: "/dashboard/chat", askReleased: false }).kind).toBe("render-with-back");
+    expect(routeDashboardRequest({ decision: moved, pathWithSearch: "/dashboard/chat", askReleased: false })).toMatchObject({ kind: "render-with-back", route: "/chat" });
   });
 
-  it("renders a page that stays, with a way back to the workspace", () => {
+  it("keeps a gated page with a way back, and redirects an ungated one (October 16)", () => {
     for (const path of ["/dashboard", "/dashboard/review", "/dashboard/site", "/dashboard/content"]) {
       const routing = routeDashboardRequest({ decision: moved, pathWithSearch: path });
       expect(routing.kind, path).toBe("render-with-back");
       if (routing.kind === "render-with-back") expect(routing.homeHref).toBe(`/workspace?workspaceId=${WS}`);
     }
+    expect(routeDashboardRequest({ decision: moved, pathWithSearch: "/dashboard/settings" }).kind).toBe("redirect");
   });
 
   it("keeps the connection panels on dashboard while Systems is off", () => {
@@ -246,9 +248,9 @@ describe("wave 6 exact owner destinations", () => {
       if (result.kind === "redirect") { expect(result.location.endsWith(`#${anchor}`)).toBe(true); expect(workspaceReturnTarget(result.location)).toBe(result.location); }
     }
   });
-  it("has 24 exact homes and one intentionally retained Settings page", () => {
-    expect(DASHBOARD_DISPOSITIONS.filter(item => item.state === "ready")).toHaveLength(24);
-    expect(DASHBOARD_DISPOSITIONS.filter(item => item.state === "stay").map(item => item.route)).toEqual(["/settings"]);
+  it("has 25 exact homes and no page retained on /dashboard (October 16)", () => {
+    expect(DASHBOARD_DISPOSITIONS.filter(item => item.state === "ready")).toHaveLength(25);
+    expect(DASHBOARD_DISPOSITIONS.filter(item => item.state === "stay").map(item => item.route)).toEqual([]);
     expect(pagesBlockingOwnerEntry(new Set(["always", "store", "wellness", "local"]))).toEqual([]);
   });
 });

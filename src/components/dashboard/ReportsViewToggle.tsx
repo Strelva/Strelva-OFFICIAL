@@ -8,7 +8,7 @@ import { XaSegmented } from "@/components/ui/strelva/Xa";
 export function ReportsViewToggle({ current }: { current: "weekly" | "monthly" }) {
   const router = useRouter();
   const pathname = usePathname();
-  return <XaSegmented label="Which report" value={current} onChange={(view) => router.push(`${pathname}?view=${view}`)} options={[
+  return <XaSegmented label="Which recap" value={current} onChange={(view) => router.push(`${pathname}?view=${view}`)} options={[
     { value: "weekly", label: "Weekly" },
     { value: "monthly", label: "Monthly" },
   ]} />;

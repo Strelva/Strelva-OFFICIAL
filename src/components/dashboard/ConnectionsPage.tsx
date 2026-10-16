@@ -1,14 +1,12 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { Search } from "lucide-react";
 import { XaRow, XaRows, XaSays, XaSystemTile, XaTextLink } from "@/components/ui/strelva/Xa";
-import { DashNote, DashPage, DashSection } from "./xa/DashboardXa";
-import { useState, useEffect, useMemo } from "react";
+import { DashEmpty, DashLoading, DashPage, DashSection } from "./xa/DashboardXa";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import {
   CONNECTABLE_INTEGRATIONS,
   deriveIntelligenceStatus,
-  filterIntegrations,
   getIntegrationCategories,
   normalizeIntegrationStatus,
   type IntegrationStatus,
@@ -62,18 +60,24 @@ export function connectionStatusWord(status: IntegrationStatus): { kind: "waits"
 function ConnectionRow({ connection, onClick }: { connection: Connection; onClick: () => void }) {
   const state = connectionStatusWord(connection.status);
   const trouble = state.kind === "waits" || state.kind === "down";
-  const detail = trouble ? `${state.word}. ${connection.addsIntelligence}`
+  const detail = state.kind === "waits" ? `Your ${connection.name} sign-in ran out, so Strelva stopped reading it.`
+    : state.kind === "down" ? `${state.word}. ${connection.addsIntelligence}`
     : !connection.connected && connection.providerId === "google-search-console"
-      ? `${connection.addsIntelligence} Needs one manual step.`
+      ? `${connection.addsIntelligence} One step on your side: give Strelva read access to your site in Google Search Console.`
       : connection.addsIntelligence;
+  // Every row that asks the owner to do something carries the way to do it.
+  const action = state.kind === "waits" ? <XaTextLink onClick={onClick} aria-label={`Sign in to ${connection.name} again`}>Sign in again</XaTextLink>
+    : state.kind === "down" ? <XaTextLink onClick={onClick} aria-label={`Reconnect ${connection.name}`}>Reconnect</XaTextLink>
+    : !connection.connected ? <XaTextLink onClick={onClick} aria-label={`Connect ${connection.name}`}>Connect</XaTextLink>
+    : undefined;
   return (
     <XaRow
       lead={connection.id === "google-business" ? <XaSystemTile kind="listing" size={32} /> : undefined}
       title={connection.name}
       detail={detail}
       tone={trouble ? "waits" : undefined}
-      action={!connection.connected && !trouble ? <XaTextLink onClick={onClick} aria-label={`Connect ${connection.name}`}>Connect</XaTextLink> : undefined}
-      onClick={connection.connected || trouble ? onClick : undefined}
+      action={action}
+      onClick={connection.connected ? onClick : undefined}
     />
   );
 }
@@ -83,7 +87,6 @@ export function ConnectionsPage() {
   const dashboard = useDashboardOptional();
   const dashboardHref = dashboard?.dashboardHref ?? ((path: string) => path);
   const apiHref = dashboardHref;
-  const [query, setQuery] = useState("");
   const [sourceState, setSourceState] = useState<SourceState>({
     providerStatuses: {},
     settings: {},
@@ -92,15 +95,18 @@ export function ConnectionsPage() {
   });
 
   const [loadDone, setLoadDone] = useState(false);
+  const [attempt, setAttempt] = useState(0);
+  const retry = useCallback(() => { setLoadDone(false); setAttempt((n) => n + 1); }, []);
 
   useEffect(() => {
+    let live = true;
     Promise.allSettled([
-      fetch(apiHref("/api/tenant-settings"), { credentials: "same-origin" }).then((r) => {
-        if (!r.ok) throw new Error("Failed to load tenant settings");
+      fetch(apiHref("/api/tenant-settings"), { credentials: "same-origin" }).then(async (r) => {
+        if (!r.ok) { await r.text().catch(() => ""); throw new Error("Failed to load tenant settings"); }
         return r.json();
       }),
-      fetch(apiHref("/api/connections"), { credentials: "same-origin" }).then((r) => {
-        if (!r.ok) throw new Error("Failed to load connections");
+      fetch(apiHref("/api/connections"), { credentials: "same-origin" }).then(async (r) => {
+        if (!r.ok) { await r.text().catch(() => ""); throw new Error("Failed to load connections"); }
         return r.json();
       }),
     ])
@@ -121,10 +127,12 @@ export function ConnectionsPage() {
           }
         }
 
+        if (!live) return;
         setSourceState(nextState);
         setLoadDone(true);
       });
-  }, [apiHref]);
+    return () => { live = false; };
+  }, [apiHref, attempt]);
 
   const allConnections: Connection[] = useMemo(
     () =>
@@ -161,15 +169,8 @@ export function ConnectionsPage() {
     [sourceState]
   );
 
-  const searchedConnectionIds = useMemo(
-    () => new Set(filterIntegrations(CONNECTABLE_INTEGRATIONS, query).map((integration) => integration.id)),
-    [query]
-  );
-
-  const connections = useMemo(
-    () => allConnections.filter((connection) => searchedConnectionIds.has(connection.id)),
-    [allConnections, searchedConnectionIds],
-  );
+  // A list of five needs no search box (October 16); filterIntegrations stays for longer lists.
+  const connections = allConnections;
 
   const connectedCount = allConnections.filter((c) => c.connected).length;
   const totalCount = allConnections.length;
@@ -179,7 +180,7 @@ export function ConnectionsPage() {
   const featured =
     allConnections.find((connection) => connection.id === "google-business" && connection.status !== "connected") ??
     allConnections.find((connection) => connection.id === "website-activity" && connection.status !== "connected");
-  const showHero = !query.trim() && !!featured;
+  const showHero = !!featured;
   const heroId = showHero ? featured?.id : undefined;
 
   const groupedConnections = useMemo(() => {
@@ -196,18 +197,30 @@ export function ConnectionsPage() {
 
 
   const open = (connection: Connection) => router.push(dashboardHref(`/dashboard/sources/${connection.id}`));
-  const failed = loadDone && !sourceState.connectionLoaded && !sourceState.settingsLoaded;
+  // The accounts themselves come from /api/connections. When that read fails,
+  // nothing true can be said about them, so no row and no Connect is shown.
+  const failed = loadDone && !sourceState.connectionLoaded;
+
+  if (!loadDone) return <DashPage title="Connections." label="Connections"><DashLoading label="Reading your connections" rows={5} /></DashPage>;
+  if (failed) {
+    return (
+      <DashPage title="Connections." label="Connections">
+        <DashEmpty
+          pose="fixing"
+          title="Strelva could not read your connections just now."
+          job="Nothing was changed. Your accounts stay connected the way they were."
+          secondary={<XaTextLink onClick={retry}>Try again</XaTextLink>}
+        />
+      </DashPage>
+    );
+  }
 
   return (
     <DashPage
       title="Connections."
-      quiet={`${connectedCount} of ${totalCount} connected.`}
+      // A sentence, not a score: "1 of 5" read as a progress meter.
+      quiet={connectedCount === 0 ? "Nothing is connected yet." : connectedCount === totalCount ? "Everything is connected." : connectedCount === 1 ? "One is connected so far." : `${connectedCount} are connected so far.`}
       lede="Each one lets Strelva see or do a little more for you."
-      actions={<label className="flex min-h-[40px] w-full items-center gap-2 rounded-full border border-[var(--st-line)] bg-[var(--st-surface)] px-4 sm:w-[240px]">
-        <Search className="h-4 w-4 shrink-0 text-[var(--st-text-3)]" strokeWidth={1.7} aria-hidden="true" />
-        <span className="sr-only">Search connections</span>
-        <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search connections" className="w-full bg-transparent text-[14px] text-[var(--st-text)] outline-none placeholder:text-[var(--st-faint)]" />
-      </label>}
       label="Connections"
     >
       {showHero && featured ? (
@@ -217,8 +230,6 @@ export function ConnectionsPage() {
       ) : null}
 
       <GoogleResourceSelector connected={sourceState.providerStatuses.google?.status === "connected"} />
-
-      {failed ? <DashNote tone="down" role="status">Your connections didn&apos;t load. Nothing about them changed; reload to try again.</DashNote> : null}
 
       {groupedConnections.length > 0 ? (
         groupedConnections.map((group) => (
@@ -232,7 +243,7 @@ export function ConnectionsPage() {
         ))
       ) : (
         <p className="m-0 text-[15px] text-[var(--st-text-2)]">
-          {query.trim() ? "No connection matches that. Try an account name, or what it helps with." : "Nothing is connected yet. Start with your Google listing."}
+          Nothing is connected yet. Start with your Google listing.
         </p>
       )}
     </DashPage>

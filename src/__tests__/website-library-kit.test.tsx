@@ -28,7 +28,9 @@ describe("real website library kit consumers", () => {
     const request = vi.fn<typeof fetch>(async () => Response.json({ error: "Unavailable" }, { status: 503 })); vi.stubGlobal("fetch", request);
     const node = await mount(createElement(PhotoLibrary));
     expect(request).toHaveBeenCalledWith("/client/example/api/media", { credentials: "same-origin" });
-    expect(node.querySelector('[role="alert"]')?.textContent).toContain("photos could not be read");
+    // Pebble in frame, one sentence and a Try again that refetches (October 16).
+    expect(node.textContent).toContain("Strelva could not read your photos just now.");
+    expect(node.textContent).toContain("Try again");
     expect(node.textContent).not.toContain("No photos yet");
   });
   it("retains multipart image upload through the same tenant path", async () => {

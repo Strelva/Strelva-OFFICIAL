@@ -2,19 +2,18 @@
 
 import { useState } from "react";
 import type { UnifiedEvent } from "@/lib/types";
-import type { ReactNode } from "react";
-import { XaButton, XaLabel, XaPage, XaPageChange, XaPebbleAvatar, XaStatus, XaSystemTile, XaTextLink, XaYes } from "@/components/ui/strelva/Xa";
+import { XaButton, XaLabel, XaPageChange, XaPebbleAvatar, XaStatus, XaSystemTile, XaTextLink, XaYes } from "@/components/ui/strelva/Xa";
 import type { PreviewDiff } from "@/lib/agent-risk";
-import { UseAsTestimonialModal } from "./UseAsTestimonialModal";
+import { UseAsTestimonial } from "./UseAsTestimonial";
 import { useDashboardOptional } from "./DashboardContext";
 import styles from "./queue.module.css";
 
 /**
  * One thing that waits, as an open row (XA · O5). Opened, it becomes the
  * decision in place: the page as visitors will see it with the new words
- * tinted, then the one yes (XA · O3). Beside the yes sit two text links with
- * what each one does: "Not now" closes it and keeps it waiting, "Skip" turns
- * it down and nothing changes.
+ * tinted, then the one yes (XA · O3) with the workspace's one way out, "Not
+ * yet": it turns the change down and nothing on the site changes, as Not yet
+ * does on workspace Home. Closing the row keeps it waiting.
  */
 
 // Owner-facing label for an event's source, never the raw internal slug.
@@ -45,6 +44,12 @@ export function queueLead(event: UnifiedEvent, size = 36) {
   return <XaSystemTile kind={SOURCE_CLAY[event.source] ?? "website"} size={size} />;
 }
 
+/** Section changes go back through POST /api/queue/<id>/undo (src/lib/queue-undo.ts); other acts have no server reversal. */
+export function queueEventUndoable(event: UnifiedEvent): boolean {
+  return event.type === "content_update" && typeof event.metadata?.section === "string"
+    && event.metadata?.kind !== "manual_structural_change" && event.metadata?.kind !== "gbp_post_draft" && event.metadata?.kind !== "gbp_hours_draft";
+}
+
 export function formatEventStatus(event: UnifiedEvent): string {
   if (event.status === "approved") {
     // Structural changes are handed to the builder, not auto-published.
@@ -53,13 +58,13 @@ export function formatEventStatus(event: UnifiedEvent): string {
       : "Made live";
   }
   if (event.status === "auto_approved") return "Handled";
-  if (event.status === "dismissed") return "Skipped";
+  if (event.status === "dismissed") return "Not yet";
   return "Waits for you";
 }
 
-export function formatTimestamp(iso: string): string {
+export function formatTimestamp(iso: string, now: number = Date.now()): string {
   const date = new Date(iso);
-  const diffMs = Date.now() - date.getTime();
+  const diffMs = now - date.getTime();
   if (!Number.isFinite(diffMs)) return "";
   const diffMin = Math.floor(diffMs / 60000);
   const diffHr = Math.floor(diffMs / 3600000);
@@ -72,8 +77,8 @@ export function formatTimestamp(iso: string): string {
 }
 
 /** Who acted, then when: "Strelva prepared it · 2 h ago". */
-function whoAndWhen(event: UnifiedEvent, isCustomRequest: boolean): string {
-  const when = formatTimestamp(event.createdAt);
+function whoAndWhen(event: UnifiedEvent, isCustomRequest: boolean, now?: number): string {
+  const when = formatTimestamp(event.createdAt, now);
   const who = isCustomRequest ? "You asked"
     : event.type === "suggestion" ? "Strelva suggested it"
       : event.source === "ai" ? "Strelva prepared it"
@@ -127,7 +132,7 @@ function readDiffs(event: UnifiedEvent): PreviewDiff[] {
 function pageAddress(event: UnifiedEvent, domain: string | null): string {
   const section = typeof event.metadata?.section === "string" ? event.metadata.section : "hero";
   const name = PAGE_NAMES[section] ?? "website";
-  if (!domain) return `Your ${name}`;
+  if (!domain) return `your ${name}`;
   return section === "hero" ? domain : `${domain}/${section}`;
 }
 
@@ -139,23 +144,21 @@ function pageAddress(event: UnifiedEvent, domain: string | null): string {
  */
 export function QueueChange({ event, domain }: { event: UnifiedEvent; domain: string | null }) {
   const meta = event.metadata ?? {};
+  // Flat (October 16): no card, no address strip. The page's name is the
+  // label, and the new words carry the kit's moss tint.
   if (event.type === "content_update" && meta.kind === "gbp_post_draft" && typeof meta.summary === "string" && meta.summary.trim()) {
     const cta = typeof meta.ctaUrl === "string" && meta.ctaUrl.trim() ? meta.ctaUrl.trim() : null;
     return <div className={styles.change}>
-      <XaLabel>What will be posted to Google</XaLabel>
-      <XaPage address="Your Google listing · new post" flat>
-        <XaPageChange>{meta.summary.trim()}</XaPageChange>
-        {cta ? <p className={styles.pageNote}>Button link {cta}</p> : null}
-      </XaPage>
+      <XaLabel>What will be posted on your Google listing</XaLabel>
+      <XaPageChange>{meta.summary.trim()}</XaPageChange>
+      {cta ? <p className={styles.pageNote}>The post&apos;s button opens {cta.replace(/^https?:\/\//, "")}</p> : null}
     </div>;
   }
   if (event.type === "content_update" && meta.kind === "gbp_hours_draft" && Array.isArray(meta.hours)) {
     const hours = (meta.hours as { day?: unknown; open?: unknown; close?: unknown }[]).filter((h) => typeof h?.day === "string" && typeof h.open === "string" && typeof h.close === "string") as { day: string; open: string; close: string }[];
     if (hours.length) return <div className={styles.change}>
-      <XaLabel>New hours for Google</XaLabel>
-      <XaPage address="Your Google listing · hours" flat>
-        <dl className={styles.hours}>{hours.map((h, i) => <div key={`${h.day}-${i}`}><dt>{DAY_LABELS[h.day] ?? h.day}</dt><dd>{clock(h.open)} to {clock(h.close)}</dd></div>)}</dl>
-      </XaPage>
+      <XaLabel>New hours on your Google listing</XaLabel>
+      <dl className={styles.hours}>{hours.map((h, i) => <div key={`${h.day}-${i}`}><dt>{DAY_LABELS[h.day] ?? h.day}</dt><dd>{clock(h.open)} to {clock(h.close)}</dd></div>)}</dl>
     </div>;
   }
   const diffs = readDiffs(event);
@@ -163,17 +166,15 @@ export function QueueChange({ event, domain }: { event: UnifiedEvent; domain: st
   const shown = diffs.slice(0, MAX_DIFF_ROWS);
   const extra = diffs.length - shown.length;
   return <div className={styles.change}>
-    <XaLabel>What changed</XaLabel>
-    <XaPage address={pageAddress(event, domain)} flat>
-      {shown.map((d, i) => <div key={`${d.field}-${i}`} className={styles.diff}>
-        <span className={styles.diffField}>{d.field}</span>
-        {d.type === "removed"
-          ? <p className={`${styles.diffGone} line-through`}><span className="sr-only">Removed: </span>{d.before}</p>
-          : <XaPageChange>{d.after}</XaPageChange>}
-        {d.type === "changed" && d.before ? <p className={styles.pageNote}><span className="sr-only">Was: </span>Replaces <span className="line-through">{d.before}</span></p> : null}
-      </div>)}
-      {extra > 0 ? <p className={styles.pageNote}>+{extra} more field{extra === 1 ? "" : "s"} changed</p> : null}
-    </XaPage>
+    <XaLabel>The change, on {pageAddress(event, domain)}</XaLabel>
+    {shown.map((d, i) => <div key={`${d.field}-${i}`} className={styles.diff}>
+      <span className={styles.diffField}>{d.field}</span>
+      {d.type === "removed"
+        ? <p className={`${styles.diffGone} line-through`}><span className="sr-only">Removed: </span>{d.before}</p>
+        : <XaPageChange>{d.after}</XaPageChange>}
+      {d.type === "changed" && d.before ? <p className={styles.pageNote}><span className="sr-only">Was: </span>Replaces <span className="line-through">{d.before}</span></p> : null}
+    </div>)}
+    {extra > 0 ? <p className={styles.pageNote}>+{extra} more field{extra === 1 ? "" : "s"} changed</p> : null}
   </div>;
 }
 
@@ -229,7 +230,7 @@ export function QueueCard({ event, onApprove, onDismiss, onWorkflowAction, disab
     {queueLead(event)}
     <span className={styles.text}>
       <span className={styles.title}>{event.title}</span>
-      <span className={styles.detail}>{whoAndWhen(event, isCustomRequest)}</span>
+      <span className={styles.detail}>{whoAndWhen(event, isCustomRequest, dashboard?.fixtureNow)}</span>
     </span>
     <span className={styles.end}>{status}</span>
   </>;
@@ -246,17 +247,19 @@ export function QueueCard({ event, onApprove, onDismiss, onWorkflowAction, disab
         <div className={styles.decision}>
           {event.body ? <p className={styles.body}>{event.body}</p> : null}
           <QueueChange event={event} domain={domain} />
-          <XaYes
-            state={disabled ? "going" : "waiting"}
-            yesLabel={isSuggestion ? "Use this idea" : "Make it live"}
-            onYes={() => onApprove(event.id)}
-            block={false}
-          />
-          <DecisionLinks
-            onNotNow={onOpenChange ? () => onOpenChange(false) : undefined}
-            onSkip={() => onDismiss(event.id)}
-            extra={isReview && reviewData ? <XaTextLink onClick={() => setTestimonialModalOpen(true)}>Put this review on your site</XaTextLink> : null}
-          />
+          {testimonialModalOpen && reviewData ? <UseAsTestimonial review={reviewData} onClose={() => setTestimonialModalOpen(false)} onSuccess={() => onApprove(event.id)} /> : <>
+            <XaYes
+              state={disabled ? "going" : "waiting"}
+              yesLabel={isSuggestion ? "Use this idea" : "Make it live"}
+              onYes={() => onApprove(event.id)}
+              onNotYet={() => onDismiss(event.id)}
+              // No server Undo for this one (a Google post, a reply, an email): the yes says so first.
+              question={!isSuggestion && !queueEventUndoable(event) && event.type !== "change_request" ? "This goes out as soon as you say yes. Strelva can't take it back from here." : undefined}
+              notYetAriaLabel={`Not yet: ${event.title}. Nothing on your site changes.`}
+              block={false}
+            />
+            {isReview && reviewData ? <p className={styles.links}><XaTextLink onClick={() => setTestimonialModalOpen(true)}>Put this review on your site</XaTextLink></p> : null}
+          </>}
         </div>
       ) : null}
 
@@ -281,24 +284,6 @@ export function QueueCard({ event, onApprove, onDismiss, onWorkflowAction, disab
         </div>
       ) : null}
 
-      {reviewData && (
-        <UseAsTestimonialModal
-          open={testimonialModalOpen}
-          onClose={() => setTestimonialModalOpen(false)}
-          review={reviewData}
-          onSuccess={() => onApprove(event.id)}
-        />
-      )}
     </div>
   );
-}
-
-/** The two ways out of a decision, each saying what it does. */
-function DecisionLinks({ onNotNow, onSkip, extra }: { onNotNow?: () => void; onSkip: () => void; extra?: ReactNode }) {
-  return <p className={styles.links}>
-    {onNotNow ? <><XaTextLink onClick={onNotNow}>Not now</XaTextLink> · </> : null}
-    <XaTextLink onClick={onSkip}>Skip</XaTextLink>
-    <span className={styles.linksWhy}>{onNotNow ? "Not now keeps it here for later. " : ""}Skip turns it down and nothing on your site changes.</span>
-    {extra ? <span className={styles.linksExtra}>{extra}</span> : null}
-  </p>;
 }

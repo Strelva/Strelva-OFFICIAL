@@ -11,7 +11,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { ImageIcon } from "lucide-react";
 import { StSkeleton } from "@/components/ui/strelva/Kit";
 import { XaButton, XaRow, XaRows, XaTextLink, XaYes } from "@/components/ui/strelva/Xa";
-import { ConfirmDialog } from "./ConfirmDialog";
+import { ConfirmInPlace } from "./ConfirmInPlace";
 import { DashNote, DashPage, DashSection } from "./xa/DashboardXa";
 import { useDashboardOptional } from "./DashboardContext";
 import { AssetPickerModal } from "./AssetPickerModal";
@@ -301,12 +301,16 @@ export function CollectionsManager({
               {fieldErrors[f.name] ? <span className="text-[13px] text-[var(--st-critical)]" role="alert">{fieldErrors[f.name]}</span> : null}
             </label>
           ))}
+          {/* Deleting asks in place of the save controls: one ink pill on the screen at a time. */}
+          {confirmDelete && editingEntry ? <ConfirmInPlace open title={`Delete this ${singular}?`} confirmLabel="Delete it" cancelLabel="Keep it"
+            message={`“${nameOf(editingEntry)}” comes off your site and can't be brought back from here.`} onCancel={() => setConfirmDelete(null)} onConfirm={() => { const slug = confirmDelete; setConfirmDelete(null); if (slug && editing) { const t = editing.type; closeEditor(); void remove(t, slug); } }} /> : <>
           {!readOnly ? <XaYes state={saving ? "going" : "waiting"} yesLabel="Make it live" onYes={() => void save("published")} block={false} shortcut={false} /> : null}
           <div className="flex flex-wrap items-center gap-4">
             {!readOnly ? <XaButton disabled={saving} onClick={() => void save("draft")}>Save draft</XaButton> : null}
             <XaTextLink onClick={closeEditor}>Cancel</XaTextLink>
             {!readOnly && editingEntry ? <XaTextLink onClick={() => setConfirmDelete(editingEntry.slug)}>Delete this {singular}</XaTextLink> : null}
           </div>
+          </>}
         </section> : types.map((t) => {
           const entries = entriesByType[t];
           return <DashSection key={t} label={TYPE_LABEL[t]} aside={!readOnly ? <XaTextLink onClick={() => open(t)}>{`New ${TYPE_ONE[t]}`}</XaTextLink> : undefined}>
@@ -319,8 +323,6 @@ export function CollectionsManager({
           </DashSection>;
         })}
 
-      <ConfirmDialog open={Boolean(confirmDelete && editingEntry)} destructive title={`Delete this ${singular}?`} confirmLabel="Delete it" cancelLabel="Keep it"
-        message={`“${editingEntry ? nameOf(editingEntry) : ""}” comes off your site and can't be brought back from here.`} onCancel={() => setConfirmDelete(null)} onConfirm={() => { const slug = confirmDelete; setConfirmDelete(null); if (slug && editing) { const t = editing.type; closeEditor(); void remove(t, slug); } }} />
       <AssetPickerModal
         open={pickingField !== null}
         onClose={() => setPickingField(null)}

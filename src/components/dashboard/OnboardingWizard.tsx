@@ -118,7 +118,7 @@ export function OnboardingWizard() {
     <section className="flex flex-col gap-5" aria-labelledby="onboarding-wizard-title">
       {step === "welcome" && (
         <>
-          <XaSays links={[<XaTextLink key="skip" onClick={dismiss}>Not now</XaTextLink>]}>
+          <XaSays links={[<XaTextLink key="skip" onClick={dismiss}>Not yet</XaTextLink>]}>
             <span id="onboarding-wizard-title">Welcome, {firstName}. Three quick answers and Strelva runs your site the way you would.</span>
           </XaSays>
           <div><XaButton onClick={() => setStep("find")}>Answer three questions</XaButton></div>

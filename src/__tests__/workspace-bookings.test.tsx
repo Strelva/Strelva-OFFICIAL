@@ -171,8 +171,8 @@ describe("/dashboard/roster and /dashboard/schedule move to the bookings views",
     expect(routeDashboardRequest({ decision: moved, pathWithSearch: "/dashboard/schedule", flagOn: on })).toEqual({ kind: "redirect", location: `/workspace/bookings?workspaceId=${WS}&view=week`, route: "/schedule" });
   });
 
-  it("stay on /dashboard while Systems is off", () => {
-    expect(routeDashboardRequest({ decision: moved, pathWithSearch: "/dashboard/roster", flagOn: () => false })).toMatchObject({ kind: "render-with-back" });
+  it("keep the restyled roster with a way back while Systems is off (Home has no roster, so nothing is lost)", () => {
+    expect(routeDashboardRequest({ decision: moved, pathWithSearch: "/dashboard/roster", flagOn: () => false })).toMatchObject({ kind: "render-with-back", route: "/roster", homeHref: `/workspace?workspaceId=${WS}` });
   });
 
   it("no longer block owner entry for wellness tenants", () => {

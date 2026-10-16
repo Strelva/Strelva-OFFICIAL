@@ -73,13 +73,13 @@ export function WeeklyBriefClient({ brief, history = [], dailyMetrics = [], proo
     return (
       <div className="h-full overflow-y-auto">
         <div className="flex flex-col gap-10 px-4 pb-28 pt-8 md:px-[88px] md:pt-16">
-          <XaEmpty pose="resting" title="Your first report is on its way." job="Collecting this week's visits, bookings and changes"
+          <XaEmpty pose="resting" title="Your first recap is on its way." job="Collecting this week's visits, bookings and changes"
             action={<XaTextLink href={chatHref}>Ask Strelva for a small change meanwhile</XaTextLink>}>
             It lands at the end of your first full week, here and by email: who found you, what they did, and what changed on your site.
           </XaEmpty>
           <div className="flex max-w-[880px] flex-col gap-10">
             {googleConnected ? <SearchAnalyticsPanel search={searchPerf} ga={gaPerf} connectHref={connectHref} />
-              : <XaSays links={[<XaTextLink key="connect" href={connectHref}>Connect Google</XaTextLink>]}>Connect Google and your reports also show what people searched to find you.</XaSays>}
+              : <XaSays links={[<XaTextLink key="connect" href={connectHref}>Connect Google</XaTextLink>]}>Connect Google and your recaps also show what people searched to find you.</XaSays>}
             {aiVisibility ? <AiVisibilityScorecard data={aiVisibility} /> : null}
             {footerSlot ?? null}
           </div>
@@ -102,7 +102,7 @@ export function WeeklyBriefClient({ brief, history = [], dailyMetrics = [], proo
       title={buildVerdict(brief.stats, periodLabel === "this month" ? { periodNoun: "month", priorPhrase: "from last month" } : undefined)}
       quiet={`${formatWeekRange(brief.weekStart, brief.weekEnd)}, written by Strelva.`}
       actions={viewToggle}
-      label="Report"
+      label="Recap"
     >
       {anomaly ? (
         <XaSays links={[<XaTextLink key="ask" href={chatHref}>Ask Strelva to do it</XaTextLink>]}>
@@ -173,7 +173,7 @@ export function WeeklyBriefClient({ brief, history = [], dailyMetrics = [], proo
       ) : null}
 
       {history.length > 1 ? (
-        <DashSection label="Earlier reports">
+        <DashSection label="Earlier recaps">
           <div className="flex flex-col">
             {history.slice(1).map((item, i) => (
               <details key={`${item.id}-${i}`} className="group border-t border-[var(--st-line)] py-3 first:border-t-0">

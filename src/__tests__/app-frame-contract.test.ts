@@ -48,18 +48,17 @@ describe("shared app frame accessibility contract", () => {
     expect(styles).toContain("z-index: 50;");
   });
 
-  it("keeps managed chat contextual and leaves the full chat route canonical", () => {
+  it("keeps one way to ask: the full chat route, reached from New request (October 16)", () => {
     const source = managedShell();
 
-    expect(source).toContain("OptionalManagedDiscussion");
-    expect(source).toContain('effectivePathname === "/dashboard/chat"');
     expect(source).toContain("<StrelvaShell");
     expect(source).toContain("<ManagedNavigation");
-    expect(source).toContain('aria-controls="managed-discussion"');
-    expect(source).toContain("useHydrationReady");
-    expect(source).toContain("disabled={!hydrationReady}");
     expect(readFileSync(path.join(root, "src/experience/workspace/WorkspaceLayout.tsx"), "utf8")).toContain("<StrelvaShell");
-    expect(source).not.toContain('rightRail={<ChatPanel');
+    // No header "Ask Strelva" button and no side chat beside the page.
+    expect(source).not.toContain("ChatPanel");
+    expect(source).not.toContain("rightRail=");
+    expect(source).not.toContain('aria-controls="managed-discussion"');
+    expect(readFileSync(path.join(root, "src/components/dashboard/ManagedNavigation.tsx"), "utf8")).toContain('dashboardHref("/dashboard/chat")');
   });
 
   it("keeps personal workspace sign-out discoverable without carrying handoff state", () => {

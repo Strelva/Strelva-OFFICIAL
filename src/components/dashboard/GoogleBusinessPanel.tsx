@@ -38,7 +38,7 @@ export function GoogleBusinessPanel({ connected, state }: { connected: boolean; 
           ["Hours", "Change them once. Your site and your listing match."],
           ["Posts", "Updates and offers go to Google after your yes."],
           ["Reviews", "New reviews land here with a reply written in your voice."],
-          ["Search", "See how people find you on Google, in your weekly report."],
+          ["Search", "See how people find you on Google, in your weekly recap."],
         ]} />
         <XaSays>Connecting asks Google once for your listing, what people search, and who visits your site. Nothing posts until you say yes.</XaSays>
       </DashPage>
@@ -89,7 +89,7 @@ export function GoogleBusinessPanel({ connected, state }: { connected: boolean; 
           ) : (
             <p className={styles.quiet}>No posts yet. Ask Strelva to write one from a recent update; it posts after your yes.</p>
           )}
-          <XaSays>Every change to your listing waits in Needs you. Nothing reaches Google without your yes.</XaSays>
+          <XaSays>Every change to your listing waits on Home. Nothing reaches Google without your yes.</XaSays>
         </section>
       </div>
     </DashPage>

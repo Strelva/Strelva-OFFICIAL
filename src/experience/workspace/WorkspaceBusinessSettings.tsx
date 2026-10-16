@@ -11,36 +11,25 @@ import { WorkspaceAllowanceSummary } from "./WorkspaceAllowanceSummary";
 import { WorkspacePayerTransition } from "./WorkspacePayerTransition";
 import { DecisionPolicySettings } from "./DecisionPolicySettings";
 
-type ManagedSettingsDestination = "business" | "connections" | "domains" | "subscription";
 export type SiteAssignmentState = "known" | "loading" | "unavailable";
 
-const DESTINATION_PATH: Record<ManagedSettingsDestination, string> = {
-  business: "/dashboard/settings#profile",
-  connections: "/dashboard/integrations",
-  domains: "/dashboard/settings#domains",
-  subscription: "/dashboard/settings#plan",
-};
-
-/** Build a link into the existing tenant-scoped dashboard without carrying tenant authority. */
-export function managedSettingsHref(href: string, destination: ManagedSettingsDestination): string | null {
-  const safe = sameAppHref(href);
-  if (!safe) return null;
-  const base = safe.split(/[?#]/, 1)[0];
-  if (base === "/preview/strelva/website") return `${base}${DESTINATION_PATH[destination]}`;
-  if (!base || !/\/dashboard\/?$/.test(base)) return null;
-  return base.replace(/\/dashboard\/?$/, DESTINATION_PATH[destination]);
-}
-
-function settingLinks(site: ManagedWorkSummary) {
+/**
+ * Each managed website's settings, at their workspace homes. October 16: these
+ * used to link `/dashboard/settings#profile|#domains|#plan`, which redirect a
+ * moved owner to Business details (no domain or plan editing there), so they
+ * led nowhere useful. The website opens through its own link (the dashboard
+ * routes it to the Website System or keeps the page); Connections is the
+ * workspace place; the web address is changed by Strelva on request; the plan
+ * row lives under Plan and ownership below.
+ */
+export function managedSiteLinks(site: ManagedWorkSummary, workspaceId: string) {
+  const place = (view: string) => `/workspace?${new URLSearchParams({ view, workspaceId })}`;
+  const website = sameAppHref(site.href);
   return [
-    { id: "business" as const, label: "Website profile", detail: "Public details and brand for this website" },
-    { id: "connections" as const, label: "Connections", detail: "Accounts and services connected to this website" },
-    { id: "domains" as const, label: "Domains", detail: "Verified website addresses and domain state" },
-    { id: "subscription" as const, label: "Subscription", detail: "The plan and billing state for this website" },
-  ].flatMap((item) => {
-    const href = managedSettingsHref(site.href, item.id);
-    return href ? [{ ...item, href }] : [];
-  });
+    ...(website ? [{ id: "website" as const, label: "Pages, photos and look", detail: "Change what visitors see on this website", href: website, end: "Open" }] : []),
+    { id: "connections" as const, label: "Connections", detail: "Accounts and services connected to this website", href: place("connections"), end: "Open" },
+    { id: "address" as const, label: site.domain ? `Web address: ${site.domain.replace(/^www\./, "")}` : "Web address", detail: "Strelva changes it when you ask", href: place("help"), end: "Ask" },
+  ];
 }
 
 export function WorkspaceBusinessSettings({
@@ -86,7 +75,7 @@ export function WorkspaceBusinessSettings({
     {managedWorkUnavailable ? <StNotice>Some website settings could not be loaded. No business setting was changed.</StNotice> : null}
     {!business ? <StEmpty>Choose your business to manage business information, people, work, and website relationships.</StEmpty> : <StSplit balance="aside" aside={<>
       <StSection title="Managed websites">
-        {sites.map(site => <StSection key={site.id} title={site.title}><StRows>{settingLinks(site).map(({ id, label, detail, href }) => <StRow key={id} title={label} detail={detail} href={href} end="Open" />)}{!settingLinks(site).length ? <StRow title="Open website controls" detail="Settings links are not available from here." href={site.href} end="Open" /> : null}</StRows></StSection>)}
+        {sites.map(site => <StSection key={site.id} title={site.title}><StRows>{managedSiteLinks(site, workspace?.id ?? "").map(({ id, label, detail, href, end }) => <StRow key={id} title={label} detail={detail} href={href} end={end} />)}</StRows></StSection>)}
         {unassignedSites.length ? <WebsiteAssignmentHandoff businessName={workspace?.name || "this business"} state={managedWorkUnavailable ? { status: "unavailable", reason: "Linked website access is unavailable right now." } : assignmentState} sites={unassignedSites} onRetry={onRetryWebsiteAssignments} onCommand={onWebsiteCommand} /> : !sites.length && siteAssignmentState === "loading" ? <StNotice>Checking linked websites…</StNotice> : !sites.length && siteAssignmentState === "unavailable" ? <StNotice>Linked website access is unavailable right now. No business setting was changed.</StNotice> : !sites.length ? <StEmpty>No managed website is linked or assigned to this business. Business information, people, work, and usage remain available here without one.</StEmpty> : null}
       </StSection>
       <StSection id="workspace-usage" title="Usage and limits"><StLabel>Recorded allowances are separate from website subscription billing.</StLabel><WorkspaceAllowanceSummary businessId={workspace?.id || ""} enabled={Boolean(business && workspace && !readOnly)} />{business && workspace?.role === "owner" && !readOnly ? <WorkspacePayerTransition workspaceId={workspace.id} canPropose /> : null}</StSection>
