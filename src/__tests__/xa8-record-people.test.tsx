@@ -2,8 +2,10 @@
 import { act, createElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { PeopleAndAccess } from "@/experience/record/PeopleAndAccess";
-import { saidBy, upcomingHolidays, weeklySummary } from "@/experience/record/record-words";
+import { PeopleAndAccess, personName } from "@/experience/record/PeopleAndAccess";
+import { nextSpecialDay, saidBy, upcomingHolidays, weeklyLines, weeklySummary } from "@/experience/record/record-words";
+import { readersFromSystems } from "@/experience/record/record-readers";
+import { leaveSentence } from "@/experience/workspace/WorkspaceExit";
 import type { WorkspaceSnapshot } from "@/experience/workspace/contracts";
 
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }) }));
@@ -20,8 +22,8 @@ const entry = (id: string, kind: string, label: string, status: string, canRevok
 const review = (providerCanRevoke = true) => ({ workspaceId, actorUserId: memberId, organization: false, inaccessibleUnits: 0, units: [{ workspaceId, name: "Harbor Dental", role: "owner", entries: [
   entry("44444444-4444-4444-8444-444444444444", "member", "dr.lin@harbordental.com", "owner", false),
   entry(memberId, "member", "ana.ruiz@harbordental.com", "member", true),
-  entry(providerId, "provider", "North Studio", "active", providerCanRevoke),
-  entry("55555555-5555-4555-8555-555555555555", "agency_assignment", "Maya Okafor", "active", false),
+  { ...entry(providerId, "provider", "North Studio", "active", providerCanRevoke), since: "2026-10-09T14:00:00Z" },
+  entry("55555555-5555-4555-8555-555555555555", "agency_assignment", "maya.okafor@northstudio.co · North Studio", "active", false),
 ] }] });
 
 describe("record words", () => {
@@ -36,6 +38,30 @@ describe("record words", () => {
     const weekly = [1, 2, 3, 4, 5].map(day => ({ day, opens: "08:00", closes: "17:00" })).concat([{ day: 6, opens: "09:00", closes: "13:00" }]);
     expect(weeklySummary(weekly)).toBe("Mon–Fri 8–5 · Sat 9–1");
     expect(weeklySummary([])).toBe("Closed every day");
+  });
+  it("reads the week one run per line, closed days said once", () => {
+    const weekly = [1, 2, 3, 4, 5].map(day => ({ day, opens: "08:00", closes: "17:00" })).concat([{ day: 6, opens: "09:00", closes: "13:00" }]);
+    expect(weeklyLines(weekly)).toEqual(["Mon–Fri 8–5", "Sat 9–1", "Sun closed"]);
+    expect(nextSpecialDay([{ date: "2026-12-24", closed: false, opens: "08:00", closes: "12:00" }, { date: "2026-01-01", closed: true }], new Date("2026-10-15T12:00:00"))).toBe("Dec 24 · 8–12");
+  });
+  it("names people from their email when the review has no name", () => {
+    expect(personName("ana.ruiz@harbordental.com")).toBe("Ana Ruiz");
+    expect(personName("maya.okafor@northstudio.co · North Studio")).toBe("Maya Okafor");
+    expect(personName("North Studio")).toBe("North Studio");
+  });
+  it("says what leaving stopped in one sentence, dropping zero counts", () => {
+    const sentence = leaveSentence({ standingPaused: 0, standingRevoked: 0, scheduledPaused: 0, scheduledCancelled: 0, assignmentsRevoked: 3, providerDeliveriesRevoked: 0, investigationsPaused: 2, retainedAccepted: 1, retainedUnknown: 0 }, "2026-10-15T18:00:00Z");
+    expect(sentence).toMatch(/I ended 3 agency assignments, paused 2 checks and kept 1 change you accepted\.$/);
+    expect(sentence).not.toContain(" 0 ");
+  });
+  it("draws Read by only from live Systems with a connected read of the record", () => {
+    const sys = (id: string, kind: string, lifecycle = "live") => ({ system: { id, name: id, kind, lifecycle } });
+    const reads = (systemId: string, resource: string, state = "connected") => ({ connection: { source: { systemId }, kind: "read", state, target: { type: "business_resource", resource } } });
+    const readers = readersFromSystems({ systems: [sys("site", "website"), sys("google", "listing"), sys("old", "website", "paused")], connections: [reads("site", "business_record:facts"), reads("google", "business_record:hours"), reads("google", "business_record:links"), reads("old", "business_record:facts")] });
+    expect(readers?.hours?.map(item => item.name)).toEqual(["site", "google"]);
+    expect(readers?.phone?.map(item => item.kind)).toEqual(["website"]);
+    expect(readers?.owner_recipient).toBeUndefined();
+    expect(readersFromSystems({ systems: [sys("site", "website")], connections: [reads("site", "business_record:facts", "disconnected")] })).toBeUndefined();
   });
   it("offers the next holidays, soonest first", () => {
     expect(upcomingHolidays(new Date("2026-10-15T12:00:00"), 2)).toEqual([{ label: "Thanksgiving", date: "2026-11-26" }, { label: "Christmas Eve", date: "2026-12-24" }]);
@@ -59,6 +85,11 @@ describe("People & access (XA · R3–R5)", () => {
     await act(async () => root.render(createElement(PeopleAndAccess, { snapshot, currentRole: "owner", request, postAction: vi.fn() })));
     expect(node.textContent).toContain("Who can see and change Harbor Dental.");
     expect(node.textContent).toContain("ana.ruiz@harbordental.com");
+    expect(node.textContent).toContain("Ana Ruiz");
+    expect(node.textContent).toContain("Works in Harbor Dental");
+    expect(node.textContent).toContain("since October 9");
+    expect(node.querySelector('a[href$="view=help#bring-in-an-agency"]')).not.toBeNull();
+    expect(node.textContent).not.toContain("See all access");
     expect(node.textContent).toContain("North Studio");
     expect(document.querySelectorAll("[data-xa-primary]")).toHaveLength(1);
     const input = node.querySelector('input[type="email"]') as HTMLInputElement;
@@ -66,7 +97,7 @@ describe("People & access (XA · R3–R5)", () => {
     await act(async () => (node.querySelector("form") as HTMLFormElement).requestSubmit());
     const post = calls.find(call => call.url === "/api/workspace-invitations");
     expect(JSON.parse(String(post?.init?.body))).toEqual({ workspaceId, recipientEmail: "desk@harbordental.com", role: "member" });
-    expect(node.textContent).toContain("Strelva doesn't send it.");
+    expect(node.textContent).toContain("I never email it for you.");
     expect((node.querySelector('input[readonly]') as HTMLInputElement).value).toContain("/workspace/invitations/accept/t0k");
   });
 
@@ -83,7 +114,9 @@ describe("People & access (XA · R3–R5)", () => {
     await act(async () => root.render(createElement(PeopleAndAccess, { snapshot, currentRole: "owner", request, postAction: vi.fn() })));
     await act(async () => button("What they can do")!.click());
     expect(node.textContent).toContain("Never, without you");
-    expect(node.textContent).toContain("Maya Okafor works on Harbor Dental");
+    expect(node.textContent).toContain("Who at North Studio");
+    expect(node.textContent).toContain("Maya Okafor");
+    expect(node.textContent).toContain("Your agency since October 9");
     await act(async () => button("Remove North Studio")!.click());
     expect(posts).toHaveLength(0);
     const confirm = [...document.querySelectorAll("dialog button")].find(item => item.textContent === "Remove North Studio") as HTMLButtonElement;
@@ -94,9 +127,18 @@ describe("People & access (XA · R3–R5)", () => {
 
   it("sends an agency the review won't drop directly to the handoff instead", async () => {
     const request = vi.fn(async (input: RequestInfo | URL) => String(input).startsWith("/api/workspace/access-review") ? Response.json(review(false)) : Response.json({ invitations: [] })) as unknown as typeof fetch;
-    await act(async () => root.render(createElement(PeopleAndAccess, { snapshot, currentRole: "owner", request, postAction: vi.fn(), initialAgency: providerId, initialRemoving: true })));
+    const released = { ...snapshot, releases: { systems: false, providerChange: true } } as WorkspaceSnapshot;
+    await act(async () => root.render(createElement(PeopleAndAccess, { snapshot: released, currentRole: "owner", request, postAction: vi.fn(), initialAgency: providerId, initialRemoving: true })));
     const handoff = [...document.querySelectorAll("dialog a")].find(item => item.textContent === "Start the handoff");
     expect(handoff?.getAttribute("href")).toBe(`/workspace/provider-change?workspaceId=${workspaceId}`);
+  });
+
+  it("never links a handoff page that is closed; asks Strelva instead", async () => {
+    const request = vi.fn(async (input: RequestInfo | URL) => String(input).startsWith("/api/workspace/access-review") ? Response.json(review(false)) : Response.json({ invitations: [] })) as unknown as typeof fetch;
+    await act(async () => root.render(createElement(PeopleAndAccess, { snapshot, currentRole: "owner", request, postAction: vi.fn(), initialAgency: providerId, initialRemoving: true })));
+    const links = [...document.querySelectorAll("dialog a")];
+    expect(links.some(item => item.getAttribute("href")?.includes("provider-change"))).toBe(false);
+    expect(links.find(item => item.textContent === "Ask Strelva to start the handoff")?.getAttribute("href")).toBe(`/workspace?workspaceId=${workspaceId}&view=help`);
   });
 
   it("says it couldn't read access, and changes nothing", async () => {

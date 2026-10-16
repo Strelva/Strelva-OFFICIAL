@@ -1,10 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { XaAnswers, XaButton, XaButtonLink, XaHeadline, XaLabel, XaPebbleScene, XaRow, XaRows, XaSays, XaSystemTile, XaTextLink, XaWorking } from "@/components/ui/strelva/Xa";
+import { Globe } from "lucide-react";
+import { XaAnswers, XaButton, XaButtonLink, XaHeadline, XaLabel, XaPebbleScene, XaRow, XaRows, XaSays, XaSystemTile, XaTextLink } from "@/components/ui/strelva/Xa";
 import styles from "@/experience/record/record.module.css";
 
 import { ownerExportHistorySchema, type OwnerExportHistory } from "@/platform/workspace-exports/history-contracts";
+import type { WorkspaceExitOptions } from "@/platform/workspace-exit/contracts";
 
 export type ExportManifestRow = { title: string; detail: string; count?: string; included: boolean };
 const SCHEMA_3_SCOPE: ExportManifestRow[] = [
@@ -16,8 +18,8 @@ const SCHEMA_3_SCOPE: ExportManifestRow[] = [
   { title: "Documents and uploads", detail: "Stored records and authenticated download references.", included: true },
   { title: "Billing and payments", detail: "Stored billing state and payment records.", included: true },
   { title: "Card details", detail: "Held by Stripe, never by Strelva.", included: false },
-  { title: "Passwords and connection tokens", detail: "Credentials stay out of the export.", included: false },
-  { title: "Booking management links", detail: "These links are credentials.", included: false },
+  { title: "Passwords and sign-ins", detail: "Passwords and sign-ins for connected accounts are never included.", included: false },
+  { title: "Booking management links", detail: "They work like passwords, so they stay out.", included: false },
   { title: "Strelva’s internal notes", detail: "Strelva’s own records.", included: false },
   { title: "Records never imported", detail: "Export these from the provider that holds them.", included: false },
 ];
@@ -54,13 +56,32 @@ const EXPORT_TILE: Record<string, string> = {
   "Your website": "website", "Inquiries and bookings": "inbox", "Business record and history": "documents", "Documents, billing and payments": "payments",
 };
 const LEGACY_SCOPE: ExportManifestRow[] = [
-  { title: "Workspace and saved results", detail: "Current identity, supported records, releases, onboarding and economics receipts.", included: true },
-  { title: "Uploads", detail: "Size, digest, extraction status and authenticated download references; uploaded bytes stay out of the JSON.", included: true },
-  { title: "Sites and outside services", detail: "Managed-site content, calendars, inquiries, agency handover and Internal tool artifacts are outside this snapshot.", included: false },
-  { title: "Credentials and internal records", detail: "Passwords, access tokens, command digests and internal learning stay out.", included: false },
+  { title: "Workspace and saved results", detail: "Your business, its settings and the results Strelva saved.", included: true },
+  { title: "Uploads", detail: "Everything you uploaded, with a link to download each file.", included: true },
+  { title: "Website, calendars and inquiries", detail: "Not in this smaller copy yet. Ask Strelva for them.", included: false },
+  { title: "Passwords and Strelva's own notes", detail: "Passwords and sign-ins for connected accounts are never included.", included: false },
 ];
 
 type ExportProps = { workspaceId: string; schema3?: boolean; request?: typeof fetch; businessName?: string; manifest?: ExportManifestRow[] };
+
+type DomainLine = { siteName: string; done: boolean; evidence?: string };
+
+/** The domain step of the exit handoff plan, where one exists. Any failure shows no domain line. */
+function useDomainLines(workspaceId: string, request: typeof fetch): DomainLine[] {
+  const [lines, setLines] = useState<DomainLine[]>([]);
+  useEffect(() => {
+    const controller = new AbortController();
+    void request(`/api/workspace-exit?workspaceId=${encodeURIComponent(workspaceId)}`, { cache: "no-store", signal: controller.signal })
+      .then(response => response.ok ? response.json() : null)
+      .then((body: { handoff?: WorkspaceExitOptions["handoff"]; state?: { handoff?: WorkspaceExitOptions["handoff"] } | null } | null) => {
+        if (controller.signal.aborted) return;
+        const plan = body?.state?.handoff ?? body?.handoff;
+        setLines((plan?.sites ?? []).flatMap(site => site.steps.filter(step => step.kind === "domain").map(step => ({ siteName: site.siteName, done: step.status === "completed", evidence: step.evidence }))));
+      }).catch(() => { if (!controller.signal.aborted) setLines([]); });
+    return () => controller.abort();
+  }, [workspaceId, request]);
+  return lines;
+}
 
 export function WorkspaceExport(props: ExportProps) {
   // Workspace switches discard all prior archive references, including pending reads.
@@ -77,6 +98,7 @@ function WorkspaceExportScreen({ workspaceId, schema3 = false, request = fetch, 
   const [refresh, setRefresh] = useState(0);
   const [pendingBuild, setPendingBuild] = useState<string | null>(null);
   const building = Boolean(pendingBuild) || exports.some(row => row.status === "building");
+  const domains = useDomainLines(workspaceId, request);
   useEffect(() => {
     if (!schema3) return;
     const controller = new AbortController();
@@ -101,7 +123,7 @@ function WorkspaceExportScreen({ workspaceId, schema3 = false, request = fetch, 
         if (current && current.status !== "building") {
           setPendingBuild(null);
           setError(current.status !== "ready");
-          setNotice(current.status === "ready" ? "Your business export is ready. Download it below." : "This export did not finish or has expired. Prepare a new export.");
+          setNotice(current.status === "ready" ? "Your export is ready. Download it below." : "That export didn't finish. Press Download everything to try again.");
         }
         // Refresh ready archives too, so expiry removes their download controls.
         timer = setTimeout(() => void poll(), rows.some(row => row.status === "building") || pendingBuild && !current ? 3000 : 60000);
@@ -141,27 +163,32 @@ function WorkspaceExportScreen({ workspaceId, schema3 = false, request = fetch, 
   const included = groupForOwner(rows.filter(row => row.included), !manifest);
   const left = rows.filter(row => !row.included);
   const failed = error && notice ? notice : historyError;
-  const scopeNote = !manifest ? schema3 ? "The downloaded file lists actual counts and names anything unavailable. Counts are not available on this page." : "Exports above 2 MB stop without creating a partial file or success receipt." : null;
+  const scopeNote = !manifest ? schema3 ? "The file lists how many of each." : "This copy stops at 2 MB rather than give you half a file." : null;
+  const newest = exports.find(row => row.status === "ready" && row.expiresAt);
+  // Pebble's job beside the list: the export in progress, the newest one and when it goes, or what pressing does.
+  const pebble = building ? { title: "I'm gathering every record into one file.", body: "You can leave this page. It waits here for seven days once it's ready." }
+    : newest ? { title: `Your newest export is ready until ${exportDay(newest.expiresAt!)}.`, body: "Download it below, or press Download everything for a fresh one." }
+    : { title: "I put every record in one file when you ask.", body: "It takes a few minutes. Your Systems keep running while I do it." };
   return <div className={styles.take}>
     <div className={styles.takeMain}>
-      <XaHeadline quiet={schema3 ? "Download it any time. Downloading changes nothing and stops nothing." : "Download a copy any time. Downloading changes nothing and stops nothing."}>{businessName ? `${businessName} is yours.` : "Everything is yours."}</XaHeadline>
-      <ul className={styles.contents} aria-label={manifest ? "Export manifest" : "Export scope"}>
-        {included.map(row => <li key={row.title} className={styles.content}><XaSystemTile kind={EXPORT_TILE[row.title] ?? "documents"} size={40} /><span className={styles.changeText}><span className={styles.changeTitle}>{row.title}</span><span className={styles.changeDetail}>{row.detail}</span></span><span className={styles.contentEnd}>{row.count ?? "Included"}</span></li>)}
+      <XaHeadline quiet="Download it any time. If you leave, your site keeps working.">{businessName ? `${businessName} is yours.` : "Everything is yours."}</XaHeadline>
+      <ul className={styles.contents} aria-label={manifest ? "Export manifest" : "What the file holds"}>
+        {included.map(row => <li key={row.title} className={styles.content}><XaSystemTile kind={EXPORT_TILE[row.title] ?? "documents"} size={40} /><span className={styles.changeText}><span className={styles.changeTitle}>{row.title}</span><span className={styles.changeDetail}>{row.detail}</span></span>{row.count ? <span className={styles.contentEnd}>{row.count}</span> : <span />}</li>)}
+        {domains.map(line => <li key={`domain:${line.siteName}`} className={styles.content}><span className={styles.globe} aria-hidden="true"><Globe size={20} strokeWidth={1.6} /></span><span className={styles.changeText}><span className={styles.changeTitle}>Your domain</span><span className={styles.changeDetail}>{line.done ? line.evidence ?? `${line.siteName}'s domain has moved where you chose.` : `${line.siteName}'s domain stays registered to you. Moving it is arranged with you; nothing changes until you say so.`}</span></span><span /></li>)}
       </ul>
       {!rows.length ? <p className={styles.quietNote}>No records were found in this export manifest.</p> : null}
       <div className={styles.takeActions}>
-        <XaButton variant="primary" size="lg" busy={loading} disabled={building || schema3 && (historyLoading || Boolean(historyError))} onClick={() => void download()}>{schema3 ? "Prepare business export" : "Download everything"}</XaButton>
+        <XaButton variant="primary" size="lg" busy={loading || building} disabled={building || schema3 && (historyLoading || Boolean(historyError))} onClick={() => void download()}>{building ? "Preparing your file" : "Download everything"}</XaButton>
         <XaTextLink href={`/workspace/exit?workspaceId=${encodeURIComponent(workspaceId)}`}>Leave Strelva</XaTextLink>
       </div>
       {scopeNote ? <p className={styles.quietNote}>{scopeNote}</p> : null}
-      {building ? <XaWorking title="Preparing your export" steps={[{ id: "prepare", label: "Gathering every record into one file", state: "active" }, { id: "download", label: "Download it here for seven days", state: "pending" }]} /> : null}
       {notice && !error ? <div role="status"><XaSays>{notice}</XaSays></div> : null}
       {failed ? <div role="alert"><XaSays links={historyError ? [<XaTextLink key="reload" onClick={() => { setHistoryLoading(true); setRefresh(value => value + 1); }}>Reload exports</XaTextLink>] : undefined}>{failed}</XaSays></div> : null}
       {schema3 ? <section className={styles.history} aria-label="Recent exports">
         <XaLabel>Recent exports</XaLabel>
-        {historyLoading ? <p role="status" className={styles.quietNote}>Looking for your exports…</p> : historyError ? null : !exports.length ? <p className={styles.quietNote}>No recent exports. Prepare one to download your business records.</p> : <XaRows label="Export history">{exports.map(row => <XaRow key={row.buildId}
+        {historyLoading ? <p role="status" className={styles.quietNote}>Looking for your exports…</p> : historyError ? null : !exports.length ? <p className={styles.quietNote}>None yet. Press Download everything and it appears here.</p> : <XaRows label="Export history">{exports.map(row => <XaRow key={row.buildId}
           title={`Export from ${exportDate(row.createdAt)}`}
-          detail={row.status === "ready" ? `Ready · Download until ${exportDate(row.expiresAt!)}` : row.status === "building" ? "Being prepared. You can leave and return here." : row.status === "expired" ? "Expired. Prepare a new export." : row.status === "stalled" ? "Preparation stopped. Prepare a new export." : "Preparation failed. Prepare a new export."}
+          detail={row.status === "ready" ? `Download until ${exportDate(row.expiresAt!)}` : row.status === "building" ? "Being prepared" : row.status === "expired" ? "Expired" : "Didn't finish. Press Download everything to try again."}
           tone={row.status === "failed" || row.status === "stalled" ? "waits" : undefined}
           action={row.status === "ready" ? <XaButtonLink size="sm" href={`/api/workspace-export/v3/owner-download?build=${encodeURIComponent(row.buildId)}`}>Download</XaButtonLink> : undefined}
         />)}</XaRows>}
@@ -169,13 +196,16 @@ function WorkspaceExportScreen({ workspaceId, schema3 = false, request = fetch, 
       {left.length ? <section className={styles.history} aria-label="Left out on purpose"><XaLabel>Left out on purpose</XaLabel><XaAnswers labelWidth={220} rows={left.map(row => [row.title, row.detail] as const)} /></section> : null}
     </div>
     <aside className={styles.takeSide} aria-label="What downloading does">
-      <XaPebbleScene pose="resting" size={320} label="Pebble resting beside the bookings calendar" />
-      <div><h2>Downloading changes nothing.</h2>
-      <p>Your Systems keep running while you download. Nothing is deleted unless you ask for it.</p></div>
+      <XaPebbleScene pose={building ? "fixing" : "resting"} size={320} label={building ? "Pebble gathering your records" : "Pebble beside your bookings calendar"} />
+      <div role={building ? "status" : undefined}><h2>{pebble.title}</h2><p>{pebble.body}</p></div>
     </aside>
   </div>;
 }
 
 function exportDate(value: string) {
   return new Intl.DateTimeFormat(undefined, { year: "numeric", month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZoneName: "short" }).format(new Date(value));
+}
+
+function exportDay(value: string) {
+  return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" }).format(new Date(value));
 }

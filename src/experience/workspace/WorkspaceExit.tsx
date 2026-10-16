@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { StHold } from "@/components/ui/strelva/Kit";
-import { XaAnswers, XaButton, XaButtonLink, XaHeadline, XaLabel, XaRow, XaRows, XaSays, XaSegmented, XaStatus, XaSystemTile, XaTextLink } from "@/components/ui/strelva/Xa";
+import { XaButtonLink, XaHeadline, XaLabel, XaPebbleScene, XaRow, XaRows, XaSays, XaSegmented, XaStatus, XaSystemTile, XaTextLink } from "@/components/ui/strelva/Xa";
 import { RecordLoading, RecordTrouble } from "@/experience/record/RecordStates";
 import styles from "@/experience/record/record.module.css";
 import { SelectInput } from "@/components/ui/TextInput";
@@ -91,70 +91,88 @@ export function WorkspaceExit({ workspaceId, request = fetch, businessBillingRel
   const crumb = <nav className={styles.crumb} aria-label="Where you are"><a href={exportHref}>Take it with you</a><span aria-hidden="true">/</span><span>Leaving Strelva</span></nav>;
   const billing = businessBillingReleased ? <XaTextLink href={`/workspace/billing?workspaceId=${encodeURIComponent(workspaceId)}`}>Manage payments or cancel your plan</XaTextLink> : null;
   if (loading) return <RecordLoading title="Leaving Strelva" rows={4} label="Loading what leaving would change" />;
-  if (error && !options) return <RecordTrouble title="Leaving Strelva can't be read right now." quiet="Nothing changed. Everything keeps running." action={<XaButton onClick={() => void load()}>Try again</XaButton>}><p className={styles.quietNote} role="alert">{error}</p></RecordTrouble>;
+  if (error && !options) return <RecordTrouble title="Leaving Strelva can't be read right now." quiet="Nothing changed. Everything keeps running." retry={{ label: "Try again", onClick: () => void load() }}>{error}</RecordTrouble>;
 
   const state = options?.state;
   if (state) return <div className={styles.screen}>
     {crumb}
     <XaHeadline quiet="Your records stay here for you to download.">{state.futureWork === "paused" ? "New work is paused." : "New work has been cancelled."}</XaHeadline>
-    <XaSays>{`You chose this on ${new Date(state.completedAt).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}. Agency work was ${state.providerParticipation}. ${state.maintainedResources.kind === "successor" ? `${state.maintainedResources.successorEmail} was named to look after what Strelva maintained.` : "What Strelva maintained here has stopped."}`}</XaSays>
-    <XaAnswers labelWidth={220} rows={[
-      ["Assignments ended", <Count key="a" value={state.summary.assignmentsRevoked} />],
-      ["Scheduled checks paused", <Count key="b" value={state.summary.investigationsPaused} />],
-      ["Accepted work kept", <Count key="c" value={state.summary.retainedAccepted} />],
-      ["Work with an unknown result kept", <Count key="d" value={state.summary.retainedUnknown} />],
-    ]} />
-    <p className={styles.quietNote}>This decision does not change billing or stop an outside service. {billing ?? "Billing controls are not open here. Contact your billing provider to end an existing agreement."}</p>
+    <XaSays>{`${leaveSentence(state.summary, state.completedAt)}${state.maintainedResources.kind === "successor" ? ` ${state.maintainedResources.successorEmail} looks after what Strelva ran for you.` : ""}`}</XaSays>
+    <p className={styles.quietNote}>{"This doesn't change billing or stop an outside service. "}{billing ?? "Billing controls are not open here. Contact your billing provider to end an existing agreement."}</p>
     {state.handoff ? <HandoffPlan plan={state.handoff} /> : null}
-    <section className={styles.section} aria-labelledby="exit-review">
+    {state.retainedObligations.length ? <section className={styles.section} aria-labelledby="exit-review">
       <XaLabel as="h2" id="exit-review">Still needs a look</XaLabel>
-      {state.retainedObligations.length ? <XaRows label="Retained obligations">{state.retainedObligations.map(item => <XaRow key={item.workId} title={item.title} detail={`${obligationEffectLabel(item.effect)} · ${obligationStatusLabel(item.status)}`} tone={item.status === "accepted" ? undefined : "waits"} />)}</XaRows> : <p className={styles.quietNote}>Nothing accepted or unresolved was left open.</p>}
-    </section>
-    <div className={styles.takeActions}><XaButtonLink variant="primary" href={exportHref}>Download your records</XaButtonLink><XaTextLink href={`/workspace?workspaceId=${encodeURIComponent(workspaceId)}&view=access`}>Back to your workspace</XaTextLink></div>
+      <XaRows label="Still needs a look">{state.retainedObligations.map(item => <XaRow key={item.workId} title={item.title} detail={obligationSentence(item.status, item.effect)}
+        tone={item.status === "waiting" || item.status === "needs_attention" ? "waits" : undefined}
+        action={item.status === "waiting" || item.status === "needs_attention" ? <XaTextLink href={`/workspace?workspaceId=${encodeURIComponent(workspaceId)}&view=needs-you`}>See it</XaTextLink> : undefined} />)}</XaRows>
+    </section> : null}
+    <div className={styles.takeActions}><XaButtonLink variant="primary" href={exportHref}>Download your records</XaButtonLink><XaTextLink href={`/workspace?workspaceId=${encodeURIComponent(workspaceId)}`}>Back to Home</XaTextLink></div>
   </div>;
 
   return <div className={styles.screen}>
     {crumb}
     <XaHeadline quiet="Read each line first. You can stop at any step.">Leaving Strelva</XaHeadline>
+    <div className={styles.pebbleLine}><XaPebbleScene pose="fixing" size={88} label="Pebble, keeping your records" /><p>{futureWork === "pause" ? "I'll pause new work; your records stay here to download." : "I'll close work that hasn't started; your records stay here to download."}</p></div>
     {error ? <div role="alert"><XaSays>{error}</XaSays></div> : null}
     {options?.handoff ? <HandoffPlan plan={options.handoff} /> : null}
     <section className={styles.section} aria-label="What happens when you leave">
-      <Choice title="Future work" open={editing === "work"} onToggle={() => setEditing(editing === "work" ? null : "work")} now={futureWork === "pause" ? "New work pauses. Its history stays." : "Work that has not started closes. Its history stays."} detail="Work already started, accepted, or unresolved stays here for you to review.">
+      <Choice title="Future work" open={editing === "work"} onToggle={() => setEditing(editing === "work" ? null : "work")} now={futureWork === "pause" ? "New work pauses. Its history stays." : "Work that hasn't started closes. Its history stays."} detail="Anything already started or waiting for your yes stays here for you to look at.">
         <XaSegmented label="Future work" value={futureWork} onChange={setFutureWork} options={[{ value: "pause", label: "Pause new work" }, { value: "cancel", label: "Cancel new work" }]} />
       </Choice>
-      <Choice title="Agency work" open={editing === "agency"} onToggle={() => setEditing(editing === "agency" ? null : "agency")} now={agencyParticipation === "keep" ? "Work your agency recorded stays here." : "Your agency can't start new work here. History stays."} detail="Strelva can't prove an outside agency stopped working.">
+      <Choice title="Agency work" open={editing === "agency"} onToggle={() => setEditing(editing === "agency" ? null : "agency")} now={agencyParticipation === "keep" ? "Your agency keeps what it recorded; new work pauses with everything else." : "Your agency can't start anything new here. What it recorded stays."} detail="If they also work for you outside Strelva, tell them yourself.">
         <XaSegmented label="Agency work" value={agencyParticipation} onChange={setAgencyParticipation} options={[{ value: "keep", label: "Keep recorded work" }, { value: "revoke", label: "Stop new agency work" }]} />
       </Choice>
-      <Choice title="What Strelva maintains" open={editing === "resources"} onToggle={() => setEditing(editing === "resources" ? null : "resources")} now={resourceKind === "stop" ? "Offerings, applications and access maintained here stop. Their records stay." : "They stay, for the person you name to look after."} detail="Naming someone records who looks after them. It does not hand over ownership or access.">
-        <XaSegmented label="What Strelva maintains" value={resourceKind} onChange={setResourceKind} options={[{ value: "stop", label: "Stop them" }, { value: "successor", label: "Name someone", disabled: !options?.successors.length }]} />
+      <Choice title="What Strelva runs for you" open={editing === "resources"} onToggle={() => setEditing(editing === "resources" ? null : "resources")} now={resourceKind === "stop" ? "What Strelva runs for you stops. Its records stay to download." : "It keeps running, looked after by the person you name."} detail={resourceKind === "stop" ? "Your apps and services here stop taking new work." : "They look after it day to day; you stay the owner."}>
+        <XaSegmented label="What Strelva runs for you" value={resourceKind} onChange={setResourceKind} options={[{ value: "stop", label: "Stop them" }, { value: "successor", label: "Name someone", disabled: !options?.successors.length }]} />
         {resourceKind === "successor" ? <SelectInput label="Who looks after them" value={successorUserId} onChange={event => setSuccessorUserId(event.target.value)} options={[{ value: "", label: "Choose someone" }, ...(options?.successors.map(successor => ({ value: successor.userId, label: successor.email })) ?? [])]} helperText="Only people already in this business with a confirmed email." /> : null}
         {!options?.successors.length ? <p className={styles.quietNote}>No one else in this business has a confirmed email, so these stop and their records stay.</p> : null}
       </Choice>
-      <div className={styles.choice}><span className={styles.canTitle}>Business record and History</span><span className={styles.canDetail}>They stay here for you to download until you ask for them to be deleted.</span></div>
-      <div className={styles.choice}><span className={styles.canTitle}>Billing and outside services</span><span className={styles.canDetail}>This choice does not change billing or stop an outside service. {billing ?? "Billing controls are not open here. Contact your billing provider to end an existing agreement."}</span></div>
+      <div className={styles.choice}><span className={styles.choiceText}><span className={styles.canTitle}>Business record and history</span><span className={styles.canDetail}>They stay here to download until you ask for them to be deleted.</span></span></div>
+      <div className={styles.choice}><span className={styles.choiceText}><span className={styles.canTitle}>Billing and outside services</span><span className={styles.canDetail}>{"This doesn't change billing or stop an outside service. "}{billing ?? "Billing controls are not open here. Contact your billing provider to end an existing agreement."}</span></span></div>
     </section>
     <p className={styles.quietNote}>This is final for this workspace. Nothing is deleted. <XaTextLink href={exportHref}>Download everything first</XaTextLink></p>
     <div><StHold label={busy ? "Recording your choice…" : "Hold to leave"} disabled={busy || (resourceKind === "successor" && !successorUserId)} onAccept={() => void complete()} /></div>
   </div>;
 }
 
+/** One choice, said as it stands. The whole row opens it; "Change" shows on hover or focus. */
 function Choice({ title, now, detail, open, onToggle, children }: { title: string; now: string; detail: string; open: boolean; onToggle: () => void; children: ReactNode }) {
-  return <div className={styles.choice}>
-    <div className={styles.choiceHead}><span><span className={styles.canTitle}>{title}</span><br /><span className={styles.choiceNow}>{now}</span><br /><span className={styles.canDetail}>{detail}</span></span><XaButton size="sm" variant="quiet" aria-expanded={open} onClick={onToggle}>{open ? "Done" : "Change"}</XaButton></div>
+  return <div className={styles.choice} data-open={open || undefined}>
+    <button type="button" className={styles.choiceHead} aria-expanded={open} onClick={onToggle}>
+      <span className={styles.choiceText}><span className={styles.canTitle}>{title}</span><span className={styles.choiceNow}>{now}</span><span className={styles.canDetail}>{detail}</span></span>
+      <span className={styles.rowAction} aria-hidden="true">{open ? "Done" : "Change"}</span>
+    </button>
     {open ? children : null}
   </div>;
 }
 
-function Count({ value }: { value: number }) {
-  return <span className={styles.contentEnd}>{value}</span>;
+const plural = (count: number, one: string, many: string) => `${count} ${count === 1 ? one : many}`;
+
+/** What leaving stopped, in one sentence of owner words. Zero counts are left out. */
+export function leaveSentence(summary: { standingPaused: number; standingRevoked: number; scheduledPaused: number; scheduledCancelled: number; assignmentsRevoked: number; providerDeliveriesRevoked: number; investigationsPaused: number; retainedAccepted: number; retainedUnknown: number }, completedAt: string): string {
+  const parts = [
+    summary.assignmentsRevoked ? `ended ${plural(summary.assignmentsRevoked, "agency assignment", "agency assignments")}` : null,
+    summary.providerDeliveriesRevoked ? `stopped ${plural(summary.providerDeliveriesRevoked, "agency delivery", "agency deliveries")}` : null,
+    summary.standingPaused + summary.scheduledPaused ? `paused ${plural(summary.standingPaused + summary.scheduledPaused, "piece of scheduled work", "pieces of scheduled work")}` : null,
+    summary.standingRevoked + summary.scheduledCancelled ? `cancelled ${plural(summary.standingRevoked + summary.scheduledCancelled, "piece of scheduled work", "pieces of scheduled work")}` : null,
+    summary.investigationsPaused ? `paused ${plural(summary.investigationsPaused, "check", "checks")}` : null,
+    summary.retainedAccepted ? `kept ${plural(summary.retainedAccepted, "change you accepted", "changes you accepted")}` : null,
+    summary.retainedUnknown ? `kept ${plural(summary.retainedUnknown, "change whose result isn't known", "changes whose result isn't known")} for you to check` : null,
+  ].filter((part): part is string => Boolean(part));
+  const when = new Date(completedAt).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+  if (!parts.length) return `On ${when} I stopped new work. Nothing else was running.`;
+  const list = parts.length === 1 ? parts[0] : `${parts.slice(0, -1).join(", ")} and ${parts[parts.length - 1]}`;
+  return `On ${when} I ${list}.`;
 }
 
-function obligationStatusLabel(status: "running" | "waiting" | "needs_attention" | "accepted" | "unknown") {
-  return status === "needs_attention" ? "Needs review" : status[0]!.toUpperCase() + status.slice(1);
-}
-
-function obligationEffectLabel(effect: "none" | "accepted" | "unknown") {
-  return effect === "none" ? "Nothing outside Strelva changed" : effect === "accepted" ? "It changed something outside Strelva" : "Not known whether it changed anything outside Strelva";
+/** Where a kept piece of work stands, as one plain line. */
+function obligationSentence(status: "running" | "waiting" | "needs_attention" | "accepted" | "unknown", effect: "none" | "accepted" | "unknown") {
+  if (status === "waiting") return "Still waits for your yes.";
+  if (status === "needs_attention") return "Needs a look before anything else happens.";
+  if (status === "running") return "Still running.";
+  if (effect === "accepted") return "Accepted; it changed something outside Strelva.";
+  if (effect === "unknown" || status === "unknown") return "It isn't known whether it changed anything outside Strelva.";
+  return "Accepted. Nothing outside Strelva changed.";
 }
 
 function HandoffPlan({ plan }: { plan: NonNullable<WorkspaceExitOptions["handoff"]> }) {
@@ -165,7 +183,7 @@ function HandoffPlan({ plan }: { plan: NonNullable<WorkspaceExitOptions["handoff
     {plan.sites.map(site => <XaRows key={site.tenantStableId} label={`Handoff for ${site.siteName}`}>{site.steps.map(step => <XaRow key={step.kind}
       lead={<XaSystemTile kind={step.kind === "billing" ? "payments" : step.kind === "export" ? "documents" : "website"} size={32} />}
       title={`${site.siteName} · ${step.kind === "files" ? "website files" : step.kind === "export" ? "business export" : step.kind === "billing" ? "billing" : "domain"}`}
-      detail={step.status === "completed" ? step.evidence ?? step.detail : step.detail}
+      detail={step.status === "completed" ? step.evidence ?? step.detail : step.kind === "domain" ? `${site.siteName}'s domain stays registered to you. Moving it is arranged with you; nothing changes until you say so.` : step.detail}
       tone={step.status === "completed" ? undefined : "waits"}
       meta={step.status === "completed" ? <XaStatus kind="live" size="sm">Done</XaStatus> : <XaStatus kind="waits" size="sm">Not yet</XaStatus>} />)}</XaRows>)}
   </section>;

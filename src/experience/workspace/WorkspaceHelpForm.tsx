@@ -322,7 +322,7 @@ export function WorkspaceHelp({ workspaceName, hasManagedService: _hasManagedSer
       {deliveryContextError ? <StNotice tone="critical">{deliveryContextError} <StTextButton onClick={openDeliveryControls}>Try again</StTextButton></StNotice> : null}
     </StSection> : null}
     {editingRequest && deliveryContext ? <ServiceRequestDeliveryCompletion request={editingRequest} installation={deliveryContext.installation} responsibilities={deliveryContext.responsibilities} onRequestUpdated={updated => { setEditingRequest(updated); setSaved(updated); setSavedRequests(current => current.map(item => item.id === updated.id ? updated : item)); }} /> : null}
-    {workspaceId ? <BringInAgency workspaceId={workspaceId} canManage={canManageAgencies} initialScope={initialAgencyScope} /> : <StSection title="Want it done for you?">
+    {workspaceId ? <div id="bring-in-an-agency"><BringInAgency workspaceId={workspaceId} canManage={canManageAgencies} initialScope={initialAgencyScope} /></div> : <StSection title="Want it done for you?">
       <p className={styles.copy}>Open your business in Strelva to bring in an agency. You choose what it can do, and it accepts before anything changes.</p>
     </StSection>}
     <StSection title="Working for a client?">

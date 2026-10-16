@@ -56,13 +56,13 @@ describe("workspace exit request lifetime", () => {
     await act(async () => root.render(createElement(WorkspaceExit, { workspaceId: firstWorkspace, request, businessBillingReleased })));
     const billingLink = () => container.querySelector(`a[href="/workspace/billing?workspaceId=${firstWorkspace}"]`);
     expect(Boolean(billingLink())).toBe(businessBillingReleased);
-    expect(container.textContent).toContain("does not change billing");
+    expect(container.textContent).toContain("change billing or stop an outside service");
     if (!businessBillingReleased) expect(container.textContent).toContain("Contact your billing provider");
     await act(async () => root.render(null));
     request.mockResolvedValue(response({ state: completedState(firstWorkspace), successors: [] }));
     await act(async () => root.render(createElement(WorkspaceExit, { workspaceId: firstWorkspace, request, businessBillingReleased })));
     expect(Boolean(billingLink())).toBe(businessBillingReleased);
-    expect(container.textContent).toContain("does not change billing");
+    expect(container.textContent).toContain("change billing or stop an outside service");
   });
 
   it("does not let an older completion overwrite the newly selected workspace", async () => {

@@ -125,3 +125,28 @@ export function weeklySummary(weekly: readonly { day: number; opens: string; clo
   }
   return runs.map(run => `${run.from === run.to ? SHORT_DAYS[run.from] : `${SHORT_DAYS[run.from]}–${SHORT_DAYS[run.to]}`} ${run.text}`).join(" · ");
 }
+
+/** The usual week as owners read it, one run per line: ["Mon–Fri 8–5", "Sat 9–1", "Sun closed"]. */
+export function weeklyLines(weekly: readonly { day: number; opens: string; closes: string }[]): string[] {
+  const summary = weekly.length ? weeklySummary(weekly).split(" · ") : [];
+  const open = new Set(weekly.map(period => period.day));
+  const closed = [1, 2, 3, 4, 5, 6, 0].filter(day => !open.has(day));
+  if (!closed.length) return summary;
+  const names = closed.map(day => SHORT_DAYS[day]);
+  return [...summary, `${closed.length === 7 ? "Every day" : names.join(", ")} closed`];
+}
+
+/** The next special day on or after today, said plainly ("Dec 24 · 8–12", "Nov 26 · closed"). */
+export function nextSpecialDay(overrides: readonly { date: string; closed: boolean; opens?: string; closes?: string; label?: string }[] | undefined, now: Date = new Date()): string | null {
+  const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+  const next = [...(overrides ?? [])].filter(item => item.date >= today).sort((a, b) => a.date.localeCompare(b.date))[0];
+  if (!next) return null;
+  return `${shortDate(next.date)} · ${next.closed ? "closed" : `${clock(next.opens ?? "")}–${clock(next.closes ?? "")}`}`;
+}
+
+/**
+ * The Google approval said in one line where the save happens. Saving with a
+ * connected listing approves applying hours, holiday hours, phone, website
+ * and description there (`recordGoogleApprovalCopy` holds the full terms).
+ */
+export const GOOGLE_APPROVAL_LINE = "Saving also puts it on your Google listing; Google may review it first.";

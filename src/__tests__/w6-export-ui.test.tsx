@@ -17,7 +17,7 @@ describe("business export screen", () => {
   it("keeps the old endpoint and bounded copy while schema 3 is off", async () => {
     const fetch = vi.fn().mockResolvedValue(Response.json({ error: "denied" }, { status: 403 })); vi.stubGlobal("fetch", fetch);
     await act(async () => root.render(createElement(WorkspaceExport, { workspaceId })));
-    expect(document.body.textContent).toContain("Exports above 2 MB stop");
+    expect(document.body.textContent).toContain("This copy stops at 2 MB");
     await act(async () => (document.querySelector("button") as HTMLButtonElement).click());
     expect(fetch).toHaveBeenCalledWith("/api/workspace-export", expect.any(Object));
   });
@@ -35,7 +35,7 @@ describe("business export screen", () => {
     expect(blob).not.toHaveBeenCalled();
     const link = document.querySelector('a[href*="owner-download"]');
     expect(link?.getAttribute("href")).toBe(`/api/workspace-export/v3/owner-download?build=${buildId}`);
-    expect(document.body.textContent).toContain("Your business export is ready");
+    expect(document.body.textContent).toContain("Your export is ready");
   });
   it("allows retry after a failed background build", async () => {
     let prepared = false;
@@ -46,15 +46,15 @@ describe("business export screen", () => {
     await act(async () => root.render(createElement(WorkspaceExport, { workspaceId, schema3: true })));
     await act(async () => (document.querySelector("button") as HTMLButtonElement).click()); await settle();
     expect((document.querySelector("button") as HTMLButtonElement).disabled).toBe(false);
-    expect(document.body.textContent).toContain("Prepare a new export");
+    expect(document.body.textContent).toContain("Press Download everything to try again");
   });
   it("names the omissions and avoids inventing record counts", async () => {
     vi.stubGlobal("fetch", vi.fn().mockImplementation(async () => history()));
     await act(async () => root.render(createElement(WorkspaceExport, { workspaceId, schema3: true })));
     expect(document.body.textContent).toContain("Card details");
     expect(document.body.textContent).toContain("Held by Stripe");
-    expect(document.body.textContent).toContain("Counts are not available on this page");
-    expect(document.querySelector('[aria-label="Export scope"]')).not.toBeNull();
+    expect(document.body.textContent).toContain("The file lists how many of each.");
+    expect(document.querySelector('[aria-label="What the file holds"]')).not.toBeNull();
   });
   it("shows owner permission failure as an alert and keeps retry available", async () => {
     vi.stubGlobal("fetch", vi.fn().mockImplementation(async (_url, options) => options?.method === "POST" ? Response.json({ error: "Only the confirmed owner can export." }, { status: 403 }) : history()));
@@ -85,8 +85,8 @@ describe("business export screen", () => {
   it("shows expired and failed exports with recovery rather than downloads", async () => {
     const fetch = vi.fn().mockImplementation(async () => history([archive("expired"), archive("stalled", "cccccccc-cccc-4ccc-8ccc-cccccccccccc")]));
     await act(async () => root.render(createElement(WorkspaceExport, { workspaceId, schema3: true, request: fetch })));
-    expect(document.body.textContent).toContain("Expired. Prepare a new export.");
-    expect(document.body.textContent).toContain("Preparation stopped");
+    expect(document.body.textContent).toContain("Expired");
+    expect(document.body.textContent).toContain("Didn't finish");
     expect(document.querySelector('a[href*="owner-download"]')).toBeNull();
     expect((document.querySelector("button") as HTMLButtonElement).disabled).toBe(false);
   });
@@ -122,7 +122,7 @@ describe("business export screen", () => {
     await act(async () => vi.advanceTimersByTimeAsync(60000));
     expect(document.querySelector('a[href*="owner-download"]')).toBeNull();
     expect(document.querySelector('[role="alert"]')?.textContent).toContain("Owner access has ended");
-    expect([...document.querySelectorAll("button")].find(button => button.textContent === "Prepare business export")!.disabled).toBe(true);
+    expect([...document.querySelectorAll("button")].find(button => button.textContent === "Download everything")!.disabled).toBe(true);
   });
   it("recovers a build accepted despite a lost preparation response", async () => {
     let started = false;

@@ -12,6 +12,7 @@ import { StrelvaShell, type StrelvaSection } from "@/experience/app-frame/Strelv
 import type { StrelvaPinnedItem } from "@/experience/app-frame/workspace-places";
 import { WorkspaceBusinessDetails } from "@/experience/places/WorkspaceBusinessDetails";
 import type { RecordReaders } from "@/experience/places/BusinessDetailsForm";
+import { readersFromSystems } from "@/experience/record/record-readers";
 import { PeopleAndAccess } from "@/experience/record/PeopleAndAccess";
 import { RecordLoading } from "@/experience/record/RecordStates";
 import { WorkspaceExport } from "@/experience/workspace/WorkspaceExport";
@@ -50,15 +51,18 @@ function harborRecord(access: BusinessRecord["access"], empty = false): Business
   };
 }
 
-const READERS: RecordReaders = {
-  hours: [{ kind: "website", name: "Website" }, { kind: "bookings", name: "Bookings" }, { kind: "listing", name: "Google listing" }],
-  phone: [{ kind: "website", name: "Website" }, { kind: "listing", name: "Google listing" }, { kind: "form", name: "New-patient form" }],
-  address: [{ kind: "website", name: "Website" }, { kind: "listing", name: "Google listing" }],
-  services: [{ kind: "website", name: "Website" }, { kind: "bookings", name: "Bookings" }],
-  insurance_accepted: [{ kind: "website", name: "Website" }, { kind: "form", name: "New-patient form" }],
-  display_name: [{ kind: "website", name: "Website" }, { kind: "listing", name: "Google listing" }, { kind: "inbox", name: "Inbox" }],
-  email: [{ kind: "website", name: "Website" }],
-};
+/** A fictional System graph, read through the same `readersFromSystems` the real page uses. */
+const sys = (id: string, name: string, kind: string) => ({ system: { id, name, kind, lifecycle: "live" } });
+const reads = (systemId: string, resource: string) => ({ connection: { source: { systemId }, kind: "read", state: "connected", target: { type: "business_resource", resource } } });
+const READERS: RecordReaders | undefined = readersFromSystems({
+  systems: [sys("web", "harbordental.com", "website"), sys("gbp", "Harbor Dental on Google", "listing"), sys("book", "Bookings", "booking"), sys("form", "New-patient form", "internal_app")],
+  connections: [
+    reads("web", "business_record:facts"),
+    ...["hours", "phone", "links", "description"].map(slice => reads("gbp", `business_record:${slice}`)),
+    reads("book", "business_record:hours"), reads("book", "business_record:services"),
+    reads("form", "business_record:insurance_accepted"), reads("form", "business_record:phone"),
+  ],
+});
 
 const snapshot: WorkspaceSnapshot = {
   actor: { email: "dr.lin@harbordental.com", localPreview: true }, workspaceId: WS,
@@ -73,10 +77,10 @@ function review(state: Xa8State) {
     : [
       entry("a0000000", "member", "dr.lin@harbordental.com", "owner", false),
       entry("a1000000", "member", "ana.ruiz@harbordental.com", "member", state !== "readonly"),
-      entry("b0000000", "provider", "North Studio", "active", state !== "handoff"),
-      entry("c0000000", "agency_assignment", "Maya Okafor", "active", false),
-      entry("c1000000", "agency_assignment", "Jon Reyes", "active", false),
-      entry("c2000000", "agency_assignment", "Priya Shah", "active", false),
+      { ...entry("b0000000", "provider", "North Studio", "active", state !== "handoff"), since: "2026-10-09T14:00:00Z" },
+      entry("c0000000", "agency_assignment", "maya.okafor@northstudio.co · North Studio", "active", false),
+      entry("c1000000", "agency_assignment", "jon.reyes@northstudio.co · North Studio", "active", false),
+      entry("c2000000", "agency_assignment", "priya.shah@northstudio.co · North Studio", "active", false),
     ];
   return { workspaceId: WS, actorUserId: AMY, organization: false, inaccessibleUnits: 0, units: [{ workspaceId: WS, name: "Harbor Dental", role: state === "readonly" ? "member" : "owner", entries }] };
 }
@@ -112,7 +116,8 @@ function stubFetch(screen: Xa8Screen, state: Xa8State): typeof fetch {
     if (url.startsWith("/api/workspace-exit")) {
       if (state === "error") return json({ error: "Leaving can't be read right now." }, 503);
       if (state === "done") return json({ state: { id: "f0000000-1111-4111-8111-111111111111", workspaceId: WS, status: "completed", requestedAt: "2026-10-15T18:00:00Z", completedAt: "2026-10-15T18:00:01Z", requestedBy: AMY, futureWork: "paused", providerParticipation: "kept", maintainedResources: { kind: "stopped" }, summary: { standingPaused: 0, standingRevoked: 0, scheduledPaused: 2, scheduledCancelled: 0, assignmentsRevoked: 3, providerDeliveriesRevoked: 0, investigationsPaused: 2, retainedAccepted: 1, retainedUnknown: 0 }, retainedObligations: [{ workId: "w", title: "Thanksgiving hours", status: "waiting", effect: "none" }], resources: [] }, successors: [] });
-      return json({ state: null, successors: [{ userId: "a1000000-1111-4111-8111-111111111111", email: "ana.ruiz@harbordental.com" }] });
+      return json({ state: null, successors: [{ userId: "a1000000-1111-4111-8111-111111111111", email: "ana.ruiz@harbordental.com" }],
+        handoff: { businessRecordRetained: true, dataDeleted: false, systems: [], sites: [{ tenantId: "harbor", tenantStableId: "99999999-1111-4111-8111-111111111111", siteName: "harbordental.com", steps: [{ kind: "domain", status: "pending", detail: "Arrange the domain move with the owner; no DNS or provider change has been made." }] }] } });
     }
     return json({ error: "Not part of this preview" }, 404);
   }) as typeof fetch;
@@ -147,11 +152,12 @@ export function Xa8RecordPreview({ screen, state, mode }: { screen: Xa8Screen; s
     if (screen === "record" || screen === "hours") {
       if (state === "loading") return <RecordLoading title="Said once, here." label="Loading your business record" />;
       const record = harborRecord(owner ? "owner" : "member", state === "empty");
-      return <WorkspaceBusinessDetails workspaceId={WS} now={NOW} agencyName="North Studio" readers={state === "empty" ? undefined : READERS} showInsurance
+      return <WorkspaceBusinessDetails workspaceId={WS} now={NOW} agencyName="North Studio" readers={state === "empty" || state === "plain" ? undefined : READERS} showInsurance
         edit={screen === "hours" ? "hours" : null} hours={{ request, initialMode: state === "week" ? "week" : "day", now: NOW }}
         action={owner ? async () => undefined : undefined}
         result={screen === "record" && (state === "done" || state === "waiting") ? "saved" : null}
-        googleResult={screen === "record" && state === "waiting" ? "needs_approval" : screen === "record" && state === "done" ? "confirmed" : null}
+        googleResult={screen === "record" && state === "waiting" ? "needs_approval" : null}
+        savedSequence={screen === "record" && state === "done" ? 15 : null} undoAction={owner ? async () => undefined : undefined}
         state={state === "error" && screen === "record" ? { kind: "error" } : { kind: "ready", data: { record, operator: false, publishing: true, listings: false, googleApprovalCopy: screen === "hours" && owner ? recordGoogleApprovalCopy(record, true) : null, sites: [{ tenantId: "harbor", siteName: "harbordental.com" } as never], denied: [] } }} />;
     }
     if (screen === "take") return <WorkspaceExport workspaceId={WS} schema3 request={request} businessName="Harbor Dental" />;

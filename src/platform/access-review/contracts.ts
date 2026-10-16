@@ -6,6 +6,8 @@ export const accessReviewSchema = z.object({
   workspaceId: z.string().uuid(), actorUserId: z.string().uuid(), organization: z.boolean(), inaccessibleUnits: z.number().int().nonnegative(),
   units: z.array(z.object({ workspaceId: z.string().uuid(), name: z.string(), role: z.enum(["owner", "admin", "member"]), entries: z.array(z.object({
     id: z.string().uuid(), kind: accessReviewKindSchema, label: z.string(), status: z.string(), lastUsedAt: z.string().nullable(), canRevoke: z.boolean(),
+    /** When an agency of record started on this business (provider entries, once 20261028100800 is applied). */
+    since: z.string().optional(),
   }).strict()) }).strict()),
 }).strict();
 export type AccessReview = z.infer<typeof accessReviewSchema>;

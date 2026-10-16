@@ -2595,14 +2595,17 @@ entry so a retry is recorded once. Previews: `/preview/strelva/care-report` and
 
 ### October 15 · XA-8 business record, people, leaving (lane xa/lane-xa8-record)
 
-Built on the XA kit (`@/components/ui/strelva/Xa`); no kit part was forked or added.
+Built on the XA kit (`@/components/ui/strelva/Xa`). Two kit changes: `XaSheet`
+now uses the kit's large shadow and 16px radius, and after opening it focuses
+the element marked `data-sheet-focus` (put it on the safe choice, never on a
+destructive pill).
 
 | Screen (Pen) | Component | Notes |
 |---|---|---|
-| R1 Business record | `places/WorkspaceBusinessDetails`, `places/BusinessDetailsForm` | Open rows: detail, Read by (only when the caller passes `readers`), Said by (`record/record-words.saidBy`). A row edits in place and submits only that field with the exact revision through the existing server action. |
-| R2 One day's hours | `publishing/RecordPublishingFields` (`/workspace/business-details?edit=hours`) | Usual week / One day; upcoming holidays as one-tap dates; "This will change" is the one large-shadow object. Same `/api/workspace/publishing/record` call and command id. |
-| R3 People, R4 What the agency can do, R5 Remove | `record/PeopleAndAccess` (used by `WorkspaceAccess` for business owners) | Reads `read_access_review`; removal uses the same revoke. An agency the review won't drop goes to the agency handoff. Invitations make a private link; nothing is emailed. R4 has no per-capability switches because the platform has none. |
-| R6 Take it with you, Leaving | `workspace/WorkspaceExport`, `workspace/WorkspaceExit` | Static scope grouped into four owner groups; a real manifest is never regrouped. Exit keeps `StHold` (no Undo exists for leaving). |
+| R1 Business record | `places/WorkspaceBusinessDetails`, `places/BusinessDetailsForm` | Hours leads as the one large object (the week one run per line, the next special day). Other details are open rows: detail, Read by, Said by (`record/record-words.saidBy`), and a quiet "Change" (always shown on phone; "Add" on empty rows). Read by comes from the business's own System graph (`record/record-readers.readersFromSystems`: live Systems with a connected `read` of `business_record:*`); with none known the column and its copy are not drawn. Undo is offered after a save that changed nothing on Google (`undoBusinessDetailsAction`, the record's own undo). Sidebar "Business record" opens this route. |
+| R2 One day's hours | `publishing/RecordPublishingFields` (`/workspace/business-details?edit=hours`) | Usual week as a table (Opens/Closes said once, "Mark closed" / "Set hours"); One day with holidays as a one-tap row and a readable day field over the native picker. "This will change" is the one raised object and hugs its rows; the Google approval is one line on the Google row (`GOOGLE_APPROVAL_LINE`). |
+| R3 People, R4 What the agency can do, R5 Remove | `record/PeopleAndAccess` (used by `WorkspaceAccess` for business owners) | Names from the review (`personName`), email and GLOSSARY role words beside them, neutral discs for everyone. "Bring in an agency" opens the agency list in Help (`#bring-in-an-agency`). R4 header says since when (provider `since`, migration 20261028100800, prepared and unapplied); `?agency=` links an agency page. The handoff links `/workspace/provider-change` only when `releases.providerChange`; otherwise "Ask Strelva to start the handoff". |
+| R6 Take it with you, Leaving | `workspace/WorkspaceExport`, `workspace/WorkspaceExit` | Hairline rows on the page, no "Included" column; a domain line from the exit handoff plan where one exists; Pebble's caption carries the export in progress or the newest one's expiry. Leaving: Pebble in frame, rows open in place, the result said in one sentence with zero counts dropped. Exit keeps `StHold`. |
 
-Shared lane parts: `record/record.module.css`, `record/RecordStates` (loading, trouble with Pebble fixing), `record/record-words`.
-Preview: `/preview/strelva/xa/xa8-record/<record|hours|people|agency|remove|take|leave>?state=ready|empty|loading|error|waiting|done|readonly|week|handoff&mode=dark`.
+Shared lane parts: `record/record.module.css`, `record/RecordStates` (loading; trouble left-aligned with Pebble beside one sentence and a "Try again" link), `record/record-words`, `record/record-readers`.
+Preview: `/preview/strelva/xa/xa8-record/<record|hours|people|agency|remove|take|leave>?state=ready|plain|empty|loading|error|waiting|done|readonly|week|handoff&mode=dark`.
