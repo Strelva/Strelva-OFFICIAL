@@ -129,7 +129,7 @@ describe("Photos: delete held for the Undo window", () => {
   it("takes the photo out with Undo and deletes nothing until the window ends", async () => {
     const fetchMock = vi.fn(async (_url: string, init?: RequestInit) => init?.method === "DELETE" ? Response.json({ success: true }) : Response.json({ assets }));
     vi.stubGlobal("fetch", fetchMock);
-    const node = await mount(createElement(PhotoLibrary, { initialSelectedId: "m1", askDeleteFirst: true }));
+    const node = await mount(createElement(PhotoLibrary, { initialSelectedId: "m1", initialConfirming: true }));
     await flush();
     // The grid stays beside the open photo, with the open one marked.
     expect(node.querySelector('[aria-pressed="true"]')?.getAttribute("aria-label")).toBe("Open Dr. Lin at work");
@@ -145,7 +145,7 @@ describe("Photos: delete held for the Undo window", () => {
   it("sends the delete when the window ends", async () => {
     const fetchMock = vi.fn(async (_url: string, init?: RequestInit) => init?.method === "DELETE" ? Response.json({ success: true }) : Response.json({ assets }));
     vi.stubGlobal("fetch", fetchMock);
-    const node = await mount(createElement(PhotoLibrary, { initialSelectedId: "m1", askDeleteFirst: true }));
+    const node = await mount(createElement(PhotoLibrary, { initialSelectedId: "m1", initialConfirming: true }));
     await flush();
     await act(async () => { button(node, "Delete the photo")!.click(); });
     await flush();

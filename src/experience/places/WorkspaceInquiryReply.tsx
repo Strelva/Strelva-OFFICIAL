@@ -12,10 +12,10 @@ export const REPLY_OUTCOME: Record<WorkspaceReplyStatus, string> = {
   sending: "This reply is being checked. Reload its receipt before sending anything else.",
   suppressed: "Email is paused. Nothing was sent.",
   accepted: "Sent. Delivery isn't confirmed yet.",
-  delivered: "Delivered to the recipient's email provider.",
-  deferred: "Sent. The recipient's email provider delayed delivery.",
-  bounced: "Sent, but the recipient's email provider bounced it. Check their address.",
-  failed: "The provider reported a failure. This reply won't be sent again.",
+  delivered: "Delivered. Their email service accepted it.",
+  deferred: "Sent. Their email service is holding it and will keep trying.",
+  bounced: "Sent, but their email service sent it back. Check their address.",
+  failed: "It didn't send. This reply won't be sent again on its own.",
   unknown: "The send couldn't be confirmed. Strelva must check the receipt before another attempt.",
 };
 

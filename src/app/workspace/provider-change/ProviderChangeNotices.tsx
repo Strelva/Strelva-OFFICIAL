@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { TextArea } from "@/components/ui/TextInput";
-import { XaYes } from "@/components/ui/strelva/Xa";
+import { XaTextLink, XaYes } from "@/components/ui/strelva/Xa";
 import { StEmpty, StMono, StNotice, StPill, StRow, StRows, StSection, StState, StSurface, StTextButton } from "@/components/ui/strelva/Kit";
 import { useWorkspaceRequest } from "@/experience/workspace/WorkspaceRequest";
 
@@ -82,7 +82,8 @@ export default function ProviderChangeNotices({ workspaceId, requests, canCancel
       </div></StSurface> : null}
       {canCancel && q.business_workspace_id === workspaceId && q.status === "notified" ? <XaYes state={busy === q.id ? "going" : "waiting"} block={false} shortcut={false} yesLabel="Complete the agency change" disabled={!!busy} working={{ title: "Completing the agency change", steps: [] }}
         question="This ends your current agency's access. It can't be undone here."
-        disabledReason={!q.respond_by ? "The response window has not been set yet." : new Date(q.respond_by).getTime() > Date.now() ? `You can complete it after ${new Date(q.respond_by).toLocaleString()}.` : undefined} onYes={() => void act(q.id, "complete")} /> : null}
+        disabledReason={!q.respond_by ? "The response window has not been set yet." : new Date(q.respond_by).getTime() > Date.now() ? `You can complete it after ${new Date(q.respond_by).toLocaleString()}.` : undefined}
+        unblock={<XaTextLink href={`/workspace?${new URLSearchParams({ workspaceId, view: "help" })}`}>Ask Strelva when it can be completed</XaTextLink>} onYes={() => void act(q.id, "complete")} /> : null}
     </StSection>) : <StEmpty>No agency changes are waiting.</StEmpty>}
     <StNotice>Strelva doesn’t pass messages between agencies. If you want to talk to the other agency, that’s up to you.</StNotice>
     {message ? <p role="status" className="text-sm text-positive">{message}</p> : null}

@@ -65,7 +65,8 @@
 .holidays::-webkit-scrollbar { display: none; }
 .holiday { flex: none; min-height: 34px; padding: 0 14px; border: 1px solid var(--st-line); border-radius: 999px; background: var(--st-surface); color: var(--st-text-body); font: inherit; font-size: 13px; white-space: nowrap; cursor: pointer; transition: background-color var(--motion-fast) var(--ease-settle), border-color var(--motion-fast) var(--ease-settle), color var(--motion-fast) var(--ease-settle); }
 .holiday:hover { background: var(--st-hover); }
-.holiday[aria-pressed="true"] { border-color: var(--st-action); background: var(--st-action); color: var(--st-on-action); }
+/* Chosen: an ink ring on the selected tint, so the save stays the one ink pill on the screen. */
+.holiday[aria-pressed="true"] { border-color: var(--st-text); background: var(--st-selected); color: var(--st-text); box-shadow: inset 0 0 0 1px var(--st-text); font-weight: 500; }
 .dayField { position: relative; display: flex; flex-direction: column; gap: 2px; padding: 10px 16px; border: 1px solid var(--st-line); border-radius: var(--st-r-md, 12px); background: var(--st-surface); cursor: pointer; }
 .dayField:focus-within { border-color: var(--st-accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--st-accent) 16%, transparent); }
 .dayField[data-invalid] { border-color: var(--st-critical); }
@@ -119,6 +120,13 @@
 .who { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; margin: -8px 0 0; color: var(--st-text); font-size: 15px; line-height: 22px; }
 .whoLabel { color: var(--st-text-3); font-size: 13px; font-weight: 500; }
 .removeLine { margin-top: 8px; }
+/* R5 in place: opens where "Remove" was, set off by a hairline, never a sheet or a card. */
+.removeInline { display: flex; max-width: 560px; flex-direction: column; gap: 16px; margin-top: 8px; padding-top: 20px; border-top: 1px solid var(--st-line); animation: var(--kf-fade-in) var(--motion-base) var(--ease-settle) both; }
+.removeHead { display: grid; grid-template-columns: 96px minmax(0, 1fr); align-items: center; gap: 16px; }
+.removeTitle { margin: 0 0 4px; color: var(--st-text); font-size: 20px; font-weight: 600; line-height: 26px; }
+/* Focus moves here so a screen reader hears the question; the heading is not a control, so no ring. */
+.removeTitle:focus, .removeTitle:focus-visible { outline: none; box-shadow: none; }
+.removeActions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
 .canTitle { font-size: 16px; line-height: 22px; }
 .canDetail { color: var(--st-text-2); font-size: 13px; line-height: 18px; }
 .canEnd { color: var(--st-text-2); font-size: 14px; text-align: right; }

@@ -70,7 +70,8 @@ export function ConversationShell({
       signedIn={signedIn}
       signOut={signOut}
       accountName={accountName}
-      accountDetail={[accountEmail, relationshipLabel].filter(Boolean).join(" · ") || undefined}
+      // One fact fits the rail's footer whole: the email when known, else the relationship. Two joined got cut mid-word.
+      accountDetail={accountEmail || relationshipLabel || undefined}
       context={<PropertySwitcher fallbackName={businessName} />}
       navigation={<ManagedNavigation businessName={businessName} pendingCount={pendingCount} isSuperAdmin={isSuperAdmin} viewAsClient={viewAsClient} onToggleViewAsClient={() => setViewAsClient((value) => !value)} appBase={appBase} />}
       contentId="main-content"

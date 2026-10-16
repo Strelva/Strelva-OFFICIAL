@@ -18,13 +18,9 @@ export function LegacyErrorPreview() {
   return <DashboardErrorView onRetry={() => window.location.reload()} />;
 }
 
-/**
- * Deleting a photo: the real PhotoLibrary with one photo open beside the grid
- * (marked in it) and its in-place question already asked. Saying yes takes it
- * out with Undo; the fixture API's delete only runs when the window ends.
- */
+/** Deleting a photo, asked in place beside the library grid (no sheet over the page). The real library on the fixture API. */
 export function LegacyConfirmPreview() {
-  return <PhotoLibrary initialSelectedId="m1" askDeleteFirst />;
+  return <PhotoLibrary initialSelectedId="m1" initialConfirming />;
 }
 
 /* ---------- Real client components, fixture props ---------- */

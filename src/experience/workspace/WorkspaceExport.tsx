@@ -21,7 +21,7 @@ const SCHEMA_3_SCOPE: ExportManifestRow[] = [
   { title: "Passwords and sign-ins", detail: "Passwords and sign-ins for connected accounts are never included.", included: false },
   { title: "Booking management links", detail: "They work like passwords, so they stay out.", included: false },
   { title: "Strelva’s internal notes", detail: "Strelva’s own records.", included: false },
-  { title: "Records never imported", detail: "Export these from the provider that holds them.", included: false },
+  { title: "Records never imported", detail: "Download these from the service that holds them, such as your booking or email tool.", included: false },
 ];
 /**
  * The static scope, said the way an owner thinks of it (XA · R6): four

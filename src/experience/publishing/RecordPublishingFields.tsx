@@ -10,7 +10,7 @@
 import { useMemo, useRef, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import {
-  XaButton, XaChoices, XaField, XaHeadline, XaSays, XaSegmented, XaStatus, XaSystemTile, XaTextLink, type XaStatusKind,
+  XaChoices, XaField, XaHeadline, XaSays, XaSegmented, XaStatus, XaSystemTile, XaTextLink, XaYes, type XaStatusKind, type XaYesState,
 } from "@/components/ui/strelva/Xa";
 import type { BusinessRecord, FactValues } from "@/platform/business-record/contracts";
 import type { RecordGoogleEffect } from "@/products/publishing/client";
@@ -34,7 +34,28 @@ const GOOGLE_WORDS: Record<RecordGoogleEffect["status"], { kind: XaStatusKind; t
   already_approved: { kind: "live", text: "Already approved on Google" },
   already_on_google: { kind: "live", text: "Google already showed this" },
   failed: { kind: "down", text: "Google didn't take it" },
+  withdrawn: { kind: "draft", text: "Withdrawn. Google never got it" },
 };
+
+/** What the usual week says about one date, as a one-day override would say it. */
+export function usualDay(hours: Hours, date: string): Override | null {
+  if (!date) return null;
+  const weekday = new Date(`${date}T12:00:00Z`).getUTCDay();
+  if (Number.isNaN(weekday)) return null;
+  const periods = hours.weekly.filter(period => period.day === weekday).sort((a, b) => a.opens.localeCompare(b.opens));
+  return periods.length ? { date, closed: false, opens: periods[0]!.opens, closes: periods[periods.length - 1]!.closes } : { date, closed: true };
+}
+
+/**
+ * The form's fields for a date: its own override, or else (`fallback: "usual"`) what the usual week already
+ * says. Picking a holiday with no override starts at Closed all day (`fallback: "closed"`), the change people
+ * come here to make (XA · R2); an Undo puts the day back to the usual week.
+ */
+export function dayFields(hours: Hours, date: string, fallback: "usual" | "closed" = "usual"): { open: "closed" | "open"; opens: string; closes: string; note: string } {
+  const own = hours.overrides?.find(item => item.date === date) ?? (fallback === "usual" ? usualDay(hours, date) : null);
+  return own && !own.closed ? { open: "open", opens: own.opens ?? "09:00", closes: own.closes ?? "17:00", note: hours.overrides?.find(item => item.date === date)?.label ?? "" }
+    : { open: "closed", opens: "09:00", closes: "13:00", note: hours.overrides?.find(item => item.date === date)?.label ?? "" };
+}
 
 export function RecordPublishingFields({ record, approvalCopy, readOnly = false, request = fetch, backHref, listingConnected, initialMode = "day", initialDate, now, readers }: {
   record: BusinessRecord; approvalCopy?: string | null; readOnly?: boolean; request?: typeof fetch;
@@ -56,10 +77,11 @@ export function RecordPublishingFields({ record, approvalCopy, readOnly = false,
   const holidays = useMemo(() => upcomingHolidays(now), [now]);
   const [date, setDate] = useState(initialDate ?? holidays[0]?.date ?? "");
   const existing = hours.overrides?.find(item => item.date === date);
-  const [dayOpen, setDayOpen] = useState<"closed" | "open">(existing && !existing.closed ? "open" : "closed");
-  const [opens, setOpens] = useState(existing?.opens ?? "09:00");
-  const [closes, setCloses] = useState(existing?.closes ?? "13:00");
-  const [note, setNote] = useState(existing?.label ?? "");
+  const initialFields = dayFields(hours, date, "closed");
+  const [dayOpen, setDayOpenState] = useState<"closed" | "open">(initialFields.open);
+  const [opens, setOpensState] = useState(initialFields.opens);
+  const [closes, setClosesState] = useState(initialFields.closes);
+  const [note, setNoteState] = useState(initialFields.note);
   const [weekChanged, setWeekChanged] = useState(false);
   const [revision, setRevision] = useState(record.revision);
   const [busy, setBusy] = useState(false);
@@ -67,24 +89,37 @@ export function RecordPublishingFields({ record, approvalCopy, readOnly = false,
   const [fieldError, setFieldError] = useState<{ date?: string; times?: string }>({});
   const [result, setResult] = useState<{ google: RecordGoogleEffect[]; propagationError?: string; record: { revision: number; changeCount: number } }>();
   const commandId = useRef<string | null>(null);
+  // The one yes (XaYes): waiting > going > live with Undo, then undone or expired. An edit after a save arms it again.
+  const [yes, setYes] = useState<XaYesState>("waiting");
+  // Undo after a save: the hours as they were, written back as a new revision through the same route,
+  // and the Google drafts that save prepared, withdrawn while Google still waits on them.
+  const [undo, setUndo] = useState<{ before: Hours; sentence: string; drafts: string[] } | null>(null);
+  const [undone, setUndone] = useState<"done" | "failed" | null>(null);
+  // How many of the undone save's Google drafts were still waiting and could not be withdrawn.
+  const [leftWaiting, setLeftWaiting] = useState(0);
   const connected = listingConnected ?? Boolean(approvalCopy);
   const disabled = readOnly || busy;
 
+  /** Any edit after a save re-arms the yes; the saved result steps aside for "This will change". */
+  function edited() { if (result) setResult(undefined); if (yes !== "waiting") setYes("waiting"); setUndo(null); setUndone(null); commandId.current = null; }
+  function fillDay(fields: ReturnType<typeof dayFields>) { setDayOpenState(fields.open); setOpensState(fields.opens); setClosesState(fields.closes); setNoteState(fields.note); }
+  const setDayOpen = (value: "closed" | "open") => { setDayOpenState(value); edited(); };
+  const setOpens = (value: string) => { setOpensState(value); edited(); };
+  const setCloses = (value: string) => { setClosesState(value); edited(); };
+  const setNote = (value: string) => { setNoteState(value); edited(); };
+
   function pickDate(next: string) {
-    setDate(next); setResult(undefined); commandId.current = null;
-    const found = hours.overrides?.find(item => item.date === next);
-    setDayOpen(found && !found.closed ? "open" : "closed");
-    if (found?.opens) setOpens(found.opens);
-    if (found?.closes) setCloses(found.closes);
-    setNote(found?.label ?? "");
+    setDate(next); edited();
+    fillDay(dayFields(hours, next, "closed"));
   }
-  function changeWeek(next: Hours) { setHours(next); setWeekChanged(true); setResult(undefined); commandId.current = null; }
+  function changeWeek(next: Hours) { setHours(next); setWeekChanged(true); edited(); }
 
   const dayOverride: Override | null = date ? (dayOpen === "closed" ? { date, closed: true, ...(note.trim() ? { label: note.trim() } : {}) } : { date, closed: false, opens, closes, ...(note.trim() ? { label: note.trim() } : {}) }) : null;
   const nextHours: Hours = mode === "day" && dayOverride
     ? { ...hours, overrides: [...(hours.overrides ?? []).filter(item => item.date !== date), dayOverride].sort((a, b) => a.date.localeCompare(b.date)) }
     : hours;
-  const dayChanged = mode === "day" && Boolean(dayOverride) && JSON.stringify(existing ?? null) !== JSON.stringify(dayOverride);
+  // A day with no override of its own compares against what the usual week already says: showing those hours is not a change.
+  const dayChanged = mode === "day" && Boolean(dayOverride) && JSON.stringify(existing ?? usualDay(hours, date)) !== JSON.stringify(dayOverride);
   const changed = mode === "day" ? dayChanged : weekChanged;
 
   async function save() {
@@ -95,16 +130,37 @@ export function RecordPublishingFields({ record, approvalCopy, readOnly = false,
       setFieldError(problems);
       if (Object.keys(problems).length) return;
     }
-    setBusy(true); setError(""); setResult(undefined);
+    if (!changed) { setError(mode === "week" ? "Change an hour first. Nothing is saved yet." : "Pick a day or change its hours first. Nothing is saved yet."); return; }
+    setBusy(true); setError(""); setResult(undefined); setUndo(null); setUndone(null); setYes("going");
+    const before = hours;
     try {
-      if (!changed) { setError(mode === "week" ? "Change an hour first. Nothing is saved yet." : "Pick a day or change its hours first. Nothing is saved yet."); return; }
       commandId.current ??= crypto.randomUUID();
       const response = await request("/api/workspace/publishing/record", { method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ workspaceId: record.workspaceId, revision, commandId: commandId.current, patch: { facts: { hours: { value: nextHours } } }, googleApprovalDisclosed: Boolean(approvalCopy) }) });
       const data = await response.json(); if (!response.ok) throw new Error(data.error || "Your hours could not be confirmed. Reload before trying again.");
       setResult(data.result); setRevision(data.result.record.revision); setHours(nextHours); setWeekChanged(false); commandId.current = null;
+      const drafts = (data.result.google as RecordGoogleEffect[]).filter(effect => effect.status === "needs_approval" && effect.eventId).map(effect => effect.eventId!);
+      if (data.result.record.changeCount) setUndo({ before, sentence: mode === "day" ? `${date ? shortDate(date) : "That day"} saved: ${dayHours.toLowerCase()}` : "Your usual week is saved", drafts });
+      setYes(data.result.record.changeCount ? "live" : "expired");
       router.refresh();
-    } catch (cause) { setError(cause instanceof Error ? cause.message : "Your hours could not be saved."); }
+    } catch (cause) { setYes("waiting"); setError(cause instanceof Error ? cause.message : "Your hours could not be saved."); }
+    finally { setBusy(false); }
+  }
+
+  async function takeBack() {
+    if (!undo || busy) return;
+    const { before, drafts } = undo;
+    setUndo(null); setBusy(true); setError("");
+    try {
+      const response = await request("/api/workspace/publishing/record", { method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ workspaceId: record.workspaceId, revision, commandId: crypto.randomUUID(), patch: { facts: { hours: { value: before } } }, googleApprovalDisclosed: Boolean(approvalCopy), ...(drafts.length ? { withdrawGoogleEventIds: drafts } : {}) }) });
+      const data = await response.json(); if (!response.ok) throw new Error(data.error || "That couldn't be undone. Your saved hours are still there.");
+      setResult(data.result); setRevision(data.result.record.revision); setHours(before); setUndone("done"); setYes("undone");
+      setLeftWaiting(Math.max(0, drafts.length - (data.result.google as RecordGoogleEffect[]).filter(effect => effect.status === "withdrawn").length));
+      // The form shows the day as it now is: its own override if it had one, otherwise the usual week's hours.
+      fillDay(dayFields(before, date));
+      router.refresh();
+    } catch (cause) { setUndone("failed"); setYes("expired"); setError(cause instanceof Error ? cause.message : "That couldn't be undone. Your saved hours are still there."); }
     finally { setBusy(false); }
   }
 
@@ -119,13 +175,18 @@ export function RecordPublishingFields({ record, approvalCopy, readOnly = false,
     ...googleRow,
   ];
   const primaryLabel = approvalCopy ? XA_YES_LABELS.yes : mode === "day" ? "Save this day" : "Save your week";
+  const googleHref = `/workspace/google?workspaceId=${encodeURIComponent(record.workspaceId)}`;
+  const withdrawnCount = result?.google.filter(effect => effect.status === "withdrawn").length ?? 0;
+  // After an Undo, a fresh Google draft waits only when Google had (or may still get) the change being undone.
+  const undoWaits = undone === "done" ? result?.google.filter(effect => effect.status === "needs_approval") ?? [] : [];
+  const stillWaiting = undoWaits;
   const dateInput = useRef<HTMLInputElement>(null);
 
   return <div className={styles.hours}>
     <form className={styles.hoursMain} onSubmit={event => { event.preventDefault(); void save(); }} aria-label="Hours from your business record">
       {backHref ? <nav className={styles.crumb} aria-label="Where you are"><a href={backHref}>Business record</a><span aria-hidden="true">/</span><span>Hours</span></nav> : null}
       {mode === "day" ? <XaHeadline quiet="Your usual week stays as it is.">Holiday hours for one day.</XaHeadline> : <XaHeadline quiet="One-off days sit under One day.">Your usual week.</XaHeadline>}
-      <XaSegmented label="Which hours" value={mode} onChange={next => { setMode(next); setResult(undefined); }} options={[{ value: "week", label: "Usual week" }, { value: "day", label: "One day" }]} />
+      <XaSegmented label="Which hours" value={mode} onChange={next => { setMode(next); edited(); }} options={[{ value: "week", label: "Usual week" }, { value: "day", label: "One day" }]} />
       {mode === "day" ? <div className={styles.hoursForm}>
         {holidays.length ? <div className={styles.holidays} role="group" aria-label="Coming up">{holidays.map(holiday => <button key={holiday.date} type="button" className={styles.holiday} aria-pressed={date === holiday.date} disabled={disabled} onClick={() => pickDate(holiday.date)}>{holiday.label} · {shortDate(holiday.date)}</button>)}</div> : null}
         <label className={styles.dayField} data-disabled={disabled || undefined} data-invalid={fieldError.date ? true : undefined}
@@ -135,7 +196,7 @@ export function RecordPublishingFields({ record, approvalCopy, readOnly = false,
           <input ref={dateInput} className={styles.dayInput} type="date" required value={date} disabled={disabled} aria-label={`Day, ${date ? longDate(date) : "not chosen"}`} onChange={event => pickDate(event.target.value)} />
         </label>
         {fieldError.date ? <p className={styles.fieldError} role="alert">{fieldError.date}</p> : null}
-        <XaChoices label="Hours that day" value={dayOpen} onChange={value => { setDayOpen(value); setResult(undefined); }} options={[{ value: "closed", label: "Closed all day" }, { value: "open", label: "Open different hours" }]} />
+        <XaChoices label="Hours that day" value={dayOpen} onChange={value => setDayOpen(value)} options={[{ value: "closed", label: "Closed all day" }, { value: "open", label: "Open different hours" }]} />
         {dayOpen === "open" ? <div className={styles.timePair}>
           <XaField label="Opens" type="time" required value={opens} disabled={disabled} onChange={event => setOpens(event.target.value)} error={fieldError.times} />
           <XaField label="Closes" type="time" required value={closes} disabled={disabled} onChange={event => setCloses(event.target.value)} />
@@ -165,16 +226,23 @@ export function RecordPublishingFields({ record, approvalCopy, readOnly = false,
     <aside className={styles.changes} aria-labelledby="hours-changes">
       <div className={styles.changesHead}><h2 id="hours-changes">{result ? "What changed" : "This will change"}</h2><span className={styles.changesWhen}>{result ? "Just now" : "Before you save"}</span></div>
       {result ? <div className={styles.result} role="status">
-        <XaSays>{result.record.changeCount ? `Saved. ${mode === "day" ? `${dayText} reads ${dayHours.toLowerCase()}.` : "Your usual week is updated."}` : "Nothing changed in your record."}</XaSays>
+        <XaSays links={stillWaiting.length ? [<XaTextLink key="google" href={googleHref}>See what Google waits on</XaTextLink>] : undefined}>{undone === "done" ? `Undone. ${mode === "day" ? `${dayText} is back to ${dayHours.toLowerCase()}${existing ? "" : ", as in your usual week"}.` : "Your usual week is back to what it was."}${leftWaiting && undoWaits.length ? ` Google still has the ${mode === "day" && date ? shortDate(date) : "earlier"} change waiting, and Strelva sent it the undo too. Say yes only to the newest one.` : withdrawnCount ? " Google never got the change, so Strelva withdrew it there too." : undoWaits.length ? " Google shows the earlier change; putting it back waits for your yes on Google." : ""}` : result.record.changeCount ? `Saved. ${mode === "day" ? `${dayText} reads ${dayHours.toLowerCase()}.` : "Your usual week is updated."}` : "Nothing changed in your record."}</XaSays>
         {result.propagationError ? <p className={styles.quietNote}>{result.propagationError}</p> : null}
         <ul className={styles.changesList}>{result.google.map((effect, index) => { const words = GOOGLE_WORDS[effect.status]; return <li key={index} className={styles.change}><XaSystemTile kind="listing" size={40} /><span className={styles.changeText}><span className={styles.changeTitle}>Google listing{result.google.length > 1 ? ` ${index + 1}` : ""}</span><span className={styles.changeDetail}>{effect.kind === "hours" ? "Hours" : "Business info"}{effect.reason ? `. ${effect.reason}` : ""}</span></span><XaStatus kind={words.kind} size="sm">{words.text}</XaStatus></li>; })}</ul>
-        {result.google.length ? <XaTextLink href={`/workspace/google?workspaceId=${encodeURIComponent(record.workspaceId)}`}>See each Google change</XaTextLink> : null}
+        {result.google.length && !stillWaiting.length ? <XaTextLink href={googleHref}>See each Google change</XaTextLink> : null}
       </div> : <ul className={styles.changesList}>{changes.map(item => <li key={item.key} className={styles.change}>{item.lead}<span className={styles.changeText}><span className={styles.changeTitle}>{item.title}</span><span className={styles.changeDetail}>{item.detail}</span>{item.extra ? <span className={styles.changeDetail}>{item.extra}</span> : null}</span>{item.state ?? <span />}</li>)}</ul>}
       {!result && !connected ? <p className={styles.quietNote}>No Google listing is connected, so nothing outside Strelva changes.</p> : null}
       {error ? <p className={styles.quietNote} role="alert">{error}</p> : null}
       <div className={styles.changesActions}>
-        {readOnly ? null : <XaButton type="button" variant="primary" size="lg" block busy={busy} onClick={() => result ? (backHref ? router.push(backHref) : setResult(undefined)) : void save()}>{result ? "Back to your record" : primaryLabel}</XaButton>}
-        {backHref && !result ? <XaTextLink href={backHref}>Cancel</XaTextLink> : null}
+        {readOnly ? null : <XaYes state={yes} yesLabel={primaryLabel} onYes={() => void save()} shortcut={false}
+          disabledReason={yes === "waiting" && !changed && !busy ? mode === "day" ? `${date ? longDate(date) : "That day"} already reads ${dayHours.toLowerCase()}. Choose what's different first.` : "Your usual week is as saved. Change an hour first." : undefined}
+          unblock={mode === "day" ? <XaTextLink onClick={() => setDayOpen(dayOpen === "closed" ? "open" : "closed")}>{dayOpen === "closed" ? "Open different hours" : "Close it all day"}</XaTextLink>
+            : <XaTextLink onClick={() => document.querySelector<HTMLInputElement>(`input[aria-label="${DAYS[1]} opens"]`)?.focus()}>Change an hour</XaTextLink>}
+          working={yes === "going" ? { title: "Saving your hours", steps: [{ id: "record", label: `Writing ${mode === "day" ? dayText : "your usual week"} to ${businessName}'s record`, state: "active" }, ...(connected ? [{ id: "google", label: "Preparing the Google listing", state: "pending" as const }] : [])] } : undefined}
+          liveLabel={undo?.sentence} onUndo={undo ? () => void takeBack() : undefined} onUndoExpired={() => { setUndo(null); setYes("expired"); }}
+          settled={null} />}
+        {/* After a save, going back is navigation: a text link, never the ink pill. */}
+        {backHref ? <XaTextLink href={backHref}>{result ? "Back to your record" : "Cancel"}</XaTextLink> : null}
       </div>
     </aside>
   </div>;

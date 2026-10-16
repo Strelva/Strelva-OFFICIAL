@@ -128,6 +128,7 @@ export function CareReportEditor({ initial, brand, emailOn, shareLinksOn, origin
 
   const signedInLink = careReportWorkspaceUrl(origin, report.id, report.businessWorkspaceId, latest || undefined);
   const noteTooLong = note.length > NOTE_MAX;
+  const noteId = `care-note-${report.id}`;
   const noteDirty = note !== (view.report.agencyNote ?? "");
   const next = careReleaseLabel(latest + 1);
   const latestRelease = releases[0];
@@ -142,14 +143,15 @@ export function CareReportEditor({ initial, brand, emailOn, shareLinksOn, origin
     {view.canWrite ? <div className={styles.shareYes}><XaYes state={yesState} yesLabel={`Share ${next} with ${business}`} onYes={() => void publish()}
       liveLabel={sharedNumber !== null ? `${careReleaseLabel(sharedNumber)} shared with ${business}` : undefined}
       failure={problem ?? `${next} was not shared. ${business} still sees the last Release.`}
-      disabledReason={!facts.success ? "Count the month again to rebuild the draft first." : noteTooLong ? `Keep the note under ${NOTE_MAX} characters.` : undefined} /></div> : null}
+      disabledReason={!facts.success ? "Count the month again to rebuild the draft first." : noteTooLong ? `Keep the note under ${NOTE_MAX} characters.` : undefined}
+      unblock={!facts.success ? <XaTextLink onClick={() => void refresh()}>{busy === "refresh" ? "Counting again" : "Count the month again"}</XaTextLink> : <XaTextLink href={`#${noteId}`}>Shorten the note</XaTextLink>} /></div> : null}
   </>;
   const emailLine = careDeliveryLine(null, false);
   const story = <>
     {message ? <XaNote role="status" tone="done">{message}</XaNote> : null}
     {problem && !publishFailed ? <XaNote role="alert" tone="down">{problem}</XaNote> : null}
     {view.canWrite ? <XaBlock label={`Your note to ${business}`} action={noteDirty && !noteTooLong ? <XaTextLink onClick={() => void saveNote()}>{busy === "note" ? "Saving" : "Save without sharing"}</XaTextLink> : undefined}>
-      <XaTextArea label={<span className="sr-only">Your note to {business}</span>} value={note} maxLength={NOTE_MAX + 200} rows={4} onChange={event => setNote(event.target.value)}
+      <XaTextArea id={noteId} label={<span className="sr-only">Your note to {business}</span>} value={note} maxLength={NOTE_MAX + 200} rows={4} onChange={event => setNote(event.target.value)}
         hint={noteTooLong ? undefined : note.length > NOTE_MAX * 0.8 ? `${NOTE_MAX - note.length} characters left` : "It goes at the top of the report, beside your name."} error={noteTooLong ? `Keep the note under ${NOTE_MAX} characters.` : undefined} placeholder="What you did this month, in your words" />
     </XaBlock> : <XaNote>You can read this report. An agency owner or admin adds the note and shares it.</XaNote>}
     <XaBlock label={`With ${business}`}>

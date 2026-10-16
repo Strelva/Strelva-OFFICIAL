@@ -13,7 +13,7 @@ export { XaDot, XaInitial, xaInitialOf, XaKbd, XaMark, XaStatus, type XaStatusKi
 export { XA_POSES, XA_SYSTEM_KINDS, XaAddTile, XaPebbleAvatar, XaPebbleScene, XaSystemTile, xaSystemKind, type XaPose, type XaSystemKind } from "./xa/characters";
 export { XaComposer, XaWaiting, type XaComposerScope, type XaComposerSystem, type XaWaitingItem } from "./xa/composer";
 export { XaStream, XaWorking, type XaWorkingStep } from "./xa/working";
-export { XaDecision, XaUndo, XaUndoDock, XaYes, type XaYesState } from "./xa/yes";
+export { XaDecision, XaUndo, XaUndoDock, XaYes, type XaUnblock, type XaYesState } from "./xa/yes";
 export { XaAnswers, XaEmpty, XaFold, XaHeadline, XaLabel, XaLede, XaLines, XaPage, XaPageChange, XaRow, XaRows, XaSays, XaSheet } from "./xa/surfaces";
 export { XaChoices, XaDoors, XaField, XaFileDrop, XaSegmented, XaSelect, XaTextArea, type XaOption } from "./xa/inputs";
 export { XaCollapse, XaGlideList, XaRollingCount } from "./xa/motion";

@@ -50,7 +50,7 @@ it("rejects identity from a foreign scope and keeps the targeted revocation iden
   expect(node.textContent).not.toContain("North Studio");
   // No ids are shown to an owner; the row stays identifiable by what was shared.
   expect(node.textContent).not.toContain(agencyId);
-  expect(node.textContent).toContain("I couldn't confirm this agency's name.");
+  expect(node.textContent).toContain("Strelva couldn't confirm this agency's name.");
   expect([...node.querySelectorAll("button")].find(button => button.textContent?.startsWith("Stop sharing"))?.disabled).toBe(false);
 });
 it("refuses an acknowledgment receipt for another handoff", async () => {

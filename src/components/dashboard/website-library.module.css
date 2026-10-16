@@ -11,4 +11,14 @@
 .mediaRow { display: flex; align-items: center; gap: 16px; }
 .mediaLogo { width: 48px; height: 48px; object-fit: contain; border-radius: var(--st-r-sm); background: var(--st-inset); }
 .actions { display: flex; align-items: center; flex-wrap: wrap; gap: 16px; }
-@media (max-width: 767px) { .photoGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px 16px; } }
+@media (max-width: 767px) {
+  .photoGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px 16px; }
+  /* A phone opens the photo in place of the grid, in the page itself: no sheet, no scrim. */
+  .library { flex-direction: column; }
+  .library > * { flex-shrink: 0; }
+  /* The page's own scroll box steps aside on a phone, so the library scrolls as one page with the photo in it. */
+  .library > :first-child { flex: 0 0 auto; height: auto; overflow: visible; }
+  .library[data-open="true"] > :first-child > * { padding-bottom: 24px; }
+  .library > [role="region"] { width: auto; margin: 0 16px 24px; }
+  .library[data-open="true"] .photoGrid, .library[data-open="true"] .photoHint { display: none; }
+}

@@ -116,6 +116,7 @@ function GooglePreview({ state, mode }: { state: string; mode: "light" | "dark" 
       summary={{ gsc: { status: "ok", totals: { clicks: 318, impressions: 9420, position: 7.4 } }, ga4: { status: "ok", report: { users: 1204, sessions: 1530, pageviews: 4012 } } }} actions={{ start: noop, choose: noop, disconnect: noop }} /> : null}</>;
   return <OwnerShell mode={mode} title="Google listing" current="listing" account={state === "agency" ? "Maya Okafor" : XA_HARBOR.owner}>
     <WorkspaceGoogle workspaceId={WS} state={listingState} action={action} result={result} connect={connect} reviews={state === "connected" || state === "waiting" ? { kind: "ready", data: [REVIEWS] } : undefined}
+      reconnect={state === "disconnected" ? async () => { setResult("Preview: Google sign-in would open here. Nothing was connected."); } : undefined}
       reviewRequest={async () => Response.json({ published: false })} />
   </OwnerShell>;
 }

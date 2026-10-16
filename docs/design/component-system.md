@@ -198,8 +198,10 @@ XA-4 Systems up close (October 16, branch xa/lane-xa4-systems):
 - **E5, patient form:** [VisitorIntakeForm](../../src/experience/vertical-intake/VisitorIntakeForm.tsx)
   renders a real `PublicIntakeForm`, checks with `validateIntakeAnswers`, and is
   the "What patients see" preview on the Dental intake panel.
-- **E6, Today on the phone:** [OwnerPhoneToday](../../src/experience/workspace/OwnerPhoneToday.tsx)
-  on `NeedsYouState` and `SystemView[]`. Not yet mounted by `BusinessHome`.
+- **E6, Today on the phone:** the real owner Home, [OwnerToday](../../src/experience/workspace/today/OwnerToday.tsx),
+  which `BusinessHome` mounts at `/workspace`; below 768 px it is the phone
+  layout with one composer carrying what waits (October 16: the separate
+  `OwnerPhoneToday` was retired so there is one Home).
 - Previews: `/preview/strelva/xa/xa7-outside/{waits-email,phone-yes,monday-email,booking,patient-form,today-phone}`.
 - **October 16 fixes:** the business (name, owner, logo or initial) heads every
   E2 page, never the platform's mark; an agency adds its logo or initial,
@@ -407,6 +409,20 @@ and every product caller uses `XaYes` directly, with `question` for an act that
 has no server Undo. `StComposerBar` is a deprecated wrapper that renders
 `XaComposer` (a string `scope` becomes its scope chip), and `WorkspaceComposer`
 draws `XaComposer` in every tone. See `design-notes/XA-FOUNDATION.md`.
+
+October 16 owner-lane critic pass (kit):
+- `XaYes` with `disabledReason` now requires `unblock` (type `XaUnblock`, never
+  empty): a blocked yes always carries the action or text link that clears it.
+- `XaWaiting` is a line above the composer field with a hairline under it, not
+  a filled card inside the composer card. Owner Home passes the business scope
+  chip in every state, so the composer chrome never changes with what waits.
+- While `XaUndoDock` is mounted, the page that scrolls under it reserves the
+  pill's height (the composer-dock rule), so nothing is left covered.
+- The entry felt (`XaEntry` stage) and `XaPebbleScene`'s circle are one flat
+  felt tone: no radial haze. With a panel, the entry's account links sit at
+  the page's right edge over the panel corner, not where the task column ends.
+- `PhotoLibrary` deletes softly for the Undo window; `PhotoDetail` opens beside
+  the grid on desktop and in place of it on a phone (no sheet or scrim).
 
 October 12 legacy adoption adds [StChoiceCards / StChoiceLink](../../src/components/ui/strelva/ChoiceCards.tsx):
 full-card account choices use native radio semantics, a shared group name, visible

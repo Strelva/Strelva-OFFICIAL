@@ -33,9 +33,13 @@ const detailFetch = (extra?: (url: string, init?: RequestInit) => Response | und
 
 describe("XA · S5 A Possibility", () => {
   it("compares live and proposed, and puts it live through the same Make real call with one yes", async () => {
-    const request = detailFetch(url => url === "/api/workspace/systems/make-real" ? Response.json({ live: { live: true, status: "done", headline: "Live on harbordental.com", activationId: "a1" } }) : undefined);
+    const onAsk = vi.fn();
+    const request = detailFetch(url => url === "/api/workspace/systems/make-real" ? Response.json({ live: { live: true, status: "done", headline: "Live on harbordental.com", activationId: "a1" } })
+      // The read-back: the activation and the Possibility are gone, and a receipt says what landed.
+      : url.startsWith("/api/workspace?") ? Response.json({ workspaceId: XA4_WORKSPACE, systems: { status: "ready", systems: [], connections: [], possibilities: [], activations: [], handled: [{ id: "r1", systemId: XA4_SITE, sentence: "Book a visit is at the top of harbordental.com.", at: new Date().toISOString(), undo: "" }] } })
+        : undefined);
     const site = harborWebsite("waiting");
-    const node = await mount(createElement(SystemPage, { ...base, system: site, systems: [site], initialPossibilityId: site.possibilities[0]!.id }), request);
+    const node = await mount(createElement(SystemPage, { ...base, onAsk, system: site, systems: [site], initialPossibilityId: site.possibilities[0]!.id }), request);
     expect(node.textContent).toContain("Put booking at the top of your home page.");
     expect(node.textContent).toContain("A Possibility from Maya at North Studio · Nov 21");
     expect(node.textContent).toContain("Your site stays as it is until you say yes.");
@@ -46,7 +50,18 @@ describe("XA · S5 A Possibility", () => {
     await act(async () => { await new Promise(resolve => setTimeout(resolve, 0)); });
     const call = request.mock.calls.find(([url]) => url === "/api/workspace/systems/make-real")!;
     expect(JSON.parse(String(call[1]!.body))).toEqual({ workspaceId: XA4_WORKSPACE, possibilityId: site.possibilities[0]!.id, executionMode: "live" });
-    expect(node.textContent).toContain("Live on harbordental.com");
+    await act(async () => { await new Promise(resolve => setTimeout(resolve, 0)); });
+    expect(request.mock.calls.some(([url]) => String(url).startsWith("/api/workspace?"))).toBe(true);
+    expect(node.textContent).toContain("Book a visit is at the top of harbordental.com.");
+    expect(node.textContent).not.toContain("Reload");
+    // Live: the live page alone (read again), no Proposed beside it, and no trail of checks.
+    expect(node.querySelectorAll("iframe")).toHaveLength(1);
+    expect(node.textContent).not.toContain("Proposed");
+    // No pill pretends to be Undo: rolling it back is its own change, and the link that asks for it stays.
+    expect(button(node, "Roll it back")).toBeUndefined();
+    expect(node.textContent).toContain("Rolling it back is its own change.");
+    await act(async () => button(node, "Ask Strelva to roll it back")!.click());
+    expect(onAsk).toHaveBeenCalledWith(expect.stringContaining("Roll back"));
   });
 
   it("asks for a reload instead of a retry when the answer is lost", async () => {
@@ -56,14 +71,14 @@ describe("XA · S5 A Possibility", () => {
     await act(async () => button(node, "Make it live")!.click());
     await act(async () => { await new Promise(resolve => setTimeout(resolve, 0)); });
     expect(node.querySelector("[role=alert]")?.textContent).toContain("Reload this System");
-    expect([...node.querySelectorAll("a")].find(link => link.textContent === "Reload now")?.getAttribute("href")).toBe(`/systems/${XA4_SITE}`);
+    expect([...node.querySelectorAll("a")].find(link => link.textContent?.startsWith("Check "))?.getAttribute("href")).toBe(`/systems/${XA4_SITE}`);
     expect(button(node, "Try again")).toBeUndefined();
   });
 
   it("blocks the yes for someone who is not the owner and says why", async () => {
     const site = { ...harborWebsite("waiting"), possibilities: [harborPossibility()] };
     const html = renderToStaticMarkup(createElement(SystemPage, { ...base, readOnly: true, canMakeReal: false, ownerName: "Dr. Lin", system: site, systems: [site], initialPossibilityId: site.possibilities[0]!.id, websiteDetail: { status: "ready", detail: harborWebsiteDetail("full") } }));
-    expect(html).toMatch(/<button[^>]*disabled=""[^>]*>[^]*?Make it live/);
+    expect(html).not.toContain("data-xa-primary");
     expect(html).toContain("Only Dr. Lin can say yes to this.");
     expect(html).not.toContain("possibility real");
   });

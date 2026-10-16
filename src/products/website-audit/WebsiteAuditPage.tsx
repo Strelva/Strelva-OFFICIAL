@@ -372,6 +372,7 @@ export function WebsiteAuditPage({ initialUrl = "", initialBusiness = "", initia
 
   const body = state === "scanning" ? <WebsiteAuditPending url={url} business={business} headingRef={headingRef} /> : state === "done" ? done : idle;
   const scanningPage = <CheckPage address={hostOf(url) || "your site"} title={business.trim() || hostOf(url)} source="Reading now" facts={readingMarks()} />;
+  const idlePage = <CheckPage address={hostOf(url) || "yourbusiness.com"} title={business.trim() || "Your business"} source="What the check looks for" facts={LOOKING_FOR.map(([id, label]) => ({ id, label, state: "waiting" as const })).concat([{ id: "health", label: "Speed, search, phones, security and accessibility", state: "waiting" as const }])} label="What the check reads on your site" />;
   const felt: ReactNode = state === "done"
     ? result
       ? <XaEntryFelt object={<>{page}{!aiResult ? <div className={styles.feltLine}><XaEntryPebbleLine>{aiError ? "Gemini didn’t answer this time." : "Gemini wasn’t part of this check."} <XaTextLink onClick={handleReset}>Run a complete check</XaTextLink></XaEntryPebbleLine></div>
@@ -383,7 +384,8 @@ export function WebsiteAuditPage({ initialUrl = "", initialBusiness = "", initia
         ? <XaEntryFelt pose="fixing" title={agency ? `${agency.name}’s link needs a fix.` : "This agency link needs a fix."}>Nothing was checked, and nothing on any site changed.</XaEntryFelt>
         : error
           ? <XaEntryFelt pose="fixing" title="The check didn’t finish.">Run it again with the same website and business name. Nothing on your site changed.</XaEntryFelt>
-          : <XaEntryFelt pose="fixing" title="Two checks, one answer.">Website health across speed, search, phones, structured data, security and accessibility. Then whether Gemini names your business when someone asks.</XaEntryFelt>;
+          // Before a check: no idle Pebble. The page the check will read, with what it looks for; Pebble arrives to read it once it runs.
+          : <XaEntryFelt object={<>{idlePage}<div className={styles.feltLine}><p className={styles.quiet}>Two checks, one answer: website health, then whether Gemini names your business when someone asks.</p></div></>} />;
 
   if (embed) return <div data-workspace-theme="linen" data-workspace-mode={mode} className={styles.embed}>
     {brand ? <p className={styles.embedBrand} data-agency-brand={brand.agencyId ?? undefined}><span>Prepared by {brand.name}. Runs on Strelva.</span></p> : null}
@@ -391,7 +393,7 @@ export function WebsiteAuditPage({ initialUrl = "", initialBusiness = "", initia
   </div>;
 
   return <XaEntryFrame brand={brand} brandCredit={false} mode={mode} wide={state === "done"} label="Website and business check"
-    end={<>{!brand ? <XaTextLink href="/agencies">For agencies</XaTextLink> : null}<XaTextLink href={signedIn ? "/workspace" : "/sign-in"}>{signedIn ? "Your workspace" : "Sign in"}</XaTextLink></>}
+    end={<>{!brand ? <XaTextLink href="/agencies">For agencies</XaTextLink> : null}<XaTextLink href={signedIn ? "/workspace" : "/sign-in"}>{signedIn ? "Your business" : "Sign in"}</XaTextLink></>}
     phoneSays={state === "scanning" ? "Reading the site now. Nothing on it changes." : state !== "done" && (error || attributionError) ? (attributionError ? "This agency link needs a fix." : "The check didn’t finish.") : undefined}
     felt={felt}
     footnote={brand ? `Prepared by ${brand.name}. Runs on Strelva.` : undefined}>

@@ -13,7 +13,7 @@
  * because no picture of the page at that time is stored (said, not faked).
  */
 import { useRef, useState } from "react";
-import { XaAnswers, XaButton, XaButtonLink, XaEmpty, XaHeadline, XaInitial, XaPage, XaPageChange, XaPebbleAvatar, XaStatus, XaTextLink } from "@/components/ui/strelva/Xa";
+import { XaAnswers, XaButton, XaButtonLink, XaEmpty, XaHeadline, XaInitial, XaPage, XaPebbleAvatar, XaSays, XaStatus, XaTextLink } from "@/components/ui/strelva/Xa";
 import { actorPresentation, recordedActor } from "@/platform/presentation/actor";
 import { useWorkspaceRequest } from "@/experience/workspace/WorkspaceRequest";
 import type { SystemHistoryRow } from "../model";
@@ -131,10 +131,9 @@ export function WebsiteHistoryView({ workspaceId, systemId, siteName, state, sys
       <div className={styles.sheetHead}><h2 className={styles.sheetTitle}>Release {number(index)}</h2><span className={styles.quiet}>{byLine(selected)}</span></div>
       {showLive ? <XaPage bleed flat address={address || siteName} label={`${siteName} as visitors see it now`}>
         <iframe className={styles.sheetFrame} title={`${siteName} as visitors see it now`} src={livePreviewSrc} sandbox={sandbox(livePreviewSrc)} loading="lazy" referrerPolicy="no-referrer" tabIndex={-1} />
-      </XaPage> : <XaPage flat address={address || siteName} label={`${titleOf(selected)}, on ${siteName}`}>
-        <XaPageChange>{titleOf(selected)}</XaPageChange>
-        <p className={styles.pageNote}>{index === 0 ? "This is the newest change." : "A picture of the page at the time isn't kept. Going back shows it to you before anything changes."}</p>
-      </XaPage>}
+      </XaPage> : <XaSays>{index === 0
+        ? `${titleOf(selected)}. This is the newest change, and Strelva didn't keep a picture of the page from it.`
+        : `Strelva didn't keep a picture of ${siteName} from ${day(selected.at)}, so its change is named here instead: ${titleOf(selected).replace(/[.?!]+$/, "")}.`}</XaSays>}
       <XaAnswers labelWidth={110} rows={[
         ...(showLive ? [["Changed", titleOf(selected)] as const] : []),
         ...(selected.deployment ? [["Checked", CHECKED[selected.deployment.readBack]] as const] : []),

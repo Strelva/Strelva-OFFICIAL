@@ -58,10 +58,10 @@ describe("agency Full-control review", () => {
     const request = vi.fn<typeof fetch>().mockResolvedValue(Response.json(page([{ ...decision, review: null }], false)));
     await mount(request);
     expect(node.textContent).toContain("exact reviews could not be loaded");
+    // A blocked yes is a sentence, never a dead pill: there is nothing to press that approves unseen changes.
     const controls = [...node.querySelectorAll("button")].filter(button => button.textContent !== "Refresh decisions");
-    expect(controls).toHaveLength(1);
-    expect(controls.every(button => button.disabled)).toBe(true);
-    await click("Make it live");
+    expect(controls.some(button => button.textContent?.includes("Make it live"))).toBe(false);
+    expect(node.querySelector("[data-xa-primary]")).toBeNull();
     expect(request).toHaveBeenCalledTimes(1);
   });
 

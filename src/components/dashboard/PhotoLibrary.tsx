@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { Upload } from "lucide-react";
 import Image from "next/image";
 import { StSkeleton } from "@/components/ui/strelva/Kit";
-import { XaButton, XaEmpty, XaRow, XaRows, XaSays, XaTextLink, XaUndo, XaUndoDock } from "@/components/ui/strelva/Xa";
+import { XaButton, XaEmpty, XaRow, XaRows, XaTextLink, XaUndo, XaUndoDock } from "@/components/ui/strelva/Xa";
 import { strelvaUndoWindowMs } from "@/platform/infra/motion";
 import { DashEmpty, DashNote, DashPage } from "@/components/dashboard/xa/DashboardXa";
 import styles from "./website-library.module.css";
@@ -22,15 +22,20 @@ type UploadResult = {
   message: string;
 };
 
-/** A delete held for the Undo window: nothing leaves the store until it ends. */
-type HeldDelete = { asset: MediaAsset; index: number };
-
-export function PhotoLibrary({ initialSelectedId, askDeleteFirst = false }: {
-  /** Preview harnesses only: open this photo once the library loads. */
+/**
+ * The photo library. A photo opens beside the grid on desktop and in place of
+ * it on a phone (no sheet over the page). Deleting is soft for the Undo
+ * window: the photo leaves the grid at once, and the server delete runs only
+ * when the window ends (or the page closes) without an Undo.
+ */
+export interface PhotoLibraryProps {
+  /** Preview and deep links: open this photo once the library loads. */
   initialSelectedId?: string;
-  /** Preview harnesses only: open it with the delete question asked. */
-  askDeleteFirst?: boolean;
-}) {
+  /** Preview: open it with the delete question already asked. */
+  initialConfirming?: boolean;
+}
+
+export function PhotoLibrary({ initialSelectedId, initialConfirming = false }: PhotoLibraryProps) {
   const dashboard = useDashboardOptional();
   const apiHref = useMemo(
     () => dashboard?.dashboardHref ?? ((path: string) => path),
@@ -45,10 +50,13 @@ export function PhotoLibrary({ initialSelectedId, askDeleteFirst = false }: {
   const [dragging, setDragging] = useState(false);
   const [uploadResults, setUploadResults] = useState<UploadResult[]>([]);
   const [uploadProgress, setUploadProgress] = useState<{ current: number; total: number } | null>(null);
-  const [held, setHeld] = useState<HeldDelete | null>(null);
+  // A deleted photo waits here for the Undo window before the server delete is final.
+  const [removing, setRemoving] = useState<{ asset: MediaAsset; index: number } | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const removingRef = useRef<typeof removing>(null);
+  // The preview's first photo opens with the question asked; only that first time.
+  const [confirmFirst, setConfirmFirst] = useState(initialConfirming);
   const [attempt, setAttempt] = useState(0);
-  const heldRef = useRef<HeldDelete | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dragCounterRef = useRef(0);
   const today = new Date(dashboard?.fixtureNow ?? Date.now());
@@ -152,54 +160,52 @@ export function PhotoLibrary({ initialSelectedId, askDeleteFirst = false }: {
     setUploading(false);
   }, [apiHref, readOnly]);
 
-  // Delete, held for the Undo window (October 16). The photo leaves the
-  // library at once with Undo beside it; the store delete runs only when the
-  // window ends (or the owner leaves the page), so Undo is a real reversal.
-  const sendDelete = useCallback((asset: MediaAsset, keepalive = false) => fetch(
-    apiHref(`/api/media?id=${encodeURIComponent(asset.id)}`),
-    { method: "DELETE", credentials: "same-origin", keepalive },
-  ), [apiHref]);
-
-  const commitHeld = useCallback(async () => {
-    const current = heldRef.current;
-    if (!current) return;
-    heldRef.current = null;
-    setHeld(null);
+  // The server delete, once the Undo window has passed. A failure puts the photo back where it was.
+  const commitDelete = useCallback(async (pending: { asset: MediaAsset; index: number }, keepalive = false) => {
     try {
-      const res = await sendDelete(current.asset);
+      const res = await fetch(apiHref(`/api/media?id=${encodeURIComponent(pending.asset.id)}`), { method: "DELETE", credentials: "same-origin", keepalive });
       if (!res.ok) throw new Error("Delete failed");
     } catch {
-      // Put it back where it was and say so: nothing was deleted.
-      setAssets((prev) => { const next = [...prev]; next.splice(Math.min(current.index, next.length), 0, current.asset); return next; });
-      setDeleteError(`${photoCaption(current.asset.filename)} wasn't deleted. It's back in your library.`);
+      if (keepalive) return;
+      setAssets((prev) => prev.some((a) => a.id === pending.asset.id) ? prev : [...prev.slice(0, pending.index), pending.asset, ...prev.slice(pending.index)]);
+      setDeleteError(`${photoCaption(pending.asset.filename)} couldn't be deleted. It is back in your library.`);
     }
-  }, [sendDelete]);
+  }, [apiHref]);
 
-  const deleteAsset = useCallback(async (asset: MediaAsset) => {
-    // A second delete inside the window commits the first one now.
-    if (heldRef.current) void commitHeld();
-    setDeleteError(null);
-    const entry = { asset, index: Math.max(0, assets.findIndex((a) => a.id === asset.id)) };
-    heldRef.current = entry;
-    setHeld(entry);
-    setAssets((prev) => prev.filter((a) => a.id !== asset.id));
-    setSelected((current) => (current?.id === asset.id ? null : current));
-  }, [assets, commitHeld]);
-
-  const undoDelete = useCallback(() => {
-    const current = heldRef.current;
-    if (!current) return;
-    heldRef.current = null;
-    setHeld(null);
-    setAssets((prev) => { const next = [...prev]; next.splice(Math.min(current.index, next.length), 0, current.asset); return next; });
-  }, []);
-
-  // Leaving the page inside the window still deletes what the owner deleted.
+  // Invoked from PhotoDetail after the person confirms: the photo leaves at once; Undo brings it back.
+  const deleteAsset = useCallback(
+    async (asset: MediaAsset) => {
+      setConfirmFirst(false);
+      const earlier = removingRef.current;
+      if (earlier) void commitDelete(earlier);
+      const index = assets.findIndex((a) => a.id === asset.id);
+      const pending = { asset, index: index < 0 ? 0 : index };
+      removingRef.current = pending;
+      setRemoving(pending);
+      setDeleteError(null);
+      setAssets((prev) => prev.filter((a) => a.id !== asset.id));
+      setSelected((current) => (current?.id === asset.id ? null : current));
+    },
+    [assets, commitDelete],
+  );
+  const undoDelete = () => {
+    const pending = removingRef.current;
+    if (!pending) return;
+    removingRef.current = null; setRemoving(null);
+    setAssets((prev) => prev.some((a) => a.id === pending.asset.id) ? prev : [...prev.slice(0, pending.index), pending.asset, ...prev.slice(pending.index)]);
+  };
+  const finishDelete = () => {
+    const pending = removingRef.current;
+    if (!pending) return;
+    removingRef.current = null; setRemoving(null);
+    void commitDelete(pending);
+  };
+  // Leaving the page inside the window still deletes it: the person confirmed and did not undo.
   useEffect(() => {
-    const flush = () => { const current = heldRef.current; if (current) { heldRef.current = null; void sendDelete(current.asset, true).catch(() => undefined); } };
+    const flush = () => { const pending = removingRef.current; if (pending) { removingRef.current = null; void commitDelete(pending, true); } };
     window.addEventListener("pagehide", flush);
     return () => { window.removeEventListener("pagehide", flush); flush(); };
-  }, [sendDelete]);
+  }, [commitDelete]);
 
   const uploadSummary = uploadResults.length
     ? {
@@ -244,7 +250,7 @@ export function PhotoLibrary({ initialSelectedId, askDeleteFirst = false }: {
 
   const upload = () => fileInputRef.current?.click();
 
-  return <div className={styles.library} onDragEnter={handleDragEnter} onDragLeave={handleDragLeave} onDragOver={handleDragOver} onDrop={handleDrop}>
+  return <div className={styles.library} data-open={selected ? "true" : undefined} onDragEnter={handleDragEnter} onDragLeave={handleDragLeave} onDragOver={handleDragOver} onDrop={handleDrop}>
     <DashPage
       title="Photos."
       quiet={assets.length ? `${assets.length} ${assets.length === 1 ? "photo" : "photos"} Strelva can use on your site.` : "Photos Strelva can use on your site."}
@@ -259,14 +265,14 @@ export function PhotoLibrary({ initialSelectedId, askDeleteFirst = false }: {
         <DashNote tone={uploadSummary.failed ? "waits" : "live"} role="status">{uploadSummary.uploaded} uploaded, {uploadSummary.failed} failed or skipped</DashNote>
         {uploadSummary.failed ? <XaRows label="Upload results">{uploadResults.filter((result) => result.status !== "uploaded").map((result, index) => <XaRow key={`${result.name}-${index}`} title={result.name} detail={result.message} tone="waits" />)}</XaRows> : null}
       </section> : null}
-      {deleteError ? <div role="alert"><XaSays>{deleteError}</XaSays></div> : null}
       {dragging && !readOnly ? <DashNote tone="quiet">Drop the photos anywhere here to add them.</DashNote> : null}
+      {deleteError ? <DashNote tone="waits" role="alert">{deleteError}</DashNote> : null}
       {loading ? <section className="flex flex-col gap-3" aria-busy="true" aria-label="Loading photos"><StSkeleton /><StSkeleton width="80%" /></section>
         : loadError ? <DashEmpty pose="fixing" title="Strelva could not read your photos just now." job="Nothing was changed. Your photos are where they were."
             secondary={<XaTextLink onClick={retryLoad}>Try again</XaTextLink>} />
-        : assets.length === 0 ? <XaEmpty pose="adds" title="No photos yet." job="Ready to place your photos on the site" action={<XaButton variant="primary" disabled={readOnly} onClick={upload}>Add your first photos</XaButton>}>Photos of your space, your team and your work. Images up to 5 MB.</XaEmpty>
+        : assets.length === 0 && !removing ? <XaEmpty pose="adds" title="No photos yet." job="Ready to place your photos on the site" action={<XaButton variant="primary" disabled={readOnly} onClick={upload}>Add your first photos</XaButton>}>Photos of your space, your team and your work. Images up to 5 MB.</XaEmpty>
         : <>
-          <p className="m-0 text-[14px] text-[var(--st-text-2)]">{thisMonth === 0 ? "None added this month." : `${thisMonth} added this month.`} Drop photos anywhere here to add more.</p>
+          <p className={cn(styles.photoHint, "m-0 text-[14px] text-[var(--st-text-2)]")}>{thisMonth === 0 ? "None added this month." : `${thisMonth} added this month.`} Drop photos anywhere here to add more.</p>
           <div className={styles.photoGrid}>{assets.map(asset => {
             const caption = photoCaption(asset.filename);
             return <div key={asset.id} className={styles.photoItem}>
@@ -277,7 +283,7 @@ export function PhotoLibrary({ initialSelectedId, askDeleteFirst = false }: {
           })}</div>
         </>}
     </DashPage>
-    <PhotoDetail asset={selected} onClose={() => setSelected(null)} onDelete={readOnly ? undefined : deleteAsset} askDeleteFirst={askDeleteFirst && selected?.id === initialSelectedId} />
-    {held ? <XaUndoDock><XaUndo key={held.asset.id} onUndo={undoDelete} windowMs={strelvaUndoWindowMs} onExpire={() => void commitHeld()} shortcut>Deleted {photoCaption(held.asset.filename)}</XaUndo></XaUndoDock> : null}
+    <PhotoDetail asset={selected} onClose={() => setSelected(null)} onDelete={readOnly ? undefined : deleteAsset} initialConfirming={confirmFirst && selected?.id === initialSelectedId} />
+    {removing ? <XaUndoDock><XaUndo key={removing.asset.id} onUndo={undoDelete} windowMs={strelvaUndoWindowMs} onExpire={finishDelete} shortcut>Deleted {photoCaption(removing.asset.filename)}</XaUndo></XaUndoDock> : null}
   </div>;
 }

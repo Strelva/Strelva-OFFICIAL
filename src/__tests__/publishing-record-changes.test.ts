@@ -7,7 +7,7 @@ const commandId = "7f000000-0000-4000-8000-000000000099";
 const record: BusinessRecord = { workspaceId, access: "owner", revision: 1, lastSequence: 1, updatedAt: null, facts: {}, services: [], people: [], contactCount: 0 };
 const saved = { workspaceId, sequence: 2, revision: 2, changeCount: 1, undoOf: null, contacts: { created: 0, merged: 0, unchanged: 0 }, replayed: false };
 function deps(): RecordChangeDeps {
-  return { read: vi.fn(async () => record), patch: vi.fn(async () => saved), publishing: vi.fn(async () => true), policy: vi.fn(async () => false), locations: vi.fn(async () => [{ tenantId: "mooney", locationId: "first" }, { tenantId: "mooney", locationId: "second" }]), prepare: vi.fn(async () => ({ id: "draft" })), approve: vi.fn(async () => ({ changed: true })) };
+  return { read: vi.fn(async () => record), patch: vi.fn(async () => saved), publishing: vi.fn(async () => true), policy: vi.fn(async () => false), locations: vi.fn(async () => [{ tenantId: "mooney", locationId: "first" }, { tenantId: "mooney", locationId: "second" }]), prepare: vi.fn(async () => ({ id: "draft" })), approve: vi.fn(async () => ({ changed: true })), withdraw: vi.fn(async () => null) };
 }
 const patch = { facts: { phone: { value: "716-555-0100" } } };
 describe("record changes and Google policy", () => {
@@ -84,5 +84,26 @@ describe("record changes and Google policy", () => {
     d.approve = vi.fn(async () => ({ changed: false, reason: "google_write_unconfirmed" }));
     const result = await changeRecordWithGoogle(actor, workspaceId, 1, patch, { source: "owner", commandId, googleApprovalDisclosed: true }, d);
     expect(result.google.every(effect => effect.status === "write_unconfirmed")).toBe(true);
+  });
+  it("an Undo withdraws the draft Google never got instead of preparing a second, opposite one", async () => {
+    const d = deps(); d.locations = vi.fn(async () => [{ tenantId: "mooney", locationId: "first" }]);
+    d.withdraw = vi.fn(async (_actor, _workspace, eventId: string) => eventId === "closed-draft" ? { tenantId: "mooney", locationId: "first", kind: "hours" as const } : null);
+    const result = await changeRecordWithGoogle(actor, workspaceId, 2, { facts: { hours: { value: { timezone: "America/New_York", weekly: [], overrides: [] } } } }, { source: "owner", commandId, withdrawGoogleEventIds: ["closed-draft"] }, d);
+    expect(d.withdraw).toHaveBeenCalledWith(actor, workspaceId, "closed-draft");
+    expect(result.google).toEqual([{ tenantId: "mooney", locationId: "first", kind: "hours", eventId: "closed-draft", status: "withdrawn" }]);
+    expect(d.prepare).not.toHaveBeenCalled(); expect(d.approve).not.toHaveBeenCalled();
+    // The withdrawal never leaks into the record write.
+    expect(d.patch).toHaveBeenCalledWith(actor, workspaceId, 2, expect.anything(), { source: "owner", commandId });
+  });
+  it("prepares the undo draft when the earlier one can't be withdrawn, and never withdraws for an operator", async () => {
+    const d = deps(); d.locations = vi.fn(async () => [{ tenantId: "mooney", locationId: "first" }]);
+    d.withdraw = vi.fn(async () => { throw new Error("storage unavailable"); });
+    const hours = { facts: { hours: { value: { timezone: "America/New_York", weekly: [], overrides: [] } } } };
+    const owner = await changeRecordWithGoogle(actor, workspaceId, 2, hours, { source: "owner", commandId, withdrawGoogleEventIds: ["closed-draft"] }, d);
+    expect(owner.google.map(effect => effect.status)).toEqual(["needs_approval"]);
+    expect(d.prepare).toHaveBeenCalledOnce();
+    const e = deps();
+    await changeRecordWithGoogle(actor, workspaceId, 2, hours, { source: "operator", commandId, withdrawGoogleEventIds: ["closed-draft"] }, e);
+    expect(e.withdraw).not.toHaveBeenCalled();
   });
 });

@@ -15,7 +15,7 @@ import { XaAnswers, XaButton, XaButtonLink, XaComposer, XaComposerDock, XaDecisi
 import { SidePanel, SystemHead } from "./xa/SystemHead";
 import { PossibilityView } from "./xa/PossibilityView";
 import { WebsiteHistoryView } from "./xa/WebsiteHistoryView";
-import { LIVE_YES, ownerOnlyReason, requestMakeReal } from "./make-real-request";
+import { LIVE_YES, ownerOnlyReason, whoCanSayYesHref, requestMakeReal } from "./make-real-request";
 import x from "./xa/system-xa.module.css";
 import { InquiryServerWorkspaceExperience } from "@/experience/inquiries/InquiryServerExperience";
 import type { InquirySurfaceAdapter } from "@/experience/inquiries/contracts";
@@ -205,7 +205,7 @@ export function SystemPage(props: SystemPageProps) {
   const reload = () => setDetailVersion(version => version + 1);
   if (website && view === "history") return <WebsiteHistoryView workspaceId={props.workspaceId} systemId={system.id} siteName={system.name} state={websiteDetail} systemHistory={system.history} canRestore={!readOnly && (props.operator || (props.canMakeReal ?? true))} appBase={props.appBase} address={surface.domain} livePreviewSrc={surface.previewSrc} sandbox={websiteSandbox} onBack={() => setView("site")} onPrepared={reload} onReload={reload} onAskRestore={filesRequests ? () => { setView("site"); setAskingChange(true); } : undefined} />;
   if (comparing && mode !== "current") {
-    return <PossibilityView system={withSurface} systems={systems} possibility={comparing} workspaceId={props.workspaceId} appBase={props.appBase || ""} readOnly={readOnly} canMakeReal={props.canMakeReal ?? !readOnly} blockedReason={readOnly || props.canMakeReal === false ? props.makeRealReason || readOnlyReason || ownerOnlyReason(props.ownerName) : undefined} systemHref={props.systemHref} sandbox={websiteSandbox} onBack={() => { setMode("current"); setCompareId(null); }} />;
+    return <PossibilityView system={withSurface} systems={systems} possibility={comparing} workspaceId={props.workspaceId} appBase={props.appBase || ""} readOnly={readOnly} canMakeReal={props.canMakeReal ?? !readOnly} blockedReason={readOnly || props.canMakeReal === false ? props.makeRealReason || readOnlyReason || ownerOnlyReason(props.ownerName) : undefined} systemHref={props.systemHref} sandbox={websiteSandbox} onBack={() => { setMode("current"); setCompareId(null); }} onAsk={readOnly ? undefined : onAsk} />;
   }
   const checks = system.health.signals ?? [];
   const failing = new Set(system.health.failing ?? []);
@@ -323,7 +323,7 @@ function DraftYes({ possibility, workspaceId, systemHref, blockedReason, onLive 
       : outcome.kind === "result" ? `${outcome.result.headline} ${makeRealSummary(outcome.result)}` : outcome.message;
     return <div role={live || outcome.kind === "result" ? "status" : "alert"}><XaSays links={[<XaTextLink key="see" href={systemHref}>{live ? "See it" : "Reload now"}</XaTextLink>]}>{sentence.replace(/\.\.$/, ".")}</XaSays></div>;
   }
-  return <XaYes state={state === "going" ? "going" : "waiting"} onYes={() => void yes()} disabledReason={blockedReason} yesLabel={LIVE_YES}
+  return <XaYes state={state === "going" ? "going" : "waiting"} onYes={() => void yes()} disabledReason={blockedReason} unblock={<XaTextLink href={whoCanSayYesHref(workspaceId)}>See who can say yes</XaTextLink>} yesLabel={LIVE_YES}
     working={{ title: "Making it live", steps: [{ id: "ask", label: "Asking to make it live", state: "active" }] }} />;
 }
 

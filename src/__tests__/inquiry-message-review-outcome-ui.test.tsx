@@ -62,7 +62,7 @@ const accepted = { acceptedAt: "2026-09-11T16:05:00.000Z", providerMessageId: "p
 describe("message review outcome after the provider accepted the message", () => {
   it("tells the owner a deferred message needs nothing and offers no new review", async () => {
     const node = await approveWithOutcome({ ...base, ...accepted, status: "deferred", retryable: true });
-    expect(node.textContent).toContain("The provider is still trying to deliver this message.");
+    expect(node.textContent).toContain("The email service is still trying to deliver this message.");
     expect(node.textContent).toContain("Nothing to do");
     expect(node.textContent).not.toContain("Prepare a new review");
     expect(node.textContent).not.toContain("failed attempt");

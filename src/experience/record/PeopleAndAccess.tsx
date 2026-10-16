@@ -17,8 +17,9 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { Lock } from "lucide-react";
 import {
-  XaAnswers, XaButton, XaButtonLink, XaField, XaHeadline, XaInitial, XaLabel, XaPebbleScene, XaSays, XaSheet, XaTextLink,
+  XaAnswers, XaButton, XaButtonLink, XaField, XaHeadline, XaInitial, XaLabel, XaPebbleScene, XaSays, XaTextLink, XaUndo, XaUndoDock, XaYes,
 } from "@/components/ui/strelva/Xa";
+import { strelvaUndoWindowMs } from "@/platform/infra/motion";
 import { StSkeleton } from "@/components/ui/strelva/Kit";
 import { accessReviewSchema, type AccessReview } from "@/platform/access-review/contracts";
 import type { WorkspaceSnapshot } from "@/experience/workspace/contracts";
@@ -26,6 +27,8 @@ import { RecordTrouble } from "./RecordStates";
 import styles from "./record.module.css";
 
 type Entry = AccessReview["units"][number]["entries"][number];
+/** What the agency had, read before it is removed, so Undo can ask it back with the same access (ADR 0015 bring-in). */
+type AgencyGrant = { agencyWorkspaceId: string; name: string; scopes: { scope: string; level: string }[] };
 type Role = "owner" | "admin" | "member";
 type Invitation = { id: string; recipientEmail: string; role: Role; status: "pending" | "accepted" | "revoked" | "expired"; expiresAt: string; createdAt: string };
 export type PeoplePoster = <T>(action: { action: "revoke_delegation"; delegationId: string }, fallback: string) => Promise<T>;
@@ -103,6 +106,9 @@ export function PeopleAndAccess({ snapshot, currentRole, request, postAction, on
   const [busy, setBusy] = useState<string | null>(null);
   const [failure, setFailure] = useState<string | null>(null);
   const [reload, setReload] = useState(0);
+  // Undo after removing an agency: ask them back with the access they had. They accept before anything changes.
+  const [bringBack, setBringBack] = useState<AgencyGrant | null>(null);
+  const [bringing, setBringing] = useState(false);
   const alive = useRef(true);
   useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
 
@@ -152,11 +158,38 @@ export function PeopleAndAccess({ snapshot, currentRole, request, postAction, on
     finally { if (alive.current) setBusy(null); }
   }
 
+  /** The agency's current grant, by name, from the same read Bring in an agency uses. Null when it can't be read. */
+  async function readGrant(name: string): Promise<AgencyGrant | null> {
+    try {
+      const response = await request(`/api/workspace/agencies?${new URLSearchParams({ workspaceId })}`, { cache: "no-store" });
+      const body = await json<{ agencies?: { agencyWorkspaceId: string; name: string; ofRecord?: boolean; scopes: { scope: string; level: string; status: string }[] }[] }>(response, "");
+      const match = body.agencies?.find(item => item.name === name);
+      const scopes = match?.scopes.filter(item => item.status === "active").map(({ scope, level }) => ({ scope, level })) ?? [];
+      return match && scopes.length ? { agencyWorkspaceId: match.agencyWorkspaceId, name: match.name, scopes } : null;
+    } catch { return null; }
+  }
+  async function askBack(grant: AgencyGrant) {
+    setBringBack(null); setBringing(true); setFailure(null); setSaid(null);
+    try {
+      await json(await request("/api/workspace/agencies", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ workspaceId, agencyWorkspaceId: grant.agencyWorkspaceId, scopes: grant.scopes }) }), `${grant.name} couldn't be asked back. Bring them in from the list of agencies.`);
+      if (!alive.current) return;
+      setSaid(`${grant.name} is asked back with the same access. Nothing changes until they accept.`);
+      setReload(value => value + 1); onChanged?.();
+    } catch (cause) { if (alive.current) setFailure(cause instanceof Error ? cause.message : `${grant.name} couldn't be asked back.`); }
+    finally { if (alive.current) setBringing(false); }
+  }
+  const undoDock = bringBack ? <XaUndoDock><XaUndo key={bringBack.agencyWorkspaceId} onUndo={() => void askBack(bringBack)} undoLabel={`Bring ${bringBack.name} back`} windowMs={strelvaUndoWindowMs} onExpire={() => setBringBack(null)} shortcut>{`${bringBack.name} removed`}</XaUndo></XaUndoDock> : null;
+
   const agency = agencyId ? agencies.find(entry => entry.id === agencyId) ?? null : null;
   if (agencyId && reviewState === "ready" && agency) return <AgencyPage agency={agency} businessName={businessName} seats={seats} assigned={assigned} owner={owner} workspaceId={workspaceId}
     busy={busy === `provider:${agency.id}`} failure={failure} initialRemoving={initialRemoving} handoffOpen={snapshot.releases?.providerChange === true}
     onBack={() => { setAgencyId(null); setFailure(null); }}
-    onRemove={async () => { const ok = await revoke(agency, `${agency.label} no longer has access to ${businessName}. Your Systems kept running.`); if (ok) setAgencyId(null); return ok; }} />;
+    onRemove={async () => {
+      const grant = await readGrant(agency.label);
+      const ok = await revoke(agency, `${agency.label} no longer has access to ${businessName}. Your Systems kept running.${grant ? "" : " To work with them again, bring them in from the list of agencies."}`);
+      if (ok) { setAgencyId(null); setBringBack(grant); }
+      return ok;
+    }} />;
 
   const quiet = owner ? "Only you can make a change live." : "The owner decides who joins.";
   if (reviewState === "loading") return <div className={styles.screen} aria-busy="true"><XaHeadline quiet={quiet}>{`Who can see and change ${businessName}.`}</XaHeadline><div className={styles.skeletonRows}><StSkeleton label="Loading people" width="80%" /><StSkeleton width="64%" /><StSkeleton width="72%" /></div></div>;
@@ -169,9 +202,9 @@ export function PeopleAndAccess({ snapshot, currentRole, request, postAction, on
   const agencyListHref = `/workspace?${new URLSearchParams({ workspaceId, view: "help" })}#bring-in-an-agency`;
   return <div className={styles.screen}>
     <XaHeadline quiet={quiet}>{`Who can see and change ${businessName}.`}</XaHeadline>
-    {said || failure ? <div role={failure ? "alert" : "status"}><XaSays>{failure ?? said}</XaSays></div> : null}
+    {said || failure ? <div role={failure ? "alert" : "status"}><XaSays>{failure ?? (bringing ? "Asking them back" : said)}</XaSays></div> : null}
 
-    {reviewState === "error" ? <div role="alert"><XaSays links={[<XaTextLink key="retry" onClick={retry}>Try again</XaTextLink>]}>{"I couldn’t read who has access just now. Everyone keeps the access they had."}</XaSays></div> : <>
+    {reviewState === "error" ? <div role="alert"><XaSays links={[<XaTextLink key="retry" onClick={retry}>Try again</XaTextLink>]}>{"Strelva couldn’t read who has access just now. Everyone keeps the access they had."}</XaSays></div> : <>
     <section className={styles.section} aria-labelledby="people-label">
       <XaLabel as="h2" id="people-label">People</XaLabel>
       <div className={styles.people}>
@@ -207,7 +240,7 @@ export function PeopleAndAccess({ snapshot, currentRole, request, postAction, on
         const work = snapshot.work.find(item => item.id === delegation.workId)?.title;
         return <div key={delegation.id} className={styles.person}>
           <XaInitial name={name || "Agency"} shape="round" size={40} color={DISC} />
-          <span className={styles.personText}><span className={styles.personName}>{name || "An agency"}</span><span className={styles.personDetail}>Sees {work ? `“${work}”` : "one piece of work"}. Read only.{name ? "" : " I couldn't confirm this agency's name."}</span></span>
+          <span className={styles.personText}><span className={styles.personName}>{name || "An agency"}</span><span className={styles.personDetail}>Sees {work ? `“${work}”` : "one piece of work"}. Read only.{name ? "" : " Strelva couldn't confirm this agency's name."}</span></span>
           <span className={styles.personEnd}>{delegation.canRevoke ? <XaTextLink onClick={() => void stopSharing(delegation.id, name || "The agency")}>{name ? `Stop sharing with ${name}` : `Stop sharing ${work ? `“${work}”` : "this work"}`}</XaTextLink> : null}</span>
         </div>;
       })}</div>
@@ -223,6 +256,7 @@ export function PeopleAndAccess({ snapshot, currentRole, request, postAction, on
     </section> : null}
 
     <p className={styles.foot}>Every change shows who made it, in History.</p>
+    {undoDock}
   </div>;
 
   async function withdraw(invitationId: string) {
@@ -271,9 +305,9 @@ function InviteForm({ workspaceId, businessName, request, onMade }: { workspaceI
       <XaField label="Invite someone" type="email" autoComplete="email" value={email} onChange={event => setEmail(event.target.value)} placeholder={`name@${domain || "business"}.com`} error={error || undefined} />
       <XaButton type="submit" variant="primary" busy={busy}>Invite</XaButton>
     </form>
-    {made ? null : <XaSays>{"Invites are private links you share yourself. I never email anyone for you."}</XaSays>}
+    {made ? null : <XaSays>{"Invites are private links you share yourself. Strelva never emails anyone for you."}</XaSays>}
     {made ? <div className={styles.made} role="status">
-      <XaSays>{`Share this private link with ${made.email}. It works for seven days, only for that email. I never email it for you.`}</XaSays>
+      <XaSays>{`Share this private link with ${made.email}. It works for seven days, only for that email. Strelva never emails it for you.`}</XaSays>
       <div className={styles.linkBox}><input readOnly value={made.link} aria-label={`Private invitation link for ${made.email}`} onFocus={event => event.currentTarget.select()} /><XaButton size="sm" onClick={() => void navigator.clipboard.writeText(made.link).then(() => setCopied(true), () => setCopied(false))}>{copied ? "Copied" : "Copy link"}</XaButton></div>
     </div> : null}
   </>;
@@ -311,26 +345,44 @@ function AgencyPage({ agency, businessName, seats, assigned, owner, workspaceId,
         <li className={styles.can} data-lock><Lock size={16} aria-hidden="true" /><span className={styles.canTitle}>Take your data or your domain</span><span className={styles.canEnd}>Stays yours</span></li>
       </ul>
     </section>
-    {failure ? <div role="alert"><XaSays>{failure}</XaSays></div> : null}
-    {owner ? <div className={styles.removeLine}><XaSays links={[<button key="remove" type="button" className={styles.danger} onClick={() => setRemoving(true)}>Remove {agency.label}</button>]}>{handoff ? `If ${agency.label} goes, a handoff moves their work first.` : `If ${agency.label} goes, their access ends at once; your Systems keep running.`}</XaSays></div>
+    {failure && !removing ? <div role="alert"><XaSays>{failure}</XaSays></div> : null}
+    {owner ? removing ? <RemoveAgencyInline agency={agency} businessName={businessName} handoff={handoff} handoffOpen={handoffOpen} workspaceId={workspaceId} ends={ends} busy={busy} failure={failure}
+      onKeep={() => setRemoving(false)} onRemove={() => void onRemove().then(ok => { if (ok) setRemoving(false); })} />
+      : <div className={styles.removeLine}><XaSays links={[<button key="remove" type="button" className={styles.danger} onClick={() => setRemoving(true)}>Remove {agency.label}</button>]}>{handoff ? `If ${agency.label} goes, a handoff moves their work first.` : `If ${agency.label} goes, their access ends at once; your Systems keep running.`}</XaSays></div>
       : <p className={styles.quietNote}>Only the owner can remove an agency.</p>}
-    <XaSheet open={removing} onClose={() => setRemoving(false)} title={`Remove ${agency.label}?`}
-      actions={handoff
-        ? <>{handoffOpen
-          ? <XaButtonLink variant="primary" size="lg" block href={`/workspace/provider-change?${new URLSearchParams({ workspaceId })}`}>Start the handoff</XaButtonLink>
-          : <XaButtonLink variant="primary" size="lg" block href={`/workspace?${new URLSearchParams({ workspaceId, view: "help" })}`}>Ask Strelva to start the handoff</XaButtonLink>}
-          <XaButton variant="quiet" size="lg" data-sheet-focus onClick={() => setRemoving(false)}>Keep them</XaButton></>
-        : <><XaButton variant="primary" size="lg" block busy={busy} onClick={() => void onRemove().then(ok => { if (ok) setRemoving(false); })}>Remove {agency.label}</XaButton><XaButton variant="quiet" size="lg" data-sheet-focus onClick={() => setRemoving(false)}>Keep them</XaButton></>}>
-      <div className={styles.sheetPebble}>
-        <XaPebbleScene pose="fixing" size={80} label="Pebble, keeping your Systems running" />
-        <div className={styles.sheetPebbleText}>
-          <p className={styles.sheetLede}>{ends}</p>
-          <XaAnswers labelWidth={64} rows={handoff
-            ? [["Now", `${agency.label} keeps working until the handoff completes.`], ["Stays", "Your Systems and records, running as they are."]]
-            : [["Stays", "Your Systems and records, running as they are."], ["Ends", `${agency.label}'s access to ${businessName}.`]]} />
-        </div>
-      </div>
-      {failure && removing ? <p className={styles.quietNote} role="alert">{failure}</p> : null}
-    </XaSheet>
   </div>;
+}
+
+/**
+ * XA · R5, in place. Removing an agency opens right where "Remove" was, not in
+ * a sheet over the page: what stays, what ends, and the one yes. Access ends
+ * the moment the owner confirms and there is no server undo, so the yes asks
+ * its one question and the pill is the confirmation; Keep them backs out.
+ */
+function RemoveAgencyInline({ agency, businessName, handoff, handoffOpen, workspaceId, ends, busy, failure, onKeep, onRemove }: {
+  agency: Entry; businessName: string; handoff: boolean; handoffOpen: boolean; workspaceId: string; ends: string; busy: boolean; failure: string | null;
+  onKeep: () => void; onRemove: () => void;
+}) {
+  const heading = useRef<HTMLHeadingElement>(null);
+  useEffect(() => { heading.current?.focus(); }, []);
+  return <section className={styles.removeInline} aria-labelledby="remove-agency-title">
+    <div className={styles.removeHead}>
+      <XaPebbleScene pose="fixing" size={96} bare label="Pebble, keeping your Systems running" />
+      <div>
+        <h2 id="remove-agency-title" ref={heading} tabIndex={-1} className={styles.removeTitle}>Remove {agency.label}?</h2>
+        <p className={styles.sheetLede}>{ends}</p>
+      </div>
+    </div>
+    <XaAnswers labelWidth={64} rows={handoff
+      ? [["Now", `${agency.label} keeps working until the handoff completes.`], ["Stays", "Your Systems and records, running as they are."]]
+      : [["Stays", "Your Systems and records, running as they are."], ["Ends", `${agency.label}'s access to ${businessName}.`]]} />
+    {failure ? <p className={styles.quietNote} role="alert">{failure}</p> : null}
+    {handoff
+      ? <div className={styles.removeActions}>{handoffOpen
+        ? <XaButtonLink variant="primary" size="lg" href={`/workspace/provider-change?${new URLSearchParams({ workspaceId })}`}>Start the handoff</XaButtonLink>
+        : <XaButtonLink variant="primary" size="lg" href={`/workspace?${new URLSearchParams({ workspaceId, view: "help" })}`}>Ask Strelva to start the handoff</XaButtonLink>}
+        <XaButton variant="quiet" size="lg" onClick={onKeep}>Keep them</XaButton></div>
+      : <XaYes state={busy ? "going" : "waiting"} block={false} shortcut={false} yesLabel={`Remove ${agency.label}`} notYetLabel="Keep them" onYes={onRemove} onNotYet={onKeep}
+        working={{ title: `Removing ${agency.label}`, steps: [{ id: "revoke", label: `Ending ${agency.label}'s access to ${businessName}`, state: "active" }] }} />}
+  </section>;
 }

@@ -8,7 +8,7 @@ import { renderPaperEmailHtml } from "@/platform/infra/email/paper";
 import { EMAIL_PREVIEW_TEMPLATES } from "@/experience/workspace/preview/email-fixture";
 import { InquiryBookingChoice } from "@/experience/bookings/InquiryBookingChoice";
 import { VisitorIntakeForm } from "@/experience/vertical-intake/VisitorIntakeForm";
-import { OwnerPhoneToday } from "@/experience/workspace/OwnerPhoneToday";
+import { OwnerToday } from "@/experience/workspace/today/OwnerToday";
 import { E4_CLOSURES, E5_FILLED, HARBOR, SLOT_STARTS, e1Mail, e3Mail, e4Choice, e5Form, e6Decision, e6Systems } from "@/experience/workspace/preview/xa7-outside-fixture";
 
 const SLOP = [/monospace|Geist Mono|font-mono/i, /text-transform:\s*uppercase/i, /linear-gradient|radial-gradient/i, /—/, /\$—/, /seamless|effortless|unlock|supercharge|AI-powered/i, /Actor not recorded/];
@@ -220,41 +220,27 @@ describe("XA · E5 the patient form", () => {
   });
 });
 
-describe("XA · E6 Today on the phone", () => {
-  const base = { greetingName: "Dr. Lin", business: "Harbor Dental", systems: e6Systems(), hour: 8, onReview: () => undefined, onAsk: () => undefined, onOpenSystem: () => undefined };
-  it("puts the one waiting item in the composer with who prepared it, then what is running", () => {
-    const html = renderToStaticMarkup(createElement(OwnerPhoneToday, { ...base, needs: { status: "ready", role: "owner", items: [e6Decision()], complete: true, handled: [], handledAvailable: true }, facts: { book: "2 booked today" } }));
+describe("XA · E6 Today on the phone (the real Home)", () => {
+  const NOW = Date.parse("2026-11-23T08:14:00-05:00");
+  const base = { businessName: "Harbor Dental", ownerName: "Dr. Lin", minute: Math.floor(NOW / 60_000), now: NOW, notices: {}, systems: e6Systems(), onAsk: () => undefined, onReview: () => undefined, onAllWaiting: () => undefined, onRetry: () => undefined, onWhatChanged: () => undefined, systemHref: (id: string) => `/systems/${id}` };
+  it("puts the one waiting item in the one composer with who prepared it, then what is running", () => {
+    const html = renderToStaticMarkup(createElement(OwnerToday, { ...base, needs: { status: "ready", role: "owner", items: [e6Decision()], complete: true, handled: [], handledAvailable: true } }));
     expect(html).toContain("Good morning, Dr. Lin.");
-    expect(html).toContain("One thing waits for you. Everything else is running.");
-    expect(html).toContain("Waits for you · from Maya at North Studio");
-    expect(html).toContain("2 booked today");
-    expect(html).not.toContain(">Live<");
-    expect(html).toContain("Ask Strelva for anything");
-    expect(html).not.toMatch(/data-kind="(waits|live)"/);
+    expect(html).toContain("Maya at North Studio");
+    expect(html).toContain("Close for Thanksgiving, Nov 26–27?");
+    expect(html).toContain("Running for you");
+    expect(html.match(/<textarea/g)).toHaveLength(1);
     expect(clean(html)).toEqual([]);
   });
   it("shows an exception only where a System differs from normal", () => {
-    const systems = e6Systems().map(system => system.id === "form" ? { ...system, lifecycle: "draft" as const } : system);
-    const html = renderToStaticMarkup(createElement(OwnerPhoneToday, { ...base, systems, needs: { status: "ready", role: "owner", items: [], complete: true, handled: [], handledAvailable: true } }));
-    expect(html.match(/<span>Draft<\/span>/g)?.length).toBe(1);
+    const html = renderToStaticMarkup(createElement(OwnerToday, { ...base, needs: { status: "ready", role: "owner", items: [], complete: true, handled: [], handledAvailable: true } }));
+    expect(visible(html).match(/Draft/g)?.length).toBe(1);
     expect(html).toContain("Nothing needs you.");
   });
-  it("keeps Pebble in frame when the morning cannot load", () => {
-    const html = renderToStaticMarkup(createElement(OwnerPhoneToday, { ...base, onRetry: () => undefined, needs: { status: "error", message: "Your decisions could not be checked." } }));
-    expect(html).toContain("pose-fixing");
-    expect(html).toContain('data-bare="true"');
-    expect(html).toContain("Harbor Dental didn’t load, but your Systems are still running.");
-    expect(html).not.toContain("could not be checked");
-    expect(html).toContain("Try again");
-    expect(html).toContain("Ask Strelva for anything");
-  });
-});
-
-describe("XA · E6 empty", () => {
-  it("says nothing is running once and keeps Pebble on the canvas, doing the website job", () => {
-    const html = renderToStaticMarkup(createElement(OwnerPhoneToday, { greetingName: "Dr. Lin", business: "Harbor Dental", systems: [], hour: 8, onReview: () => undefined, onAsk: () => undefined, onOpenSystem: () => undefined, onBringInWebsite: () => undefined, needs: { status: "ready", role: "owner", items: [], complete: true, handled: [], handledAvailable: true } }));
-    expect(visible(html).match(/Nothing is running yet/g)).toHaveLength(1);
-    expect(html).toContain('data-bare="true"');
-    expect(html).toContain("Pebble reads your website first");
+  it("says it could not check what waits, and keeps the composer", () => {
+    const html = renderToStaticMarkup(createElement(OwnerToday, { ...base, needs: { status: "error", message: "Your decisions could not be checked." } }));
+    expect(html).toContain("Strelva could not check what waits for you.");
+    expect(html).toContain("Check again");
+    expect(html.match(/<textarea/g)).toHaveLength(1);
   });
 });

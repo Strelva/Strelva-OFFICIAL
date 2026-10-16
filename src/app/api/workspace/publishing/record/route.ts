@@ -7,7 +7,9 @@ import { readWorkspaceBody, workspaceHttpActor, workspaceHttpFailure, workspaceJ
 
 export const dynamic = "force-dynamic";
 const commandSchema = z.object({ workspaceId: z.string().uuid(), revision: z.number().int().nonnegative(), commandId: z.string().uuid(),
-  patch: businessRecordPatchSchema, googleApprovalDisclosed: z.boolean().default(false) }).strict();
+  patch: businessRecordPatchSchema, googleApprovalDisclosed: z.boolean().default(false),
+  /** Undo: the Google drafts the change being undone prepared, declined if still waiting. */
+  withdrawGoogleEventIds: z.array(z.string().min(1).max(200)).max(20).optional() }).strict();
 
 /** One owner-approved record edit, with individually governed Google effects.
  * Saving the record is permanent even when one outside effect fails. */
@@ -21,7 +23,7 @@ export async function POST(request: Request) {
     if (!(await publishingEnabledForWorkspace(command.workspaceId, actor))) return workspaceJson({ error: "Publishing is not enabled for this business." }, 503);
     if (await isRateLimitedWindowedAsync(`workspace:publishing-record:${actor.userId}`, 20, 60_000)) return workspaceJson({ error: "Please wait before trying again." }, 429);
     const result = await changeRecordWithGoogle(actor, command.workspaceId, command.revision, command.patch,
-      { source: "owner", commandId: command.commandId, googleApprovalDisclosed: command.googleApprovalDisclosed });
+      { source: "owner", commandId: command.commandId, googleApprovalDisclosed: command.googleApprovalDisclosed, ...(command.withdrawGoogleEventIds?.length ? { withdrawGoogleEventIds: command.withdrawGoogleEventIds } : {}) });
     return workspaceJson({ result });
   } catch (error) { return workspaceHttpFailure(error); }
 }

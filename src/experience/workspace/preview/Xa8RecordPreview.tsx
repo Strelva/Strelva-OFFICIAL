@@ -98,6 +98,12 @@ function stubFetch(screen: Xa8Screen, state: Xa8State): typeof fetch {
       if (method === "POST") return json({ ok: true, changed: true });
       return json(review(state));
     }
+    // Bring in an agency (ADR 0015): what North Studio has, and asking them back with the same access after a removal.
+    if (url.startsWith("/api/workspace/agencies")) {
+      const scopes = [{ scope: "website", level: "prepare" }, { scope: "bookings", level: "prepare" }, { scope: "google", level: "prepare" }];
+      if (method === "POST") return json({ agencies: [{ agencyWorkspaceId: "b1000000-1111-4111-8111-111111111111", name: XA_NORTH.name, seat: false, ofRecord: false, scopes: scopes.map(item => ({ ...item, status: "proposed" })) }] });
+      return json({ directory: [], agencies: [{ agencyWorkspaceId: "b1000000-1111-4111-8111-111111111111", name: XA_NORTH.name, seat: true, ofRecord: true, scopes: scopes.map(item => ({ ...item, status: "active" })) }] });
+    }
     if (url.startsWith("/api/workspace-invitations/revoke")) return json({ status: "revoked" });
     if (url.startsWith("/api/workspace-invitations")) {
       if (method === "POST") { const body = JSON.parse(String(init?.body)); return json({ token: "preview-token-not-real", invitation: { id: "d0000000-1111-4111-8111-111111111111", recipientEmail: body.recipientEmail, role: "member", status: "pending", expiresAt: "2026-10-22T15:00:00Z", createdAt: NOW.toISOString() } }); }
@@ -105,7 +111,11 @@ function stubFetch(screen: Xa8Screen, state: Xa8State): typeof fetch {
     }
     if (url.startsWith("/api/workspace/publishing/record")) {
       if (state === "error") return json({ error: "The record changed while you were editing. Nothing was saved; reload to see the latest." }, 409);
-      return json({ result: { record: { revision: 15, changeCount: 1 }, google: [{ tenantId: "t", locationId: "l", kind: "hours", status: state === "done" ? "posted" : "needs_approval" }] } });
+      // A save prepares one Google draft; an Undo of it withdraws that draft while Google still waits (never a second, opposite one).
+      const body = JSON.parse(String(init?.body ?? "{}")) as { revision?: number; withdrawGoogleEventIds?: string[] };
+      const revision = (body.revision ?? 14) + 1;
+      if (body.withdrawGoogleEventIds?.length) return json({ result: { record: { revision, changeCount: 1 }, google: body.withdrawGoogleEventIds.map(eventId => ({ tenantId: "t", locationId: "l", kind: "hours", status: "withdrawn", eventId })) } });
+      return json({ result: { record: { revision, changeCount: 1 }, google: [{ tenantId: "t", locationId: "l", kind: "hours", status: state === "done" ? "posted" : "needs_approval", eventId: `preview-google-draft-${revision}` }] } });
     }
     if (url.startsWith("/api/workspace-export/v3/history")) {
       if (state === "error") return json({ error: "Only the current owner can see exports. Ask Dr. Lin." }, 403);

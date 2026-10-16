@@ -234,7 +234,8 @@ function Editor({ value, workId, context, owner, crumbs, canEdit, until, notice,
     yes={canEdit ? <XaYes state={yes} block={false} yesLabel={`Send to ${owner}`} notYetLabel="Keep editing" onNotYet={yes === "failed" ? () => setYes("waiting") : undefined}
       onYes={() => void send()} working={{ title: `Sending to ${owner}`, steps }} failure={failure}
       liveLabel={`Sent to ${owner}. Nothing changes until ${owner} makes it live.`}
-      disabledReason={!dirty && sent ? `${owner} has this draft. Change something to send it again.` : !title.trim() || fields.some(field => !field.label.trim()) ? "Every question needs words before it can be sent." : undefined} />
+      disabledReason={!dirty && sent ? `${owner} has this draft. Change something to send it again.` : !title.trim() || fields.some(field => !field.label.trim()) ? "Every question needs words before it can be sent." : undefined}
+      unblock={<XaTextLink href={`#${id}-name`}>{!dirty && sent ? "Change the draft" : "Fill in the empty words"}</XaTextLink>} />
       : <XaNote tone="waits">{context.businessName} hasn&apos;t opened this draft to you, or the permission ended. You can read it; you can&apos;t send it.</XaNote>}>
     <div className={styles.preview}>
       <ApplicationUseRenderer presentation="preview" snapshot={applicationPreviewSnapshot(spec)} draft={previewDraft} onDraftChange={setPreviewDraft}

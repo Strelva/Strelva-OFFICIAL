@@ -132,7 +132,7 @@ export function WorkspaceExit({ workspaceId, request = fetch, businessBillingRel
     <p className={styles.quietNote}>This is final for this business. Nothing is deleted. <XaTextLink href={exportHref}>Download everything first</XaTextLink></p>
     {/* Leaving has no Undo, so the one yes is the confirmation; the page above is its question. */}
     <div><XaYes state={busy ? "going" : "waiting"} block={false} shortcut={false} yesLabel="Leave Strelva" working={{ title: "Recording your choice", steps: [] }}
-      disabledReason={resourceKind === "successor" && !successorUserId ? "Choose who looks after them first." : undefined} onYes={() => void complete()} /></div>
+      disabledReason={resourceKind === "successor" && !successorUserId ? "Choose who looks after them first." : undefined} unblock={<XaTextLink onClick={() => setEditing("resources")}>Choose someone</XaTextLink>} onYes={() => void complete()} /></div>
   </div>;
 }
 

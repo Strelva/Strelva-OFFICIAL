@@ -22,15 +22,27 @@ type Agency = { id: string; name: string };
 
 type ReadinessState = "confirmed" | "missing" | "unverified" | "stale";
 
+type ReadinessItem = { requirement: string; state: ReadinessState; source: string; responsibleParty: string };
+
+/** Who has to act on one unmet requirement, as a name the person knows. */
+export function readinessWho(item: ReadinessItem, brokerage: string): string {
+  return /provider|feed/i.test(item.responsibleParty) ? "The listings feed" : /brokerage/i.test(item.responsibleParty) ? brokerage : item.source || item.responsibleParty;
+}
+
 /** One unmet requirement as one plain sentence that names who has to act. */
-export function readinessSentence(item: { requirement: string; state: ReadinessState; source: string; responsibleParty: string }, brokerage: string): string {
+export function readinessSentence(item: ReadinessItem, brokerage: string): string {
   const what = item.requirement.toLowerCase();
-  const who = /provider|feed/i.test(item.responsibleParty) ? "The listings feed" : /brokerage/i.test(item.responsibleParty) ? brokerage : item.source || item.responsibleParty;
+  const who = readinessWho(item, brokerage);
   const stale = item.state === "stale";
   if (/inquir/.test(what)) return stale ? `Where ${brokerage}'s inquiries go is out of date.` : `${who} hasn't confirmed where inquiries go.`;
   if (/licen/.test(what)) return stale ? `${brokerage}'s signed license is out of date.` : `${who} hasn't confirmed the signed license.`;
   if (/grant|provider|feed|listing/.test(what)) return stale ? `The listings feed's permission for ${brokerage} is out of date.` : `${who} hasn't confirmed ${brokerage} may show its listings.`;
   return `${item.requirement} ${stale ? "is out of date" : item.state === "missing" ? "is missing" : "isn't confirmed yet"}.`;
+}
+/** The note an agency copies and sends to whoever has to confirm. Strelva never sends it. */
+export function confirmationNote(item: ReadinessItem, binding: { brokerageName: string; sourceName: string; approvedOrigin: string }): string {
+  const ask = readinessSentence(item, binding.brokerageName).replace(/ hasn't confirmed /, " needs to confirm ").replace(/ is out of date\.$/, " needs to be confirmed again.");
+  return `Home Finder for ${binding.brokerageName} on ${host(binding.approvedOrigin)} is ready except for one thing. ${ask} Once it's confirmed with ${binding.sourceName}, buyers can start searching.`;
 }
 const dateLabel = (iso: string) => new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 const host = (origin: string) => { try { return new URL(origin).host; } catch { return origin; } };
@@ -84,7 +96,7 @@ function HomeFinderLoader({ workspaceId, agencies, request }: { workspaceId: str
   if (!selected || installing) {
     return <XaObjectPage label="Home Finder"
       phone="object-first"
-      head={<><XaSystemTile kind="listing" size={48} label="Home Finder" /><XaHeadline quiet="The brokerage keeps its inquiries. The listings feed confirms it before buyers can use it.">Home search on the brokerage&apos;s own website.</XaHeadline></>}
+      head={<><XaSystemTile kind="website" size={48} label="Home Finder" /><XaHeadline quiet="The brokerage keeps its inquiries. The listings feed confirms it before buyers can use it.">Home search on the brokerage&apos;s own website.</XaHeadline></>}
       story={<>
         {notice ? <XaNote role="status" tone="done">{notice}</XaNote> : null}
         {failure}
@@ -95,25 +107,26 @@ function HomeFinderLoader({ workspaceId, agencies, request }: { workspaceId: str
 
   const unmet = selected.readiness?.filter(item => item.state !== "confirmed") ?? [];
   return <XaObjectPage label={`Home Finder for ${selected.brokerageName}`} phone="object-first"
-    head={<><XaSystemTile kind="listing" size={48} label="Home Finder" /><XaHeadline quiet={selected.status === "revoked" ? "It's stopped. Buyers can't ask about homes." : selected.lifecycle === "live" ? (selected.runtimeAllowed ? "Buyers are searching." : "Live, but new inquiries wait until the feed confirms it again.") : selected.lifecycle === "paused" ? "New inquiries are paused." : "A draft. Buyers can't see it yet."}>
+    head={<><XaSystemTile kind="website" size={48} label="Home Finder" /><XaHeadline quiet={selected.status === "revoked" ? "It's stopped. Buyers can't ask about homes." : selected.lifecycle === "live" ? (selected.runtimeAllowed ? "Buyers are searching." : "Live, but new inquiries wait until the feed confirms it again.") : selected.lifecycle === "paused" ? "New inquiries are paused." : `It opens on ${host(selected.approvedOrigin)}.`}>
         Home Finder for {selected.brokerageName}.
       </XaHeadline></>}
     story={<>
       {notice ? <XaNote role="status" tone="done">{notice}</XaNote> : null}
       {failure}
-      {selected.status === "active" && selected.lifecycle !== "live" ? unmet.length || !selected.readiness?.length ? <XaBlock label="Before buyers can use it">
-        {unmet.map(item => <XaNote key={item.requirement} tone="waits">{readinessSentence(item, selected.brokerageName)}</XaNote>)}
-        {!selected.readiness?.length ? <XaNote tone="waits">The listings feed hasn&apos;t confirmed anything yet.</XaNote> : null}
-      </XaBlock> : <XaNote tone="done">The license, the feed and the inquiry address are all confirmed.</XaNote> : null}
-      <XaNote>On {host(selected.approvedOrigin)}, with listings from {selected.sourceName}. Licensed until {dateLabel(selected.licenseExpiresAt)}. Inquiries go to {selected.brokerageName}.</XaNote>
+      {/* The first thing that waits is said once, in the yes beside the page; the rest follow here. */}
+      {selected.status === "active" && selected.lifecycle !== "live" ? unmet.length > 1 ? <XaBlock label="After that">
+        {unmet.slice(1).map(item => <XaNote key={item.requirement} tone="waits">{readinessSentence(item, selected.brokerageName)}</XaNote>)}
+      </XaBlock> : unmet.length || !selected.readiness?.length ? null : <XaNote tone="done">The license, the feed and the inquiry address are all confirmed.</XaNote> : null}
+      <XaNote>{selected.lifecycle === "draft" && selected.status === "active" ? <>Listings from {selected.sourceName}, licensed until {dateLabel(selected.licenseExpiresAt)}. Inquiries go to {selected.brokerageName}.</> : <>On {host(selected.approvedOrigin)}, with listings from {selected.sourceName}. Licensed until {dateLabel(selected.licenseExpiresAt)}. Inquiries go to {selected.brokerageName}.</>}</XaNote>
       {selected.status === "active" ? <div className={styles.quiet}>
-        <XaTextLink onClick={() => void change({ action: "check", workspaceId, bindingId: selected.id })}>{busy && lastAction === "check" ? "Checking" : "Check with the feed again"}</XaTextLink>
-        {selected.lifecycle === "live" ? <> · <XaTextLink onClick={() => void change({ action: "pause", workspaceId, bindingId: selected.id, expectedChange: selected.changeNumber })}>Pause new inquiries</XaTextLink></> : null}
-        {" · "}<RevokeControl key={selected.id} binding={selected} locked={locked} onRevoke={() => void change({ action: "revoke", workspaceId, bindingId: selected.id, expectedRevision: selected.revision })} />
+        {/* While the yes is blocked, checking again sits beside it (the unblock), not here too. */}
+        {unmet.length && selected.lifecycle !== "live" ? null : <><XaTextLink onClick={() => void change({ action: "check", workspaceId, bindingId: selected.id })}>{busy && lastAction === "check" ? "Checking" : "Check with the feed again"}</XaTextLink>{" · "}</>}
+        {selected.lifecycle === "live" ? <><XaTextLink onClick={() => void change({ action: "pause", workspaceId, bindingId: selected.id, expectedChange: selected.changeNumber })}>Pause new inquiries</XaTextLink>{" · "}</> : null}
+        <RevokeControl key={selected.id} binding={selected} locked={locked} onRevoke={() => void change({ action: "revoke", workspaceId, bindingId: selected.id, expectedRevision: selected.revision })} />
       </div> : null}
       {selected.status === "active" ? <HomeFinderConfiguration key={`${selected.id}:${selected.revision}`} binding={selected} changeNumber={selected.changeNumber} locked={locked} onChange={change} /> : null}
       {bindings.length > 1 ? <XaBlock label="Other brokerages">
-        <XaRows label="Other brokerages">{bindings.filter(b => b.id !== selected.id).map(b => <XaRow key={b.id} lead={<XaSystemTile kind="listing" size={32} />} title={b.brokerageName} detail={b.lifecycle === "paused" ? "Paused" : b.lifecycle === "live" ? undefined : "Draft"} onClick={() => setSelectedId(b.id)} />)}</XaRows>
+        <XaRows label="Other brokerages">{bindings.filter(b => b.id !== selected.id).map(b => <XaRow key={b.id} lead={<XaSystemTile kind="website" size={32} />} title={b.brokerageName} detail={b.lifecycle === "paused" ? "Paused" : b.lifecycle === "live" ? undefined : "Draft"} onClick={() => setSelectedId(b.id)} />)}</XaRows>
       </XaBlock> : null}
       <p className={styles.quiet}>
         <XaTextLink href={`/workspace?workspaceId=${encodeURIComponent(workspaceId)}&systemId=${encodeURIComponent(selected.systemId)}`}>Open this System</XaTextLink>
@@ -121,20 +134,38 @@ function HomeFinderLoader({ workspaceId, agencies, request }: { workspaceId: str
       </p>
     </>}
     object={<BuyerPreview binding={selected} busy={busy && lastAction === "publish"} failed={Boolean(error) && lastAction === "publish"} error={error} locked={locked}
+      checking={busy && lastAction === "check"} onCheck={() => void change({ action: "check", workspaceId, bindingId: selected.id })}
+      onRetry={pending.current ? () => pending.current && void change(pending.current) : () => { pending.current = null; setAttempt(v => v + 1); }}
       onPublish={() => void change({ action: "publish", workspaceId, bindingId: selected.id, expectedChange: selected.changeNumber })} />} />;
 }
 
 /** The search as a buyer sees it on the brokerage's site, with the one yes beside it. */
-function BuyerPreview({ binding, busy, failed, error, locked, onPublish }: { binding: Binding; busy: boolean; failed: boolean; error: string; locked: boolean; onPublish: () => void }) {
+function BuyerPreview({ binding, busy, failed, error, locked, checking, onCheck, onRetry, onPublish }: { binding: Binding; busy: boolean; failed: boolean; error: string; locked: boolean; checking: boolean; onCheck: () => void; onRetry: () => void; onPublish: () => void }) {
+  const [asked, setAsked] = useState<"copied" | "failed" | null>(null);
   const live = binding.lifecycle === "live";
   const canPublish = binding.status === "active" && !live;
-  const blocked = binding.readiness?.find(item => item.state !== "confirmed");
+  const unmet = binding.readiness?.filter(item => item.state !== "confirmed") ?? [];
+  const blocked = unmet[0];
+  const who = blocked ? readinessWho(blocked, binding.brokerageName) : null;
+  const waitingOn = locked && !busy;
+  // Blocked: the actual reason, said once here, and the action that gets it confirmed. Strelva never sends the note itself.
+  const reason = waitingOn ? "Your last change to Home Finder wasn't confirmed, so this waits until it is."
+    : blocked ? `${readinessSentence(blocked, binding.brokerageName)}${unmet.length > 1 ? ` ${unmet.length - 1} more ${unmet.length === 2 ? "thing waits" : "things wait"} after that.` : ""}${asked === "copied" ? ` A note for ${who === "The listings feed" ? "the listings feed" : who} is copied; send it from your own email.` : asked === "failed" ? " The note couldn't be copied. Tell them this in your own words." : ""}`
+      : !binding.readiness?.length ? "The listings feed hasn't confirmed anything yet." : undefined;
+  async function ask() {
+    if (!blocked) return;
+    try { await navigator.clipboard.writeText(confirmationNote(blocked, binding)); setAsked("copied"); }
+    catch { setAsked("failed"); }
+  }
+  const unblock = waitingOn ? <XaTextLink onClick={onRetry}>Send the same change again</XaTextLink>
+    : blocked && who ? <span className={styles.row}><XaButton variant="primary" size="lg" onClick={() => void ask()}>{asked === "copied" ? "Copied" : `Ask ${who === "The listings feed" ? "the listings feed" : who} to confirm`}</XaButton><XaTextLink onClick={onCheck}>{checking ? "Checking" : "Check again"}</XaTextLink></span>
+      : <XaTextLink onClick={onCheck}>{checking ? "Checking" : "Check with the feed again"}</XaTextLink>;
   return <XaDecision label={`${binding.brokerageName} Home Finder, as buyers see it`}
     status={binding.status === "revoked" ? <XaStatus kind="down">Stopped</XaStatus> : live ? <XaStatus kind="live" breathe={binding.runtimeAllowed}>Live</XaStatus> : binding.lifecycle === "paused" ? <XaStatus kind="waits">Paused</XaStatus> : <XaStatus kind="draft">Draft</XaStatus>}
-    meta={live && binding.runtimeAllowed ? <XaTextLink href={binding.approvedOrigin}>Open the brokerage website</XaTextLink> : "Buyers can't see it yet"}
+    meta={live && binding.runtimeAllowed ? <XaTextLink href={binding.approvedOrigin}>Open the brokerage website</XaTextLink> : canPublish && who ? `Waits for ${who === "The listings feed" ? "the listings feed" : who}` : undefined}
     yes={canPublish ? <XaYes state={busy ? "going" : failed ? "failed" : "waiting"} onYes={onPublish} failure={error || "It didn't go live. Buyers still can't search."}
       working={{ title: "Checking the feed and making it live", steps: [{ id: "check", label: "Checking the license, the feed and the inquiry address", state: "active" }] }}
-      disabledReason={locked && !busy ? "Another change is still being confirmed." : blocked ? `${readinessSentence(blocked, binding.brokerageName)} Strelva checks again when you press it.` : undefined} /> : null}>
+      disabledReason={reason} unblock={unblock} /> : null}>
     <XaPage address={`${host(binding.approvedOrigin)}/homes`} title="Find your home" flat>
       <p className={styles.pageSub}>{binding.brokerageName} · {binding.sourceName}</p>
       <div className={styles.fakeSearch} aria-hidden="true"><span>City, area or address</span><span className={styles.fakeButton}>Search homes</span></div>

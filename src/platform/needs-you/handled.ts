@@ -162,7 +162,8 @@ function decisionReceipt(row: Record<string, unknown>, id: string, at: string, a
   }
   const sentence = booking
     ? actorSentence(actor, `confirmed the booking ${who === "you decided" ? "you approved" : `(${who})`}: ${booking}`)
-    : actorSentence(actor, `did "${title}" ${who === "you decided" ? "as you approved" : `after ${who}`}.`, `Completed "${title}" ${who === "you decided" ? "as you approved" : `after ${who}`}.`);
+    // "Maya at North Studio finished it after your yes: Close online booking for Thanksgiving." Names the work without quoting it inside a verb.
+    : actorSentence(actor, `finished it ${who === "you decided" ? "after your yes" : `after ${who}`}: ${title.replace(/[.?!]+$/, "")}.`, `Done ${who === "you decided" ? "after your yes" : `after ${who}`}: ${title.replace(/[.?!]+$/, "")}.`);
   const changed = lifecycle === "make_real" ? str(row.outcomeReason) ?? str(row.approveEffect) : str(row.approveEffect);
   return { ...base, evidence, sentence, changed, undo: approvedDecisionUndo(lifecycle, str(row.kind), str(row.receiptRef)) };
 }

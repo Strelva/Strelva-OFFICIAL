@@ -41,7 +41,8 @@ export function BookingRequestYes({ workspaceId, bookingId, clientName, homeHref
     <XaYes state={needs.pending === item.id ? "going" : "waiting"} block={false} shortcut={false}
       yesLabel="Confirm booking" onYes={() => void decide("approve")} onNotYet={canDecide ? () => void decide("not_yet") : undefined}
       working={{ title: decided?.decision === "not_yet" ? "Releasing the time" : "Confirming the booking", steps: [] }}
-      disabledReason={canDecide ? undefined : "Only the owner can confirm a booking."} />
+      disabledReason={canDecide ? undefined : "Only the owner can confirm a booking."}
+      unblock={<XaTextLink href={`/workspace?${new URLSearchParams({ workspaceId, view: "access" })}`}>See who can confirm it</XaTextLink>} />
     {notice ? <p className={x.sentence} data-tone={notice.tone === "error" ? "waits" : undefined} role={notice.tone === "error" ? "alert" : "status"}>{noticeText}</p> : null}
   </div>;
 }

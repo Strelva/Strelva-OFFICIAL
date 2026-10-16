@@ -55,8 +55,8 @@ describe("recorded actor presentation", () => {
     expect(handledFromStore({ ...row, source: "operator" })?.sentence).toBe("Platform operator (support) updated your hours in your business record");
     expect(handledFromStore({ ...row, source: "operator", actor: { kind: "agency", displayName: "Acme" } })?.sentence).toBe("Platform operator (support) updated your hours in your business record");
     const decision = { store: "owner_decisions", id: "d1", at: row.at, state: "approved", outcome: "done", title: "Update hours", sourceLifecycle: "website_document", decidedByKind: "operator" };
-    expect(handledFromStore(decision)?.sentence).toBe('Completed "Update hours" after Platform operator (support) reviewed it.');
-    expect(handledFromStore({ ...decision, decidedByKind: null })?.sentence).toBe('Completed "Update hours" after a decision was recorded.');
+    expect(handledFromStore(decision)?.sentence).toBe('Done after Platform operator (support) reviewed it: Update hours.');
+    expect(handledFromStore({ ...decision, decidedByKind: null })?.sentence).toBe('Done after a decision was recorded: Update hours.');
   });
 
   it("does not infer an actor from an automatic tenant-event status", () => {
