@@ -1,7 +1,6 @@
 import { formatVisitorTime } from "@/platform/bookings/public-admission-time";
 import { VisitorBookingShell } from "./VisitorBookingShell";
 import { VisitorAppointment, visitorAppointmentTime } from "./VisitorAppointment";
-import { visitorBookingTone } from "./VisitorBookingOutcome";
 import styles from "./visitor.module.css";
 
 /** What /booking-confirm/[token] reads: `readVisitorConfirmation`'s shape. */
@@ -13,6 +12,8 @@ export interface VisitorConfirmationView {
   bookingStatus: "held" | "requested" | "confirmed" | "declined" | "cancelled" | "completed" | null;
   timeZone: string;
   expiresAt?: string;
+  /** The service booked, when the confirmation record carries it. */
+  serviceName?: string;
 }
 
 /**
@@ -42,24 +43,18 @@ export function BookingConfirmation({ identity, error, actionUrl, statusUrl, ser
   const lede = failed
     ? error === "rate" ? "Too many tries. Wait a minute and try again." : "The link may have expired or the time may have been taken. Contact the business before requesting again."
     : cancelled ? "This booking was cancelled or declined. Contact the business about another time."
-    : confirmed ? "Your time is booked. Use your booking email to change or cancel it."
+    : confirmed ? "Use your booking email to change or cancel it."
     : done ? `Your email is confirmed. ${business} will reply to accept this time or suggest another. Use your booking email to check, change or cancel your request.`
     : identity.state === "confirming" ? "Your email was received, but the booking outcome is not confirmed. Read its current status, or contact the business."
     : `Nothing is booked until you confirm your email. ${business} may then need to accept your request.`;
   const when = identity ? visitorAppointmentTime(identity.start, identity.timeZone) : null;
-  const tone = !identity ? undefined
-    : cancelled ? { tone: "ended" as const, label: "No longer active" }
-    : done && identity.bookingStatus ? visitorBookingTone(identity.bookingStatus, identity.businessName)
-    : identity.state === "confirming" ? { tone: "waits" as const, label: "Outcome not confirmed" }
-    : failed ? undefined
-    : { tone: "waits" as const, label: "Waiting for you to confirm" };
   const canConfirm = !done && !failed && identity?.state === "held";
 
   return <VisitorBookingShell siteName={identity?.businessName}>
     <div className={styles.page}>
       <h1 className={styles.title}>{headline}</h1>
       <p role={failed ? "alert" : undefined} className={styles.intro}>{lede}</p>
-      {identity && when ? <VisitorAppointment day={when.day} time={when.time} zone={when.zone} service={service ?? `With ${identity.businessName}`} status={tone} struck={cancelled}>
+      {identity && when ? <VisitorAppointment day={when.day} time={when.time} zone={when.zone} service={service ?? identity.serviceName} struck={cancelled}>
         {!done && identity.expiresAt ? <p className={styles.deadline}>Confirm by {formatVisitorTime(identity.expiresAt, identity.timeZone)}.</p> : null}
       </VisitorAppointment> : null}
       {canConfirm ? <form method="post" action={actionUrl} className={styles.actions}>

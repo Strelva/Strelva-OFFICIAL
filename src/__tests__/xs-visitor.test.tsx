@@ -6,10 +6,16 @@ import { BookingConfirmation } from "@/experience/bookings/BookingConfirmation";
 import { SiteLinks } from "@/components/public/SiteLinks";
 import { SiteBlogIndex } from "@/components/public/SiteBlog";
 import { renderEmailHtml, renderEmailText, type EmailOptions } from "@/platform/infra/email/layout";
-import { visitorNewsletterMail, offeredDatesMail } from "@/platform/infra/email/visitor-mail";
+import { visitorNewsletterMail } from "@/platform/infra/email/visitor-mail";
 import { renderXaMailHtml } from "@/platform/infra/email/xa-mail";
 import { customerReminderEmail, requestLapsedEmail } from "@/platform/bookings/emails";
-import { confirmState, harborLinks, manageState, previewBooking } from "@/experience/workspace/preview/xs-visitor-fixture";
+import { confirmState, harborLinks, harborSite, manageState, offerState, previewBooking } from "@/experience/workspace/preview/xs-visitor-fixture";
+import { InquiryBookingOffer } from "@/experience/bookings/InquiryBookingOffer";
+import { sitePageTree, SITE_CATALOG_CSS, type SiteTree } from "@/products/websites/site-render-tree";
+import { ownerRequestReminderEmail } from "@/platform/bookings/emails";
+import { readFileSync } from "node:fs";
+
+const text = (tree: SiteTree): string => typeof tree === "string" ? tree : `<${tree.tag} ${Object.entries(tree.attrs).map(([k, v]) => `${k}="${v}"`).join(" ")}>${tree.children.map(text).join("")}</${tree.tag}>`;
 
 const primaries = (html: string) => (html.match(/data-xa-primary/g) ?? []).length;
 
@@ -28,12 +34,11 @@ describe("xs-visitor: what a business's visitors see", () => {
     const html = renderEmailHtml(options);
     expect(html).toContain(">9:15 AM<"); expect(html).toContain("Eastern Time"); expect(html).toContain("Change or cancel");
     const lapsed = renderEmailHtml(requestLapsedEmail({ booking: previewBooking("declined"), businessName: "Harbor Dental", alternatives: [], bookAgainUrl: null }).options);
-    expect(lapsed).toContain("line-through"); expect(lapsed).toContain("Not booked");
+    expect(lapsed).toContain("line-through"); expect(lapsed).toContain("Your time wasn&#39;t confirmed"); expect(lapsed).not.toContain("Not booked");
   });
-  it("keeps the newsletter free of platform credit and offers dates as links that only open a page", () => {
+  it("keeps the newsletter free of platform credit", () => {
     const html = renderXaMailHtml(visitorNewsletterMail({ business: "Harbor Dental", subject: "News", html: "<p>Hi</p>", text: "Hi", unsubscribeUrl: "https://app.example.test/u" }));
     expect(html).not.toContain("Strelva"); expect(html).toContain("Unsubscribe from Harbor Dental");
-    expect(() => offeredDatesMail({ business: "B", person: "P", greeting: "G", dates: [] })).toThrow();
   });
   it("says what just happened instead of repeating the standing sentence, and cancels in place", () => {
     const html = renderToStaticMarkup(<ManageBooking state={manageState("cancelled")} actionUrl="#" />);
@@ -52,5 +57,27 @@ describe("xs-visitor: what a business's visitors see", () => {
     const links = renderToStaticMarkup(<SiteLinks siteName="Harbor Dental" links={harborLinks} />);
     expect(primaries(links)).toBe(1); expect(links).not.toMatch(/gradient|uppercase|tracking-widest/);
     expect(renderToStaticMarkup(<SiteBlogIndex siteName="Harbor Dental" posts={[]} />)).toContain("No posts yet");
+  });
+  it("says closures in place and gives the offer page one column with one primary", () => {
+    const view = offerState("choose");
+    const html = renderToStaticMarkup(<InquiryBookingOffer offer={view.offer} actionUrl="#" />);
+    expect(html).toContain("Closed Nov 26–27 for Thanksgiving."); expect(html).toContain(">Closed<"); expect(primaries(html)).toBe(1);
+    const gone = renderToStaticMarkup(<InquiryBookingOffer offer={null} actionUrl="#" />);
+    expect(gone).toContain("These times have expired"); expect(gone).not.toContain("Business details unavailable"); expect(gone).not.toContain("suggestion");
+  });
+  it("keeps one filled action on a native page: the header CTA goes quiet beside a hero CTA, list rows use text links", () => {
+    const html = text(sitePageTree(harborSite, "/", { preview: true }));
+    expect(html).toContain('class="site-action-quiet" href="/book"');
+    expect((html.match(/class="site-action"/g) ?? []).length).toBe(1);
+    expect(html).toContain('class="site-text-action"'); expect(html).not.toContain("site-centered");
+    expect(SITE_CATALOG_CSS).not.toMatch(/font-family:var\(--font-body/); expect(SITE_CATALOG_CSS).toContain("--font-workspace");
+  });
+  it("never reads the app's Geist token on visitor pages", () => {
+    for (const file of ["src/experience/bookings/visitor.module.css", "src/components/public/site-pages.module.css"]) expect(readFileSync(file, "utf8")).not.toMatch(/font-family:[^;]*--font-body/);
+  });
+  it("sends the owner's chase to the decision, not the Bookings list", () => {
+    const html = renderEmailHtml(ownerRequestReminderEmail({ booking: previewBooking("requested"), businessName: "Harbor Dental", openUrl: "https://app.example.test/workspace?workspaceId=w" }).options);
+    expect(html).toContain("Confirm or say not yet"); expect(html).not.toContain("Open Bookings"); expect(html).not.toContain("say not yet there");
+    expect(html).toContain("border-radius:16px"); expect(html).not.toContain("border-radius:24px");
   });
 });

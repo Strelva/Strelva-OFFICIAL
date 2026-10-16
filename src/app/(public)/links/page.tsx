@@ -64,7 +64,7 @@ export default async function LinksPage() {
   return (
     <>
       <PageViewTracker />
-      <SiteLinks siteName={settings.siteName} tagline={settings.siteTagline} links={links} />
+      <SiteLinks siteName={settings.siteName} tagline={settings.siteTagline} links={links} logoUrl={settings.logoUrl} />
     </>
   );
 }

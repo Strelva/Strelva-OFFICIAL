@@ -101,23 +101,6 @@ export function visitorBookingMail(input: VisitorBookingMailInput): XaMail {
   };
 }
 
-/** One to three dates a business offers from an inquiry. Opening a date only opens the page where it is requested. */
-export function offeredDatesMail(input: { business: string; person: string; greeting: string; dates: readonly { label: string; reviewUrl: string }[]; expires?: string }): XaMail {
-  if (input.dates.length < 1 || input.dates.length > 3) throw new Error("An offer must contain one to three dates");
-  return {
-    subject: `Pick a time with ${input.person}`,
-    preheader: input.greeting,
-    fromName: input.business,
-    blocks: [
-      { kind: "identity", business: input.business },
-      { kind: "headline", text: `Pick a time with ${input.person}`, lede: input.greeting },
-      { kind: "choices", label: "Open times", items: input.dates.map(date => ({ label: date.label, url: date.reviewUrl })) },
-      { kind: "sentence", text: `Opening a time changes nothing. ${input.person} confirms by email.${input.expires ? ` These times are held until ${input.expires}.` : ""} None work? Reply with what does.`, muted: true },
-    ],
-    footer: footer(input.business),
-  };
-}
-
 /** A newsletter issue, with no Strelva credit. `html` must already be sanitized by `sanitizeEmailHtml`. */
 export function visitorNewsletterMail(input: { business: string; subject: string; html: string; text: string; previewText?: string; unsubscribeUrl: string }): XaMail {
   return {

@@ -14,7 +14,8 @@ export function VisitorAppointment({ day, time, zone, service, status, struck = 
   day: string;
   time: string;
   zone?: string;
-  service: string;
+  /** What it is. Left out when the record doesn't say, never replaced with a placeholder. */
+  service?: string;
   status?: { tone: VisitorAppointmentTone; label: string };
   struck?: boolean;
   /** One or two quiet lines under the time: a deadline, where to go, who booked it. */
@@ -24,7 +25,7 @@ export function VisitorAppointment({ day, time, zone, service, status, struck = 
     {status ? <p className={styles.state} data-tone={status.tone}><span className={styles.stateDot} aria-hidden="true" />{status.label}</p> : null}
     <p className={styles.apDay}>{day}</p>
     <p className={styles.apTime}>{struck ? <span className={styles.srOnly}>No longer booked: </span> : null}<span className={styles.apClock}>{time}</span>{zone ? <span className={styles.apZone}>{zone}</span> : null}</p>
-    <p className={styles.apService}>{service}</p>
+    {service ? <p className={styles.apService}>{service}</p> : null}
     {children ? <div className={styles.apMore}>{children}</div> : null}
   </section>;
 }

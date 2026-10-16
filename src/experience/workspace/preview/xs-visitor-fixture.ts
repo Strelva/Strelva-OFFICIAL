@@ -21,7 +21,7 @@ export const PREVIEW_NOW = Date.parse("2026-11-20T14:05:00Z");
 /* ---------- The native website ---------- */
 
 export const harborSite: SiteDocument = {
-  version: 2, siteName: HARBOR.name, theme: { palette: "ocean", typeScale: "editorial", accent: "#1f4e6b" },
+  version: 2, siteName: HARBOR.name, theme: { palette: "ocean", typeScale: "standard", accent: "#1f4e6b" },
   pages: [
     { path: "/", title: "Harbor Dental", description: "Cleanings, exams and first visits at 1180 Elmwood Ave, Buffalo.", root: "home" },
     { path: "/about", title: "About Dr. Lin", description: "Dr. Amy Lin and the Harbor Dental team.", root: "about" },
@@ -30,11 +30,12 @@ export const harborSite: SiteDocument = {
     home: { id: "home", type: "Section", variant: "container", props: {}, children: ["header", "hero", "services", "faq", "footer"], factIds: [] },
     about: { id: "about", type: "Section", variant: "container", props: {}, children: ["header", "story", "footer"], factIds: [] },
     header: { id: "header", type: "Header", variant: "logo-left", props: { brand: HARBOR.name, links: [{ label: "Services", href: "/#services" }, { label: "About", href: "/about" }, { label: HARBOR.phone, href: "tel:+17165550142" }], cta: { label: "Book a visit", href: "/book" } }, children: [], factIds: [] },
-    hero: { id: "hero", type: "Hero", variant: "statement", props: { eyebrow: "Book a visit", title: "See Dr. Lin on Elmwood.", body: "Cleanings, exams and first visits at 1180 Elmwood Avenue, Buffalo. New patients are welcome most weeks.", cta: { label: "Book a visit", href: "/book" }, secondaryCta: { label: "Call (716) 555-0142", href: "tel:+17165550142" } }, children: [], factIds: [] },
+    hero: { id: "hero", type: "Hero", variant: "split", props: { eyebrow: "Family dentistry in Elmwood Village", title: "See Dr. Lin on Elmwood.", body: "Cleanings, exams and first visits at 1180 Elmwood Avenue, Buffalo. New patients are welcome most weeks.", cta: { label: "Book a visit", href: "/book" }, secondaryCta: { label: "Call (716) 555-0142", href: "tel:+17165550142" } }, children: ["hours"], factIds: [] },
+    hours: { id: "hours", type: "Hours", variant: "table", props: { title: "Hours", rows: [{ day: "Monday to Friday", hours: "8 AM–5 PM" }, { day: "Saturday", hours: "9 AM–1 PM" }, { day: "Sunday", hours: "Closed" }, { day: "Nov 26–27", hours: "Closed for Thanksgiving" }] }, children: [], factIds: [] },
     services: { id: "services", type: "ServiceGrid", variant: "list", props: { title: "What we do", items: [
-      { title: "New-patient exam", body: "Sixty minutes with Dr. Lin: X-rays, a full exam and a plan you can take home." },
-      { title: "Cleaning", body: "Every six months, forty-five minutes, with a hygienist who will remember you." },
-      { title: "Emergency visit", body: "Call before 10 AM and most days we can see you the same day." },
+      { title: "New-patient exam", body: "60 minutes with Dr. Lin: X-rays, a full exam and a plan you can take home. $180, or covered by most PPO plans.", href: "/book?service=exam" },
+      { title: "Cleaning", body: "45 minutes with a hygienist, every six months. $120.", href: "/book?service=cleaning" },
+      { title: "Emergency visit", body: "Call before 10 AM and most weekdays we can see you the same day.", href: "tel:+17165550142" },
     ] }, children: [], factIds: [] },
     faq: { id: "faq", type: "Faq", variant: "accordion", props: { title: "Before your visit", items: [
       { question: "Do you take my insurance?", answer: "Most PPO plans. Call and we will check before you come in." },
@@ -138,7 +139,7 @@ const slot = (iso: string) => ({ start: iso, end: new Date(Date.parse(iso) + 3_6
 export const harborOfferSlots = ["2026-11-23T13:00:00Z", "2026-11-23T15:30:00Z", "2026-11-24T14:15:00Z", "2026-11-24T18:30:00Z", "2026-11-25T13:30:00Z", "2026-11-28T14:00:00Z", "2026-11-28T16:00:00Z"].map(slot);
 export const OFFER_STATES = ["choose", "empty", "error", "gone", "unavailable", "held", "requested", "confirmed", "expired", "unknown"] as const;
 export function offerState(state: string): { offer: InquiryBookingOffer | null; receipt: InquiryReceipt | null; error: boolean; unavailable: boolean } {
-  const offer = { businessName: HARBOR.name, id: "fixture", serviceId: "exam", serviceName: "New-patient exam · 60 min", timeZone: HARBOR.zone, slots: harborOfferSlots, expiresAt: "2026-11-22T23:00:00Z", url: "#", token: "fixture", booked: false } as unknown as InquiryBookingOffer;
+  const offer = { businessName: HARBOR.name, id: "fixture", serviceId: "exam", serviceName: "New-patient exam · 60 min", timeZone: HARBOR.zone, slots: harborOfferSlots, expiresAt: "2026-11-22T23:00:00Z", url: "#", token: "fixture", booked: false, closedDays: [{ date: "2026-11-26", label: "Thanksgiving" }, { date: "2026-11-27", label: "Thanksgiving" }] } as unknown as InquiryBookingOffer;
   const receipt = (status: InquiryReceipt["status"], confirmUntil: string | null = null): InquiryReceipt => ({ status, start: "2026-11-24T14:15:00Z", timeZone: HARBOR.zone, confirmUntil });
   switch (state) {
     case "empty": return { offer: { ...offer, slots: [] }, receipt: null, error: false, unavailable: false };

@@ -24,19 +24,35 @@
 .factLabel { width: 120px; flex-shrink: 0; color: var(--st-text-2); font-size: 13px; line-height: 22px; }
 @media (max-width: 767px) { .factLabel { width: 80px; } }
 
-/* xs-visitor (Oct 16): the public business page in XA. */
-.profile { max-width: 1200px; margin: 0 auto; padding: 40px 40px 96px; display: flex; flex-direction: column; gap: 32px; }
-.reach { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 28px; }
-.reachLink { display: inline-flex; flex-direction: column; min-height: 44px; justify-content: center; color: var(--st-text); font-size: 15px; line-height: 20px; text-decoration: none; overflow-wrap: anywhere; }
+/* xs-visitor (Oct 16): the public business page in XA. The reach panel is the
+   page's one dominant object; everything else reads as a column beside it. */
+.profile { max-width: 1200px; margin: 0 auto; padding: 40px 40px 96px; display: flex; flex-direction: column; gap: 40px; }
+.profileColumns { grid-template-columns: minmax(0, 1fr) 400px; gap: 72px; }
+.identity { display: flex; max-width: 760px; flex-direction: column; gap: 12px; }
+.factBlock { display: flex; flex-direction: column; gap: 12px; }
+.services { margin: 0; padding: 0; list-style: none; border-top: 1px solid var(--st-line); }
+.service { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 24px; row-gap: 2px; padding: 14px 0; border-bottom: 1px solid var(--st-line); }
+.serviceName { font-size: 16px; line-height: 24px; font-weight: 500; color: var(--st-text); }
+.servicePrice { grid-column: 2; grid-row: 1; font-size: 15px; line-height: 24px; color: var(--st-text); text-align: right; font-variant-numeric: tabular-nums; }
+.serviceDetail { grid-column: 1 / -1; font-size: 14px; line-height: 21px; color: var(--st-text-2); overflow-wrap: anywhere; }
+.reachPanel { position: sticky; top: 24px; display: flex; flex-direction: column; gap: 20px; padding: 28px; border: 1px solid var(--st-line); border-radius: 16px; background: var(--st-surface); }
+.reachTitle { margin: 0; font-size: 22px; line-height: 28px; font-weight: 600; letter-spacing: -.3px; color: var(--st-text); }
+.hours { margin: 0; }
+.hoursRow { display: flex; justify-content: space-between; gap: 16px; padding: 10px 0; border-bottom: 1px solid var(--st-line); font-size: 15px; line-height: 22px; }
+.hoursRow:first-child { border-top: 1px solid var(--st-line); }
+.hoursRow dt { color: var(--st-text-2); }
+.hoursRow dd { margin: 0; color: var(--st-text); font-variant-numeric: tabular-nums; text-align: right; }
+.reachList { display: flex; flex-direction: column; margin: 0; padding: 0; list-style: none; }
+.reachLink { display: flex; flex-direction: column; min-height: 44px; justify-content: center; padding: 6px 0; color: var(--st-text); font-size: 15px; line-height: 20px; text-decoration: none; overflow-wrap: anywhere; }
 .reachLink:hover .reachVerb, .reachLink:focus-visible .reachVerb { color: var(--st-accent); }
 .reachLink:focus-visible { outline: 2px solid var(--st-accent); outline-offset: 3px; border-radius: 8px; }
 .reachVerb { color: var(--st-text-2); font-size: 13px; font-weight: 500; transition: color var(--motion-fast) var(--ease-settle); }
-.factBlock { display: flex; flex-direction: column; gap: 12px; }
-.answer { display: flex; flex-direction: column; gap: 2px; overflow-wrap: anywhere; }
-.answerDetail { color: var(--st-text-2); font-size: 13px; line-height: 20px; }
-.aside { display: flex; flex-direction: column; gap: 14px; padding-top: 8px; }
+.checked { margin: 0; max-width: 720px; color: var(--st-text-2); font-size: 14px; line-height: 22px; }
+.assistants { display: flex; max-width: 720px; flex-direction: column; gap: 10px; padding-top: 24px; border-top: 1px solid var(--st-line); }
 .asideText { margin: 0; color: var(--st-text-2); font-size: 14px; line-height: 22px; }
 .endpoint { color: var(--st-text); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.elsewhere { margin: 0; color: var(--st-text-2); }
+.elsewhere a { color: var(--st-text); font-weight: 500; text-underline-offset: 3px; }
 .withheld { display: flex; align-items: flex-start; gap: 12px; max-width: 560px; padding: 24px 0; color: var(--st-text); font-size: 16px; line-height: 24px; }
 .withheld p { margin: 4px 0 0; }
 .loading { display: flex; max-width: 640px; flex-direction: column; gap: 14px; }
@@ -46,5 +62,11 @@
 .loading span[data-size="md"] { width: 75%; }
 @keyframes profileSheen { 0%, 100% { opacity: 1; } 50% { opacity: .55; } }
 @media (prefers-reduced-motion: reduce) { .loading span { animation: none; } .reachVerb { transition: none; } }
-@media (max-width: 899px) { .profileColumns { grid-template-columns: minmax(0, 1fr); gap: 40px; } .aside { padding-top: 24px; border-top: 1px solid var(--st-line); } }
-@media (max-width: 767px) { .profile { padding: 16px 16px 64px; gap: 24px; } }
+@media (max-width: 899px) { .profileColumns { grid-template-columns: minmax(0, 1fr); gap: 32px; } .reachPanel { position: static; order: -1; } }
+@media (max-width: 767px) { .profile { padding: 16px 16px 64px; gap: 28px; } .reachPanel { padding: 20px; } .service { grid-template-columns: minmax(0, 1fr); } .servicePrice { grid-column: 1; grid-row: auto; text-align: left; } }
+
+/* A /biz address with nothing published: Pebble holds up a blank page. */
+.missing { display: flex; max-width: 560px; flex-direction: column; align-items: flex-start; gap: 12px; padding-top: 24px; }
+.missing h1 { margin: 8px 0 0; font-size: 34px; line-height: 40px; font-weight: 600; letter-spacing: -.8px; color: var(--st-text); }
+.missing p { margin: 0; font-size: 16px; line-height: 25px; color: var(--st-text-2); }
+.missingActions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 24px; margin-top: 12px; }

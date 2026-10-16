@@ -76,7 +76,8 @@ describe("booking lifecycle run", () => {
     // The owner reminder is client mail: tenant-aware gate, the owner recipient, a link to Bookings.
     expect(owner).toMatchObject({ audience: "client", tenantId: "mooney", to: "owner@mooney.example" });
     expect(owner.fromAddress).toBeUndefined();
-    expect(owner.options?.button?.url).toBe("https://app.strelva.example/workspace/bookings?view=week&date=2026-11-03&workspaceId=ws-1");
+    // The yes or not yet for a request lives in Needs you on Today.
+    expect(owner.options?.button?.url).toBe("https://app.strelva.example/workspace?workspaceId=ws-1");
 
     expect(finished).toEqual(expect.arrayContaining([
       ["m-lapse", "sent", "msg_1", null],

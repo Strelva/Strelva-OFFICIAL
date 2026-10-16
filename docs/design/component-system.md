@@ -49,8 +49,11 @@ E4, E2 and S2. Visitor pages name the business, never Strelva; emails carry the
 quiet "Runs on Strelva" credit, newsletters none.
 
 - **The booking as one object:** [VisitorAppointment](../../src/experience/bookings/VisitorAppointment.tsx)
-  (day, time in large figures, zone small, service; a dot and a word only when
-  it waits, is booked, or no longer holds; a time that no longer holds is struck).
+  (day, time in large figures, zone small, service when known; hairline border,
+  no lifted shadow; visitor pages pass no status dot because the headline says
+  the state; a time that no longer holds is struck). The choose pages
+  (`/book-inquiry`, `/inquiry-booking`) are one column; `VisitorSlotWeek` takes
+  `closed` days and says "Closed" plus the reason in place.
   Used by [ManageBooking](../../src/experience/bookings/ManageBooking.tsx) (`/b/[token]`:
   change the time as day rows under it, one primary; cancel opens in place in a
   `<details>`, never a modal), [BookingConfirmation](../../src/experience/bookings/BookingConfirmation.tsx)
@@ -64,7 +67,7 @@ quiet "Runs on Strelva" credit, newsletters none.
   so inquiry digests hold. `EmailOptions.xa` lets a builder give its own XA mail:
   booking reminders, today, lapsed, the owner's "still waiting" chase
   (`bookings/emails.ts`) and booking updates (`bookingUpdateVisitorMail`).
-  `offeredDatesMail` and `visitorNewsletterMail` (used by `sendNewsletter`).
+  `visitorNewsletterMail` (used by `sendNewsletter`). No offered-dates XA mail: the inquiry offer still sends through the existing options path until it is wired.
   `xa-mail.ts` gains `status`, `when`, `rows`, `quote`, `choices`, `link` and
   `html` blocks; `settings` is optional, `footerLinks` added.
 - **Unsubscribe:** [unsubscribe-page.ts](../../src/platform/infra/email/unsubscribe-page.ts),
@@ -73,13 +76,21 @@ quiet "Runs on Strelva" credit, newsletters none.
   (`/links`), [SiteBlog](../../src/components/public/SiteBlog.tsx) (`/blog`, `/blog/[slug]`),
   `(public)/error.tsx`, new `(public)/not-found.tsx` and `sites/[tenant]/not-found.tsx`,
   all on `site-pages.module.css`: the site's `--site-*` first, then paper and ink;
-  never the app's `--color-*`. The native catalog CSS uses 16 px cards and
-  images and pill buttons, and centers a statement hero's actions.
+  never the app's `--color-*`. Face: the business's `--site-font` (legacy theme
+  font) else DM Sans (`--font-workspace`), never the app's `--font-body` (Geist);
+  `tests/xs-visitor-fonts.spec.ts` asserts the computed face. `/links` shows the
+  business logo or nothing (no initial tile); blog has no topic chips. The native
+  catalog CSS (every native site): DM Sans, 16 px cards and images, pill
+  buttons, a left-aligned statement hero, the header CTA as a text link when the
+  page's hero has one, list-variant services as hairline rows with a text action
+  (Book / Call / Learn more), FAQ `+` marker. Before/after on a real tenant:
+  `design/xa-build-2026-10-15/xs-visitor/tenant-mooney-{before,after}-*.png`.
 - **Business page:** [PublicBusinessProfile](../../src/experience/product/assistants/PublicBusinessProfile.tsx)
-  (`/biz/[handle]`) on the XA kit: headline with the place, one primary "Book a
-  time", call/email/visit as labeled links, facts as `XaAnswers` with the source
-  said once, policies, evidence, and "For assistants" beside it. No mono.
-  `biz/[handle]/not-found.tsx` puts Pebble in frame.
+  (`/biz/[handle]`): the reach panel (hours, one primary "Book a time", call,
+  email and visit stacked) is the dominant object; services as hairline rows
+  with price in place; how the page is checked is one sourced sentence; "For
+  assistants" sits below, quieter; social links by name. One date format.
+  `biz/[handle]/not-found.tsx`: Pebble holding a blank page, primary to Google Maps.
 - Previews: `/preview/strelva/xa/xs-visitor` (index of every screen and state).
 
 ## October 11 coherence amendment

@@ -95,9 +95,9 @@ export function ownerRequestReminderEmail(input: {
       heading: "A booking request is still waiting",
       paragraphs: [
         `${who} asked for ${cleanSubjectText(input.booking.serviceName)} on ${day} at ${time}. Nobody has confirmed it yet.`,
-        "Confirm it or say not yet from the email we sent when it came in, or open Bookings. If nobody answers within 3 days of the request, the customer receives a notice saying the time wasn't confirmed, with an option to choose other times. A booking is never confirmed by silence.",
+        "Confirm it or say not yet from the email we sent when it came in, or in Needs you on Today. If nobody answers within 3 days of the request, the customer receives a notice saying the time wasn't confirmed, with an option to choose other times. A booking is never confirmed by silence.",
       ],
-      button: { label: "Open Bookings", url: input.openUrl },
+      button: { label: "Confirm or say not yet", url: input.openUrl },
       footerNote: input.businessName ? `For ${cleanSubjectText(input.businessName)}` : undefined,
     },
   };
@@ -125,9 +125,8 @@ export function requestLapsedEmail(input: {
     options: {
       xa: visitorBookingMail({
         business, subject, preheader: `${day} at ${time} is not booked. Pick another time.`,
-        status: { tone: "ended", label: "Not booked" },
         headline: "Your time wasn't confirmed",
-        lede: `Hi ${first(input.booking.customer.name)}, ${business || "the business"} didn't confirm your request in time, so this time is not booked.`,
+        lede: `Hi ${first(input.booking.customer.name)}, ${business || "the business"} didn't answer your request in time.${open.length && input.bookAgainUrl ? " Pick one of the open times below, or reply to this email." : ""}`,
         when: { day, time, detail: cleanSubjectText(input.booking.serviceName), struck: true },
         ...(open.length && input.bookAgainUrl ? { choices: { label: "Open right now", items: open.map(label => ({ label, url: input.bookAgainUrl! })) } }
           : open.length ? { note: `Open right now: ${open.join(", ")}. Reply to this email to ask for one.` }
@@ -156,7 +155,7 @@ function ownerChaseMail(input: { who: string; day: string; time: string; service
       { kind: "waits", label: "Waits for you" },
       { kind: "headline", text: input.who === "A customer" ? `Confirm this request for ${input.day}?` : `Confirm ${input.who} for ${input.day}?`, lede: `${input.who} asked a day ago and nobody has answered. A booking is never confirmed by silence.` },
       { kind: "when", ...splitZone({ day: input.day, time: input.time, detail: `${input.service} · ${input.who}` }) },
-      { kind: "primary", action: { label: "Open Bookings", url: input.openUrl }, note: "Confirm it or say not yet there." },
+      { kind: "primary", action: { label: "Confirm or say not yet", url: input.openUrl }, note: "It waits for you in Needs you on Today." },
       { kind: "rule" },
       { kind: "sentence", text: `If nobody answers within 3 days of the request, ${input.who} is told the time wasn't confirmed and can pick another.`, muted: true },
     ],

@@ -9,17 +9,17 @@ export function InquiryBookingChoice({ choice, actionUrl, unavailable, error, bu
   const booking = choice?.booking;
   const confirmUntil = booking?.status === "held" && Number.isFinite(Date.parse(booking.createdAt)) ? new Date(Date.parse(booking.createdAt) + 15 * 60000).toISOString() : null;
   const expired = Boolean(now !== undefined && confirmUntil && Date.parse(confirmUntil) <= now);
-  const choosing = Boolean(choice && !booking && choice.offer.slots.length);
   if (choice && booking) return <VisitorBookingShell siteName={businessName}>
     <VisitorBookingOutcome status={booking.status} start={booking.start} timeZone={booking.timeZone} service={choice.offer.serviceName} businessName={businessName} confirmUntil={confirmUntil} expired={expired} />
   </VisitorBookingShell>;
-  return <VisitorBookingShell siteName={businessName} wide={choosing}>
-    <div className={choosing ? styles.split : styles.page}>
+  // One reading column at every width: the week of times is the page's object, never half of an empty split.
+  return <VisitorBookingShell siteName={businessName}>
+    <div className={styles.page}>
       <h1 className={styles.title}>{!choice ? unavailable ? "These times couldn’t load" : "This link has expired" : "Choose an appointment time"}</h1>
       {!choice ? <p role={unavailable ? "alert" : undefined} className={styles.intro}>{unavailable ? "These times couldn't load. Reload in a minute, or reply to the business for help." : "This link expired or these times are no longer available. Reply to the business for fresh times."}</p> : <>
         <p className={styles.intro}>Pick a time, then check your email to confirm. The business may then need to accept your request.</p>
         {error && <p role="alert" className={styles.said} data-tone="problem">{error === "rate" ? "Wait a minute before trying again." : "That time couldn't be requested. Reload for current times, or reply to the business. Nothing was confirmed."}</p>}
-        <div className={styles.section}>
+        <div className={styles.offerCard}>
           {choice.offer.slots.length === 0 ? <><h2 className={styles.label}>{choice.offer.serviceName}</h2><p className={styles.note}>No times are open. Reply to the business for fresh times.</p></>
               : <form method="post" action={actionUrl} className={styles.card}>
                 <p className={styles.cardTitle}>{choice.offer.serviceName}</p>

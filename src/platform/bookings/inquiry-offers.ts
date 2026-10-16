@@ -8,10 +8,10 @@ import { z } from "zod";
 import { decryptSecret, encryptSecret } from "@/platform/infra/crypto/secrets";
 import type { EmailOptions } from "@/platform/infra/email/layout";
 import { PublicBookingError } from "./errors";
-import { settingsOrDefault, timeZoneOf } from "./availability";
+import { openRanges, settingsOrDefault, timeZoneOf } from "./availability";
 import { bookingReadSource, bookingStoreWriteEnabled } from "./flags";
 import { nativeRpc, nativeSlots, newBookingAccess, tokenHash } from "./native";
-import { parseStoreBooking, readBookingContext, type StoreBooking } from "./store";
+import { parseStoreBooking, readBookingContext, type BookingContext, type StoreBooking } from "./store";
 
 export function bookingInquiryOffersEnabled(env: Partial<Record<string, string | undefined>> = process.env) {
   return env.STRELVA_BOOKING_INQUIRY_OFFERS?.trim() === "1" && bookingStoreWriteEnabled(env);
@@ -29,6 +29,8 @@ export interface InquiryBookingOffer {
   businessName?: string;
   id: string; serviceId: string; serviceName: string; timeZone: string;
   slots: Array<{ start: string; end: string }>; expiresAt: string; url: string; token: string; booked: boolean;
+  /** Local dates between the first and last offered day when the business is closed, with its reason when given. Read-only presentation. */
+  closedDays?: Array<{ date: string; label?: string }>;
 }
 function project(raw: unknown): InquiryBookingOffer | null {
   const row = rawOfferSchema.safeParse(raw);
@@ -93,7 +95,28 @@ export async function readInquiryBookingOffer(token: string): Promise<InquiryBoo
   const row = rawOfferSchema.parse(raw);
   const business = await nativeRpc("read_booking_business_details", { p_tenant_id: row.tenantId }) as { name?: string } | null;
   if (!business?.name?.trim()) throw new PublicBookingError("unavailable", "The business identity could not be verified.");
-  return { ...offer, businessName: business.name };
+  // Closures are presentation only ("Closed" in place of "No times"); a failed read leaves them out.
+  const context = offer.booked ? null : await readBookingContext(row.tenantId).catch(() => null);
+  const closedDays = context ? offerClosedDays(context, offer) : [];
+  return { ...offer, businessName: business.name, ...(closedDays.length ? { closedDays } : {}) };
+}
+
+/** Days between the first and last offered day with no open hours, and the reason the business gave, if any. Pure. */
+export function offerClosedDays(context: BookingContext, offer: Pick<InquiryBookingOffer, "slots" | "timeZone">): Array<{ date: string; label?: string }> {
+  let zone = offer.timeZone;
+  try { new Intl.DateTimeFormat("en-CA", { timeZone: zone }).format(); } catch { zone = "UTC"; }
+  const local = new Intl.DateTimeFormat("en-CA", { timeZone: zone, year: "numeric", month: "2-digit", day: "2-digit" });
+  const dates = offer.slots.map(slot => local.format(new Date(slot.start))).sort();
+  if (!dates.length) return [];
+  const labels = new Map<string, string>();
+  for (const o of [...(context.hours?.overrides ?? []), ...(settingsOrDefault(context).bookableOverrides ?? [])]) if (o.closed && o.label?.trim() && !labels.has(o.date)) labels.set(o.date, o.label.trim().slice(0, 120));
+  const out: Array<{ date: string; label?: string }> = [];
+  for (let at = Date.parse(`${dates[0]}T12:00:00Z`), last = Date.parse(`${dates[dates.length - 1]}T12:00:00Z`); at <= last && out.length < 14; at += 86_400_000) {
+    const date = new Date(at).toISOString().slice(0, 10);
+    if (dates.includes(date) || openRanges(context, date).length) continue;
+    out.push(labels.has(date) ? { date, label: labels.get(date)! } : { date });
+  }
+  return out;
 }
 export async function chooseInquiryBookingOffer(token: string, start: string): Promise<StoreBooking> {
   const offer = await readInquiryBookingOffer(token);

@@ -18,13 +18,13 @@ const DOES: Record<SiteLinkKind, string> = {
  * its one main link as the page's only filled button, then open rows that each
  * say where they go. No gradient, glass, uppercase or hover zoom.
  */
-export function SiteLinks({ siteName, tagline, links }: { siteName: string; tagline?: string; links: readonly SiteLinkItem[] }) {
+export function SiteLinks({ siteName, tagline, links, logoUrl }: { siteName: string; tagline?: string; links: readonly SiteLinkItem[]; /** The business's own logo; with none, the name leads on its own (never an initial in a tile). */ logoUrl?: string | null }) {
   const name = siteName.trim() || "Links";
   const main = links.find(link => link.featured);
   const rest = links.filter(link => link !== main);
   return <section className={`${styles.page} ${styles.narrow}`} aria-labelledby="site-links-name">
     <div className={styles.who}>
-      <span className={styles.initial} aria-hidden="true">{name.charAt(0).toUpperCase()}</span>
+      {logoUrl && /^(https:\/\/|\/(?!\/))/.test(logoUrl) ? <img src={logoUrl} alt="" className={styles.logo} width={56} height={56} /> : null}
       <div><h1 id="site-links-name" className={styles.name}>{name}</h1>{tagline ? <p className={styles.tagline}>{tagline}</p> : null}</div>
     </div>
     {main ? <div className={styles.main}><a href={main.url} target="_blank" rel="noopener noreferrer" className={styles.primary} data-xa-primary>{main.title}</a></div> : null}

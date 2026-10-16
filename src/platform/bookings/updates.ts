@@ -135,13 +135,13 @@ export function bookingUpdateVisitorMail(input: { title: string; state: StoreBoo
   const { title, state, rescheduled, business, booking, when, agentSource, url } = input;
   return visitorBookingMail({
     business: business.name, subject: `${title}: ${booking.serviceName}, ${when.day} ${when.time}`, headline: title,
-    status: state === "held" ? { tone: "waits", label: "Confirm within 15 minutes" } : state === "requested" ? { tone: "waits", label: `Waiting on ${business.name}` }
-      : state === "confirmed" ? { tone: "live", label: "Booked" } : { tone: "ended", label: state === "cancelled" ? "Cancelled" : "Not booked" },
+    // The headline already says what happened; a dot appears only for the deadline it can't say.
+    ...(state === "held" ? { status: { tone: "waits" as const, label: "Confirm within 15 minutes" } } : {}),
     lede: state === "held" ? "You asked for this time. Nothing is booked until you confirm."
-      : state === "requested" ? `${business.name} will confirm or suggest another time.`
-      : state === "cancelled" ? "This booking is cancelled, and the time is open for someone else."
-      : state === "declined" ? "This time was not confirmed. Reply to ask about another time."
-      : rescheduled ? "Your new time is booked." : "Your time is booked.",
+      : state === "requested" ? `${business.name} will confirm it or suggest another time, and you'll get an email either way.`
+      : state === "cancelled" ? "The time is open for someone else."
+      : state === "declined" ? "Reply to this email to ask about another time."
+      : rescheduled ? "The calendar file for the new time is attached." : "The calendar file is attached, so you can add it to your calendar.",
     when: { day: when.day, time: when.time, detail: booking.serviceName, struck: state === "cancelled" || state === "declined" },
     ...(business.address || agentSource ? { note: [business.address ? `Where: ${business.address}.` : "", agentSource ? `Booked through ${agentSource}.` : ""].filter(Boolean).join(" ") } : {}),
     ...(url ? { primary: { label: state === "held" ? "Review and confirm" : "Change or cancel", url } } : {}),

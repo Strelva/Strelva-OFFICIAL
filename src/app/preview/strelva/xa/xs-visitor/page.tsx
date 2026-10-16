@@ -15,7 +15,7 @@ const GROUPS: { title: string; links: [string, string][] }[] = [
   { title: "Offer from an inquiry (/book-inquiry)", links: OFFER_STATES.map(state => [state, `${P}/offer?state=${state}`]) },
   { title: "Inquiry handoff (/inquiry-booking)", links: ["choose", "held", "requested", "confirmed", "rate", "expired-link", "error"].map(state => [state, `${P}/handoff?state=${state}`]) },
   { title: "Loading", links: [["Booking pages", `${P}/loading`]] },
-  { title: "Emails", links: ["reminder", "today", "chase", "lapsed", "lapsed-none", "confirmed", "requested", "held", "cancelled", "offer-dates", "newsletter", "inquiry-reply", "inquiry-offer", "inquiry-follow", "authored-reply", "confirm-request"].map(kind => [kind, `${P}/email?kind=${kind}`]) },
+  { title: "Emails", links: ["reminder", "today", "chase", "lapsed", "lapsed-none", "confirmed", "requested", "held", "cancelled", "newsletter", "inquiry-reply", "inquiry-offer", "inquiry-follow", "authored-reply", "confirm-request"].map(kind => [kind, `${P}/email?kind=${kind}`]) },
   { title: "Unsubscribe", links: ["ask", "done", "bad", "rate", "failed"].map(state => [state, `${P}/unsubscribe?state=${state}`]) },
 ];
 

@@ -11,12 +11,14 @@ import { formatVisitorTime, visitorTimeZoneLabel } from "@/platform/bookings/pub
  * its ISO start for an offer link. Every choice's accessible name is the full
  * date and zone, so a screen reader never hears a bare "10:30".
  */
-export function VisitorSlotWeek({ slots, timeZone, name, value, legend }: {
+export function VisitorSlotWeek({ slots, timeZone, name, value, legend, closed = [] }: {
   slots: readonly { start: string }[];
   timeZone: string;
   name: string;
   value: (slot: { start: string }, index: number) => string;
   legend: string;
+  /** Local dates (YYYY-MM-DD) the business is closed, with the reason when it gave one ("Thanksgiving"). */
+  closed?: readonly VisitorClosedDay[];
 }) {
   const zone = safeZone(timeZone);
   const day = new Intl.DateTimeFormat("en-CA", { timeZone: zone, year: "numeric", month: "2-digit", day: "2-digit" });
@@ -40,10 +42,13 @@ export function VisitorSlotWeek({ slots, timeZone, name, value, legend }: {
   }
   const firstStart = slots[0]?.start;
   const range = keys.length ? rangeLabel(keys[0]!, keys[keys.length - 1]!, month) : "";
+  const closedOn = new Map(closed.filter(item => days.includes(item.date)).map(item => [item.date, item.label?.trim() || ""]));
+  const closures = closureNotes([...closedOn].filter(([, label]) => label).map(([date, label]) => ({ date, label })), month);
 
   return <fieldset className={styles.fieldset}>
     <legend className={styles.srOnly}>{legend}</legend>
     {range ? <p className={styles.range}>{range}{firstStart ? <span className={styles.muted}>Times in {visitorTimeZoneLabel(firstStart, zone)}</span> : null}</p> : null}
+    {closures.map(note => <p key={note} className={styles.closure}>{note}</p>)}
     <div className={styles.week} style={{ ["--visitor-days" as string]: String(Math.min(days.length, 7)) }}>
       {days.map(key => {
         const open = byDay.get(key) ?? [];
@@ -54,12 +59,33 @@ export function VisitorSlotWeek({ slots, timeZone, name, value, legend }: {
             {open.length ? open.map(slot => <label key={slot.start} className={styles.time}>
               <input type="radio" name={name} value={value(slot, slot.index)} required aria-label={formatVisitorTime(slot.start, zone)} />
               <span aria-hidden="true">{time.format(new Date(slot.start))}</span>
-            </label>) : <span className={styles.noTimes}>No times</span>}
+            </label>) : <span className={styles.noTimes}>{closedOn.has(key) ? "Closed" : "No times"}</span>}
           </div>
         </div>;
       })}
     </div>
   </fieldset>;
+}
+
+export interface VisitorClosedDay { date: string; label?: string }
+
+/** "Closed Nov 26–27 for Thanksgiving.": consecutive closed days with the same reason read as one sentence. */
+function closureNotes(days: readonly { date: string; label: string }[], month: Intl.DateTimeFormat): string[] {
+  const runs: { first: string; last: string; label: string }[] = [];
+  for (const day of [...days].sort((a, b) => a.date.localeCompare(b.date))) {
+    const previous = runs[runs.length - 1];
+    if (previous && previous.label === day.label && Date.parse(`${day.date}T12:00:00Z`) - Date.parse(`${previous.last}T12:00:00Z`) === 86_400_000) previous.last = day.date;
+    else runs.push({ first: day.date, last: day.date, label: day.label });
+  }
+  return runs.map(run => {
+    const a = new Date(`${run.first}T12:00:00Z`), b = new Date(`${run.last}T12:00:00Z`);
+    const short = (at: Date) => month.format(at).slice(0, 3);
+    const span = run.first === run.last ? `${short(a)} ${a.getUTCDate()}`
+      : short(a) === short(b) ? `${short(a)} ${a.getUTCDate()}–${b.getUTCDate()}` : `${short(a)} ${a.getUTCDate()} to ${short(b)} ${b.getUTCDate()}`;
+    const label = run.label.replace(/\.$/, "");
+    // A reason that already reads as a sentence ("Closed for staff training") keeps its own words.
+    return /^closed\b/i.test(label) ? `${label}, ${span}.` : `Closed ${span} for ${label}.`;
+  });
 }
 
 function safeZone(zone: string): string {

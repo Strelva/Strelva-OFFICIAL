@@ -6,12 +6,13 @@ import styles from "./site-pages.module.css";
 
 function postDate(iso: string): string {
   const at = new Date(iso);
-  return Number.isFinite(at.getTime()) ? at.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" }) : "";
+  return Number.isFinite(at.getTime()) ? at.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric", timeZone: "UTC" }) : "";
 }
 
 /**
  * The blog index (October 16, XA restraint): a reading list, newest first, one
- * hairline between posts. No uppercase dates, no cards. With no posts it says
+ * hairline between posts. No uppercase dates, no cards, no topic chips that
+ * look clickable but filter nothing. With no posts it says
  * so in a sentence under the heading, left aligned.
  */
 export function SiteBlogIndex({ siteName, posts }: { siteName: string; posts: readonly PublicBlogPost[] }) {
@@ -25,7 +26,6 @@ export function SiteBlogIndex({ siteName, posts }: { siteName: string; posts: re
             <p className={styles.meta}><time dateTime={post.publishedAt}>{postDate(post.publishedAt)}</time>{post.author ? ` · ${post.author}` : ""}</p>
             <h2 className={styles.postTitle}>{post.title}</h2>
             {post.excerpt ? <p className={styles.excerpt}>{post.excerpt}</p> : null}
-            {post.tags.length ? <ul className={styles.tags} aria-label="Topics">{post.tags.map(tag => <li key={tag} className={styles.tag}>{tag}</li>)}</ul> : null}
           </Link>
         </li>)}
       </ul>
@@ -40,7 +40,6 @@ export function SiteBlogPost({ post }: { post: PublicBlogPost }) {
     <header className={styles.article}>
       <h1 id="site-post-title" className={styles.title}>{post.title}</h1>
       <p className={styles.byline}>{[post.author, postDate(post.publishedAt)].filter(Boolean).join(" · ")}</p>
-      {post.tags.length ? <ul className={styles.tags} aria-label="Topics">{post.tags.map(tag => <li key={tag} className={styles.tag}>{tag}</li>)}</ul> : null}
     </header>
     <div className={styles.prose}>
       <ReactMarkdown components={{

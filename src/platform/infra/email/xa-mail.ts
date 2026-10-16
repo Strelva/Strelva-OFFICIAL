@@ -8,8 +8,10 @@
  *
  * Mail clients need tables and inline styles, so the LX look is written out
  * literally: paper canvas, one white card, one ink pill, clay for what waits,
- * moss for what is live, DM Sans only (figures use tabular numerals, never
- * monospace). Light only, like every Strelva email (`color-scheme: light`).
+ * moss for what is live (figures use tabular numerals, never monospace).
+ * DM Sans arrives by a Google Fonts <link>, so it shows only where the client
+ * loads web fonts (Apple Mail, iOS Mail); Gmail and Outlook strip it and show
+ * the system sans stack. Light only, like every Strelva email.
  */
 import { actorPresentation, type RecordedActor } from "@/platform/presentation/actor";
 import { BRAND_CREDIT } from "@/platform/infra/agency-brand";
@@ -110,7 +112,8 @@ function block(b: XaMailBlock): string {
     case "when": return table(`<tr><td style="padding:18px 0;border-top:1px solid ${X.line};border-bottom:1px solid ${X.line};"><p style="margin:0;font-size:15px;line-height:22px;color:${X.muted};">${e(b.day)}</p><p style="margin:2px 0 0;font-size:34px;line-height:40px;font-weight:600;letter-spacing:-0.8px;color:${b.struck ? X.muted : X.text};font-variant-numeric:tabular-nums;${b.struck ? "text-decoration:line-through;" : ""}">${e(b.time)}</p>${b.detail ? `<p style="margin:6px 0 0;font-size:15px;line-height:22px;color:${X.body};overflow-wrap:anywhere;">${e(b.detail)}</p>` : ""}</td></tr>`);
     case "rows": return table(b.rows.map(r => `<tr><td valign="top" style="padding:12px 16px 12px 0;border-bottom:1px solid ${X.line};font-size:14px;line-height:22px;color:${X.muted};white-space:nowrap;">${e(r.label)}</td><td valign="top" align="right" style="padding:12px 0;border-bottom:1px solid ${X.line};font-size:15px;line-height:22px;color:${X.text};overflow-wrap:anywhere;">${e(r.value)}</td></tr>`).join(""), `border-top:1px solid ${X.line};`);
     case "quote": return `<p style="margin:0 0 8px;font-size:13px;line-height:18px;color:${X.muted};">${e(b.label)}</p>${table(`<tr><td style="padding:12px 14px;background:${X.inset};border-radius:10px;font-size:15px;line-height:23px;color:${X.body};white-space:pre-line;overflow-wrap:anywhere;">${e(b.text)}</td></tr>`)}`;
-    case "choices": return `${b.label ? `<p style="margin:0 0 8px;font-size:13px;line-height:18px;color:${X.muted};">${e(b.label)}</p>` : ""}${table(b.items.map((item, i) => `<tr><td style="padding-top:${i ? 8 : 0}px;">${table(`<tr><td style="border:1px solid ${X.line};border-radius:12px;background:${X.surface};"><a href="${url(item.url)}" style="display:block;padding:14px 16px;font-size:16px;line-height:22px;font-weight:600;color:${X.text};text-decoration:none;font-variant-numeric:tabular-nums;">${e(item.label)}</a></td></tr>`)}</td></tr>`).join(""))}`;
+    // One hairline-divided list inside the card, never a stack of boxes: each time is a link.
+    case "choices": return `${b.label ? `<p style="margin:0 0 4px;font-size:13px;line-height:18px;color:${X.muted};">${e(b.label)}</p>` : ""}${table(b.items.map(item => `<tr><td style="border-bottom:1px solid ${X.line};"><a href="${url(item.url)}" style="display:block;padding:13px 0;font-size:16px;line-height:22px;font-weight:600;color:${X.text};text-decoration:none;font-variant-numeric:tabular-nums;">${e(item.label)}<span style="float:right;font-size:15px;font-weight:600;color:${X.moss};">Pick</span></a></td></tr>`).join(""), `border-top:1px solid ${X.line};`)}`;
     case "link": return `<p style="margin:0;text-align:center;"><a href="${url(b.action.url)}" style="display:inline-block;padding:4px 0;font-size:15px;line-height:22px;font-weight:600;color:${X.moss};text-decoration:none;">${e(b.action.label)}</a></p>`;
     case "html": return `<div style="font-size:16px;line-height:26px;color:${X.body};overflow-wrap:anywhere;">${b.html}</div>`;
   }
@@ -121,7 +124,7 @@ const GAP: Partial<Record<XaMailBlock["kind"], number>> = { identity: 0, waits: 
 /** The card body. Also what the preview frames, so preview and mail never drift. */
 export function renderXaMailBody(mail: XaMail): string {
   const rows = mail.blocks.map((b, i) => `<tr><td style="padding-top:${i ? GAP[b.kind] ?? 16 : 0}px;">${block(b)}</td></tr>`).join("");
-  const card = table(`<tr><td style="padding:36px 40px 32px;">${table(rows)}</td></tr>`, `max-width:640px;background:${X.surface};border-radius:24px;`, "100%");
+  const card = table(`<tr><td style="padding:36px 40px 32px;">${table(rows)}</td></tr>`, `max-width:640px;background:${X.surface};border-radius:16px;`, "100%");
   const links = [...(mail.settings ? [mail.settings] : []), ...(mail.footerLinks ?? [])].map(link => ` · <a href="${url(link.url)}" style="color:${X.faint};text-decoration:underline;">${e(link.label)}</a>`).join("");
   const footer = `<p style="margin:20px 0 0;text-align:center;font-size:12px;line-height:18px;color:${X.faint};">${e(mail.footer)}${links}</p>`;
   return table(`<tr><td align="center" style="padding:32px 16px 40px;font-family:${X.font};color:${X.text};">${card}${footer}</td></tr>`, `background:${X.canvas};`);

@@ -1,5 +1,5 @@
 import { VisitorBookingShell } from "./VisitorBookingShell";
-import { VisitorAppointment, type VisitorAppointmentTone } from "./VisitorAppointment";
+import { VisitorAppointment } from "./VisitorAppointment";
 import styles from "./visitor.module.css";
 import type { ManageBookingState, ManagedBookingView } from "@/platform/bookings/manage";
 
@@ -20,16 +20,9 @@ function business(booking: ManagedBookingView): string {
   return booking.siteName || "the business";
 }
 
-const TONE: Record<ManagedBookingView["status"], { tone: VisitorAppointmentTone; label: (b: ManagedBookingView) => string }> = {
-  held: { tone: "waits", label: () => "Waiting for you to confirm" },
-  pending: { tone: "waits", label: b => `Not confirmed by ${business(b)} yet` },
-  confirmed: { tone: "live", label: () => "Booked" },
-  cancelled: { tone: "ended", label: () => "Cancelled" },
-};
-
-function Appointment({ booking, ended = false }: { booking: ManagedBookingView; ended?: boolean }) {
-  const state = ended ? { tone: "ended" as const, label: "This link has expired" } : { tone: TONE[booking.status].tone, label: TONE[booking.status].label(booking) };
-  return <VisitorAppointment day={booking.day} time={booking.time} zone={booking.timeZoneLabel} service={booking.title} status={state} struck={booking.status === "cancelled"}>
+/** The headline says the booking's state, so the time carries no second label: struck when it no longer holds. */
+function Appointment({ booking }: { booking: ManagedBookingView }) {
+  return <VisitorAppointment day={booking.day} time={booking.time} zone={booking.timeZoneLabel} service={booking.title} struck={booking.status === "cancelled"}>
     {booking.agentSource ? <p>Booked through <strong>{booking.agentSource}</strong></p> : null}
   </VisitorAppointment>;
 }
@@ -64,12 +57,13 @@ export function ManageBooking({ state, actionUrl }: { state: ManageBookingState;
       <div className={styles.page}>
         <h1 className={styles.title}>This booking link has expired</h1>
         <p className={styles.intro}>The appointment has ended or the confirmation window has closed, so this link can&apos;t change it. To book again, visit {business(booking)}&apos;s website.</p>
-        <Appointment booking={booking} ended />
+        <Appointment booking={booking} />
       </div>
     </VisitorBookingShell>;
   }
 
   const cancelled = booking.status === "cancelled";
+  const errorBesideTimes = Boolean(state.error) && !cancelled && booking.status !== "held";
   const headline = cancelled ? "This booking is cancelled"
     : booking.status === "confirmed" ? "You’re booked"
     : booking.status === "held" ? "Check your email to confirm"
@@ -82,9 +76,10 @@ export function ManageBooking({ state, actionUrl }: { state: ManageBookingState;
   return <VisitorBookingShell siteName={booking.siteName}>
     <div className={styles.page}>
       <h1 className={styles.title}>{headline}</h1>
-      {/* After an action, what just happened replaces the standing sentence, so the two never say the same thing. */}
-      <p className={styles.intro} role={state.notice ? "status" : undefined}>{state.notice ? SAID[state.notice](booking) : lede}</p>
-      {state.error ? <p role="alert" className={styles.said} data-tone="problem">{state.error}</p> : null}
+      {/* After an action, what just happened replaces the standing sentence, so the two never say the same thing.
+          A failed change says so beside the times it refers to, so the standing sentence steps aside then too. */}
+      {state.notice || !errorBesideTimes ? <p className={styles.intro} role={state.notice ? "status" : undefined}>{state.notice ? SAID[state.notice](booking) : lede}</p> : null}
+      {state.error && !errorBesideTimes ? <p role="alert" className={styles.said} data-tone="problem">{state.error}</p> : null}
 
       <Appointment booking={booking} />
 
@@ -97,6 +92,7 @@ export function ManageBooking({ state, actionUrl }: { state: ManageBookingState;
       ) : cancelled ? null : <>
         <section aria-labelledby="change-time">
           <h2 id="change-time" className={styles.changeTitle}>Change the time</h2>
+          {errorBesideTimes ? <p role="alert" className={styles.said} data-tone="problem">{state.error}</p> : null}
           {state.changesClosed ? (
             <p className={styles.note}>{business(booking)} isn&apos;t taking new times right now. You can still cancel, or reply to your booking email.</p>
           ) : state.slotsUnavailable ? (
