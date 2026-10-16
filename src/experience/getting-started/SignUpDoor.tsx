@@ -27,13 +27,12 @@ export function SignUpDoor({ next, asAgency, doors, requestedNext, identityName,
   const shown = typeof brand === "string" ? { name: brand } : brand;
   return <XaEntry mode={mode} brand={shown} account={<Link href={signInHref}>Sign in</Link>} foot={identityName || shown ? "Runs on Strelva. Same account as strelva.com." : undefined}
     stage={asAgency
-      ? { pose: "lineup", label: "Pebble beside a row of client Systems", title: "Every client, in its own workspace.", body: "Clients own their workspace; you work inside it. Nothing goes live without their yes." }
-      : { pose: "alone", label: "Pebble, ready to start", title: identityName ? `${identityName}, on Strelva.` : "Your business, on Strelva.", body: "You own it and everything in it. An agency can work inside it, and nothing goes live without your yes." }}>
+      ? { pose: "lineup", label: "Pebble beside a row of client Systems", title: "Every client, in its own workspace.", body: "Clients own their workspace; you work inside it. Nothing goes live without their yes.", phone: "Clients own their workspace. Nothing goes live without their yes." }
+      : { pose: "alone", label: "Pebble, ready to start", title: identityName ? `${identityName}, on Strelva.` : "Your business, on Strelva.", body: "You own it and everything in it. An agency can work inside it, and nothing goes live without your yes.", phone: "You own it and everything in it. Nothing goes live without your yes." }}>
     <SupabaseSignIn emailReady={emailReady} key={next} next={next} emailLabel="Work email" initial={initial} prefillEmail={prefillEmail} heading={<>
       <XaHeadline quiet={asAgency ? "Use the account your agency works from." : "Use the account you run the business with."}>{identityName ? `Create access for ${identityName}.` : "Make your Strelva account."}</XaHeadline>
       {doors ? <AccountKindChoice selected={asAgency ? "agency" : "business"} next={requestedNext} /> : null}
     </>} />
-    <p className="m-0 text-[14px] leading-5 text-[var(--st-text-2)]">Already have an account? <XaTextLink href={signInHref}>Sign in</XaTextLink></p>
   </XaEntry>;
 }
 
@@ -59,7 +58,7 @@ function AccountKindChoice({ selected, next }: { selected: "business" | "agency"
     return query.size ? `/sign-up?${query}` : "/sign-up";
   };
   return <XaEntryDoors label="Who is this for?" options={[
-    { href: href("business"), label: "I run a business", current: selected === "business" },
-    { href: href("agency"), label: "I run work for clients", current: selected === "agency" },
+    { href: href("business"), label: "Use it yourself", current: selected === "business" },
+    { href: href("agency"), label: "Run it for others", current: selected === "agency" },
   ]} />;
 }

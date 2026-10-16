@@ -14,17 +14,25 @@
 import Link from "next/link";
 import type { CSSProperties, ReactNode } from "react";
 import { StrelvaLockup } from "@/components/brand/StrelvaLockup";
-import { XaPebbleScene, type XaPose } from "./characters";
+import { XaPebbleAvatar, XaPebbleScene, type XaPose } from "./characters";
 import styles from "./entry.module.css";
 
 export interface XaEntryStage {
   pose: XaPose;
   /** What Pebble is doing, for screen readers. */
   label: string;
-  title: ReactNode;
+  /** One caption only the stage can say. Omit it when the object already says it. */
+  title?: ReactNode;
   body?: ReactNode;
   /** A real object beside Pebble, such as the page that was read. */
   object?: ReactNode;
+  /** Changes when the object is a new thing, so it settles in again (Slow, settle). */
+  objectKey?: string;
+  /**
+   * Below 1100 px the stage steps aside. This one line keeps Pebble in frame
+   * on a phone, above the column: the promise on B1, the first ask on B2.
+   */
+  phone?: ReactNode;
 }
 
 /** The entry frame. `account` sits top right (Sign in, or the signed-in person). */
@@ -49,16 +57,19 @@ export function XaEntry({ children, account, foot, stage, mode, width = "form", 
           : <Link href={homeHref} className={styles.home} aria-label="Strelva home"><StrelvaLockup className={styles.lockup} /></Link>}
         {account ? <div className={styles.account}>{account}</div> : null}
       </header>
-      <div className={styles.column} data-width={width}>{children}</div>
+      <div className={styles.column} data-width={width}>
+        {stage?.phone ? <p className={styles.phoneStage}><XaPebbleAvatar size={36} /><span>{stage.phone}</span></p> : null}
+        {children}
+      </div>
       {foot ? <footer className={styles.foot}>{foot}</footer> : null}
     </div>
     {stage ? <aside className={styles.stage} aria-label={stage.label}>
       <div className={styles.art} style={{ "--xa-art": `${stage.object ? 300 : 440}px` } as CSSProperties}><XaPebbleScene pose={stage.pose} size={stage.object ? 300 : 440} bare label={stage.label} /></div>
-      {stage.object ? <div className={styles.object}>{stage.object}</div> : null}
-      <div className={styles.caption}>
-        <p className={styles.captionTitle}>{stage.title}</p>
+      {stage.object ? <div key={stage.objectKey} className={styles.object}>{stage.object}</div> : null}
+      {stage.title || stage.body ? <div className={styles.caption} aria-live="polite">
+        {stage.title ? <p className={styles.captionTitle}>{stage.title}</p> : null}
         {stage.body ? <p className={styles.captionBody}>{stage.body}</p> : null}
-      </div>
+      </div> : null}
     </aside> : null}
   </main>;
 }
@@ -74,8 +85,8 @@ export function XaEntrySteps({ steps, current, label = "Getting started" }: { st
 }
 
 /**
- * Two doors as links in a segmented track (I run a business / I run work for
- * clients). Each is a page of its own, so it works before any script loads.
+ * Two doors as links in a segmented track (Use it yourself / Run it for
+ * others, GLOSSARY). Each is a page of its own, so it works before any script loads.
  */
 export function XaEntryDoors({ label, options }: { label: string; options: readonly { href: string; label: string; current: boolean }[] }) {
   return <nav className={styles.doors} aria-label={label}>

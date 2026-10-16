@@ -6,6 +6,7 @@ import { GettingStarted, type GettingStartedLinks } from "@/experience/getting-s
 import { StartBusinessFromCheck } from "@/experience/getting-started/StartBusinessFromCheck";
 import { WorkspaceRequestContext } from "@/experience/workspace/WorkspaceRequest";
 import type { FoundFact } from "@/products/getting-started/contracts";
+import { XA_PLACE_LABELS } from "@/platform/presentation/place-labels";
 
 vi.mock("next/link", () => ({ default: ({ href, children, ...rest }: { href: string; children: React.ReactNode }) => createElement("a", { href, ...rest }, children) }));
 
@@ -73,18 +74,41 @@ describe("Getting started", () => {
     expect(container.querySelector('[aria-current="step"]')?.textContent).toContain("Your site");
   });
 
-  it("skips to the next steps with an honest closed step and moves focus to the new heading", async () => {
+  it("skips to the next steps: one step leads, the rest are one line of links, and focus moves to the new heading", async () => {
     await mount(createElement(GettingStarted, { business, links }), vi.fn());
     await act(async () => button("Skip this step")!.click());
     expect(container.querySelector("h1")?.textContent).toContain("Northside Bakery is set up.");
     expect(document.activeElement?.closest("h1")).toBe(container.querySelector("h1"));
-    expect([...container.querySelectorAll("a")].find(a => a.getAttribute("href") === links.google)?.textContent).toContain("Keep your Google listing in step");
-    expect([...container.querySelectorAll("a")].find(a => a.getAttribute("href") === links.agency)?.textContent).toContain("Bring in an agency");
-    // Keep your site isn't open for this business: no dead link.
-    expect(container.textContent).toContain("Keep your site where it is");
-    expect(container.textContent).toContain("Not open for your business yet.");
+    // Keeping the site isn't open for this business, so it never shows as a dead step.
+    expect(container.textContent).not.toContain("Keep your site where it is");
     expect(container.querySelector('a[href*="entry=connect"]')).toBeNull();
+    expect(container.querySelector("h2")?.textContent).toBe("See what AI assistants say about you");
+    expect(container.textContent).toContain("Also:");
+    expect([...container.querySelectorAll("a")].find(a => a.getAttribute("href") === links.google)?.textContent).toBe("Connect Google");
+    expect([...container.querySelectorAll("a")].find(a => a.getAttribute("href") === links.agency)?.textContent).toBe("Bring in an agency");
     expect([...container.querySelectorAll("a")].find(a => a.getAttribute("href") === links.home)?.textContent).toBe("Go to Northside Bakery");
+    expect(container.querySelectorAll("[data-xa-primary]")).toHaveLength(1);
+  });
+
+  it("leads with keeping the site when that is open, and shows the first ask once with See it", async () => {
+    const open = { ...links, connect: `/workspace/site?workspaceId=${BUSINESS}&entry=connect`, ask: { text: "Keep my website working. Take bookings.", href: `/workspace?workspaceId=${BUSINESS}&view=ask` } };
+    await mount(createElement(GettingStarted, { business, links: open, start: { phase: "next", saved: { added: 4, later: 1 } } }), vi.fn());
+    expect(container.querySelector("h2")?.textContent).toBe("Keep your site where it is");
+    expect(container.textContent).toContain(`Four details added from northside.example. One waits for you on ${XA_PLACE_LABELS.today}.`);
+    expect(container.textContent).toContain("Your first ask: Keep my website working. Take bookings.");
+    expect([...container.querySelectorAll("a")].find(a => a.getAttribute("href") === open.ask.href)?.textContent).toBe("See it");
+  });
+
+  it("says what found nothing, offers adding details as the one primary, and reading another address as a link", async () => {
+    const transport = vi.fn(async () => json({ reading: { url: "https://northside.example/", revision: 2, pagesRead: 1, facts: [] } }));
+    await mount(createElement(GettingStarted, { business, links }), transport);
+    await act(async () => container.querySelector("form")!.requestSubmit());
+    expect(container.textContent).toContain("Strelva read 1 page of northside.example and found nothing to add.");
+    expect(container.textContent).not.toContain("Tick what");
+    const primary = container.querySelector<HTMLAnchorElement>("[data-xa-primary]")!;
+    expect(primary.textContent).toBe("Add details yourself");
+    expect(button("Read another address")).toBeDefined();
+    expect(container.textContent).not.toMatch(/\bI read\b/);
   });
 
   it("opens on a business's stored waiting facts with the current value", async () => {
@@ -121,8 +145,7 @@ describe("Getting started", () => {
     expect(confirm).toEqual({ action: "decide_found_facts", workspaceId: BUSINESS, revision: 2, decisions: [
       { id: found[0]!.id, decision: "confirm" }, { id: found[1]!.id, decision: "later" },
     ], timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone });
-    expect(container.textContent).toContain("Added 1 detail to Northside Bakery.");
-    expect(container.textContent).toContain("1 detail waits for you on Today.");
+    expect(container.textContent).toContain(`One detail added from northside.example. One waits for you on ${XA_PLACE_LABELS.today}.`);
   });
 
   it("removes a fact marked Not right through decide_found_facts", async () => {

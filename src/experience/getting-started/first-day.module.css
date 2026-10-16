@@ -1,16 +1,9 @@
-/* XA · B6 (T8GU7a): a 560 column beside the felt circle, as in O1. */
-.split { box-sizing: border-box; display: flex; width: 100%; min-height: 100%; align-items: center; gap: 72px; padding: 48px 72px 64px 96px; }
-.lead { display: flex; width: min(560px, 100%); flex-shrink: 0; flex-direction: column; gap: 28px; }
+/* XA · B6 (T8GU7a): the owner Home composer, the one deliberate centered column. */
+.day { box-sizing: border-box; display: flex; width: 100%; min-height: 100%; align-items: center; justify-content: center; padding: 48px 32px 96px; }
+.lead { display: flex; width: min(600px, 100%); flex-direction: column; gap: 28px; }
 .greeting { display: flex; flex-direction: column; gap: 10px; }
-.side { display: flex; min-width: 0; flex: 1; flex-direction: column; align-items: center; gap: 28px; }
-.trail { width: min(340px, 100%); }
+.quiet { margin: 0; color: var(--st-text-2); font-size: 14px; line-height: 20px; }
 .center { box-sizing: border-box; display: grid; min-height: 100%; place-items: center; padding: 48px 24px; }
-@media (max-width: 1100px) {
-  .split { flex-direction: column; align-items: stretch; gap: 32px; padding: 40px 32px 96px; }
-  .lead { width: 100%; max-width: 560px; }
-  .side { align-items: flex-start; }
-  .side > :first-child { display: none; }
-}
 @media (max-width: 767px) {
-  .split { padding: 24px 16px 120px; }
+  .day { align-items: flex-start; padding: 24px 16px 120px; }
 }

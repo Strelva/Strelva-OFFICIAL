@@ -26,6 +26,8 @@ import { AgencyClientDecisionStatus, AgencyClientChanges, AgencyClientDeliveryCh
 import { WorkspaceBusinessSwitcher, agencyClientLinks, clientAgencyWorkspace } from "./WorkspaceBusinessSwitcher";
 import { WorkspaceComposer } from "./WorkspaceComposer";
 import { requestDraftKey } from "./request-draft";
+import { FirstDay } from "@/experience/getting-started/FirstDay";
+import { useWaitingFacts } from "@/experience/getting-started/useWaitingFacts";
 import { useBusinessDeliveries } from "./useBusinessDeliveries";
 import { NeedsYouSection, StrelvaHandledSection } from "./NeedsYouSection";
 import { decisionCount } from "./needs-you-presentation";
@@ -309,6 +311,14 @@ export function BusinessHome({ needs: providedNeeds, agencyHome: providedAgencyH
   const systemsLine = business && systems.length ? [live ? `${live} live` : "", drafts ? `${drafts} in draft` : "", paused ? `${paused} paused` : ""].filter(Boolean).join(" · ") : "";
 
   const gettingStartedHref = ownerGettingStartedHref(snapshot, appBase);
+  // XA · B6: an owner's first Home, while Getting started is open and nothing is made, asked or saved yet.
+  const dayOne = Boolean(gettingStartedHref) && business && !readOnly && view !== "needs-you" && !showHandled && !systemsLoading && !systemsUnavailable
+    && !systems.length && !results.length && !inProgress.length && !making.length && !home.attention.length;
+  const waitingFacts = useWaitingFacts(dayOne ? snapshot.workspaceId : undefined);
+  const firstDay = dayOne && gettingStartedHref ? <FirstDay key={snapshot.workspaceId} ownerName={null} businessName={name} checkHref={gettingStartedHref} onAsk={request}
+    state={busy || waitingFacts.status === "loading" || waitingFacts.status === "idle" ? "loading" : "ready"}
+    waiting={waitingFacts.status === "ready" ? waitingFacts.waiting : waitingFacts.status === "error" ? null : []} onRetry={waitingFacts.retry}
+    draftKey={requestDraftKey({ actorEmail: snapshot.actor.email, workspaceId: snapshot.workspaceId })} /> : null;
   const gettingStartedAction = gettingStartedHref ? <StNotice><StTextButton href={gettingStartedHref}>Getting started</StTextButton> · Read your website or add business details. Nothing has to move.</StNotice> : null;
   const homePage = <div className={styles.home} aria-busy={busy || undefined}>
     {gettingStartedAction}
@@ -415,7 +425,7 @@ export function BusinessHome({ needs: providedNeeds, agencyHome: providedAgencyH
     navigation={gettingStartedHref ? <StTextButton href={gettingStartedHref}>Getting started</StTextButton> : undefined}
     needsYou={needsYouReleased ? { count: decisionsWaiting, label: agencySeat ? `Waiting on ${name}` : undefined } : undefined}
     businessContext={business ? <WorkspaceBusinessSwitcher snapshot={snapshot} systems={systems} onSystem={onOpenSystem} busy={busy} onWorkspace={onWorkspace} onNavigate={onNavigate} /> : <label><span className={styles.srOnly}>Current workspace</span><select aria-label="Current workspace" value={snapshot.workspaceId} disabled={busy} onChange={event => onWorkspace(event.target.value)}>{snapshot.workspaces.map(workspace => <option key={workspace.id} value={workspace.id}>{workspace.name}{workspace.access === "delegated_read" ? " · Read-only" : ""}</option>)}</select></label>}>
-    {view === "needs-you" && needsYouReleased ? needsYouPage : business ? paperHome : homePage}
+    {view === "needs-you" && needsYouReleased ? needsYouPage : firstDay ?? (business ? paperHome : homePage)}
     {business ? <OwnerPhoneNavigation active={view === "needs-you" ? "needs-you" : "home"} onNavigate={place => { setHandledWorkspaceId(null); onNavigate(place); }} askReleased={snapshot.releases?.ask === true} /> : null}
   </StrelvaShell>;
 }

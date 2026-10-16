@@ -30,6 +30,9 @@
 .column { display: flex; width: min(460px, 100%); flex-direction: column; gap: 22px; margin-block: auto; padding-block: 48px; }
 .column[data-width="wide"] { width: min(520px, 100%); }
 .foot { color: var(--st-text-3); font-size: 13px; line-height: 17px; }
+/* The stage on a phone: Pebble and one line, above the heading. Hidden while the stage shows. */
+.phoneStage { display: none; margin: 0; align-items: center; gap: 12px; color: var(--st-text-2); font-size: 14px; line-height: 20px; }
+.phoneStage > span:last-child { min-width: 0; }
 
 .stage {
   position: sticky;
@@ -88,6 +91,7 @@
 @media (max-width: 1100px) {
   .entry[data-staged="true"] { grid-template-columns: minmax(0, 1fr); }
   .stage { display: none; }
+  .phoneStage { display: flex; }
   .left { padding: 12px 40px 16px; }
 }
 @media (max-width: 767px) {

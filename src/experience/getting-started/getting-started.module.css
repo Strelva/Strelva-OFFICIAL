@@ -10,4 +10,24 @@
 .source { color: var(--st-text-2); text-decoration: underline; text-decoration-color: var(--st-line-strong); text-underline-offset: 3px; border-radius: 4px; }
 .source:hover { color: var(--st-text); }
 .source:focus-visible { outline: 2px solid var(--st-accent); outline-offset: 2px; }
-.sourceText { color: var(--st-text-3); }
+
+/* The note Pebble holds (B2, B5): the business and its first ask, in the owner's words. */
+.askNote { box-sizing: border-box; display: flex; width: 100%; flex-direction: column; gap: 4px; padding: 20px 22px 22px; border: 1px solid var(--st-line); border-radius: var(--st-r-lg); background: var(--st-surface); color: var(--st-text); }
+.noteName { margin: 0 0 10px; font-size: 20px; font-weight: 600; letter-spacing: -0.3px; line-height: 26px; overflow-wrap: anywhere; }
+.noteLabel { margin: 0; color: var(--st-text-2); font-size: 13px; font-weight: 500; line-height: 17px; }
+.noteAsk { margin: 0; font-size: 16px; line-height: 23px; overflow-wrap: anywhere; }
+.noteAsk[data-empty="true"] { color: var(--st-text-3); }
+
+/* Inside the page on the stage (B3, B4). */
+.pageLine { margin: 0; color: var(--st-text-2); font-size: 15px; line-height: 22px; }
+.joining { display: flex; flex-direction: column; gap: 10px; margin: 0; padding: 0; list-style: none; font-size: 15px; line-height: 21px; }
+.joining li { display: flex; flex-direction: column; gap: 1px; animation: var(--kf-enter) var(--motion-base) var(--ease-settle) both; }
+.joining li span { color: var(--st-text-2); font-size: 13px; line-height: 17px; }
+
+/* B5: the one step that leads, then one line of the rest. */
+.lead { display: flex; align-items: flex-start; gap: 16px; padding: 20px 0; border-block: 1px solid var(--st-line); }
+.leadArt { display: flex; flex-shrink: 0; }
+.leadText { display: flex; min-width: 0; flex-direction: column; align-items: flex-start; gap: 6px; }
+.leadTitle { margin: 0; color: var(--st-text); font-size: 18px; font-weight: 600; letter-spacing: -0.2px; line-height: 24px; }
+.leadSentence { margin: 0 0 2px; color: var(--st-text-2); font-size: 15px; line-height: 22px; }
+.alsoItem { display: inline-flex; align-items: center; gap: 10px; }

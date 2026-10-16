@@ -252,6 +252,7 @@
  * navigation, the account sits on the right.
  */
 .mobileName,
+.mobileOpenHint,
 .mobileAccount {
   display: none;
 }
@@ -307,6 +308,14 @@
     font-weight: 600;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  /* The business name opens the places (Home, Requests, Minutes, your business): say so with a chevron. */
+  .root[data-workspace-look="xa"] .mobileOpenHint {
+    display: block;
+    flex-shrink: 0;
+    margin-left: -4px;
+    color: var(--st-text-2);
   }
 
   .root[data-workspace-look="xa"] .title {

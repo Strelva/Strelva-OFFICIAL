@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
-import { XaButtonLink, XaComposer, XaEmpty, XaHeadline, XaLede, XaMark, XaPebbleScene, XaWorking, type XaWorkingStep } from "@/components/ui/strelva/Xa";
+import { useEffect, useState, type ReactNode } from "react";
+import { readRequestDraft } from "@/experience/workspace/request-draft";
+import { XaButtonLink, XaComposer, XaEmpty, XaHeadline, XaLede, XaMark, XaTextLink } from "@/components/ui/strelva/Xa";
 import type { FoundFact } from "@/products/getting-started/contracts";
 import styles from "./first-day.module.css";
 
@@ -17,39 +18,48 @@ function waitingQuestion(fact: FoundFact): string {
 }
 
 /**
- * Day one at a business (XA · B6): Today right after getting started. The
- * greeting, one sentence about where things stand, the composer carrying the
- * one detail still waiting for the owner, and beside it what Pebble has
- * actually done. Every line on the right is a recorded event from the caller,
- * never a timer.
+ * Day one at a business (XA · B6): Home right after getting started, while
+ * Getting started is still open for the owner. The greeting, one sentence
+ * about where things stand, and the composer carrying the one detail still
+ * waiting for the owner. That is the screen's one dominant element.
  *
- * Built by lane XA-1 against the real Getting started types. Today itself
- * (BusinessHome) belongs to XA-3; this is the day-one state it renders.
+ * There is no activity column: nothing on this screen is invented. When a
+ * recorded-events feed exists, its sentences can join under the composer.
+ * BusinessHome mounts this behind ownerGettingStartedHref for a business with
+ * nothing made, asked or saved yet.
  */
-export function FirstDay({ ownerName, businessName, waiting, checkHref, events, state = "ready", onAsk, now = new Date(), retryHref }: {
+export function FirstDay({ ownerName, businessName, waiting, checkHref, state = "ready", onAsk, initialAsk = "", draftKey, now = new Date(), retryHref, onRetry }: {
   ownerName: string | null;
   businessName: string;
-  /** Found facts still waiting for the owner (GettingStartedBusiness.waiting). */
-  waiting: readonly FoundFact[];
+  /** Found facts still waiting for the owner (GettingStartedBusiness.waiting). Null when they couldn't be read. */
+  waiting: readonly FoundFact[] | null;
   /** Getting started, where waiting facts are ticked. */
   checkHref: string;
-  /** What was done, newest last, each naming who did it. */
-  events: readonly XaWorkingStep[];
   state?: "ready" | "loading" | "error";
   onAsk?: (words: string) => void;
+  /** The owner's first ask, carried from setup, ready to send or change. */
+  initialAsk?: string;
+  /** Where setup left the first ask (request-draft), read after mount so server and browser agree. */
+  draftKey?: string;
   now?: Date;
   retryHref?: string;
+  onRetry?: () => void;
 }) {
-  const [ask, setAsk] = useState("");
-  const first = waiting[0];
+  const [ask, setAsk] = useState(initialAsk);
+  useEffect(() => {
+    if (!draftKey) return;
+    try { const kept = readRequestDraft(window.sessionStorage, draftKey); if (kept) setAsk(current => current || kept); } catch { /* No storage: the composer starts empty. */ }
+  }, [draftKey]);
+  const first = waiting?.[0];
   if (state === "error") return <div className={styles.center}>
-    <XaEmpty pose="fixing" title={`${businessName} did not load just now.`} job="Pebble is trying again. Nothing about your business changed."
+    <XaEmpty pose="fixing" title={`${businessName} did not load just now.`} job="Nothing about your business changed. Try again in a moment."
       action={retryHref ? <XaButtonLink href={retryHref} variant="primary">Try again</XaButtonLink> : undefined} />
   </div>;
-  const lede: ReactNode = state === "loading" ? `Opening ${businessName}.` : first
-    ? `${businessName} is set up. ${waiting.length === 1 ? "One detail waits for you." : `${waiting.length} details wait for you.`}`
+  const lede: ReactNode = state === "loading" ? `Opening ${businessName}.`
+    : waiting === null ? <>{businessName} is set up. <XaTextLink href={checkHref}>See what waits for you</XaTextLink></>
+    : first ? `${businessName} is set up. ${waiting.length === 1 ? "One detail waits for you." : `${waiting.length} details wait for you.`}`
     : `${businessName} is set up. Nothing needs you yet.`;
-  return <div className={styles.split} aria-busy={state === "loading" || undefined}>
+  return <div className={styles.day} aria-busy={state === "loading" || undefined}>
     <div className={styles.lead}>
       <XaMark size={40} />
       <div className={styles.greeting}>
@@ -57,12 +67,9 @@ export function FirstDay({ ownerName, businessName, waiting, checkHref, events, 
         <XaLede>{lede}</XaLede>
       </div>
       <XaComposer value={ask} onChange={setAsk} onSubmit={() => { if (!ask.trim()) return; onAsk?.(ask.trim()); setAsk(""); }} placeholder="Ask Strelva for anything" disabled={state === "loading" || !onAsk}
-        scope={{ label: businessName, state: "live" }}
+        scope={{ label: businessName }}
         waiting={first ? { kicker: "Waits for you · found on your site", title: waitingQuestion(first), from: { pebble: true }, action: <XaButtonLink href={checkHref} size="sm">Check it</XaButtonLink> } : undefined} />
+      {waiting === null && onRetry ? <p className={styles.quiet}>Details found on your site could not be checked just now. <XaTextLink onClick={onRetry}>Check again</XaTextLink></p> : null}
     </div>
-    <aside className={styles.side} aria-label="What Pebble has done">
-      <XaPebbleScene pose="resting" size={300} label="Pebble resting beside the bookings calendar" />
-      {events.length ? <div className={styles.trail}><XaWorking state={events.some(step => step.state === "active") ? "working" : "done"} title={events.some(step => step.state === "active") ? "Pebble is still at it" : "Pebble is done for now"} steps={events} /></div> : null}
-    </aside>
   </div>;
 }

@@ -2,9 +2,9 @@
 export const XA1_SCREENS = {
   b1: ["ready", "agency", "google-only", "sent", "error", "invited", "closed"],
   b2: ["ready", "picked", "existing", "loading", "error", "signed-out"],
-  b3: ["ready", "reading", "error", "member"],
+  b3: ["ready", "reading", "landed", "error", "member"],
   b4: ["ready", "waiting", "nothing-found", "conflict", "no-website"],
-  b5: ["ready", "nothing-added", "closed", "request"],
-  b6: ["ready", "quiet", "loading", "error"],
+  b5: ["ready", "no-ask", "nothing-added", "closed", "request"],
+  b6: ["ready", "quiet", "unchecked", "loading", "error"],
 } as const;
 export type Xa1Screen = keyof typeof XA1_SCREENS;

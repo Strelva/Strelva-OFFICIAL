@@ -225,8 +225,16 @@ describe("Use my current website", () => {
   });
 
   it("reports an unreadable site without throwing a raw error", async () => {
-    const d = member(); vi.mocked(d.crawl).mockRejectedValue(new WebsiteCrawlError("robots_blocked", "This website asks crawlers not to read it."));
-    await expect(createGettingStarted(d).readWebsite(ACTOR, BUSINESS, "northside.example")).rejects.toThrow("This website asks crawlers not to read it.");
+    const d = member(); vi.mocked(d.crawl).mockRejectedValue(new WebsiteCrawlError("robots_blocked", "This website's robots.txt blocks rebuilding."));
+    // Owners never see robots.txt, crawlers or rebuilding.
+    await expect(createGettingStarted(d).readWebsite(ACTOR, BUSINESS, "northside.example")).rejects.toThrow("northside.example is set to keep tools like Strelva out, so nothing was read.");
+  });
+
+  it("brings back the first page's own title and description, and nothing when it has no title", async () => {
+    const d = member(); vi.mocked(d.crawl).mockResolvedValue({ pages: [{ title: " Northside  Bakery ", html: '<head><meta name="description" content="Cakes &amp; bread on Elmwood"></head>' }], skipped: [], assets: [], crawledAt: "", bytes: 0, elapsedMs: 0, limited: false } as never);
+    expect((await createGettingStarted(d).readWebsite(ACTOR, BUSINESS, "northside.example")).page).toEqual({ title: "Northside Bakery", description: "Cakes & bread on Elmwood" });
+    const bare = member();
+    expect((await createGettingStarted(bare).readWebsite(ACTOR, BUSINESS, "northside.example")).page).toBeNull();
   });
 
   it("decide_found_facts confirms stored IDs against the shown revision, with a stable command ID", async () => {

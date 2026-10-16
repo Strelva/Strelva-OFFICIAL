@@ -30,6 +30,8 @@ export interface WebsiteReading {
   revision: number;
   facts: FoundFact[];
   pagesRead: number;
+  /** The first page read, as its visitors see it at the top: its title and description. */
+  page?: { title: string; description: string | null } | null;
 }
 
 export interface GettingStartedBusiness {
