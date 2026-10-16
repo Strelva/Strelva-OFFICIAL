@@ -1,0 +1,84 @@
+/* XA-3 · Owner Today, the yes and after. Measured from design/xa-2026-10-15/O1..O6 at 1440,
+   phone from E6. Tokens and parts come from the XA kit; this file only places them. */
+
+/* ---------- Today (O1 normal morning, O2 one thing waits) ---------- */
+.split { box-sizing: border-box; display: flex; width: 100%; min-height: 100%; align-items: center; gap: 96px; padding: 48px 72px 72px 96px; }
+.lead { display: flex; width: min(560px, 100%); flex-shrink: 0; flex-direction: column; gap: 28px; }
+.greeting { display: flex; flex-direction: column; gap: 12px; }
+.side { display: flex; min-width: 0; flex: 1; flex-direction: column; align-items: center; gap: 28px; }
+.since { display: flex; width: min(352px, 100%); flex-direction: column; gap: 12px; }
+
+/* O2: the one deliberate centered composition in the product. */
+.centered { box-sizing: border-box; display: flex; width: 100%; min-height: 100%; flex-direction: column; align-items: center; justify-content: center; gap: 28px; padding: 48px 32px 96px; text-align: center; }
+.centered .greeting { align-items: center; }
+.centeredComposer { width: min(680px, 100%); text-align: left; }
+.centered .says { justify-content: center; text-align: left; }
+.says { display: flex; max-width: 680px; }
+.says > * { min-width: 0; }
+
+.mark { color: var(--st-text); }
+
+/* Phone (E6): the Systems the sidebar holds on desktop, as open rows. */
+.phoneSystems { display: none; }
+
+.skeletonLine { display: flex; flex-direction: column; gap: 10px; }
+
+/* ---------- The prepared change (O3) and right after (O4) ---------- */
+.decisionLayout { box-sizing: border-box; display: grid; width: 100%; grid-template-columns: minmax(0, 1fr) minmax(0, 540px); align-items: start; gap: 48px; padding: 24px 24px 140px 72px; }
+.brief { display: flex; flex-direction: column; gap: 24px; padding-top: 96px; }
+.decisionBody { display: flex; flex-direction: column; gap: 16px; }
+.changes { display: flex; flex-direction: column; gap: 8px; margin: 0; padding: 20px 22px; border: 1px solid var(--st-line); border-radius: 18px; list-style: none; }
+.changes li { margin: 0; color: var(--st-text); font-size: 15px; line-height: 1.45; overflow-wrap: anywhere; }
+.changes li + li { padding-top: 8px; border-top: 1px solid var(--st-line); }
+.amount { margin: 0; color: var(--st-text); font-size: 34px; font-weight: 600; font-variant-numeric: tabular-nums; letter-spacing: -0.8px; }
+.quote { margin: 0; padding-left: 14px; border-left: 2px solid var(--st-line); color: var(--st-text-body); font-size: 15px; line-height: 1.5; }
+.checks { display: flex; flex-direction: column; gap: 10px; margin: 0; padding: 0; list-style: none; }
+.next { display: flex; flex-wrap: wrap; gap: 4px 6px; color: var(--st-text-3); font-size: 14px; }
+.dock { width: min(480px, 100%); }
+.recordNote { margin: 0; color: var(--st-text-2); font-size: 14px; line-height: 1.45; }
+
+/* ---------- Requests (O5) ---------- */
+.page { box-sizing: border-box; display: flex; width: 100%; max-width: 1064px; flex-direction: column; gap: 28px; padding: 72px 64px 140px 96px; }
+.pageHead { display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; }
+.group { display: flex; flex-direction: column; gap: 4px; }
+.group + .group { margin-top: 12px; }
+.lead36 { display: inline-flex; flex-shrink: 0; }
+
+/* ---------- Running (O6) ---------- */
+.running { box-sizing: border-box; display: flex; width: 100%; align-items: flex-start; gap: 64px; padding: 56px 64px 96px 96px; }
+.runningMain { display: flex; width: min(612px, 100%); flex-shrink: 0; flex-direction: column; gap: 22px; }
+.runningSide { display: flex; min-width: 0; flex: 1; flex-direction: column; align-items: center; gap: 20px; padding-top: 120px; }
+.runningCaption { width: min(320px, 100%); }
+.runningCaption h2 { margin: 0; color: var(--st-text); font-size: 16px; font-weight: 500; line-height: 22px; }
+.runningCaption p { margin: 6px 0 0; color: var(--st-text-2); font-size: 14px; line-height: 1.45; }
+.checkFact { color: var(--st-text); font-size: 15px; font-weight: 500; font-variant-numeric: tabular-nums; text-align: right; }
+.controls { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 18px; }
+.controls > p { margin: 0; color: var(--st-text-2); font-size: 14px; }
+
+@media (max-width: 1180px) {
+  .split { gap: 48px; padding: 40px 32px 56px 48px; }
+  .decisionLayout { padding-left: 40px; }
+  .page, .running { padding-left: 48px; padding-right: 32px; }
+  .running { gap: 40px; }
+}
+
+/* Phone and narrow tablet (E6): one column, no felt circle, Systems as rows, composer floats. */
+@media (max-width: 1023px) {
+  .split { flex-direction: column; align-items: stretch; gap: 24px; padding: 20px 16px 120px; }
+  .lead { width: 100%; gap: 20px; }
+  .mark { display: none; }
+  .side { align-items: stretch; gap: 0; }
+  .side > :first-child { display: none; }
+  .since { width: 100%; }
+  .centered { align-items: stretch; justify-content: flex-start; gap: 20px; padding: 20px 16px 120px; text-align: left; }
+  .centered .greeting { align-items: flex-start; }
+  .centered .says { justify-content: flex-start; }
+  .phoneSystems { display: flex; flex-direction: column; gap: 8px; }
+  .decisionLayout { grid-template-columns: minmax(0, 1fr); gap: 24px; padding: 20px 16px 140px; }
+  .brief { padding-top: 0; }
+  .page { gap: 20px; padding: 24px 16px 120px; }
+  .pageHead { flex-direction: column; gap: 16px; }
+  .running { flex-direction: column; gap: 24px; padding: 24px 16px 96px; }
+  .runningMain { width: 100%; }
+  .runningSide { display: none; }
+}

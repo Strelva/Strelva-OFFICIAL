@@ -2,7 +2,8 @@
 
 import { STRELVA_HANDLED_LABEL } from "@/platform/presentation/place-labels";
 
-import { StHead, StNotice, StPage, StPillLink, StSection } from "@/components/ui/strelva/Kit";
+import { StHead, StNotice, StPage } from "@/components/ui/strelva/Kit";
+import { XaSays, XaTextLink } from "@/components/ui/strelva/Xa";
 import { ResponsibilityExperience, StandingResponsibilityPicker } from "@/experience/operations/ResponsibilityExperience";
 import { ResponsibilityProof } from "@/experience/operations/ResponsibilityProof";
 import { InquiryRunning } from "./InquiryRunning";
@@ -43,21 +44,33 @@ export function WorkspaceOngoing({
 }) {
   const finiteJobOpen = !selectedStandingId && !selectedAssignmentId && selectedWork?.productId === "operations" && selectedWork.resourceKind === "responsibility";
 
-  return <StPage>
-    <StHead title={finiteJobOpen ? selectedWork.title : "Running"}
-      meta={finiteJobOpen
-        ? "This has an end. Its steps, decisions and results are below; every request is listed in Requests."
-        : "What stays true for your business. Each one is named by its result, with its scope and latest evidence below."}
-    />
-    {readOnly ? <StNotice>Shared with you. You can read the running work and its results.</StNotice> : null}
-    {!finiteJobOpen && monthlyRecap ? <StNotice>Monthly recap records appear in {STRELVA_HANDLED_LABEL}, including recorded sends, holds and failures.</StNotice> : null}
-    {finiteJobOpen ? null : <StSection title="What should stay true?"
-      meta="Describe the result you want kept true. Your agency agrees the scope, limits and deadline before the request becomes accepted work."
-      action={!readOnly && !newWorkBlocked ? <StPillLink href={`/workspace?${new URLSearchParams({ workspaceId, view: "help" })}`}>Request an ongoing result</StPillLink> : undefined}
-    >{null}</StSection>}
-    {finiteJobOpen ? null : <InquiryRunning key={workspaceId} workspaceId={workspaceId} enabled={inquiriesEnabled} />}
+  const experience = selectedAssignmentId || selectedStandingId || selectedWork?.productId === "operations" || (initialRequest && !creatingStanding) ? <ResponsibilityExperience
+    key={`${workspaceId}:${selectedAssignmentId || selectedStandingId || selectedWork?.id || "new"}`}
+    workspaceId={workspaceId}
+    workId={selectedAssignmentId || selectedStandingId ? undefined : selectedWork?.productId === "operations" ? selectedWork.id : undefined}
+    standingId={selectedStandingId || undefined}
+    assignmentId={selectedAssignmentId || undefined}
+    sources={sources}
+    readOnly={readOnly}
+    newWorkBlocked={newWorkBlocked}
+    initialRequest={initialRequest}
+    onSaved={onSaved}
+  /> : null;
 
-    {finiteJobOpen ? null : <details open={creatingStanding || Boolean(selectedStandingId)}><summary className="cursor-pointer">Configure a supported saved check</summary><StandingResponsibilityPicker
+  // A finite job opened from Requests keeps its own page.
+  if (finiteJobOpen) return <StPage>
+    <StHead title={selectedWork.title} meta="This has an end. Its steps, decisions and results are below; every request is listed in Requests." />
+    {readOnly ? <StNotice>Shared with you. You can read the running work and its results.</StNotice> : null}
+    {experience}
+  </StPage>;
+
+  // XA · O6: what Strelva keeps true leads; the rest of Running sits in the same column.
+  return <ResponsibilityProof key={`proof:${workspaceId}`} workspaceId={workspaceId} readOnly={readOnly || newWorkBlocked}>
+    {readOnly ? <XaSays>Shared with you. You can read what is kept true and its evidence.</XaSays>
+      : !newWorkBlocked ? <XaSays links={[<XaTextLink key="ask" href={`/workspace?${new URLSearchParams({ workspaceId, view: "help" })}`}>Ask for it</XaTextLink>]}>Want something else kept true? Your agency agrees the scope, limits and deadline before it starts.</XaSays> : null}
+    {monthlyRecap ? <XaSays>Monthly recaps appear in {STRELVA_HANDLED_LABEL}, with what was sent, held or did not go through.</XaSays> : null}
+    <InquiryRunning key={workspaceId} workspaceId={workspaceId} enabled={inquiriesEnabled} />
+    <details open={creatingStanding || Boolean(selectedStandingId)}><summary className="cursor-pointer">Set up a saved check</summary><StandingResponsibilityPicker
       workspaceId={workspaceId}
       sources={sources}
       selectedId={selectedStandingId || undefined}
@@ -66,21 +79,7 @@ export function WorkspaceOngoing({
       onCreatingChange={onCreatingStandingChange}
       onOpen={onOpenStanding}
       onCreated={onOpenStanding}
-    /></details>}
-
-    {finiteJobOpen ? null : <StSection title="What the last seven days show"><ResponsibilityProof key={`proof:${workspaceId}`} workspaceId={workspaceId} readOnly={readOnly || newWorkBlocked} /></StSection>}
-
-    {selectedAssignmentId || selectedStandingId || selectedWork?.productId === "operations" || (initialRequest && !creatingStanding) ? <ResponsibilityExperience
-      key={`${workspaceId}:${selectedAssignmentId || selectedStandingId || selectedWork?.id || "new"}`}
-      workspaceId={workspaceId}
-      workId={selectedAssignmentId || selectedStandingId ? undefined : selectedWork?.productId === "operations" ? selectedWork.id : undefined}
-      standingId={selectedStandingId || undefined}
-      assignmentId={selectedAssignmentId || undefined}
-      sources={sources}
-      readOnly={readOnly}
-      newWorkBlocked={newWorkBlocked}
-      initialRequest={initialRequest}
-      onSaved={onSaved}
-    /> : null}
-  </StPage>;
+    /></details>
+    {experience}
+  </ResponsibilityProof>;
 }

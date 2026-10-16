@@ -20,6 +20,17 @@ exported. API, Pen node per part, motion and the anti-slop checklist:
 [design-notes/XA-FOUNDATION.md](../../design-notes/XA-FOUNDATION.md). Preview:
 `/preview/strelva/xa`.
 
+### XA-3 · Owner Today, the yes, after (branch xa/lane-xa3-owner-today)
+
+Owner surfaces in `src/experience/workspace/today/`, composed only from the Xa
+kit: `OwnerToday` (O1/O2/E6; BusinessHome renders it for a business's own
+people, agency seats keep their shared-status view), `OwnerDecisionView`
+(O3/O4; the Needs you place, one `XaYes`, Undo is the receipt
+`decision:<id>`), `RequestsView` (O5; WorkspaceRequests keeps its reads) and
+`RunningChecksView` (O6; ResponsibilityProof keeps its read and writes).
+Words and states are pure functions in `today-model.ts`. Preview:
+`/preview/strelva/xa/xa3-owner-today/o1..o6?state=…&mode=dark`.
+
 ## October 11 coherence amendment
 
 [GLOSSARY.md](../../GLOSSARY.md) and

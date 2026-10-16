@@ -21,20 +21,21 @@ async function render(element: React.ReactNode) {
 }
 
 describe("owner paper controls", () => {
-  it("returns from receipts through phone Home and keeps failed request reads distinct from an empty queue", async () => {
+  it("keeps a failed decisions read distinct from nothing waiting and returns through phone Home", async () => {
     const snapshot: WorkspaceSnapshot = { actor: { email: "owner@example.test", localPreview: true }, work: [], products: [], handoffs: [], delegations: [], workspaceId: "one", workspaces: [{ id: "one", kind: "customer", name: "First business", role: "owner" }], releases: { systems: true, needsYou: true } };
     const request = vi.fn<typeof fetch>(async () => Response.json({ error: "The saved records could not be read." }, { status: 503 }));
     vi.stubGlobal("fetch", request);
     const navigate = vi.fn();
     const node = await render(createElement(WorkspaceRequestContext.Provider, { value: request }, createElement(BusinessHome, { snapshot, sites: [], unassignedSites: [], siteAssignmentsKnown: true, offerings: { status: "unavailable", reason: "Unavailable" }, busy: false, onOpen: vi.fn(), onStart: vi.fn(), onNavigate: navigate, onWorkspace: vi.fn(), onOfferings: vi.fn(), accountHref: "/workspace/account", signOut: createElement("span", null, "Local test"), systemsReleased: true })));
-    expect(node.textContent).toContain("Requests could not be checked.");
-    expect(node.textContent).not.toContain("Nothing is in progress.");
-    const receipts = [...node.querySelectorAll("button")].find(button => button.textContent === "All receipts")!;
-    await act(async () => receipts.click());
-    expect(node.querySelector("#business-start-title")?.textContent).toBe("What changed");
+    await act(async () => { await Promise.resolve(); });
+    // XA · O1 error: Pebble says the check failed; Today never claims nothing needs the owner.
+    expect(node.textContent).toContain("I could not check what waits for you.");
+    expect(node.textContent).not.toContain("Nothing needs you.");
+    const retry = [...node.querySelectorAll("button")].find(button => button.textContent === "Check again")!;
+    await act(async () => retry.click());
+    expect(request.mock.calls.filter(([input]) => String(input).includes("/api/workspace/needs-you")).length).toBeGreaterThanOrEqual(2);
     const home = [...node.querySelectorAll('nav[aria-label="Phone workspace navigation"] button')].find(button => button.textContent === "Home") as HTMLButtonElement;
     await act(async () => home.click());
-    expect(node.querySelector("#business-start-title")?.textContent).toBe("First business");
     expect(navigate).toHaveBeenCalledWith("home");
   });
 
