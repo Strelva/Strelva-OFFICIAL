@@ -4,7 +4,7 @@ import type { OwnerBrand } from "@/platform/infra/agency-brand";
 import { BUSINESS_EFFORT_CATEGORY_LABELS, type BusinessEffortCategory } from "@/platform/business-effort/types";
 import type { CareReportFacts } from "@/platform/care-reports/contracts";
 import {
-  careCheckException, careLead, careMattered, careOutcomeLine, careReleaseLabel, careReportTitle, careShortDate, careSiteCheckSentence, careTimeLabel,
+  careCheckException, careCheckReason, careLead, careMattered, careOtherChanges, careOutcomeLine, careReleaseLabel, careReportTitle, careShortDate, careSiteCheckSentence, careTimeLabel,
 } from "@/platform/care-reports/model";
 import { XaChangeLine, XaLead } from "@/experience/places/XaPlace";
 import { systemHref } from "@/experience/systems/model";
@@ -42,16 +42,19 @@ export function CareReportDocument({ snapshot, brand, releaseNumber, releases, r
   /** Inside the agency's decision panel the panel is the page. */
   flat?: boolean;
 }) {
-  const { changes, requests, time } = snapshot;
+  const { requests, time } = snapshot;
   const note = snapshot.agencyNote?.trim();
   const categories = Object.entries(time.byCategory).filter(([, minutes]) => minutes > 0);
   // Only Releases shared before the one on screen; a draft lists every shared one.
   const earlier = releases?.filter(item => releaseNumber === null || item.number < releaseNumber) ?? [];
-  const lead = careLead(snapshot, brand.name, snapshot.business.name);
-  const mattered = careMattered(snapshot, brand.name, note);
-  const newest = [...changes.items].sort((a, b) => b.at.localeCompare(a.at))[0];
+  const lead = careLead(snapshot, brand.name);
+  const mattered = careMattered(snapshot, brand.name);
+  // The change that mattered is not listed again under what else changed.
+  const others = careOtherChanges(snapshot, mattered);
   // Only the owner can open the System; a shared link has no account behind it.
-  const seeHref = audience === "owner" && newest ? systemHref("", snapshot.business.workspaceId, newest.systemId) : undefined;
+  const seeHref = audience === "owner" && mattered ? systemHref("", snapshot.business.workspaceId, mattered.item.systemId) : undefined;
+  // Release numbers are the agency's versioning; the owner and a shared link see the report, not its Releases.
+  const agency = audience === "agency";
   return <>{back ? <div data-print-hide className={styles.back}><XaTextLink href={back.href}>{back.label}</XaTextLink></div> : null}<article className={styles.report} data-flat={flat || undefined} aria-label={`${careReportTitle(snapshot)} for ${snapshot.business.name}`}>
     <style>{DOCUMENT_PRINT_CSS}</style>
     <header className={styles.head}>
@@ -60,25 +63,27 @@ export function CareReportDocument({ snapshot, brand, releaseNumber, releases, r
         <span className={styles.bylineName}>{brand.name}</span>
         <span className={styles.credit}>Runs on Strelva</span>
       </p>}
-      <XaHeadline quiet={releaseNumber ? `${snapshot.business.name} · ${careReleaseLabel(releaseNumber)}` : snapshot.business.name}>{careReportTitle(snapshot)}</XaHeadline>
+      <XaHeadline quiet={agency && releaseNumber ? `${snapshot.business.name} · ${careReleaseLabel(releaseNumber)}` : snapshot.business.name}>{careReportTitle(snapshot)}</XaHeadline>
     </header>
 
     <XaLead quiet={lead.quiet}>{lead.text}</XaLead>
-    {mattered ? <XaChangeLine label="The change that mattered" when={mattered.at ? careShortDate(mattered.at) : undefined} href={seeHref}>{mattered.text}</XaChangeLine> : null}
+    {mattered ? <XaChangeLine label="The change that mattered" when={careShortDate(mattered.at)} href={seeHref}>{mattered.text}</XaChangeLine> : null}
+    {note ? <XaBlock label={`${brand.name}'s note`}><p className={styles.sentence}>{note}</p></XaBlock> : null}
 
-    <XaBlock label="What changed">
-      {changes.items.length ? <XaChanges label="What changed" rows={changes.items.map(item => {
+    {others.length || !mattered ? <XaBlock label={mattered ? "Also changed" : "What changed"}>
+      {others.length ? <XaChanges label={mattered ? "Also changed" : "What changed"} rows={others.map(item => {
         const exception = careCheckException(item.check);
+        const reason = careCheckReason(item, brand.name);
         return { key: `${item.systemId}-${item.release}`, when: careShortDate(item.at), dateTime: item.at,
-          text: item.summary || item.systemName,
+          text: <>{item.summary || item.systemName}{reason ? <span className={styles.reason}>{reason}</span> : null}</>,
           who: exception ? <XaStatus kind="waits" size="sm">{exception}</XaStatus> : undefined, tone: exception ? "waits" as const : undefined };
       })} /> : <XaNote>Nothing changed on {snapshot.business.name}&apos;s Systems this month.</XaNote>}
-    </XaBlock>
+    </XaBlock> : null}
 
     <XaBlock label="Requests">
       {requests.done.length ? <XaChanges label="Requests done" rows={requests.done.map(item => ({ key: item.id, when: careShortDate(item.doneAt), dateTime: item.doneAt, text: item.request }))} />
-        : <XaNote>No Requests were finished this month.</XaNote>}
-      {requests.openCount > 0 ? <XaNote>{plural(requests.openCount, "Request is", "Requests are")} still open.</XaNote> : null}
+        : <XaNote>No requests were finished this month.</XaNote>}
+      {requests.openCount > 0 ? <XaNote>{plural(requests.openCount, "request is", "requests are")} still open.</XaNote> : null}
     </XaBlock>
 
     <XaBlock label="Inquiries and bookings"><p className={styles.sentence}>{careOutcomeLine(snapshot.outcomes)}</p></XaBlock>
@@ -90,7 +95,7 @@ export function CareReportDocument({ snapshot, brand, releaseNumber, releases, r
         : <XaNote>{brand.name} didn&apos;t record time this month.</XaNote>}
     </XaBlock>
 
-    {earlier.length && releaseHref ? <div data-print-hide><XaBlock label="Earlier releases">
+    {agency && earlier.length && releaseHref ? <div data-print-hide><XaBlock label="Earlier releases">
       <ul className={styles.releases} aria-label="Earlier releases of this report">
         {earlier.map(item => <li key={item.number}>
           <XaTextLink href={releaseHref(item.number)}>{careReleaseLabel(item.number)}</XaTextLink>

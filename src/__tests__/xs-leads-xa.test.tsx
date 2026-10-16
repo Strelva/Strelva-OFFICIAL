@@ -36,10 +36,14 @@ describe("XA lane xs-leads words", () => {
   it("leads Results with one sentence and the one change that mattered, with no hero number or bar chart", () => {
     const html = render("results");
     const text = words(html);
-    expect(text).toContain("361 visits to harbordental.com in the last 7 days. 41 more than the previous 7 days. Most came from Google searches like “dentist elmwood buffalo”.");
+    expect(text).toContain("361 visits to harbordental.com in the last 7 days. 41 more than the 7 days before. Over the last 4 weeks, most came from Google searches like “dentist elmwood buffalo”.");
+    expect(text).toContain("31 people clicked to book or call: 24 to book, 7 to call. Up 5 from the 7 days before.");
+    expect(text).not.toMatch(/\bvs\b/);
     expect(text).toContain("The change that mattered");
     expect(text).toContain("Maya at North Studio moved the Book a visit button to the top of the home page.");
     expect(html).toMatch(/href="\/preview\/strelva\/xa\/xa4-systems\/website"[^>]*>See it</);
+    // The date and the link wrap as one, so no line can start with the separator.
+    expect(html).toMatch(/<span class="[^"]*changeTail[^"]*"><span class="[^"]*changeWhen[^"]*">Nov 20<\/span><span class="[^"]*changeWhen[^"]*"> · <\/span><a /);
     expect(html).toMatch(/aria-current="page"[^>]*>Last 7 days</);
     expect(text).toContain("Nothing needs fixing (checked Nov 23)");
     // No figure, no chart, and the head does not repeat the sentence.
@@ -66,9 +70,23 @@ describe("XA lane xs-leads words", () => {
     expect(resultsWindowPhrase({ key: "custom", label: "Nov 1 – Nov 9" })).toBe("between Nov 1 and Nov 9");
   });
 
+  it("counts the same week the same way on Results and Recaps, and 4 weeks as at least two of them", () => {
+    const results = words(render("results"));
+    const recaps = words(render("recaps"));
+    expect(results).toContain("361 visits to harbordental.com in the last 7 days. 41 more than the 7 days before.");
+    expect(recaps).toContain("361 visits to harbordental.com, up 13% from the week before.");
+    expect(words(render("recaps", "ready", { period: "week", recap: "w46" }))).toContain("320 visits to harbordental.com");
+    const fourWeeks = Number(/([\d,]+) visits and viewed/.exec(results)![1]!.replace(/,/g, ""));
+    expect(fourWeeks).toBeGreaterThanOrEqual(361 + 320);
+  });
+
   it("leads a recap with one sentence and the change that mattered, not a count", () => {
     const text = words(render("recaps"));
-    expect(text).toContain("412 visits to harbordental.com, up 12% from the week before.");
+    expect(text).toContain("361 visits to harbordental.com, up 13% from the week before. 3 people asked for directions from Google Maps.");
+    expect(text).not.toMatch(/new patients found you/);
+    // The rail lists October's report from early November, then September's.
+    expect(text).toMatch(/October report from North Studio Nov 3 .*September report from North Studio Updated Oct 2/);
+    expect(text).not.toContain("August report");
     expect(text).toContain("The change that mattered Maya at North Studio moved the Book a visit button to the top of the home page.");
     expect(text).toContain("Also changed");
     expect(render("recaps")).not.toContain("pose-lineup");
@@ -137,18 +155,26 @@ describe("XA lane xs-leads emails", () => {
     inquiries: { status: "available", count: 38, limitedToRecentRecords: true }, bookings: { status: "available", scheduledInPeriod: 61, providerAccepted: 58, providerVerified: 55 },
     visibility: { status: "available", checkedAt: "2026-09-25T12:00:00Z", mentioned: true, recommended: false, note: "Saved measurement" },
     readiness: { status: "available", checkedAt: "2026-09-25T12:00:00Z", passedChecks: 14, totalChecks: 15 },
-    changes: [{ revision: 3, contentHash: "a", createdAt: "2026-09-10T12:00:00Z", createdBy: "maya", published: true }, { revision: 4, contentHash: "b", createdAt: "2026-09-12T12:00:00Z", createdBy: "strelva", published: true }] };
+    changes: [{ revision: 3, contentHash: "a", createdAt: "2026-09-10T12:00:00Z", createdBy: "maya", published: true, summary: "added the Insurance page" }, { revision: 4, contentHash: "b", createdAt: "2026-09-12T12:00:00Z", createdBy: "strelva", published: true, summary: "changed the hours on the home page" }, { revision: 5, contentHash: "c", createdAt: "2026-09-20T12:00:00Z", createdBy: "maya", published: false, summary: null }] };
 
-  it("shapes the monthly report like E3: clay, one sentence, the change that mattered, who acted, an ink button", () => {
-    const paper = websiteReportPaper(report, "https://app.example/open", { clayUrl: "https://app.example/xa/email-lineup.png", actors: { maya: "Maya at North Studio" } });
-    expect(paper.blocks[0]).toMatchObject({ kind: "clay" });
+  it("shapes the monthly report like E3: one sentence, the change that mattered said as who did what, an ink button", () => {
+    const paper = websiteReportPaper(report, "https://app.example/open", { actors: { maya: "Maya at North Studio" } });
+    // No idle clay line-up, and no sender line repeating the subject.
+    expect(paper.blocks.some(block => block.kind === "clay")).toBe(false);
+    expect(paper.senderDetail).toBe("");
     expect(paper.blocks.some(block => block.kind === "figure" || block.kind === "rows" || block.kind === "metrics")).toBe(false);
-    expect(paper.blocks).toContainEqual({ kind: "lead", text: "38 inquiries came in through Harbor Dental in September.", quiet: "61 visits were booked, and 55 of them are on your calendar." });
-    expect(paper.blocks).toContainEqual(expect.objectContaining({ kind: "change", label: "The change that mattered", text: "Strelva published a change to the site.", date: "Sep 12", link: { label: "See it", url: "https://app.example/open" } }));
+    expect(paper.blocks).toContainEqual({ kind: "lead", text: "38 inquiries came in through your site in September.", quiet: "61 visits were booked, and 55 of them are on your calendar." });
+    // "See it" opens the website System, not the same place as the primary.
+    expect(paper.blocks).toContainEqual(expect.objectContaining({ kind: "change", label: "The change that mattered", text: "Strelva changed the hours on the home page.", date: "Sep 12",
+      link: { label: "See it", url: expect.stringContaining("/workspace?view=system&system=w&workspaceId=5e000000-0000-4000-8000-0000000000d1") } }));
     // The subject doesn't repeat the lead's number.
     expect(paper.subject).toBe("Harbor Dental: your September 2026 recap");
     const html = renderPaperEmailHtml(paper);
-    expect(html).toContain(">Maya at North Studio<"); expect(html).toContain("Also changed"); expect(html).toContain("background:#161715");
+    expect(html).toContain(">Maya at North Studio<"); expect(html).toContain("Also changed"); expect(html).toContain("Added the Insurance page"); expect(html).toContain("background:#161715");
+    expect(html).not.toMatch(/Published a change to the site|Saved a draft|Monthly recap ·/);
+    // Above the lead the business is named by the subject line and the sender only.
+    const card = html.slice(html.indexOf("<body"), html.lastIndexOf("38 inquiries"));
+    expect(card.match(/Harbor Dental/g)).toHaveLength(2);
     expect(html).not.toContain("font-size:64px");
     expect(html).not.toMatch(/retained|saved answer|Also this month/);
   });

@@ -72,7 +72,8 @@ export function XaLead({ children, quiet, id }: { children: ReactNode; quiet?: R
 export function XaChangeLine({ label, children, when, href, linkLabel = "See it" }: { label: string; children: ReactNode; when?: string; href?: string; linkLabel?: string }) {
   return <section className={styles.change} aria-label={label}>
     <XaLabel as="h2">{label}</XaLabel>
-    <p className={styles.changeText}>{children}{when ? <span className={styles.changeWhen}> · {when}</span> : null}{href ? <> <XaTextLink href={href}>{linkLabel}</XaTextLink></> : null}</p>
+    {/* The date and the link travel together and never wrap apart; the separator sits between them, so no line starts with it. */}
+    <p className={styles.changeText}>{children}{when || href ? <>{" "}<span className={styles.changeTail}>{when ? <span className={styles.changeWhen}>{when}</span> : null}{when && href ? <span className={styles.changeWhen}> · </span> : null}{href ? <XaTextLink href={href}>{linkLabel}</XaTextLink> : null}</span></> : null}</p>
   </section>;
 }
 

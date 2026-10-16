@@ -163,8 +163,12 @@ export function XsAppsCarePreview({ screen, state, mode }: { screen: XsScreen; s
     case "home-finder-unavailable": return <XaOutside from={null} meta="Home search" mode={mode}><div role="alert"><XaEmpty pose="alone" title="Open Home Finder on the brokerage website" job="New inquiries stay closed here until the brokerage link is used.">Home search only opens from the brokerage&apos;s own website, while its installation and listings provider are current.</XaEmpty></div></XaOutside>;
     case "units": return ownerShell(mode, "Businesses and locations", <Units key={state} organizationId={HARBOR_ID} businesses={UNIT_BUSINESSES} canManage={state !== "member"} request={request} />);
     case "delivery-status": {
-      const status = (["received", "reviewing", "drafting", "owner_review", "launch_ready", "launched", "paused"] as const).find(value => value === state) ?? "drafting";
-      return <SiteDeliveryStatus businessName={XA_HARBOR.name} status={status as DeliveryStatus} submittedAt="2026-11-09T15:00:00Z" updatedAt="2026-11-18T19:30:00Z" maskedEmail="am**@harbordental.com" agencyName={state === "no-agency" ? null : XA_NORTH.name} mode={mode} />;
+      // ?state=<status>, plus owner_review-link (the record carries a draft link) and drafting-legacy (no status time recorded).
+      const [base, variant] = state.split("-");
+      const status = (["received", "reviewing", "drafting", "owner_review", "launch_ready", "launched", "paused"] as const).find(value => value === base) ?? "drafting";
+      const submittedAt = "2026-11-09T15:00:00Z";
+      return <SiteDeliveryStatus businessName={XA_HARBOR.name} status={status as DeliveryStatus} submittedAt={submittedAt} updatedAt={variant === "legacy" ? submittedAt : "2026-11-18T19:30:00Z"} maskedEmail="am**@harbordental.com"
+        agencyName={state === "no-agency" ? null : XA_NORTH.name} agencyEmail={state === "no-agency" ? null : XA_NORTH.email} draftUrl={variant === "link" ? `${BASE}/delivery-request` : null} mode={mode} />;
     }
     case "delivery-queue": return wrap(agencyShell(mode, "Delivery work", <ServiceDeliveryQueue key={state} scope={{ providerWorkspaceId: NORTH_ID }} />));
     case "delivery-request": {

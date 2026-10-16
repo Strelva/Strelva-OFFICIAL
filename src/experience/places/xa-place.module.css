@@ -39,6 +39,7 @@
 .change { display: flex; max-width: 40em; flex-direction: column; gap: 6px; padding-top: 18px; border-top: 1px solid var(--st-line); }
 .changeText { margin: 0; color: var(--st-text); font-size: 17px; line-height: 1.5; }
 .changeWhen { color: var(--st-text-3); }
+.changeTail { white-space: nowrap; }
 @media (max-width: 767px) { .lead { font-size: 21px; letter-spacing: -0.3px; } .changeText { font-size: 16px; } }
 
 /* ---------- Trouble, loading, note ---------- */

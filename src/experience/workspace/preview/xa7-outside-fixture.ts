@@ -37,14 +37,15 @@ export function e1Mail(state: string): XaMail {
 export function e3Mail(state: string): XaMail {
   return mondayEmail({
     business: HARBOR.business, agencyName: "North Studio", period: "Nov 16–22", weekOf: "Week of Nov 16",
-    figure: { value: 14, label: "visits booked online", detail: "3 new patients · 11 returning · nothing went down" },
+    figure: { value: 14, label: "visits booked online", detail: "3 new patients · 11 returning" },
     changes: state === "quiet" ? [] : [
-      { date: "Nov 20", text: "The Book a visit button moved to the top of the home page", who: "Maya at North Studio" },
+      { date: "Nov 20", text: "Moved the Book a visit button to the top of the home page", who: "Maya at North Studio" },
       { date: "Nov 18", text: "Fixed the map link on the contact page", who: "Strelva" },
       { date: "Nov 19", text: "Added Delta Dental PPO to the insurance list", who: "Maya at North Studio" },
     ],
     checks: `Every check on ${HARBOR.site} passed. Your Services page was the slowest at 1.4 seconds.`,
-    seeUrl: XA_SYSTEM_HREFS.website,
+    // The sender builds this from the mattered change's systemId (systemHref); a change with no System sends null.
+    seeUrl: state === "quiet" ? null : XA_SYSTEM_HREFS.website,
     open: { label: "Open Harbor Dental", url: `${XA7_BASE}/today-phone` },
     settingsUrl: `${XA7_BASE}/monday-email?state=settings`,
   });

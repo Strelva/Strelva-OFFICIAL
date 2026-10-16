@@ -22,7 +22,9 @@ describe("Recaps: reports from your agency", () => {
 
   it("lists what the agency shared, newest first, with an open link", () => {
     const html = render({ kind: "ready", items: PREVIEW_OWNER_REPORTS });
-    for (const text of ["Reports from your agency", "September report from North Studio", "Updated Oct 2", "August report from North Studio"]) expect(html, text).toContain(text);
+    // On the fixture day (Nov 23) October's report, shared Nov 3, comes first.
+    for (const text of ["Reports from your agency", "October report from North Studio", "Nov 3", "September report from North Studio", "Updated Oct 2"]) expect(html, text).toContain(text);
+    expect(html.indexOf("October report")).toBeLessThan(html.indexOf("September report"));
     expect(html).toContain(`/workspace/care-reports/${PREVIEW_OWNER_REPORTS[0]!.reportId}?workspaceId=${WS}`);
     expect(html.indexOf("Reports from your agency")).toBeLessThan(html.indexOf("Recap period"));
   });

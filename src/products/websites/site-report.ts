@@ -16,6 +16,7 @@ import { getClientEmailOverride } from "@/platform/infra/email/client-override";
 import { getTenantConfig } from "@/lib/tenants";
 import { CONTROL_PLANE_URL, SITES_ROOT_DOMAIN } from "@/platform/infra/brand";
 import { bindToCurrentTenant } from "./hosted-routing";
+import type { SiteDocument } from "./site-document-schema";
 import { businessOutcomeReportsEnabled, deliverBusinessOutcomeReport, readBusinessOutcomeReports, type BusinessOutcomeReport } from "@/platform/business-outcomes/reports";
 export const websiteReportInputSchema=z.object({month:z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/)}).strict();
 export interface WebsiteMonthlyReport {
@@ -24,7 +25,8 @@ export interface WebsiteMonthlyReport {
  bookings:{status:"available"|"unavailable";scheduledInPeriod:number|null;providerAccepted:number|null;providerVerified:number|null};
  visibility:{status:"available"|"unavailable";checkedAt?:string;mentioned?:boolean;recommended?:boolean;note:string};
  readiness:{status:"available"|"unavailable";checkedAt?:string;passedChecks:number|null;totalChecks:number|null};
- changes:Array<{revision:number;contentHash:string;createdAt:string;createdBy:string;published:boolean}>;
+ /** `summary` says what a published change did ("changed the home page"), from the documents themselves; absent on reports saved before it. */
+ changes:Array<{revision:number;contentHash:string;createdAt:string;createdBy:string;published:boolean;summary?:string|null}>;
  businessOutcome?:BusinessOutcomeReport;
 }
 export async function readWebsiteMonthlyReport(actor:WorkspaceActor,workId:string,raw:unknown):Promise<WebsiteMonthlyReport>{
@@ -60,43 +62,101 @@ export async function readWebsiteMonthlyReport(actor:WorkspaceActor,workId:strin
  // website checks separately instead of relabeling that blended score.
  const readiness:WebsiteMonthlyReport["readiness"]=checked?{status:"available",checkedAt:checked.checkedAt,passedChecks:checked.result.signals.filter(signal=>signal.pass).length,totalChecks:checked.result.signals.length}:{status:"unavailable",passedChecks:null,totalChecks:null};
  const businessOutcome=tenantId?(await readBusinessOutcomeReports([tenantId],month))?.find(row=>row.workspaceId===record.workspaceId):undefined;
- return{workId,workspaceId:record.workspaceId,tenantId,siteName:published?.document.siteName??record.rebuild.title,month,generatedAt:new Date().toISOString(),inquiries,bookings,visibility,readiness,...(businessOutcome?{businessOutcome}:{}),changes:documents.filter(row=>during(row.createdAt)).map(row=>({revision:row.revision,contentHash:row.contentHash,createdAt:row.createdAt,createdBy:row.createdBy,published:publishedRevisions.has(`${row.revision}:${row.contentHash}`)}))};
+ return{workId,workspaceId:record.workspaceId,tenantId,siteName:published?.document.siteName??record.rebuild.title,month,generatedAt:new Date().toISOString(),inquiries,bookings,visibility,readiness,...(businessOutcome?{businessOutcome}:{}),changes:documentChanges(documents,publishedRevisions).filter(row=>during(row.createdAt))};
+}
+/** A page's own content: every node reachable from its root, with the facts those nodes show, in visit order. */
+function pageDigest(doc:SiteDocument,root:string):string{
+ const seen=new Set<string>();const out:unknown[]=[];
+ const visit=(id:string)=>{if(seen.has(id))return;seen.add(id);const node=doc.nodes[id];if(!node)return;out.push(node,node.factIds.map(fact=>doc.facts[fact]??null));node.children.forEach(visit);};
+ visit(root);return JSON.stringify(out);
+}
+const pageWord=(page:{path:string;title:string})=>page.path==="/"?"home page":`${page.title} page`;
+const listWords=(items:string[])=>items.length<=1?items.join(""):items.length===2?`${items[0]} and ${items[1]}`:`${items.slice(0,-1).join(", ")} and ${items[items.length-1]}`;
+const somePages=(pages:Array<{path:string;title:string}>)=>{const named=pages.slice(0,3).map(pageWord);const rest=pages.length-named.length;return listWords(rest>0?[...named,`${rest} more ${rest===1?"page":"pages"}`]:named).replace(/^/,"the ");};
+const SECTION_WORDS:Readonly<Record<string,string>>={Header:"header",Footer:"footer",Hero:"top section",TrustStrip:"trust badges",ServiceGrid:"services list",ServiceDetail:"service details",Story:"story",TeamGrid:"team section",Testimonials:"testimonials",ReviewSummary:"reviews",Faq:"questions and answers",Stats:"numbers",Gallery:"photos",Hours:"hours",Map:"map",Locations:"locations",Cta:"booking button",InquiryForm:"contact form",Booking:"booking section",PageHeader:"page heading",RichText:"text"};
+/** The sections of one page that changed, as "changed the hours and the map" or "moved sections"; null when it can't be said that plainly. */
+function sectionChanges(previous:SiteDocument,next:SiteDocument,oldRoot:string,newRoot:string):string|null{
+ const reach=(doc:SiteDocument,root:string)=>{const ids:string[]=[];const seen=new Set<string>();const visit=(id:string)=>{if(seen.has(id)||!doc.nodes[id])return;seen.add(id);ids.push(id);doc.nodes[id]!.children.forEach(visit);};visit(root);return ids;};
+ const own=(doc:SiteDocument,id:string)=>{const{children:_children,...rest}=doc.nodes[id]!;return JSON.stringify([rest,rest.factIds.map(fact=>doc.facts[fact]??null)]);};
+ const oldIds=new Set(reach(previous,oldRoot));const newIds=reach(next,newRoot);
+ const words=(ids:string[])=>[...new Set(ids.map(id=>SECTION_WORDS[next.nodes[id]?.type??previous.nodes[id]?.type??""]).filter(Boolean))].map(word=>`the ${word}`);
+ const edited=words(newIds.filter(id=>oldIds.has(id)&&own(previous,id)!==own(next,id)));
+ const addedSections=words(newIds.filter(id=>!oldIds.has(id)));
+ const newSet=new Set(newIds);const removedSections=[...new Set([...oldIds].filter(id=>!newSet.has(id)).map(id=>SECTION_WORDS[previous.nodes[id]!.type]).filter(Boolean))].map(word=>`the ${word}`);
+ const order=(doc:SiteDocument,ids:Iterable<string>)=>JSON.stringify([...ids].map(id=>[id,doc.nodes[id]!.children]));
+ const moved=!edited.length&&!addedSections.length&&!removedSections.length&&order(previous,reach(previous,oldRoot))!==order(next,newIds);
+ if(moved)return"moved sections";
+ if(edited.length>3||addedSections.length>2||removedSections.length>2)return null;
+ const parts=[...(edited.length?[`changed ${listWords(edited)}`]:[]),...(addedSections.length?[`added ${listWords(addedSections)}`]:[]),...(removedSections.length?[`removed ${listWords(removedSections)}`]:[])];
+ return parts.length?listWords(parts):null;
+}
+/**
+ * What a published website change did, as a verb phrase that follows its
+ * actor ("changed the home page", "added the Insurance page"), read from the
+ * two documents rather than guessed. `previous` is the last published
+ * document before it; none means this was the site's first publish.
+ */
+export function websiteChangeSummary(previous:SiteDocument|null,next:SiteDocument):string{
+ if(!previous)return"published the site";
+ const before=new Map(previous.pages.map(page=>[page.path,page]));const after=new Set(next.pages.map(page=>page.path));
+ const added=next.pages.filter(page=>!before.has(page.path));
+ const removed=previous.pages.filter(page=>!after.has(page.path));
+ const changed=next.pages.filter(page=>{const old=before.get(page.path);return!!old&&(old.title!==page.title||old.description!==page.description||pageDigest(previous,old.root)!==pageDigest(next,page.root));});
+ // One page changed and nothing else: name the parts of it that changed, in the words a visitor would use.
+ if(changed.length===1&&!added.length&&!removed.length&&JSON.stringify(previous.theme)===JSON.stringify(next.theme)){const detail=sectionChanges(previous,next,before.get(changed[0]!.path)!.root,changed[0]!.root);if(detail)return`${detail} on the ${pageWord(changed[0]!)}`;}
+ const parts=[...(changed.length?[`changed ${somePages(changed)}`]:[]),...(added.length?[`added ${somePages(added)}`]:[]),...(removed.length?[`removed ${somePages(removed)}`]:[]),...(JSON.stringify(previous.theme)!==JSON.stringify(next.theme)?["changed the site's look"]:[])];
+ return parts.length?listWords(parts):"updated the site's settings";
+}
+/** Every saved revision with whether it went live and, for a published one, what it changed since the last published one. */
+function documentChanges(documents:readonly{revision:number;contentHash:string;createdAt:string;createdBy:string;document:SiteDocument}[],publishedRevisions:ReadonlySet<string>):WebsiteMonthlyReport["changes"]{
+ let lastPublished:SiteDocument|null=null;
+ return [...documents].sort((a,b)=>a.revision-b.revision).map(row=>{
+  const published=publishedRevisions.has(`${row.revision}:${row.contentHash}`);
+  const summary=published?websiteChangeSummary(lastPublished,row.document):null;
+  if(published)lastPublished=row.document;
+  return{revision:row.revision,contentHash:row.contentHash,createdAt:row.createdAt,createdBy:row.createdBy,published,summary};
+ });
 }
 const reportMonthLabel=(month:string)=>{const date=new Date(`${month}-15T12:00:00Z`);return Number.isNaN(date.getTime())?month:date.toLocaleDateString("en-US",{month:"long",year:"numeric",timeZone:"UTC"});};
 const reportDay=(at:string)=>{const date=new Date(at);return Number.isNaN(date.getTime())?"":date.toLocaleDateString("en-US",{month:"short",day:"numeric",timeZone:"UTC"});};
 const many=(n:number,one:string,more:string)=>`${n} ${n===1?one:more}`;
 /** XA · E3 presentation of the monthly recap (lane results, October 16):
- * Pebble and the Systems at the top, one sentence for the month (inquiries,
- * else bookings) with one quiet clause that adds a different fact, the one
- * change that mattered (the newest published change) naming whoever acted
- * with a link to see it, the rest as plain sentences and rows, and one ink
- * button. No hero figure. Presentation only; counts and their sources are the
- * report's own, and a count that couldn't be read is left out rather than
- * shown as zero. `actors` names the people behind change records (an id with
- * no known name is left unnamed rather than guessed). */
-export function websiteReportPaper(report:WebsiteMonthlyReport,openUrl:string,options:{clayUrl?:string;actors?:Readonly<Record<string,string>>}={}):PaperEmail{
+ * one sentence for the month (inquiries, else bookings) with one quiet clause
+ * that adds a different fact, the one change that mattered (the newest
+ * published change, said as whoever acted and what it changed) with a link to
+ * its System, the other published changes as rows, and one ink button. No
+ * hero figure, no idle clay line-up, and no sender line repeating the subject.
+ * Draft-only saves are left out: nothing changed for visitors. Presentation
+ * only; counts and their sources are the report's own, and a count that
+ * couldn't be read is left out rather than shown as zero. `actors` names the
+ * people behind change records (an id with no known name is left unnamed
+ * rather than guessed). `systemUrl` overrides where "See it" opens (the
+ * website System); by default it is the System on the control plane. */
+export function websiteReportPaper(report:WebsiteMonthlyReport,openUrl:string,options:{actors?:Readonly<Record<string,string>>;systemUrl?:string}={}):PaperEmail{
  const month=reportMonthLabel(report.month);
  const monthName=month.split(" ")[0];
  const booked=report.bookings.scheduledInPeriod;
- const lead=report.inquiries.count!==null?{text:`${many(report.inquiries.count,"inquiry","inquiries")} came in through ${report.siteName} in ${monthName}.`,quiet:booked!==null?`${many(booked,"visit was","visits were")} booked${report.bookings.providerVerified!==null?`, and ${report.bookings.providerVerified} of them are on your calendar`:""}.`:undefined}
-  :booked!==null?{text:`${many(booked,"visit was","visits were")} booked through ${report.siteName} in ${monthName}.`,quiet:report.bookings.providerVerified!==null?`${report.bookings.providerVerified} of them are on your calendar.`:undefined}:null;
+ const lead=report.inquiries.count!==null?{text:`${many(report.inquiries.count,"inquiry","inquiries")} came in through your site in ${monthName}.`,quiet:booked!==null?`${many(booked,"visit was","visits were")} booked${report.bookings.providerVerified!==null?`, and ${report.bookings.providerVerified} of them are on your calendar`:""}.`:undefined}
+  :booked!==null?{text:`${many(booked,"visit was","visits were")} booked through your site in ${monthName}.`,quiet:report.bookings.providerVerified!==null?`${report.bookings.providerVerified} of them are on your calendar.`:undefined}:null;
  const sentences:string[]=[];
- if(report.readiness.status==="available"&&report.readiness.passedChecks!==null&&report.readiness.totalChecks!==null)sentences.push(report.readiness.passedChecks===report.readiness.totalChecks?`${report.siteName} passed all ${report.readiness.totalChecks} site checks.`:`${report.siteName} passed ${report.readiness.passedChecks} of ${report.readiness.totalChecks} site checks.`);
+ if(report.readiness.status==="available"&&report.readiness.passedChecks!==null&&report.readiness.totalChecks!==null)sentences.push(report.readiness.passedChecks===report.readiness.totalChecks?`Your site passed all ${report.readiness.totalChecks} site checks.`:`Your site passed ${report.readiness.passedChecks} of ${report.readiness.totalChecks} site checks.`);
  if(report.visibility.status==="available")sentences.push(report.visibility.mentioned?`When Strelva last asked an AI assistant, it named ${report.siteName}${report.visibility.recommended?" and recommended it":""}.`:`When Strelva last asked an AI assistant, it didn't name ${report.siteName} yet.`);
  if(report.businessOutcome)sentences.push(`Across your business: ${report.businessOutcome.line.text}`);
  const who=(id:string)=>id==="strelva"||id==="system"?"Strelva":options.actors?.[id]??"";
- const recent=report.changes.slice(-5);
- const mattered=[...recent].reverse().find(change=>change.published);
- const matteredText=mattered?(who(mattered.createdBy)?`${who(mattered.createdBy)} published a change to the site.`:"A change to the site was published."):null;
- const changes=recent.filter(change=>change!==mattered).map(change=>({date:reportDay(change.createdAt),text:change.published?"Published a change to the site":"Saved a draft of the site",who:who(change.createdBy)}));
- const clay=options.clayUrl??new URL("/xa/email-lineup.png",CONTROL_PLANE_URL).toString();
- return{subject:`${report.siteName}: your ${month} recap`,preheader:lead?.text??`Your ${month} recap for ${report.siteName}.`,sender:report.siteName,senderDetail:`Monthly recap · ${month}`,
+ // Only published changes reached visitors; a saved draft is not a change to the site.
+ const published=report.changes.filter(change=>change.published).slice(-5);
+ const what=(change:WebsiteMonthlyReport["changes"][number])=>change.summary?.trim()||"published a change to the site";
+ const said=(change:WebsiteMonthlyReport["changes"][number])=>{const actor=who(change.createdBy);const phrase=what(change);return actor?`${actor} ${phrase}.`:`${phrase.charAt(0).toUpperCase()}${phrase.slice(1)}.`;};
+ const mattered=published[published.length-1];
+ const changes=published.slice(0,-1).reverse().map(change=>({date:reportDay(change.createdAt),text:`${what(change).charAt(0).toUpperCase()}${what(change).slice(1)}`,who:who(change.createdBy)}));
+ const seeUrl=options.systemUrl??new URL(`/workspace?${new URLSearchParams({view:"system",system:report.workId,workspaceId:report.workspaceId})}`,CONTROL_PLANE_URL).toString();
+ return{subject:`${report.siteName}: your ${month} recap`,preheader:lead?.text??`Your ${month} recap for ${report.siteName}.`,sender:report.siteName,senderDetail:"",
   footer:"This comes once a month. A count that couldn't be read is left out, never shown as zero.",
-  blocks:[{kind:"clay",src:clay,width:260,height:81},
+  blocks:[
    ...(lead?[{kind:"lead" as const,...lead}]:[{kind:"paragraph" as const,text:"Inquiries and bookings couldn't be counted this month. Nothing is lost."}]),
    ...(sentences.length?[{kind:"paragraph" as const,text:sentences.join(" "),muted:true}]:[]),
-   ...(mattered&&matteredText?[{kind:"rule" as const},{kind:"change" as const,label:"The change that mattered",text:matteredText,date:reportDay(mattered.createdAt),link:{label:"See it",url:openUrl}}]:[]),
-   ...(changes.length?[...(mattered?[]:[{kind:"rule" as const}]),{kind:"label" as const,text:mattered?"Also changed":"What changed"},{kind:"changes" as const,rows:changes}]:[]),
+   ...(mattered?[{kind:"rule" as const},{kind:"change" as const,label:"The change that mattered",text:said(mattered),date:reportDay(mattered.createdAt),link:{label:"See it",url:seeUrl}}]:[]),
+   ...(changes.length?[{kind:"label" as const,text:"Also changed"},{kind:"changes" as const,rows:changes}]:[]),
    {kind:"actions",actions:[{label:`Open ${report.siteName}`,url:openUrl,style:"primary"}],full:false}]};
 }
 /** Shared transport enforces the existing tenant email gate. No recipient is inferred. */

@@ -3,6 +3,9 @@ import { e3Mail } from "@/experience/workspace/preview/xa7-outside-fixture";
 import { renderXaMailHtml, renderXaMailText } from "@/platform/infra/email/xa-mail";
 
 export const dynamic = "force-dynamic";
+/** The app's CSP blocks Google Fonts on preview routes, so the preview serves the same DM Sans from this origin (as xs-visitor/email does). Real mail loads it from EMAIL_FONT_LINKS. */
+const PREVIEW_FONT = `<style>@font-face{font-family:'DM Sans';font-style:normal;font-weight:100 1000;src:url(/xa/fonts/dm-sans-latin.woff2) format('woff2')}</style></head>`;
+
 
 /** XA · E3, the Monday email. Template only: rendered here, never sent. ?state=ready|quiet&format=text */
 export async function GET(request: Request) {
@@ -10,5 +13,5 @@ export async function GET(request: Request) {
   const url = new URL(request.url);
   const mail = e3Mail(url.searchParams.get("state") ?? "ready");
   if (url.searchParams.get("format") === "text") return new Response(renderXaMailText(mail), { headers: { "Content-Type": "text/plain; charset=utf-8", "X-Robots-Tag": "noindex" } });
-  return new Response(renderXaMailHtml(mail), { headers: { "Content-Type": "text/html; charset=utf-8", "X-Robots-Tag": "noindex", "Cache-Control": "no-store" } });
+  return new Response(renderXaMailHtml(mail).replace("</head>", PREVIEW_FONT), { headers: { "Content-Type": "text/html; charset=utf-8", "X-Robots-Tag": "noindex", "Cache-Control": "no-store" } });
 }

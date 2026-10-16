@@ -1,7 +1,7 @@
 import type { BusinessOutcomeMonth } from "@/platform/business-outcomes";
 import { formatOutcomeLine } from "@/platform/business-outcomes";
 import { releaseLabel } from "@/platform/app-releases/catalog";
-import type { CareCheck, CareReportFacts, CareSiteCheck } from "./contracts";
+import type { CareCheck, CareReportChange, CareReportFacts, CareSiteCheck, CareSource } from "./contracts";
 
 /** Pure wording and arithmetic for a Care plan report. Browser-safe: no I/O. */
 
@@ -37,6 +37,21 @@ export const CARE_CHECK_LABEL: Record<CareCheck, string> = {
 /** Status as an exception: a checked change says nothing; the others say why in two words. */
 export function careCheckException(check: CareCheck): string | null {
   return check === "confirmed" ? null : check === "not_confirmed" ? "Not confirmed" : "Not checked";
+}
+
+/** Sources Strelva reads back on the live site; any other change carries no check (README: "What Checked on the live site means"). */
+const READ_BACK_SOURCES: ReadonlySet<CareSource> = new Set(["website_deploy", "website_code", "website_document"]);
+
+/**
+ * Why a change wasn't checked and what clears it, in one sentence for the
+ * owner. A checked change has none. Never a bare exception.
+ */
+export function careCheckReason(item: Pick<CareReportChange, "check" | "source">, agencyName: string): string | null {
+  if (item.check === "confirmed") return null;
+  if (item.check === "not_confirmed") return `The live site didn't show this change when Strelva looked. ${agencyName} can publish it again.`;
+  return READ_BACK_SOURCES.has(item.source)
+    ? "No check of the live site has come back for this yet. Open the page to see it."
+    : "Strelva doesn't check this kind of change on the live site. Open the page to see it.";
 }
 
 /**
@@ -105,7 +120,7 @@ export function careSiteCheckLines(siteChecks: CareReportFacts["siteChecks"]): s
 export function careHeadline(facts: Pick<CareReportFacts, "changes" | "requests" | "time">): string {
   const parts: string[] = [];
   if (facts.changes.confirmed > 0) parts.push(`${plural(facts.changes.confirmed, "checked change", "checked changes")}`);
-  if (facts.requests.doneCount > 0) parts.push(`${plural(facts.requests.doneCount, "Request", "Requests")} done`);
+  if (facts.requests.doneCount > 0) parts.push(`${plural(facts.requests.doneCount, "request", "requests")} done`);
   if (facts.time.minutes > 0) parts.push(`${careTimeLabel(facts.time.minutes)} recorded`);
   return parts.length ? parts.join(" · ") : "No recorded work this month";
 }
@@ -113,33 +128,39 @@ export function careHeadline(facts: Pick<CareReportFacts, "changes" | "requests"
 /**
  * The report's one sentence (lane results, October 16), in place of a hero
  * figure: who did the month's work and how much, then one quiet clause with a
- * different fact (how much was checked on the live site). Never repeats the
- * time or Requests lines that follow it.
+ * different fact (how much was checked on the live site). The headline above
+ * already names the month and the business, so the sentence doesn't. Never
+ * repeats the time or requests lines that follow it.
  */
-export function careLead(facts: Pick<CareReportFacts, "month" | "changes" | "requests">, agencyName: string, businessName: string): { text: string; quiet?: string } {
-  const month = careMonthLabel(facts.month).split(" ")[0];
+export function careLead(facts: Pick<CareReportFacts, "changes" | "requests">, agencyName: string): { text: string; quiet?: string } {
   const { total, confirmed } = facts.changes;
   if (total > 0) {
     const quiet = confirmed === total ? (total === 1 ? "It was checked on the live site." : "Each was checked on the live site.")
       : confirmed > 0 ? `${confirmed.toLocaleString("en-US")} ${confirmed === 1 ? "was" : "were"} checked on the live site.` : undefined;
-    return { text: `${agencyName} made ${plural(total, "change", "changes")} for ${businessName} in ${month}.`, quiet };
+    return { text: `${agencyName} made ${plural(total, "change", "changes")}.`, quiet };
   }
-  if (facts.requests.doneCount > 0) return { text: `${agencyName} finished ${plural(facts.requests.doneCount, "Request", "Requests")} for ${businessName} in ${month}.`, quiet: "No Systems changed." };
-  return { text: `No recorded work for ${businessName} in ${month}.` };
+  if (facts.requests.doneCount > 0) return { text: `${agencyName} finished ${plural(facts.requests.doneCount, "request", "requests")}.`, quiet: "No Systems changed." };
+  return { text: "No recorded work this month." };
 }
 
 /**
- * The one change that mattered: the agency's own note when it wrote one (its
- * words about what mattered, credited to it), else the newest change, credited
- * to the agency that made it. Null in a month with neither.
+ * The one change that mattered: one recorded change, never the agency's note
+ * (a note can cover several changes; it is shown on its own as the agency's
+ * words). The newest change checked on the live site, else the newest change,
+ * credited to the agency that made it. Null in a month with no change. The
+ * rest of the month's changes are `careOtherChanges`, so none is listed twice.
  */
-export function careMattered(facts: Pick<CareReportFacts, "changes">, agencyName: string, note?: string | null): { text: string; at?: string } | null {
-  const said = note?.trim();
-  if (said) return { text: `${agencyName}: ${said}` };
-  const newest = [...facts.changes.items].sort((a, b) => b.at.localeCompare(a.at))[0];
-  if (!newest) return null;
-  const what = (newest.summary || newest.systemName).trim();
-  return { text: `${agencyName}: ${/[.!?]$/.test(what) ? what : `${what}.`}`, at: newest.at };
+export function careMattered(facts: Pick<CareReportFacts, "changes">, agencyName: string): { text: string; at: string; item: CareReportChange } | null {
+  const newestFirst = [...facts.changes.items].sort((a, b) => b.at.localeCompare(a.at));
+  const item = newestFirst.find(change => change.check === "confirmed") ?? newestFirst[0];
+  if (!item) return null;
+  const what = (item.summary || item.systemName).trim();
+  return { text: `${agencyName}: ${/[.!?]$/.test(what) ? what : `${what}.`}`, at: item.at, item };
+}
+
+/** Every change except the one that mattered, oldest first, as the report lists them. */
+export function careOtherChanges(facts: Pick<CareReportFacts, "changes">, mattered: { item: CareReportChange } | null): CareReportChange[] {
+  return facts.changes.items.filter(item => item !== mattered?.item);
 }
 
 export const CARE_DELIVERY_COPY: Record<string, string> = {

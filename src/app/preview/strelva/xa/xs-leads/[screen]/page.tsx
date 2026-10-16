@@ -5,6 +5,7 @@ import { renderPaperEmailBody, type PaperEmail } from "@/platform/infra/email/pa
 import { newInquiryEmail } from "@/platform/infra/email/paper-templates";
 import { connectedInquiryEmail } from "@/products/connected-sites/notify";
 import { websiteReportPaper, type WebsiteMonthlyReport } from "@/products/websites/site-report";
+import { XA_SYSTEM_HREFS } from "@/experience/workspace/preview/xa-day";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Strelva · XA leads, reviews, recaps, results", robots: { index: false, follow: false } };
@@ -27,8 +28,9 @@ function email(screen: EmailScreen, state: string): PaperEmail {
     bookings: unavailable ? { status: "unavailable", scheduledInPeriod: null, providerAccepted: null, providerVerified: null } : { status: "available", scheduledInPeriod: 61, providerAccepted: 58, providerVerified: 55 },
     visibility: { status: "available", checkedAt: "2026-09-25T12:00:00Z", mentioned: true, recommended: false, note: "Saved measurement" },
     readiness: unavailable ? { status: "unavailable", passedChecks: null, totalChecks: null } : { status: "available", checkedAt: "2026-09-25T12:00:00Z", passedChecks: 14, totalChecks: 15 },
-    changes: [{ revision: 3, contentHash: "a", createdAt: "2026-09-10T12:00:00Z", createdBy: "maya", published: true }, { revision: 4, contentHash: "b", createdAt: "2026-09-12T12:00:00Z", createdBy: "strelva", published: true }, { revision: 5, contentHash: "c", createdAt: "2026-09-20T12:00:00Z", createdBy: "maya", published: false }] };
-  return websiteReportPaper(report, "/preview/strelva/xa/xs-leads/results", { clayUrl: "/xa/email-lineup.png", actors: { maya: "Maya at North Studio" } });
+    // Summaries are what websiteChangeSummary reads from the documents; the draft-only save is left out of the email.
+    changes: [{ revision: 3, contentHash: "a", createdAt: "2026-09-10T12:00:00Z", createdBy: "strelva", published: true, summary: "changed the map on the Contact page" }, { revision: 4, contentHash: "b", createdAt: "2026-09-12T12:00:00Z", createdBy: "maya", published: true, summary: "changed the booking button and the hours on the home page" }, { revision: 5, contentHash: "c", createdAt: "2026-09-20T12:00:00Z", createdBy: "maya", published: false, summary: null }] };
+  return websiteReportPaper(report, "/preview/strelva/xa/xs-leads/results", { actors: { maya: "Maya at North Studio" }, systemUrl: XA_SYSTEM_HREFS.website });
 }
 
 /** Every xs-leads screen with fixtures. ?state=…&mode=dark (&range= for results, &period=&recap= for recaps, &open=1 opens the picked item on a phone, &prospect= picks a check result). */

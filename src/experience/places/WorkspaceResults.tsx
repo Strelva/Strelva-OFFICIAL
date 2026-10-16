@@ -32,8 +32,15 @@ export function resultsHref(workspaceId: string, range: RangeKey = "live", windo
 }
 
 const count = (value: number) => value.toLocaleString("en-US");
+/** The window before, as part of a sentence: "vs the previous 7 days" reads "the 7 days before"; "vs last week" reads "last week". */
+export function priorWords(priorLabel: string): string {
+  const bare = priorLabel.replace(/^vs\s+/, "");
+  const days = /^the previous (\d+) days$/.exec(bare);
+  return days ? `the ${days[1]} days before` : bare;
+}
 function change(value: number, priorLabel: string): string {
-  return value === 0 ? `Unchanged ${priorLabel}` : `${value > 0 ? "Up" : "Down"} ${count(Math.abs(value))} ${priorLabel}`;
+  const prior = priorWords(priorLabel);
+  return value === 0 ? `The same as ${prior}` : `${value > 0 ? "Up" : "Down"} ${count(Math.abs(value))} from ${prior}`;
 }
 /** Where a business usually shows up on Google, in words an owner uses (never "rank 2.1"). */
 export function searchPlace(position: number): string {
@@ -62,14 +69,15 @@ export function sourceName(source: string): string {
 export function resultsFinding(site: SiteResults): string | null {
   const stats = site.stats;
   if (!stats?.hasData) return null;
-  const prior = stats.range.priorLabel.replace(/^vs /, "");
+  const prior = priorWords(stats.range.priorLabel);
   const change = stats.pageViewsDelta === 0 ? `Visits held steady against ${prior}.` : `${stats.pageViewsDelta > 0 ? "Up" : "Down"} ${count(Math.abs(stats.pageViewsDelta))} visits from ${prior}.`;
   const top = site.gaPerf?.status === "ok" ? site.gaPerf.topSources.filter(source => source.sessions > 0).sort((a, b) => b.sessions - a.sessions)[0] : undefined;
   const query = site.searchPerf?.status === "ok" ? site.searchPerf.topQueries[0]?.query : undefined;
   const from = top ? sourceName(top.source) : null;
   if (!from) return change;
-  if (from.startsWith("Typed")) return `${change} Most people typed your address or used a bookmark.`;
-  return `${change} Most came from ${from === "Google searches" && query ? `Google searches like \u201c${query}\u201d` : from}.`;
+  // Sources and searches are read over the last 4 weeks, not the selected window, so the clause names its own window.
+  if (from.startsWith("Typed")) return `${change} Over the last 4 weeks, most people typed your address or used a bookmark.`;
+  return `${change} Over the last 4 weeks, most came from ${from === "Google searches" && query ? `Google searches like \u201c${query}\u201d` : from}.`;
 }
 
 /** A page's name as an owner says it, never its path. */
@@ -113,7 +121,7 @@ export function resultsLead(site: SiteResults): { main: string; quiet: string } 
   if (!stats) return null;
   const window = resultsWindowPhrase(stats.range);
   if (!stats.hasData) return { main: `No visits to ${site.siteName} were counted ${window}.`, quiet: "It starts filling in as people find you." };
-  const prior = stats.range.priorLabel.replace(/^vs /, "");
+  const prior = priorWords(stats.range.priorLabel);
   const moved = stats.pageViewsDelta === 0 ? `The same as ${prior}.` : `${count(Math.abs(stats.pageViewsDelta))} ${stats.pageViewsDelta > 0 ? "more" : "fewer"} than ${prior}.`;
   const finding = resultsFinding(site);
   const source = finding?.replace(/^[^.]*\.\s*/, "") ?? "";

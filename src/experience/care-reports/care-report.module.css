@@ -10,6 +10,8 @@
 .logo { width: 28px; height: 28px; border-radius: 8px; object-fit: contain; }
 .sub { display: block; margin-top: 2px; color: var(--st-text-3); font-size: 13px; line-height: 18px; }
 .sentence { margin: 0; color: var(--st-text); font-size: 15px; line-height: 1.5; }
+/* Why a change was not checked and what clears it, under the change itself. */
+.reason { display: block; margin-top: 2px; color: var(--st-need); font-size: 14px; line-height: 20px; }
 .plain { display: flex; flex-direction: column; gap: 6px; margin: 0; padding: 0; list-style: none; color: var(--st-text-body); font-size: 15px; line-height: 1.45; }
 .plain > li:last-child { color: var(--st-text-3); font-size: 13px; }
 .releases { display: flex; flex-direction: column; gap: 10px; margin: 0; padding: 0; list-style: none; font-size: 15px; }

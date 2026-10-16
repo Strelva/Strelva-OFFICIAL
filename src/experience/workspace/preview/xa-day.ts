@@ -50,6 +50,27 @@ export const XA_HARBOR = {
   email: "dr.lin@harbordental.example",
 } as const;
 
+/**
+ * Harbor Dental's visits, one source for every preview that counts them
+ * (Results, Recaps, the Care plan report). The last full week is Nov 16 to 22,
+ * the Last 7 days on the fixture day. The 4-week figure (Oct 26 to Nov 22) is
+ * at least the sum of the two weeks shown, and October is its own month.
+ */
+export const XA_HARBOR_VISITS = {
+  /** Nov 16 to 22. */
+  week: 361,
+  /** Nov 9 to 15. */
+  weekBefore: 320,
+  /** Clicks to book or call, Nov 16 to 22 and Nov 9 to 15. */
+  weekActions: 31,
+  weekBeforeActions: 26,
+  /** Oct 26 to Nov 22, the window Google sources and searches are read over. */
+  fourWeeks: 1384,
+  /** The monthly recap and the Care plan report months. */
+  october: 1612,
+  september: 1366,
+} as const;
+
 /** The agency that runs it. */
 export const XA_NORTH = {
   name: "North Studio",

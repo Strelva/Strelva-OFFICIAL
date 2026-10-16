@@ -23,14 +23,15 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
  * Agency's workspace, read like any other agency. Unknown stays null: the page
  * shows a neutral frame rather than guessing.
  */
-async function agencyNameFor(lead: { agencyWorkspaceId?: string | null; agencyName?: string | null }): Promise<string | null> {
-  const read = async (id: string) => { const brand = await resolveOwnerBrand(id); return brand.agencyId === id ? brand.name : null; };
+async function agencyFor(lead: { agencyWorkspaceId?: string | null; agencyName?: string | null }): Promise<{ name: string | null; email: string | null }> {
+  const read = async (id: string) => { const brand = await resolveOwnerBrand(id); return brand.agencyId === id ? { name: brand.name, email: brand.replyTo } : null; };
+  const recorded = { name: lead.agencyName ?? null, email: null };
   try {
-    if (lead.agencyWorkspaceId && UUID.test(lead.agencyWorkspaceId)) return await read(lead.agencyWorkspaceId) ?? lead.agencyName ?? null;
-    if (lead.agencyName) return lead.agencyName;
+    if (lead.agencyWorkspaceId && UUID.test(lead.agencyWorkspaceId)) return await read(lead.agencyWorkspaceId) ?? recorded;
+    if (lead.agencyName) return recorded;
     const strelvaAgency = await resolveStrelvaAgencyWorkspaceId();
-    return strelvaAgency ? await read(strelvaAgency) : null;
-  } catch { return lead.agencyName ?? null; }
+    return (strelvaAgency ? await read(strelvaAgency) : null) ?? { name: null, email: null };
+  } catch { return recorded; }
 }
 
 /** No-login status for a website request. The unguessable token is the only authority. */
@@ -38,5 +39,6 @@ export default async function DeliveryStatusPage({ params }: { params: Promise<{
   const { token } = await params;
   const lead = await getDeliveryLeadByToken(token);
   if (!lead) notFound();
-  return <SiteDeliveryStatus businessName={lead.businessName} agencyName={await agencyNameFor(lead)} status={lead.deliveryStatus} submittedAt={lead.submittedAt} updatedAt={lead.statusUpdatedAt} maskedEmail={maskEmail(lead.email)} />;
+  const agency = await agencyFor(lead);
+  return <SiteDeliveryStatus businessName={lead.businessName} agencyName={agency.name} agencyEmail={agency.email} draftUrl={lead.draftUrl} status={lead.deliveryStatus} submittedAt={lead.submittedAt} updatedAt={lead.statusUpdatedAt} maskedEmail={maskEmail(lead.email)} />;
 }

@@ -35,12 +35,12 @@ describe("Care plan report wording", () => {
   });
 
   it("builds the headline and omits zero parts", () => {
-    expect(careHeadline(facts())).toBe("1 checked change · 1 Request done · 3 h 20 min recorded");
+    expect(careHeadline(facts())).toBe("1 checked change · 1 request done · 3 h 20 min recorded");
     const none = facts();
     none.changes.confirmed = 0; none.requests.doneCount = 0; none.time.minutes = 0;
     expect(careHeadline(none)).toBe("No recorded work this month");
     none.requests.doneCount = 3;
-    expect(careHeadline(none)).toBe("3 Requests done");
+    expect(careHeadline(none)).toBe("3 requests done");
   });
 
   it("reads outcomes when available and says why when not", () => {
