@@ -3,8 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import { z } from "zod";
 import { beginFocusRecovery, type FocusRecovery } from "@/experience/websites/focus-recovery";
-import { StPill, StSurface, StTextButton, StLabel } from "@/components/ui/strelva/Kit";
-import { TextArea, TextInput } from "@/components/ui/TextInput";
+import { XaButton, XaField, XaLabel, XaTextArea } from "@/components/ui/strelva/Xa";
+import x from "@/experience/systems/xa/system-xa.module.css";
 import { InquiryBookingOfferComposer } from "./InquiryBookingOfferComposer";
 import type { WorkspaceReplyOutcome, WorkspaceReplyStatus } from "@/products/inquiries";
 
@@ -54,7 +54,7 @@ export function WorkspaceInquiryReply({ workspaceId, rowId, name, email, booking
     else if (!open && wasOpen.current) openerRef.current?.focus();
     wasOpen.current = open;
   }, [open]);
-  if (!open) return <StPill ref={openerRef} variant="soft" onClick={() => setOpen(true)}>Reply to {name}</StPill>;
+  if (!open) return <div><XaButton ref={openerRef} onClick={() => setOpen(true)}>Reply to {name}</XaButton></div>;
   async function send() {
     if (inFlight.current || settled.current || (!attempt.current && (!subject.trim() || !body.trim()))) return;
     inFlight.current = true;
@@ -87,21 +87,20 @@ export function WorkspaceInquiryReply({ workspaceId, rowId, name, email, booking
     finally { inFlight.current = false; setSaving(false); }
   }
   return (
-    <StSurface tone={outcome ? undefined : "need"} label={`Reply to ${name}`}><div ref={sectionRef} className="grid min-w-0 gap-4">
-      <StLabel>{outcome ? "Reply receipt" : requestId ? "Your reply · checking receipt" : "Your reply · not sent"}</StLabel>
-      <p className="text-sm break-all">To {email}</p>
-      <TextInput className="min-w-0" ref={subjectRef} label="Subject" value={subject} onChange={(event) => { if (!inFlight.current && !attempt.current) setSubject(event.target.value); }} maxLength={200} disabled={saving} readOnly={requestId !== null} />
-      <TextArea className="min-w-0" label={`Your reply to ${name}`} value={body} onChange={(event) => { if (!inFlight.current && !attempt.current) setBody(event.target.value); }} maxLength={5000} disabled={saving} readOnly={requestId !== null} />
+    <section aria-label={`Reply to ${name}`}><div ref={sectionRef} className={x.replyForm}>
+      <XaLabel>{outcome ? "Reply receipt" : requestId ? "Your reply · checking receipt" : "Your reply · not sent"}</XaLabel>
+      <p className={x.note}>To {email}</p>
+      <XaField ref={subjectRef} label="Subject" value={subject} onChange={(event) => { if (!inFlight.current && !attempt.current) setSubject(event.target.value); }} maxLength={200} disabled={saving} readOnly={requestId !== null} />
+      <XaTextArea label={`Your reply to ${name}`} value={body} onChange={(event) => { if (!inFlight.current && !attempt.current) setBody(event.target.value); }} maxLength={5000} disabled={saving} readOnly={requestId !== null} />
       {bookingOffers ? <InquiryBookingOfferComposer workspaceId={workspaceId} rowId={rowId} disabled={saving || requestId !== null} append={text => { if (inFlight.current || attempt.current) return false; const next = body ? `${body}\n\n${text}` : text; if (next.length > 5000) return false; setBody(next); return true; }} /> : null}
-      <p className="text-xs text-gray-muted">{member ? "You can send an ordinary reply for inquiries assigned or routed to you. Prices, dates and promises need the owner’s approval. A sent reply cannot be undone." : "Sending approves this exact message, including any price, date or promise. A sent reply cannot be undone."}</p>
-      {outcome ? <p ref={outcomeRef} tabIndex={-1} role="status" className="text-sm">{REPLY_OUTCOME[outcome.status]}</p> : (
-        <div className="flex flex-wrap gap-3">
-          <StPill ref={checkRef} busy={saving} disabled={saving || (!requestId && (!subject.trim() || !body.trim()))} onClick={() => void send()}>{requestId ? "Check this reply" : member ? "Send reply" : "Approve and send reply"}</StPill>
-          {!requestId ? <StTextButton disabled={saving} onClick={() => { if (!inFlight.current && !attempt.current) setOpen(false); }}>Close draft</StTextButton> : null}
+      <p className={x.quiet}>{member ? "You can send an ordinary reply for inquiries assigned or routed to you. Prices, dates and promises need the owner’s approval. A sent reply cannot be undone." : "Sending approves this exact message, including any price, date or promise. A sent reply cannot be undone."}</p>
+      {outcome ? <p ref={outcomeRef} tabIndex={-1} role="status" className={x.sentence}>{REPLY_OUTCOME[outcome.status]}</p> : (
+        <div className={x.replyRow}>
+          <XaButton ref={checkRef} variant="primary" busy={saving} disabled={saving || (!requestId && (!subject.trim() || !body.trim()))} onClick={() => void send()}>{requestId ? "Check this reply" : member ? "Send reply" : "Approve and send reply"}</XaButton>
+          {!requestId ? <XaButton variant="quiet" disabled={saving} onClick={() => { if (!inFlight.current && !attempt.current) setOpen(false); }}>Close draft</XaButton> : null}
         </div>
       )}
-      {error ? <p role="alert" className="text-sm text-critical">{error}</p> : null}
-      {outcome?.providerMessageId ? <p className="text-xs text-gray-muted break-all">Provider receipt: {outcome.providerMessageId}</p> : null}
-    </div></StSurface>
+      {error ? <p role="alert" className={x.sentence} data-tone="waits">{error}</p> : null}
+    </div></section>
   );
 }

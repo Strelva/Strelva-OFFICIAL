@@ -1,7 +1,8 @@
 "use client";
 import { actorLabel } from "@/platform/presentation/actor";
 import { useEffect, useState, type ReactNode } from "react";
-import { StPage, StSection, StRows, StRow, StState, StSurface, StNotice, StEmpty, StSkeleton, StPill, StMono } from "@/components/ui/strelva/Kit";
+import { StPage, StSection, StRows, StRow, StState, StNotice, StEmpty, StSkeleton, StPill, StMono } from "@/components/ui/strelva/Kit";
+import { XaPage } from "@/components/ui/strelva/Xa";
 import { TextInput, TextArea, SelectInput } from "@/components/ui/TextInput";
 import type { InquirySystemDetail } from "@/products/inquiries";
 
@@ -10,14 +11,14 @@ export function InquirySystemDetailView({ details, records }: { details: Inquiry
     <>{details.map(detail => <StSection key={detail.site} title={`The form on ${detail.site}`}>
       <p className="flex flex-wrap gap-2 text-sm text-gray-muted" role="status">{detail.formSource ? null : <StState kind={detail.lifecycle === "live" ? "live" : "draft"}>{detail.lifecycle === "live" ? "Live" : detail.lifecycle === "paused" ? "Paused" : "Draft"}</StState>}{detail.health}</p>
       {detail.lifecycle === "paused" ? <StNotice>New inquiries are kept. Replies and follow-ups are paused.</StNotice> : null}
-      {detail.formSource || detail.unavailable ? null : detail.forms.length ? detail.forms.map(form => <StSurface key={form.capabilityId} label={form.form.title}>
+      {detail.formSource || detail.unavailable ? null : detail.forms.length ? detail.forms.map(form => <XaPage flat key={form.capabilityId} address={detail.site} label={form.form.title}>
         <form className="grid gap-4" aria-label={`${form.form.title}, viewing copy`} onSubmit={event => event.preventDefault()}>
           <h3 className="text-base font-medium">{form.form.title}</h3><p className="text-sm text-gray-muted">{form.form.intro}</p>
-          <fieldset disabled className="grid gap-4"><legend className="mb-4 text-xs text-gray-muted">A viewing copy of the published form. Messages are sent from the site.</legend>{form.form.fields.map(field => <label key={field.id} className="grid gap-2 text-sm">{field.label}{field.required ? " (required)" : ""}
+          <fieldset disabled className="grid gap-4"><legend className="mb-4 text-xs text-gray-muted">{detail.lifecycle === "draft" ? "A viewing copy of the draft form. Nothing is sent until it is live." : "A viewing copy of the published form. Messages are sent from the site."}</legend>{form.form.fields.map(field => <label key={field.id} className="grid gap-2 text-sm">{field.label}{field.required ? " (required)" : ""}
             {field.kind === "select" ? <SelectInput defaultValue="" options={[{ value: "", label: "Choose an option" }, ...(field.options ?? []).map(option => ({ value: option, label: option }))]} /> : field.kind === "textarea" ? <TextArea placeholder={field.placeholder} /> : <TextInput type={field.kind === "phone" ? "tel" : field.kind === "email" || field.kind === "date" ? field.kind : "text"} placeholder={field.placeholder} />}
           </label>)}</fieldset><p className="text-xs text-gray-muted">{detail.handlerActors?.[form.capabilityId] ? `Handled by ${actorLabel(detail.handlerActors[form.capabilityId])}.` : actorLabel(null)}</p>
         </form>
-      </StSurface>) : <StEmpty>No published form is recorded here yet. Incoming site inquiries still appear below.</StEmpty>}
+      </XaPage>) : <StEmpty>No published form is recorded here yet. Incoming site inquiries still appear below.</StEmpty>}
     </StSection>)}</>
     {records}
     <>{details.map(detail => <details key={detail.site} className="border-t border-gray-border pt-4">

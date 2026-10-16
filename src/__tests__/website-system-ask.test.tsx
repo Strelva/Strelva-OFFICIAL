@@ -68,7 +68,7 @@ describe("Ask for a change on a managed website files a Request", () => {
     expect(links.length).toBe(1);
     expect(node.querySelector("ul[aria-label='Requests']")).toBeNull();
     await act(async () => links[0]!.click());
-    expect(node.querySelector("textarea")).not.toBeNull();
+    expect(node.querySelector("aside textarea")).not.toBeNull();
     expect(onAsk).not.toHaveBeenCalled();
   });
 
@@ -91,21 +91,21 @@ describe("Ask for a change on a managed website files a Request", () => {
     const { node, onAsk } = await mount(server(() => new Response("{}", { status: 500 })) as unknown as typeof fetch, site);
     await act(async () => buttons(node, "Ask for a change")[0]!.click());
     expect(onAsk).toHaveBeenCalledWith("About attymooney.com: ");
-    expect(node.querySelector("textarea")).toBeNull();
+    expect(node.querySelector("aside textarea")).toBeNull();
     const readOnly = await mount(server(() => new Response("{}", { status: 500 })) as unknown as typeof fetch, managed, true);
     expect(buttons(readOnly.node, "Ask for a change").every(item => item.disabled)).toBe(true);
   });
   it("opens Ask Strelva with the website scope and preserves the words without filing or approving a change", async () => {
     const request = server(() => new Response("{}", { status: 500 }));
     const { node, onAsk } = await mount(request as unknown as typeof fetch, managed);
-    const field = node.querySelector<HTMLInputElement>('input[aria-label="Ask Strelva"]')!;
-    expect(field.placeholder).toBe("Ask about attymooney.com");
-    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!;
+    const field = node.querySelector<HTMLTextAreaElement>("[data-st-composer-dock] textarea")!;
+    expect(field.placeholder).toBe("Ask for a change to attymooney.com");
+    const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")!.set!;
     await act(async () => { setter.call(field, "yes"); field.dispatchEvent(new Event("input", { bubbles: true })); });
     await act(async () => field.form!.requestSubmit());
     expect(onAsk).toHaveBeenCalledExactlyOnceWith("About attymooney.com: yes");
     expect(field.value).toBe("yes");
     expect(request.mock.calls.some(([url]) => url === "/api/workspace/site-changes")).toBe(false);
-    expect(node.querySelector("textarea")).toBeNull();
+    expect(node.querySelector("aside textarea")).toBeNull();
   });
 });

@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { StPage, StHead, StPill, StSkeleton } from "@/components/ui/strelva/Kit";
+import { XaButton, XaEmpty } from "@/components/ui/strelva/Xa";
 import { WorkspaceInquiries } from "./WorkspaceInquiries";
 import { InquirySystemDetails } from "./InquirySystemDetails";
 import type { WorkspaceLeads } from "@/products/inquiries";
@@ -25,7 +25,7 @@ export function WorkspaceInquirySystem({ workspaceId }: { workspaceId: string })
   // A business switch must hide the previous records and any open reply
   // before the next fetch completes, including its loading and error states.
   const state = loaded?.workspaceId === workspaceId ? loaded.state : null;
-  if (!state) return <StPage><StHead title="Inquiries" meta="Opening inquiries…" /><StSkeleton label="Opening inquiries" /><StSkeleton width="70%" /></StPage>;
-  const records = <><WorkspaceInquiries key={workspaceId} workspaceId={workspaceId} state={state} embedded />{state.kind === "error" ? <div className="px-6 pb-6"><StPill variant="soft" onClick={() => { setLoaded(null); setRetry(value => value + 1); }}>Try again</StPill></div> : null}</>;
+  if (!state) return <div aria-busy="true"><XaEmpty size="sm" pose="alone" title="Opening inquiries…" job="Pebble is reading everyone who reached out" /></div>;
+  const records = <><WorkspaceInquiries key={workspaceId} workspaceId={workspaceId} state={state} embedded head={false} />{state.kind === "error" ? <div><XaButton onClick={() => { setLoaded(null); setRetry(value => value + 1); }}>Try again</XaButton></div> : null}</>;
   return state.kind === "ready" ? <InquirySystemDetails key={workspaceId} workspaceId={workspaceId} records={records} /> : records;
 }

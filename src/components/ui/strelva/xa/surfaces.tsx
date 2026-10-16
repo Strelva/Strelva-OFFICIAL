@@ -16,8 +16,8 @@ import styles from "./xa.module.css";
 /* ---------- Page ---------- */
 
 /** A page the way its visitors see it: the address, then the content. */
-export function XaPage({ address, title, children, replaces, flat = false, label }: { address: string; title?: ReactNode; children?: ReactNode; replaces?: ReactNode; flat?: boolean; label?: string }) {
-  return <figure className={styles.page} data-flat={flat || undefined} aria-label={label ?? `${address}, as visitors see it`} style={{ margin: 0 }}>
+export function XaPage({ address, title, children, replaces, flat = false, bleed = false, label }: { address: string; title?: ReactNode; children?: ReactNode; replaces?: ReactNode; flat?: boolean; /** The body holds a live frame edge to edge (XA · S1, S5). */ bleed?: boolean; label?: string }) {
+  return <figure className={styles.page} data-flat={flat || undefined} data-bleed={bleed || undefined} aria-label={label ?? `${address}, as visitors see it`} style={{ margin: 0 }}>
     <div className={styles.pageAddress}><Lock size={12} aria-hidden="true" /><span>{address}</span></div>
     <div className={styles.pageBody}>
       {title ? <p className={styles.pageTitle}>{title}</p> : null}

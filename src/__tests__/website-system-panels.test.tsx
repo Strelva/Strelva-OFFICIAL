@@ -53,7 +53,7 @@ describe("website System page: domains, Waiting on you, Requests and History", (
     const page = html({ readOnly: true, websiteDetail: { status: "ready", detail: previewWebsiteDetail(SITE, "empty") } });
     const node = document.createElement("div");node.innerHTML = page;
     expect([...node.querySelectorAll("button")].find(button => button.textContent === "Ask for a change")?.disabled).toBe(true);
-    expect(node.querySelector<HTMLInputElement>('input[aria-label="Ask Strelva"]')?.disabled).toBe(true);
+    expect(node.querySelector<HTMLTextAreaElement>("[data-st-composer-dock] textarea")?.disabled).toBe(true);
   });
   it.each(["unavailable", "unassigned"] as const)("omits missing agency identity (%s) while keeping recorded attribution", status => {
     const detail = { status: "ready", detail: previewWebsiteDetail(SITE, "empty") } as const;
