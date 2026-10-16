@@ -11,12 +11,14 @@
  * checked. DM Sans with tabular figures; never monospace. Light only.
  *
  * Like E3 it opens with Pebble and the client's Systems (a PNG, since mail
- * clients drop webp), then the month's one number, the agency's note, what
- * changed with only the exceptions marked, and one sentence of site checks.
+ * clients drop webp), then one sentence for the month (lane results, October
+ * 16: no hero number), the one change that mattered credited to the agency
+ * with a link to see it, what else changed with only the exceptions marked,
+ * and one sentence of site checks.
  */
 import { escapeEmailHtml as e } from "@/platform/infra/email/escape";
 import type { CareReportFacts } from "./contracts";
-import { careCheckException, careHeadline, careMonthLabel, careOutcomeLine, careReleaseLabel, careShortDate, careSiteCheckSentence, careTimeLabel } from "./model";
+import { careCheckException, careLead, careMattered, careMonthLabel, careOutcomeLine, careReleaseLabel, careShortDate, careSiteCheckSentence, careTimeLabel } from "./model";
 
 const X = {
   canvas: "#edece7", surface: "#ffffff", line: "#e6e5e0", text: "#161715", body: "#3a3c38", muted: "#6b6f68", faint: "#81847d",
@@ -35,8 +37,8 @@ export interface CareReportMailInput {
   agencyNote?: string | null;
 }
 
-/** Pebble and the Systems, as a PNG served next to the app (public/xa/email). */
-export const CARE_REPORT_MAIL_ART = "/xa/email/pebble-lineup.png";
+/** Pebble and the Systems, as a PNG served next to the app (public/xa/email-lineup.png, 520 x 162). */
+export const CARE_REPORT_MAIL_ART = "/xa/email-lineup.png";
 
 export interface CareReportMail { subject: string; preheader: string; html: string; text: string }
 
@@ -57,10 +59,14 @@ export function renderCareReportMail(input: CareReportMailInput): CareReportMail
   const { facts, agencyName, businessName } = input;
   const label = careMonthLabel(facts.month);
   const subject = careReportMailSubject(agencyName, businessName, facts.month);
-  const preheader = careHeadline(facts);
-  const changes = facts.changes.items.slice(0, 6);
-  const more = facts.changes.items.length - changes.length;
   const note = input.agencyNote?.trim();
+  const lead = careLead(facts, agencyName, businessName);
+  const preheader = lead.text;
+  const mattered = careMattered(facts, agencyName, note);
+  // Without a note the newest change is the one that mattered; it is not listed twice.
+  const others = note ? facts.changes.items : [...facts.changes.items].sort((a, b) => b.at.localeCompare(a.at)).slice(1);
+  const changes = others.slice(0, 6);
+  const more = others.length - changes.length;
   const timeLine = facts.time.minutes > 0 ? `${agencyName} recorded ${careTimeLabel(facts.time.minutes)} of work for ${businessName}.` : null;
   const doneLine = facts.requests.doneCount > 0 ? `${facts.requests.doneCount} ${facts.requests.doneCount === 1 ? "Request" : "Requests"} done: ${facts.requests.done.slice(0, 3).map(item => item.request).join("; ")}${facts.requests.done.length > 3 ? "; and more" : ""}.` : null;
 
@@ -76,13 +82,12 @@ export function renderCareReportMail(input: CareReportMailInput): CareReportMail
   const checks = careSiteCheckSentence(facts.siteChecks, businessName);
 
   const card = [
-    `<p style="margin:0;text-align:center;"><img src="${art}" width="240" height="131" alt="Pebble and ${e(businessName)}'s Systems" style="display:inline-block;width:240px;height:auto;border:0;"></p>`,
+    `<p style="margin:0;text-align:center;"><img src="${art}" width="260" height="81" alt="Pebble and ${e(businessName)}'s Systems" style="display:inline-block;width:260px;max-width:100%;height:auto;border:0;"></p>`,
     `<p style="margin:20px 0 0;font-size:14px;line-height:20px;color:${X.faint};">${e(label)} · ${e(careReleaseLabel(input.release))}</p>`,
-    table(`<tr><td valign="middle" style="padding:20px 18px 0 0;width:1%;font-size:64px;line-height:64px;font-weight:300;letter-spacing:-2px;color:${X.text};font-variant-numeric:tabular-nums;white-space:nowrap;">${facts.changes.total}</td>
-      <td valign="middle" style="padding-top:20px;"><p style="margin:0;font-size:18px;line-height:24px;color:${X.text};">${facts.changes.total === 1 ? "change made" : "changes made"} for ${e(businessName)}</p><p style="margin:4px 0 0;font-size:14px;line-height:20px;color:${X.muted};">${e(preheader)}</p></td></tr>`),
-    note ? `<p style="margin:24px 0 0;padding:16px 0;border-top:1px solid ${X.line};border-bottom:1px solid ${X.line};font-size:15px;line-height:22px;color:${X.body};"><b style="font-weight:600;color:${X.text};">${e(agencyName)}</b> ${e(note)}</p>` : "",
-    `<p style="margin:24px 0 0;font-size:13px;line-height:18px;font-weight:500;color:${X.faint};">What changed</p>`,
-    changes.length ? table(rows, "margin-top:4px;") : `<p style="margin:8px 0 0;font-size:15px;line-height:22px;color:${X.muted};">Nothing changed this month.</p>`,
+    `<p style="margin:12px 0 0;font-size:22px;line-height:30px;font-weight:500;letter-spacing:-0.3px;color:${X.text};">${e(lead.text)}${lead.quiet ? `<span style="color:${X.muted};"> ${e(lead.quiet)}</span>` : ""}</p>`,
+    mattered ? `<div style="margin:24px 0 0;padding-top:18px;border-top:1px solid ${X.line};"><p style="margin:0 0 6px;font-size:13px;line-height:18px;font-weight:500;color:${X.faint};">The change that mattered</p><p style="margin:0;font-size:16px;line-height:24px;color:${X.text};">${e(mattered.text)}${mattered.at ? `<span style="color:${X.faint};"> · ${e(careShortDate(mattered.at))}</span>` : ""} <a href="${safeUrl(input.link)}" style="color:${X.moss};font-weight:600;text-decoration:none;">See it</a></p></div>` : "",
+    changes.length ? `<p style="margin:24px 0 0;font-size:13px;line-height:18px;font-weight:500;color:${X.faint};">${mattered ? "Also changed" : "What changed"}</p>` : "",
+    changes.length ? table(rows, "margin-top:4px;") : mattered ? "" : `<p style="margin:24px 0 0;font-size:15px;line-height:22px;color:${X.muted};">Nothing changed this month.</p>`,
     more > 0 ? `<p style="margin:6px 0 0;font-size:14px;line-height:20px;color:${X.muted};">And ${more} more in the report.</p>` : "",
     doneLine ? `<p style="margin:16px 0 0;font-size:15px;line-height:22px;color:${X.body};">${e(doneLine)}</p>` : "",
     `<p style="margin:12px 0 0;font-size:15px;line-height:22px;color:${X.body};">${e(checks)}</p>`,
@@ -97,7 +102,7 @@ export function renderCareReportMail(input: CareReportMailInput): CareReportMail
 ${table(`<tr><td align="center" style="padding:32px 16px;">
   <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="max-width:640px;border-collapse:collapse;">
     <tr><td style="padding:0 4px 20px;"><p style="margin:0;font-size:24px;line-height:30px;font-weight:600;letter-spacing:-0.4px;color:${X.text};">${e(businessName)}, ${e(label)}</p><p style="margin:6px 0 0;font-size:14px;line-height:20px;color:${X.muted};">${e(agencyName)} · Runs on Strelva</p></td></tr>
-    <tr><td style="padding:36px 40px 40px;background:${X.surface};border-radius:24px;">${card}</td></tr>
+    <tr><td style="padding:36px 40px 40px;background:${X.surface};border-radius:16px;">${card}</td></tr>
     <tr><td align="center" style="padding:20px 8px 0;font-size:13px;line-height:19px;color:${X.faint};">${e(agencyName)} sent this when it shared ${e(careReleaseLabel(input.release))} of ${e(businessName)}'s report. ${e(agencyName)} runs ${e(businessName)}'s website with Strelva.</td></tr>
   </table>
 </td></tr>`)}
@@ -107,11 +112,10 @@ ${table(`<tr><td align="center" style="padding:32px 16px;">
     `${businessName}, ${label}`,
     `${agencyName} · Runs on Strelva`,
     "",
-    `${facts.changes.total} ${facts.changes.total === 1 ? "change" : "changes"} made. ${preheader}.`,
-    note ? `\n${agencyName}: ${note}` : "",
+    lead.quiet ? `${lead.text} ${lead.quiet}` : lead.text,
+    mattered ? `\nThe change that mattered\n${mattered.text}${mattered.at ? ` (${careShortDate(mattered.at)})` : ""}\nSee it: ${input.link}` : "",
     "",
-    "What changed",
-    ...(changes.length ? changes.map(item => `${careShortDate(item.at)}  ${item.summary || item.systemName}${careCheckException(item.check) ? `  (${careCheckException(item.check)})` : ""}`) : ["Nothing changed this month."]),
+    ...(changes.length ? [mattered ? "Also changed" : "What changed", ...changes.map(item => `${careShortDate(item.at)}  ${item.summary || item.systemName}${careCheckException(item.check) ? `  (${careCheckException(item.check)})` : ""}`)] : mattered ? [] : ["Nothing changed this month."]),
     more > 0 ? `And ${more} more in the report.` : "",
     doneLine ?? "",
     checks,

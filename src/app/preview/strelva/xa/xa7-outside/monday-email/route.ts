@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 export async function GET(request: Request) {
   if (!strelvaUiPreviewEnabled()) return new Response("Not found", { status: 404 });
   const url = new URL(request.url);
-  const mail = e3Mail(url.searchParams.get("state") ?? "ready", url.origin);
+  const mail = e3Mail(url.searchParams.get("state") ?? "ready");
   if (url.searchParams.get("format") === "text") return new Response(renderXaMailText(mail), { headers: { "Content-Type": "text/plain; charset=utf-8", "X-Robots-Tag": "noindex" } });
   return new Response(renderXaMailHtml(mail), { headers: { "Content-Type": "text/html; charset=utf-8", "X-Robots-Tag": "noindex", "Cache-Control": "no-store" } });
 }

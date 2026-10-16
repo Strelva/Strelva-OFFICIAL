@@ -20,7 +20,11 @@ export type PaperBlock =
   /** XA · E3: Pebble and the Systems at the top. Decorative; `src` is an absolute https URL. */
   | { kind: "clay"; src: string; width: number; height: number }
   /** XA · E3 "What changed": a date, what happened, and whoever acted. */
-  | { kind: "changes"; rows: readonly { date: string; text: string; who: string }[] };
+  | { kind: "changes"; rows: readonly { date: string; text: string; who: string }[] }
+  /** The one sentence a report leads with (replaces a hero figure): ink, then one quiet clause with a different fact. */
+  | { kind: "lead"; text: string; quiet?: string }
+  /** The one change that mattered: a label, the sentence naming whoever acted, when, and a text link to see it. */
+  | { kind: "change"; label: string; text: string; date?: string; link?: PaperAction };
 
 /** Presentation only. URLs are supplied by existing issuance/authorization paths.
  * Rendering never creates a signed link, claims an item or sends mail. */
@@ -72,6 +76,8 @@ function block(b: PaperBlock): string {
     case "draft": return table(`<tr><td style="padding:16px;background:${b.surface ? t.surface : t.inset};border-radius:12px;${b.surface ? `border:1px solid ${t.line};` : ""}">${label(b.label)}${text(b.text)}${b.note ? `<p style="margin:8px 0 0;font-size:12px;line-height:18px;color:${t.faint};">${e(b.note)}</p>` : ""}</td></tr>`);
     case "rows": return table(b.rows.map(r => `<tr><td style="padding:12px 16px;border-bottom:1px solid ${t.line};font-size:14px;line-height:20px;color:${t.muted};">${e(r.label)}</td><td align="right" style="padding:12px 16px;border-bottom:1px solid ${t.line};font-size:13px;line-height:20px;color:${r.tone ? t[r.tone] : t.text};overflow-wrap:anywhere;">${e(r.value)}</td></tr>`).join(""), `border-top:1px solid ${t.line};`);
     case "clay": return `<img src="${url(b.src)}" alt="" width="${b.width}" height="${b.height}" style="display:block;width:${b.width}px;max-width:100%;height:auto;border:0;">`;
+    case "lead": return `<p style="margin:0;font-size:22px;line-height:30px;font-weight:500;letter-spacing:-0.3px;color:${t.text};overflow-wrap:anywhere;">${e(b.text)}${b.quiet ? `<span style="color:${t.muted};"> ${e(b.quiet)}</span>` : ""}</p>`;
+    case "change": return `${label(b.label)}<p style="margin:0;font-size:16px;line-height:24px;color:${t.text};overflow-wrap:anywhere;">${e(b.text)}${b.date ? `<span style="color:${t.faint};"> · ${e(b.date)}</span>` : ""}${b.link ? ` <a href="${url(b.link.url)}" style="color:${t.text};font-weight:600;text-decoration:underline;">${e(b.link.label)}</a>` : ""}</p>`;
     case "changes": return table(b.rows.map(r => `<tr><td valign="top" width="64" style="padding:8px 12px 8px 0;font-size:14px;line-height:21px;color:${t.faint};white-space:nowrap;">${e(r.date)}</td><td valign="top" style="padding:8px 12px 8px 0;font-size:15px;line-height:21px;color:${t.text};overflow-wrap:anywhere;">${e(r.text)}</td><td valign="top" align="right" style="padding:8px 0;font-size:13px;line-height:21px;color:${t.muted};white-space:nowrap;">${e(r.who)}</td></tr>`).join(""));
     case "metrics": return table(b.rows.map(r => `<tr><td width="76" valign="top" style="padding:12px 16px 12px 0;border-bottom:1px solid ${t.line};font-family:${t.font};font-size:28px;line-height:32px;font-weight:300;">${e(r.value)}</td><td style="padding:12px 0;border-bottom:1px solid ${t.line};font-size:15px;line-height:22px;">${e(r.label)}${r.note ? `<div style="font-size:12px;line-height:18px;color:${t.faint};">${e(r.note)}</div>` : ""}</td></tr>`).join(""));
     case "decision": return table(`<tr><td style="padding:0 0 16px;border-bottom:1px solid ${t.line};">${label(`●  ${b.category}`)}<h2 style="margin:0 0 6px;font-size:16px;font-weight:600;line-height:24px;">${e(b.title)}</h2>${text(b.detail, true)}<div style="height:8px;"></div>${actions(b.actions)}</td></tr>`);
@@ -111,6 +117,8 @@ export function renderPaperEmailText(email: PaperEmail): string {
       case "figure": lines.push(`${b.value} ${b.label}`, b.note ?? ""); break;
       case "clay": break;
       case "changes": lines.push(...b.rows.map(r => `${r.date}  ${r.text}${r.who ? ` (${r.who})` : ""}`)); break;
+      case "lead": lines.push(b.quiet ? `${b.text} ${b.quiet}` : b.text); break;
+      case "change": lines.push(b.label, `${b.text}${b.date ? ` (${b.date})` : ""}`, ...(b.link ? [`${b.link.label}: ${b.link.url}`] : [])); break;
     }
     lines.push("");
   }

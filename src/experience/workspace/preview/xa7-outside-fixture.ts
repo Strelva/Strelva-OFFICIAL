@@ -11,7 +11,7 @@ import { parseStoreBooking } from "@/platform/bookings/store";
 import { publicIntakeForm, type PublicIntakeForm } from "@/products/vertical-intake/contracts";
 import { DENTAL_INTAKE } from "@/products/vertical-intake/definitions/dental";
 import { mondayEmail, waitsForYouEmail, type XaMail } from "@/platform/infra/email/xa-mail";
-import { XA_HARBOR, XA_SYSTEMS } from "./xa-day";
+import { XA_HARBOR, XA_SYSTEM_HREFS, XA_SYSTEMS } from "./xa-day";
 
 export const XA7_BASE = "/preview/strelva/xa/xa7-outside";
 export const HARBOR = { business: XA_HARBOR.name, owner: XA_HARBOR.ownerShort, ownerFull: XA_HARBOR.owner, site: XA_HARBOR.domain, address: XA_HARBOR.address, phone: "(716) 555-0142", timeZone: "America/New_York" } as const;
@@ -33,17 +33,18 @@ export function e1Mail(state: string): XaMail {
 
 /* ---------- E3 · Monday email (template only) ---------- */
 
-export function e3Mail(state: string, origin: string): XaMail {
+/** The Monday of the one fixture day (Nov 23) reports the week before it. Thanksgiving still waits on Dr. Lin, so it is not a change yet. */
+export function e3Mail(state: string): XaMail {
   return mondayEmail({
-    business: HARBOR.business, agencyName: "North Studio", period: "Nov 9–15", weekOf: "Week of Nov 9",
+    business: HARBOR.business, agencyName: "North Studio", period: "Nov 16–22", weekOf: "Week of Nov 16",
     figure: { value: 14, label: "visits booked online", detail: "3 new patients · 11 returning · nothing went down" },
     changes: state === "quiet" ? [] : [
-      { date: "Nov 10", text: "Closed for Thanksgiving, Nov\u00a026–27", who: "You said yes" },
-      { date: "Nov 12", text: "Fixed the map link on the contact page", who: "Strelva" },
-      { date: "Nov 13", text: "New-patient form asks for the insurance member ID", who: "You said yes" },
+      { date: "Nov 20", text: "The Book a visit button moved to the top of the home page", who: "Maya at North Studio" },
+      { date: "Nov 18", text: "Fixed the map link on the contact page", who: "Strelva" },
+      { date: "Nov 19", text: "Added Delta Dental PPO to the insurance list", who: "Maya at North Studio" },
     ],
     checks: `Every check on ${HARBOR.site} passed. Your Services page was the slowest at 1.4 seconds.`,
-    artUrl: `${origin}/xa/pose-alone.webp`,
+    seeUrl: XA_SYSTEM_HREFS.website,
     open: { label: "Open Harbor Dental", url: `${XA7_BASE}/today-phone` },
     settingsUrl: `${XA7_BASE}/monday-email?state=settings`,
   });

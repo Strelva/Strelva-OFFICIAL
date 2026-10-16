@@ -38,5 +38,5 @@ export default async function DeliveryStatusPage({ params }: { params: Promise<{
   const { token } = await params;
   const lead = await getDeliveryLeadByToken(token);
   if (!lead) notFound();
-  return <SiteDeliveryStatus businessName={lead.businessName} agencyName={await agencyNameFor(lead)} status={lead.deliveryStatus} submittedAt={lead.submittedAt} maskedEmail={maskEmail(lead.email)} />;
+  return <SiteDeliveryStatus businessName={lead.businessName} agencyName={await agencyNameFor(lead)} status={lead.deliveryStatus} submittedAt={lead.submittedAt} updatedAt={lead.statusUpdatedAt} maskedEmail={maskEmail(lead.email)} />;
 }

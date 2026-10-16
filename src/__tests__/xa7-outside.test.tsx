@@ -118,16 +118,23 @@ describe("XA · E1 and E3 emails (templates only)", () => {
     expect(html).toContain("This is ready for Harbor Dental.");
     expect(html).not.toContain("prepared this");
   });
-  it("E3 leads with one number, names who acted on each change, and says a quiet week plainly", () => {
-    const html = renderXaMailHtml(e3Mail("ready", "https://app.example.test"));
-    expect(html).toContain(">14<");
-    expect(html).toContain("You said yes");
+  it("E3 leads with one sentence and the one change that mattered, names who acted, and says a quiet week plainly", () => {
+    const html = renderXaMailHtml(e3Mail("ready"));
+    expect(html).toContain("14 visits booked online this week.");
+    expect(html).toContain("3 new patients, 11 returning, nothing went down.");
+    expect(html).toContain("The change that mattered");
+    expect(html).toContain("The Book a visit button moved to the top of the home page");
+    expect(html).toContain(" · Maya at North Studio, Nov 20");
+    expect(html).toMatch(/href="\/preview\/strelva\/xa\/xa4-systems\/website"[^>]*>See it</);
+    expect(html).toContain("Also changed");
     expect(html).toContain(">Strelva<");
+    // No hero figure and no clay beside it.
+    expect(html).not.toContain("font-size:64px");
+    expect(html).not.toMatch(/pose-[a-z]+\.webp/);
     expect(html).toContain("This comes every Monday. North Studio runs Harbor Dental&#39;s website with Strelva.");
     expect(html).toContain("Every check on harbordental.com passed. Your Services page was the slowest at 1.4 seconds.");
-    expect(html).toMatch(/pose-alone\.webp" alt="Pebble with this week&#39;s number for Harbor Dental" width="64"[^>]*><\/td><td[^>]*>14</);
     expect(clean(html)).toEqual([]);
-    expect(renderXaMailHtml(e3Mail("quiet", "https://app.example.test"))).toContain("Nothing changed this week.");
+    expect(renderXaMailHtml(e3Mail("quiet"))).toContain("Nothing changed this week.");
     expect(mondayEmail({ business: "Harbor Dental", period: "Nov 9–15", weekOf: "Week of Nov 9", figure: { value: 2016, label: "checks passed" }, changes: [], open: { label: "Open", url: "/x" }, settingsUrl: "/s" }).subject).toBe("Harbor Dental, week of Nov 9: 2,016 checks passed");
   });
   it("refuses an active URL scheme", () => {

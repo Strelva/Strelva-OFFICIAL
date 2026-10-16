@@ -1,5 +1,6 @@
-/* Recaps in XA (lane xs-leads). One saved recap reads like the Monday email
-   (XA · E3): clays, period, one big number, Pebble's idea, what came of it in sentences, what changed. */
+/* Recaps in XA (lane results, October 16). One saved recap: the period, one
+   sentence, the one change that mattered, Pebble's idea, what came of it in
+   sentences, then anything else that changed. No hero number. */
 .recap { display: flex; min-width: 0; max-width: 640px; flex-direction: column; gap: 22px; }
 .recapTitle { margin: 0; font-size: 26px; font-weight: 600; letter-spacing: -0.5px; line-height: 1.2; }
 .summary { margin: 0; color: var(--st-text-2); font-size: 17px; line-height: 1.45; }

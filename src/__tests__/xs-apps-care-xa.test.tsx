@@ -5,7 +5,9 @@ import { act, createElement, type ReactElement } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { PREVIEW_FACTS, PREVIEW_NOTE, PREVIEW_BRAND, PREVIEW_SNAPSHOT, PREVIEW_RELEASES } from "@/experience/care-reports/preview-fixture";
 import { CARE_REPORT_MAIL_ART, renderCareReportMail } from "@/platform/care-reports/mail";
-import { careCheckException, careSiteCheckSentence } from "@/platform/care-reports/model";
+import { careCheckException, careLead, careMattered, careSiteCheckSentence } from "@/platform/care-reports/model";
+import { existsSync } from "node:fs";
+import { join } from "node:path";
 import { CareReportDocument } from "@/experience/care-reports/CareReportDocument";
 import { SiteDeliveryStatus } from "@/experience/operations/SiteDeliveryStatus";
 import { DeliveryCommitmentPanel, deliverySentence } from "@/experience/operations/DeliveryCommitmentPanel";
@@ -39,6 +41,26 @@ describe("Care plan report email (XA · E3, template only)", () => {
     expect(text).toContain(PREVIEW_NOTE);
     expect(html).toContain("Open the report");
   });
+  it("serves its Pebble art from a file that exists (no 404) and leads with one sentence, not a hero number", () => {
+    expect(existsSync(join(process.cwd(), "public", CARE_REPORT_MAIL_ART))).toBe(true);
+    const { html, text, preheader } = mail();
+    expect(html).not.toContain("font-size:64px");
+    expect(html).toContain("North Studio made 3 changes for Harbor Dental in September.");
+    expect(preheader).toBe("North Studio made 3 changes for Harbor Dental in September.");
+    expect(html).toContain("The change that mattered");
+    expect(html).toContain(`North Studio: ${PREVIEW_NOTE}`);
+    expect(html).toMatch(/href="https:\/\/app\.example\.test\/r"[^>]*>See it</);
+    expect(text).toContain("See it: https://app.example.test/r");
+  });
+  it("words the lead and the change that mattered from the facts, crediting the agency", () => {
+    const facts = { month: "2026-09", changes: { total: 3, confirmed: 2, notConfirmed: 0, notChecked: 1, items: PREVIEW_FACTS.changes.items }, requests: { doneCount: 2, openCount: 1, askedCount: 3, done: [] } };
+    expect(careLead(facts, "North Studio", "Harbor Dental")).toEqual({ text: "North Studio made 3 changes for Harbor Dental in September.", quiet: "2 were checked on the live site." });
+    expect(careLead({ ...facts, changes: { ...facts.changes, total: 0, confirmed: 0, items: [] } }, "North Studio", "Harbor Dental")).toEqual({ text: "North Studio finished 2 Requests for Harbor Dental in September.", quiet: "No Systems changed." });
+    expect(careLead({ ...facts, changes: { ...facts.changes, total: 0, confirmed: 0, items: [] }, requests: { ...facts.requests, doneCount: 0 } }, "North Studio", "Harbor Dental").text).toBe("No recorded work for Harbor Dental in September.");
+    expect(careMattered(facts, "North Studio", "  We fixed the hours. ")).toEqual({ text: "North Studio: We fixed the hours." });
+    expect(careMattered({ changes: { ...facts.changes, items: [] } }, "North Studio", null)).toBeNull();
+    expect(careMattered(facts, "North Studio", null)?.text).toMatch(/^North Studio: /);
+  });
   it("marks only the exception on a change and says the site checks in one sentence", () => {
     const { html, text } = mail();
     expect(html).not.toContain("Checked live");
@@ -67,7 +89,8 @@ describe("Care plan report page", () => {
     expect(page).not.toContain("Checked on the live site");
     expect(page).not.toMatch(/Ask Strelva and drafting|Strelva assistant|Release 6|Release 7|Release 8|harbordental\.example/);
     expect(page).toContain("harbordental.com passed all 30 checks.");
-    expect(page).toContain("/xa/pose-lineup.webp");
+    expect(page).not.toContain("/xa/pose-lineup.webp");
+    expect(page).toContain("The change that mattered");
   });
   it("lists only truly earlier releases, in sentence case, and credits the agency once on the shared page", () => {
     const page = html("shared");
@@ -95,11 +118,21 @@ describe("Hired work names who acts", () => {
     expect(deliverySentence(proposed, item, "business", Date.now(), { agency: "North Studio" })).toBe("North Studio sent the scope. It waits for your yes.");
   });
 
+  it("says where a website request is in one sentence and the last move, with no order-tracker steps", () => {
+    const html = renderToStaticMarkup(createElement(SiteDeliveryStatus, { businessName: "Harbor Dental", status: "owner_review", submittedAt: "2026-11-09T15:00:00Z", updatedAt: "2026-11-18T19:30:00Z", maskedEmail: "am**@harbordental.com", agencyName: "North Studio" }));
+    expect(html).toContain("The draft is ready for you to look at.");
+    expect(html).toContain("North Studio finished the draft on Nov 18. Nothing is published before you say yes.");
+    expect(html).not.toMatch(/Request received|Checking it&#x27;s a fit|Ready to launch/);
+    const received = renderToStaticMarkup(createElement(SiteDeliveryStatus, { businessName: "Harbor Dental", status: "received", submittedAt: "2026-11-09T15:00:00Z", maskedEmail: "am**@harbordental.com", agencyName: null }));
+    expect(received).toContain("You sent the request on Nov 9.");
+    expect(received).toContain("Your agency has your request and reads it next.");
+  });
   it("names the agency on the no-account status page and stays neutral when it can't", () => {
     const named = renderToStaticMarkup(createElement(SiteDeliveryStatus, { businessName: "Harbor Dental", status: "drafting", submittedAt: "2026-10-09T15:00:00Z", maskedEmail: "am**@harbordental.com", agencyName: "North Studio" }));
     expect(named).toContain("North Studio");
     expect(named).toContain("Runs on Strelva");
-    expect(named).toContain("Step 3 of 6");
+    expect(named).toContain("North Studio is building the draft now.");
+    expect(named).not.toMatch(/Step \d of \d/);
     expect(named).not.toContain("Strelva Agency");
     const neutral = renderToStaticMarkup(createElement(SiteDeliveryStatus, { businessName: "Harbor Dental", status: "paused", submittedAt: "2026-10-09T15:00:00Z", maskedEmail: "am**@harbordental.com", agencyName: null }));
     expect(neutral).not.toContain("Strelva Agency");

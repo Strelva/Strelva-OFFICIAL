@@ -65,31 +65,38 @@ export async function readWebsiteMonthlyReport(actor:WorkspaceActor,workId:strin
 const reportMonthLabel=(month:string)=>{const date=new Date(`${month}-15T12:00:00Z`);return Number.isNaN(date.getTime())?month:date.toLocaleDateString("en-US",{month:"long",year:"numeric",timeZone:"UTC"});};
 const reportDay=(at:string)=>{const date=new Date(at);return Number.isNaN(date.getTime())?"":date.toLocaleDateString("en-US",{month:"short",day:"numeric",timeZone:"UTC"});};
 const many=(n:number,one:string,more:string)=>`${n} ${n===1?one:more}`;
-/** XA · E3 presentation of the monthly recap: Pebble and the Systems at the
- * top, one figure, what else happened as sentences, What changed rows that
- * name whoever acted, and one ink button. Presentation only; counts and their
- * sources are the report's own, and a count that couldn't be read is left out
- * rather than shown as zero. `actors` names the people behind change records
- * (an id with no known name is left blank rather than guessed). */
+/** XA · E3 presentation of the monthly recap (lane results, October 16):
+ * Pebble and the Systems at the top, one sentence for the month (inquiries,
+ * else bookings) with one quiet clause that adds a different fact, the one
+ * change that mattered (the newest published change) naming whoever acted
+ * with a link to see it, the rest as plain sentences and rows, and one ink
+ * button. No hero figure. Presentation only; counts and their sources are the
+ * report's own, and a count that couldn't be read is left out rather than
+ * shown as zero. `actors` names the people behind change records (an id with
+ * no known name is left unnamed rather than guessed). */
 export function websiteReportPaper(report:WebsiteMonthlyReport,openUrl:string,options:{clayUrl?:string;actors?:Readonly<Record<string,string>>}={}):PaperEmail{
  const month=reportMonthLabel(report.month);
  const monthName=month.split(" ")[0];
- const lead=report.inquiries.count!==null?{value:String(report.inquiries.count),label:report.inquiries.count===1?"inquiry came in":"inquiries came in",note:`In ${monthName}, through ${report.siteName}`}
-  :report.bookings.scheduledInPeriod!==null?{value:String(report.bookings.scheduledInPeriod),label:report.bookings.scheduledInPeriod===1?"visit booked":"visits booked",note:`In ${monthName}`}:null;
+ const booked=report.bookings.scheduledInPeriod;
+ const lead=report.inquiries.count!==null?{text:`${many(report.inquiries.count,"inquiry","inquiries")} came in through ${report.siteName} in ${monthName}.`,quiet:booked!==null?`${many(booked,"visit was","visits were")} booked${report.bookings.providerVerified!==null?`, and ${report.bookings.providerVerified} of them are on your calendar`:""}.`:undefined}
+  :booked!==null?{text:`${many(booked,"visit was","visits were")} booked through ${report.siteName} in ${monthName}.`,quiet:report.bookings.providerVerified!==null?`${report.bookings.providerVerified} of them are on your calendar.`:undefined}:null;
  const sentences:string[]=[];
- if(lead?.label.startsWith("inquir")&&report.bookings.scheduledInPeriod!==null)sentences.push(`${many(report.bookings.scheduledInPeriod,"visit was","visits were")} booked${report.bookings.providerVerified!==null?`, and ${report.bookings.providerVerified} of them are on your calendar`:""}.`);
  if(report.readiness.status==="available"&&report.readiness.passedChecks!==null&&report.readiness.totalChecks!==null)sentences.push(report.readiness.passedChecks===report.readiness.totalChecks?`${report.siteName} passed all ${report.readiness.totalChecks} site checks.`:`${report.siteName} passed ${report.readiness.passedChecks} of ${report.readiness.totalChecks} site checks.`);
  if(report.visibility.status==="available")sentences.push(report.visibility.mentioned?`When Strelva last asked an AI assistant, it named ${report.siteName}${report.visibility.recommended?" and recommended it":""}.`:`When Strelva last asked an AI assistant, it didn't name ${report.siteName} yet.`);
  if(report.businessOutcome)sentences.push(`Across your business: ${report.businessOutcome.line.text}`);
  const who=(id:string)=>id==="strelva"||id==="system"?"Strelva":options.actors?.[id]??"";
- const changes=report.changes.slice(-5).map(change=>({date:reportDay(change.createdAt),text:change.published?"Published a change to the site":"Saved a draft of the site",who:who(change.createdBy)}));
+ const recent=report.changes.slice(-5);
+ const mattered=[...recent].reverse().find(change=>change.published);
+ const matteredText=mattered?(who(mattered.createdBy)?`${who(mattered.createdBy)} published a change to the site.`:"A change to the site was published."):null;
+ const changes=recent.filter(change=>change!==mattered).map(change=>({date:reportDay(change.createdAt),text:change.published?"Published a change to the site":"Saved a draft of the site",who:who(change.createdBy)}));
  const clay=options.clayUrl??new URL("/xa/email-lineup.png",CONTROL_PLANE_URL).toString();
- return{subject:lead?`${report.siteName}, ${month}: ${lead.value} ${lead.label.split(" ")[0]}`:`${report.siteName}, ${month}`,preheader:`Your ${month} recap for ${report.siteName}.`,sender:report.siteName,senderDetail:`Monthly recap · ${month}`,
+ return{subject:`${report.siteName}: your ${month} recap`,preheader:lead?.text??`Your ${month} recap for ${report.siteName}.`,sender:report.siteName,senderDetail:`Monthly recap · ${month}`,
   footer:"This comes once a month. A count that couldn't be read is left out, never shown as zero.",
   blocks:[{kind:"clay",src:clay,width:260,height:81},
-   ...(lead?[{kind:"figure" as const,...lead}]:[{kind:"paragraph" as const,text:"Inquiries and bookings couldn't be counted this month. Nothing is lost."}]),
+   ...(lead?[{kind:"lead" as const,...lead}]:[{kind:"paragraph" as const,text:"Inquiries and bookings couldn't be counted this month. Nothing is lost."}]),
    ...(sentences.length?[{kind:"paragraph" as const,text:sentences.join(" "),muted:true}]:[]),
-   ...(changes.length?[{kind:"rule" as const},{kind:"label" as const,text:"What changed"},{kind:"changes" as const,rows:changes}]:[]),
+   ...(mattered&&matteredText?[{kind:"rule" as const},{kind:"change" as const,label:"The change that mattered",text:matteredText,date:reportDay(mattered.createdAt),link:{label:"See it",url:openUrl}}]:[]),
+   ...(changes.length?[...(mattered?[]:[{kind:"rule" as const}]),{kind:"label" as const,text:mattered?"Also changed":"What changed"},{kind:"changes" as const,rows:changes}]:[]),
    {kind:"actions",actions:[{label:`Open ${report.siteName}`,url:openUrl,style:"primary"}],full:false}]};
 }
 /** Shared transport enforces the existing tenant email gate. No recipient is inferred. */

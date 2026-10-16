@@ -2,7 +2,8 @@ import type { ComponentProps } from "react";
 import { XA_PLACE_LABELS } from "@/platform/presentation/place-labels";
 import { StrelvaShell } from "@/experience/app-frame/StrelvaShell";
 import { XaLabel, XaRow, XaRows, XaSays, XaSystemTile, XaTextLink } from "@/components/ui/strelva/Xa";
-import { XaClay, XaFigure, XaLinkSegmented, XaNote, XaPlace, XaPlaceHead, XaPlaceLoading, XaPlaceNotMember, XaPlaceTrouble, xaShortDate } from "@/experience/places/XaPlace";
+import { XaChangeLine, XaLead, XaLinkSegmented, XaNote, XaPlace, XaPlaceHead, XaPlaceLoading, XaPlaceNotMember, XaPlaceTrouble, xaShortDate } from "@/experience/places/XaPlace";
+import { resultsHref } from "@/experience/places/WorkspaceResults";
 import place from "@/experience/places/xa-place.module.css";
 import type { RecapView, SiteRecaps } from "@/products/recaps/server";
 import type { OwnerCareReportItem } from "@/platform/care-reports";
@@ -26,10 +27,6 @@ function dateLabel(value: string, options: Intl.DateTimeFormatOptions): string {
 }
 export function recapTitle(recap: RecapView): string {
   return recap.period === "month" ? dateLabel(recap.start, { month: "long", year: "numeric" }) : `Week of ${dateLabel(recap.start, { month: "short", day: "numeric", year: "numeric" })}`;
-}
-function delta(value: number, period: RecapView["period"]): string {
-  if (!Number.isFinite(value) || value === 0) return `Same as the ${period} before`;
-  return `${value > 0 ? "Up" : "Down"} ${Math.abs(Math.round(value))}% from the ${period} before`;
 }
 const count = (value: number) => value.toLocaleString("en-US");
 
@@ -59,26 +56,44 @@ export function recapOutcomeSentences(recap: RecapView, outcome?: OutcomeRecap):
 }
 
 /**
- * One saved recap, shaped like the Monday email (XA · E3): Pebble and the
- * Systems at the top, the period, one big number, Pebble's one idea right
- * under it, what came of it in sentences, and what changed as rows that
- * name whoever acted.
+ * The change a recap leads with: the first highlight that names a change
+ * rather than repeating a count (saved highlights also hold lines like "412
+ * people visited your site", which the lead sentence already says).
  */
-export function RecapOutcome({ recap, outcome, siteName }: { recap: RecapView; outcome?: OutcomeRecap; siteName: string }) {
+export function recapMattered(recap: Pick<RecapView, "highlights">): string | null {
+  return recap.highlights.find(line => line.trim() && !/^\d/.test(line.trim()))?.trim() ?? null;
+}
+
+/** The lead sentence: the period's visits, then how that moved. One fact each. */
+export function recapLead(recap: Pick<RecapView, "visits" | "visitsDelta" | "period">, siteName: string): string {
+  const visits = `${count(recap.visits)} ${recap.visits === 1 ? "visit" : "visits"} to ${siteName}`;
+  if (!Number.isFinite(recap.visitsDelta) || Math.round(recap.visitsDelta) === 0) return `${visits}, the same as the ${recap.period} before.`;
+  return `${visits}, ${recap.visitsDelta > 0 ? "up" : "down"} ${Math.abs(Math.round(recap.visitsDelta))}% from the ${recap.period} before.`;
+}
+
+/**
+ * One saved recap (lane results, October 16): the period, one sentence, the
+ * one change that mattered (whoever acted is named in its words) with a link
+ * to see that window, Pebble's one idea, then what came of it in sentences
+ * and anything else that changed. No hero number and no clay line-up.
+ */
+export function RecapOutcome({ recap, outcome, siteName, seeHref }: { recap: RecapView; outcome?: OutcomeRecap; siteName: string; /** Where "See it" opens: Results for this recap's window. */ seeHref?: string }) {
   const range = `${dateLabel(recap.start, { month: "short", day: "numeric" })} to ${dateLabel(recap.end, { month: "short", day: "numeric" })}`;
   const said = recapOutcomeSentences(recap, outcome);
+  const mattered = recapMattered(recap);
+  const others = recap.highlights.filter(line => line.trim() && line.trim() !== mattered);
   return <article className={styles.recap} aria-label={recapTitle(recap)}>
-    <XaClay pose="lineup" height={72} />
     <div className={place.stack}>
       <p className={place.quiet}>{recap.period === "month" ? "Monthly recap" : "Weekly recap"} · {range}</p>
       <h2 className={styles.recapTitle}>{recapTitle(recap)}</h2>
     </div>
-    <XaFigure value={count(recap.visits)} label={`visits to ${siteName}`} note={delta(recap.visitsDelta, recap.period)} />
+    <XaLead quiet={recap.summary || undefined}>{recapLead(recap, siteName)}</XaLead>
+    {mattered ? <XaChangeLine label="The change that mattered" href={seeHref} linkLabel={recap.period === "month" ? "See that month" : "See that week"}>{/[.!?]$/.test(mattered) ? mattered : `${mattered}.`}</XaChangeLine> : null}
     {recap.nextAction ? <XaSays><b>{recap.nextAction.title}.</b> {recap.nextAction.description}</XaSays> : null}
-    <p className={styles.summary}>{[recap.summary, ...said].filter(Boolean).join(" ")}</p>
-    {recap.highlights.length ? <section className={place.stack} aria-label="What changed">
-      <XaLabel as="h3">What changed</XaLabel>
-      <XaRows label="What changed">{recap.highlights.map((highlight, index) => <XaRow key={index} title={highlight} />)}</XaRows>
+    <p className={styles.summary}>{said.join(" ")}</p>
+    {others.length ? <section className={place.stack} aria-label="Also changed">
+      <XaLabel as="h3">Also changed</XaLabel>
+      <XaRows label="Also changed">{others.map((highlight, index) => <XaRow key={index} title={highlight} />)}</XaRows>
     </section> : null}
     <p className={place.quiet}>Clicks aren&apos;t confirmed bookings or answered calls. Walk-ins and calls made away from the site aren&apos;t counted.</p>
   </article>;
@@ -97,7 +112,7 @@ function AgencyReports({ workspaceId, reports }: { workspaceId: string; reports:
 
 type ShellChrome = Partial<Omit<ComponentProps<typeof StrelvaShell>, "children">>;
 
-export function WorkspaceRecaps({ workspaceId, state, period, outcomes, preview = false, releaseLabel, careReports, recapId, chrome, hrefBase }: { workspaceId: string; state: WorkspaceRecapsState; period: RecapPeriodFilter; outcomes?: Record<string, OutcomeRecap>; preview?: boolean; releaseLabel?: string; careReports?: OwnerCareReportsState; recapId?: string; chrome?: ShellChrome; hrefBase?: string }) {
+export function WorkspaceRecaps({ workspaceId, state, period, outcomes, preview = false, releaseLabel, careReports, recapId, chrome, hrefBase, seeHrefFor }: { workspaceId: string; state: WorkspaceRecapsState; period: RecapPeriodFilter; outcomes?: Record<string, OutcomeRecap>; preview?: boolean; releaseLabel?: string; careReports?: OwnerCareReportsState; recapId?: string; chrome?: ShellChrome; hrefBase?: string; /** Where a recap's "See that week" opens; defaults to Results for the recap's own window. */ seeHrefFor?: (recap: RecapView) => string }) {
   const homeHref = `/workspace?workspaceId=${encodeURIComponent(workspaceId)}`;
   const base = hrefBase ?? (preview ? "/preview/strelva/recaps" : "/workspace/recaps");
   const href = (value: RecapPeriodFilter, recap?: string) => `${base}?workspaceId=${encodeURIComponent(workspaceId)}${value === "all" ? "" : `&period=${value}`}${recap ? `&recap=${encodeURIComponent(recap)}` : ""}`;
@@ -132,7 +147,7 @@ export function WorkspaceRecaps({ workspaceId, state, period, outcomes, preview 
                         {state.sites.length > 1 ? <XaLabel as="h2">{site.siteName}</XaLabel> : null}
                         {site.unavailable ? <XaPlaceTrouble title={`Recaps for ${site.siteName} couldn't be read right now.`} quiet="Nothing is lost. Reload to try again." />
                           : !current ? <XaPlaceTrouble role="status" pose="resting" title={period === "month" ? "No monthly recap yet." : period === "week" ? "No weekly recap yet." : `No recaps for ${site.siteName} yet.`} quiet="Pebble writes the first one after a full week of visits." />
-                            : <><RecapOutcome recap={current} siteName={site.siteName} outcome={outcomes?.[current.id]} />{single ? null : others(site)}</>}
+                            : <><RecapOutcome recap={current} siteName={site.siteName} outcome={outcomes?.[current.id]} seeHref={seeHrefFor ? seeHrefFor(current) : resultsHref(workspaceId, "custom", { from: current.start.slice(0, 10), to: current.end.slice(0, 10) })} />{single ? null : others(site)}</>}
                       </section>;
                     })}
                 </div>

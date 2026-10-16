@@ -10,7 +10,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { StSkeleton } from "@/components/ui/strelva/Kit";
-import { XaButtonLink, XaHeadline, XaPebbleScene, XaPebbleAvatar } from "@/components/ui/strelva/Xa";
+import { XaButtonLink, XaHeadline, XaLabel, XaPebbleScene, XaPebbleAvatar, XaTextLink } from "@/components/ui/strelva/Xa";
 import styles from "./xa-place.module.css";
 
 /** The place's paper. `width="read"` is one 720 column; `wide` holds a list beside a detail. */
@@ -56,6 +56,27 @@ export function XaFigure({ value, label, note, id }: { value: ReactNode; label: 
 }
 
 /**
+ * The one sentence a report place leads with (lane results, October 16):
+ * what came of the period in ink, then one quiet clause that adds a different
+ * fact (never the same number again). Replaces the hero figure and bar chart.
+ */
+export function XaLead({ children, quiet, id }: { children: ReactNode; quiet?: ReactNode; id?: string }) {
+  return <p className={styles.lead} id={id}>{children}{quiet ? <span className={styles.leadQuiet}> {quiet}</span> : null}</p>;
+}
+
+/**
+ * The one change that mattered, under the lead: who did it, what changed,
+ * when, and a text link to see it. The sentence names whoever acted (the
+ * owner, the agency person, or Strelva); a change with no link stays a sentence.
+ */
+export function XaChangeLine({ label, children, when, href, linkLabel = "See it" }: { label: string; children: ReactNode; when?: string; href?: string; linkLabel?: string }) {
+  return <section className={styles.change} aria-label={label}>
+    <XaLabel as="h2">{label}</XaLabel>
+    <p className={styles.changeText}>{children}{when ? <span className={styles.changeWhen}> · {when}</span> : null}{href ? <> <XaTextLink href={href}>{linkLabel}</XaTextLink></> : null}</p>
+  </section>;
+}
+
+/**
  * Bad news (or a quiet empty), with Pebble standing on the canvas already on
  * it, and one way forward. No felt circle: Pebble is in frame, not in a badge.
  */
@@ -71,7 +92,7 @@ export function XaPlaceTrouble({ title, quiet, children, action, pose = "fixing"
 /** The permission state every owner place shares. */
 export function XaPlaceNotMember({ title = "This belongs to another business." }: { title?: string }) {
   return <XaPlaceTrouble pose="waving" title={title} action={<XaButtonLink href="/workspace">Go to Home</XaButtonLink>}>
-    <p>Your account isn&apos;t a member of this business. Ask its owner to invite you, or open your own workspace.</p>
+    <p>Your account isn&apos;t a member of this business. Ask its owner to invite you, or go back to your own business.</p>
   </XaPlaceTrouble>;
 }
 

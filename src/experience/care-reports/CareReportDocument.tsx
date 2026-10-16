@@ -4,11 +4,13 @@ import type { OwnerBrand } from "@/platform/infra/agency-brand";
 import { BUSINESS_EFFORT_CATEGORY_LABELS, type BusinessEffortCategory } from "@/platform/business-effort/types";
 import type { CareReportFacts } from "@/platform/care-reports/contracts";
 import {
-  careCheckException, careHeadline, careOutcomeLine, careReleaseLabel, careReportTitle, careShortDate, careSiteCheckSentence, careTimeLabel,
+  careCheckException, careLead, careMattered, careOutcomeLine, careReleaseLabel, careReportTitle, careShortDate, careSiteCheckSentence, careTimeLabel,
 } from "@/platform/care-reports/model";
+import { XaChangeLine, XaLead } from "@/experience/places/XaPlace";
+import { systemHref } from "@/experience/systems/model";
 import { PrintDocumentButton } from "@/experience/workspace/billing/PrintDocumentButton";
 import { DOCUMENT_PRINT_CSS } from "@/experience/workspace/billing/print";
-import { XaBlock, XaChanges, XaFigure, XaNote } from "@/components/ui/strelva/Xa";
+import { XaBlock, XaChanges, XaNote } from "@/components/ui/strelva/Xa";
 import styles from "./care-report.module.css";
 
 const plural = (n: number, one: string, many: string) => `${n.toLocaleString("en-US")} ${n === 1 ? one : many}`;
@@ -17,7 +19,9 @@ export type CareReportDocumentSnapshot = CareReportFacts & { agencyNote?: string
 
 /**
  * One month's Care plan report for one client, as one printable page (XA, in
- * the voice of E3: one figure that matters, then what changed and who did it).
+ * the voice of E3; lane results, October 16: one sentence for the month, the
+ * one change that mattered credited to the agency with a link to see it for
+ * the owner, then what changed and who did it; no hero number).
  * Server-renderable. The agency's name comes from a live brand read passed in
  * by the page, never from the stored snapshot, so a renamed agency or an
  * unavailable identity shows as it is now.
@@ -43,6 +47,11 @@ export function CareReportDocument({ snapshot, brand, releaseNumber, releases, r
   const categories = Object.entries(time.byCategory).filter(([, minutes]) => minutes > 0);
   // Only Releases shared before the one on screen; a draft lists every shared one.
   const earlier = releases?.filter(item => releaseNumber === null || item.number < releaseNumber) ?? [];
+  const lead = careLead(snapshot, brand.name, snapshot.business.name);
+  const mattered = careMattered(snapshot, brand.name, note);
+  const newest = [...changes.items].sort((a, b) => b.at.localeCompare(a.at))[0];
+  // Only the owner can open the System; a shared link has no account behind it.
+  const seeHref = audience === "owner" && newest ? systemHref("", snapshot.business.workspaceId, newest.systemId) : undefined;
   return <>{back ? <div data-print-hide className={styles.back}><XaTextLink href={back.href}>{back.label}</XaTextLink></div> : null}<article className={styles.report} data-flat={flat || undefined} aria-label={`${careReportTitle(snapshot)} for ${snapshot.business.name}`}>
     <style>{DOCUMENT_PRINT_CSS}</style>
     <header className={styles.head}>
@@ -54,13 +63,8 @@ export function CareReportDocument({ snapshot, brand, releaseNumber, releases, r
       <XaHeadline quiet={releaseNumber ? `${snapshot.business.name} · ${careReleaseLabel(releaseNumber)}` : snapshot.business.name}>{careReportTitle(snapshot)}</XaHeadline>
     </header>
 
-    {/* The month's number, held up by Pebble with the client's Systems (E3). */}
-    <div className={styles.figureRow}>
-      <img className={styles.lineup} src="/xa/pose-lineup.webp" width={220} height={120} alt={`Pebble and ${snapshot.business.name}'s Systems`} />
-      <XaFigure value={changes.total.toLocaleString("en-US")} label={changes.total === 1 ? "change made this month" : "changes made this month"} detail={careHeadline(snapshot)} />
-    </div>
-
-    {note ? <div className={styles.note}><XaInitial name={brand.name} color={brand.accentColor} size={28} shape="round" /><p><span className={styles.noteFrom}>{brand.name}</span> {note}</p></div> : null}
+    <XaLead quiet={lead.quiet}>{lead.text}</XaLead>
+    {mattered ? <XaChangeLine label="The change that mattered" when={mattered.at ? careShortDate(mattered.at) : undefined} href={seeHref}>{mattered.text}</XaChangeLine> : null}
 
     <XaBlock label="What changed">
       {changes.items.length ? <XaChanges label="What changed" rows={changes.items.map(item => {

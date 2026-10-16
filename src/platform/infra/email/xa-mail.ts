@@ -49,6 +49,10 @@ export type XaMailBlock =
   | { kind: "figure"; value: string; label: string; detail?: string; /** Pebble beside the number, holding the week. */ art?: { url: string; alt: string } }
   | { kind: "changes"; label: string; rows: readonly XaMailChange[] }
   | { kind: "sentence"; text: string; muted?: boolean }
+  /** The one sentence a report leads with (replaces a hero figure): ink, then one quiet clause with a different fact. */
+  | { kind: "lead"; text: string; quiet?: string }
+  /** The one change that mattered: a label, the sentence naming whoever acted, when, and a text link to see it. */
+  | { kind: "change"; label: string; text: string; who?: string; date?: string; link?: XaMailAction }
   | { kind: "rule" }
   /* Visitor blocks (xs-visitor, Oct 16): the business writing to its own customers. */
   /** A state as a dot and a word: clay for what waits on the reader, moss for confirmed, quiet for ended. */
@@ -107,6 +111,8 @@ function block(b: XaMailBlock): string {
     case "period": return `<p style="margin:0;font-size:13px;line-height:18px;color:${X.faint};">${e(b.text)}</p>`;
     case "figure": return table(`<tr>${b.art ? `<td valign="middle" style="padding-right:14px;"><img src="${url(b.art.url)}" alt="${e(b.art.alt)}" width="64" height="64" style="display:block;border:0;"></td>` : ""}<td valign="middle" style="padding-right:16px;font-size:64px;line-height:64px;font-weight:300;letter-spacing:-2px;color:${X.text};font-variant-numeric:tabular-nums;white-space:nowrap;">${e(b.value)}</td><td valign="middle" style="width:100%;"><p style="margin:0;font-size:19px;line-height:26px;color:${X.text};">${e(b.label)}</p>${b.detail ? `<p style="margin:2px 0 0;font-size:14px;line-height:20px;color:${X.muted};">${e(b.detail)}</p>` : ""}</td></tr>`);
     case "changes": return `<p style="margin:0 0 6px;font-size:13px;line-height:18px;color:${X.faint};">${e(b.label)}</p>${table(b.rows.map(r => `<tr><td valign="top" style="padding:8px 16px 8px 0;font-size:14px;line-height:22px;color:${X.faint};white-space:nowrap;">${e(r.date)}</td><td valign="top" style="padding:8px 0;width:100%;font-size:15px;line-height:22px;color:${X.text};overflow-wrap:anywhere;">${e(r.text)}</td><td valign="top" align="right" style="padding:8px 0 8px 16px;font-size:13px;line-height:22px;color:${X.muted};white-space:nowrap;">${e(r.who)}</td></tr>`).join(""))}`;
+    case "lead": return `<p style="margin:0;font-size:24px;line-height:32px;font-weight:500;letter-spacing:-0.4px;color:${X.text};overflow-wrap:anywhere;">${e(b.text)}${b.quiet ? `<span style="color:${X.muted};"> ${e(b.quiet)}</span>` : ""}</p>`;
+    case "change": return `<p style="margin:0 0 6px;font-size:13px;line-height:18px;color:${X.faint};">${e(b.label)}</p><p style="margin:0;font-size:16px;line-height:24px;color:${X.text};overflow-wrap:anywhere;">${e(b.text)}${b.who || b.date ? `<span style="color:${X.muted};"> · ${e([b.who, b.date].filter(Boolean).join(", "))}</span>` : ""}${b.link ? ` <a href="${url(b.link.url)}" style="color:${X.moss};font-weight:600;text-decoration:none;">${e(b.link.label)}</a>` : ""}</p>`;
     case "sentence": return `<p style="margin:0;font-size:14px;line-height:22px;color:${b.muted ? X.faint : X.body};">${e(b.text)}</p>`;
     case "rule": return `<div style="height:1px;line-height:1px;font-size:1px;background:${X.line};">&nbsp;</div>`;
     case "status": { const color = b.tone === "waits" ? X.need : b.tone === "live" ? X.moss : X.muted; const dot = b.tone === "waits" ? X.needDot : b.tone === "live" ? "#3e8e5a" : X.faint;
@@ -121,7 +127,7 @@ function block(b: XaMailBlock): string {
   }
 }
 
-const GAP: Partial<Record<XaMailBlock["kind"], number>> = { identity: 0, waits: 20, status: 20, headline: 8, page: 24, primary: 20, art: 0, period: 24, figure: 20, changes: 20, sentence: 16, rule: 24, when: 24, rows: 20, quote: 20, choices: 20, link: 12, html: 20 };
+const GAP: Partial<Record<XaMailBlock["kind"], number>> = { lead: 12, change: 22, identity: 0, waits: 20, status: 20, headline: 8, page: 24, primary: 20, art: 0, period: 24, figure: 20, changes: 20, sentence: 16, rule: 24, when: 24, rows: 20, quote: 20, choices: 20, link: 12, html: 20 };
 
 /** The card body. Also what the preview frames, so preview and mail never drift. */
 export function renderXaMailBody(mail: XaMail): string {
@@ -150,6 +156,8 @@ export function renderXaMailText(mail: XaMail): string {
       case "figure": lines.push(`${b.value} ${b.label}`, ...(b.detail ? [b.detail] : [])); break;
       case "changes": lines.push(b.label, ...b.rows.map(r => `${r.date}  ${r.text} (${r.who})`)); break;
       case "sentence": lines.push(b.text); break;
+      case "lead": lines.push(b.quiet ? `${b.text} ${b.quiet}` : b.text); break;
+      case "change": lines.push(b.label, `${b.text}${b.who || b.date ? ` (${[b.who, b.date].filter(Boolean).join(", ")})` : ""}`, ...(b.link ? [`${b.link.label}: ${b.link.url}`] : [])); break;
       case "rule": break;
       case "status": lines.push(b.label); break;
       case "when": lines.push(`${b.day}, ${b.time}`, ...(b.detail ? [b.detail] : [])); break;
@@ -225,15 +233,30 @@ export interface MondayEmailInput {
   changes: readonly XaMailChange[];
   /** One plain sentence about checks in the owner's words, e.g. "Every check on harbordental.com passed." Never a path or an internal count. */
   checks?: string;
-  /** Pebble, shown beside the week's number: an absolute image URL on the app host. */
-  artUrl?: string;
+  /** Where "See it" opens for the change that mattered (the first of `changes`); defaults to `open`. */
+  seeUrl?: string;
   open: XaMailAction;
   settingsUrl: string;
 }
 
+/** "3 new patients · 11 returning" said as a sentence: "3 new patients, 11 returning." */
+function detailSentence(detail: string | undefined): string | undefined {
+  const text = detail?.split(/\s+·\s+/).map(part => part.trim()).filter(Boolean).join(", ");
+  if (!text) return undefined;
+  const sentence = text.charAt(0).toUpperCase() + text.slice(1);
+  return /[.!?]$/.test(sentence) ? sentence : `${sentence}.`;
+}
+
+/**
+ * E3 (lane results, October 16): one sentence for the week, the one change
+ * that mattered with whoever acted and a link to see it, anything else that
+ * changed, the checks in one sentence, one ink pill. No hero number and no
+ * clay beside it; the subject still carries the week's number for the inbox.
+ */
 export function mondayEmail(input: MondayEmailInput): XaMail {
   const value = input.figure.value.toLocaleString("en-US");
   const runner = input.agencyName ? `${input.agencyName} runs ${input.business}'s website with Strelva.` : `${input.business} runs on Strelva.`;
+  const [mattered, ...rest] = input.changes;
   return {
     subject: `${input.business}, ${input.weekOf.charAt(0).toLowerCase()}${input.weekOf.slice(1)}: ${value} ${input.figure.label}`,
     preheader: input.figure.detail,
@@ -241,11 +264,11 @@ export function mondayEmail(input: MondayEmailInput): XaMail {
     blocks: [
       { kind: "identity", business: input.business },
       { kind: "period", text: input.period },
-      { kind: "figure", value, label: input.figure.label, detail: input.figure.detail, ...(input.artUrl ? { art: { url: input.artUrl, alt: `Pebble with this week's number for ${input.business}` } } : {}) },
-      { kind: "rule" },
-      ...(input.changes.length
-        ? [{ kind: "changes" as const, label: "What changed", rows: input.changes }]
+      { kind: "lead", text: `${value} ${input.figure.label} this week.`, quiet: detailSentence(input.figure.detail) },
+      ...(mattered
+        ? [{ kind: "change" as const, label: "The change that mattered", text: mattered.text, who: mattered.who, date: mattered.date, link: { label: "See it", url: input.seeUrl ?? input.open.url } }]
         : [{ kind: "sentence" as const, text: "Nothing changed this week. Everything ran as it was." }]),
+      ...(rest.length ? [{ kind: "changes" as const, label: "Also changed", rows: rest }] : []),
       ...(input.checks ? [{ kind: "sentence" as const, text: input.checks }] : []),
       { kind: "primary", action: input.open, align: "start" },
     ],

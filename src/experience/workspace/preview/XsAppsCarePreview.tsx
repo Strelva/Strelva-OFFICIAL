@@ -164,7 +164,7 @@ export function XsAppsCarePreview({ screen, state, mode }: { screen: XsScreen; s
     case "units": return ownerShell(mode, "Businesses and locations", <Units key={state} organizationId={HARBOR_ID} businesses={UNIT_BUSINESSES} canManage={state !== "member"} request={request} />);
     case "delivery-status": {
       const status = (["received", "reviewing", "drafting", "owner_review", "launch_ready", "launched", "paused"] as const).find(value => value === state) ?? "drafting";
-      return <SiteDeliveryStatus businessName={XA_HARBOR.name} status={status as DeliveryStatus} submittedAt="2026-10-09T15:00:00Z" maskedEmail="am**@harbordental.com" agencyName={state === "no-agency" ? null : XA_NORTH.name} mode={mode} />;
+      return <SiteDeliveryStatus businessName={XA_HARBOR.name} status={status as DeliveryStatus} submittedAt="2026-11-09T15:00:00Z" updatedAt="2026-11-18T19:30:00Z" maskedEmail="am**@harbordental.com" agencyName={state === "no-agency" ? null : XA_NORTH.name} mode={mode} />;
     }
     case "delivery-queue": return wrap(agencyShell(mode, "Delivery work", <ServiceDeliveryQueue key={state} scope={{ providerWorkspaceId: NORTH_ID }} />));
     case "delivery-request": {

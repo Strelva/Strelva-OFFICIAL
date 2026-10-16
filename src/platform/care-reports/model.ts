@@ -110,6 +110,38 @@ export function careHeadline(facts: Pick<CareReportFacts, "changes" | "requests"
   return parts.length ? parts.join(" · ") : "No recorded work this month";
 }
 
+/**
+ * The report's one sentence (lane results, October 16), in place of a hero
+ * figure: who did the month's work and how much, then one quiet clause with a
+ * different fact (how much was checked on the live site). Never repeats the
+ * time or Requests lines that follow it.
+ */
+export function careLead(facts: Pick<CareReportFacts, "month" | "changes" | "requests">, agencyName: string, businessName: string): { text: string; quiet?: string } {
+  const month = careMonthLabel(facts.month).split(" ")[0];
+  const { total, confirmed } = facts.changes;
+  if (total > 0) {
+    const quiet = confirmed === total ? (total === 1 ? "It was checked on the live site." : "Each was checked on the live site.")
+      : confirmed > 0 ? `${confirmed.toLocaleString("en-US")} ${confirmed === 1 ? "was" : "were"} checked on the live site.` : undefined;
+    return { text: `${agencyName} made ${plural(total, "change", "changes")} for ${businessName} in ${month}.`, quiet };
+  }
+  if (facts.requests.doneCount > 0) return { text: `${agencyName} finished ${plural(facts.requests.doneCount, "Request", "Requests")} for ${businessName} in ${month}.`, quiet: "No Systems changed." };
+  return { text: `No recorded work for ${businessName} in ${month}.` };
+}
+
+/**
+ * The one change that mattered: the agency's own note when it wrote one (its
+ * words about what mattered, credited to it), else the newest change, credited
+ * to the agency that made it. Null in a month with neither.
+ */
+export function careMattered(facts: Pick<CareReportFacts, "changes">, agencyName: string, note?: string | null): { text: string; at?: string } | null {
+  const said = note?.trim();
+  if (said) return { text: `${agencyName}: ${said}` };
+  const newest = [...facts.changes.items].sort((a, b) => b.at.localeCompare(a.at))[0];
+  if (!newest) return null;
+  const what = (newest.summary || newest.systemName).trim();
+  return { text: `${agencyName}: ${/[.!?]$/.test(what) ? what : `${what}.`}`, at: newest.at };
+}
+
 export const CARE_DELIVERY_COPY: Record<string, string> = {
   email_off: "Not sent: email is off. Copy the link and send it yourself.",
   no_trusted_owner_recipient: "Not sent: there's no confirmed owner email for this client. Copy the link instead.",
