@@ -1,8 +1,10 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
+import { vi } from "vitest";
 import { WorkspaceRecaps, type WorkspaceRecapsState } from "@/experience/recaps/WorkspaceRecaps";
 import { PREVIEW_OWNER_REPORTS } from "@/experience/care-reports/preview-fixture";
+vi.mock("@/experience/app-frame/StrelvaShell", () => ({ StrelvaShell: ({ children }: { children: React.ReactNode }) => children }));
 
 const WS = "5e000000-0000-4000-8000-0000000000b0";
 const state: WorkspaceRecapsState = { kind: "ready", sites: [] };

@@ -41,8 +41,9 @@
 .readOnlyTag, .versionTag, .scopeTag, .stateTag, .receiptStamp, .consentTag { display: inline-flex; align-items: center; gap: .35rem; width: fit-content; border: 1px solid var(--gray-border); border-radius: 999px; padding: .25rem .55rem; color: var(--gray-muted); font-size: .68rem; white-space: nowrap; }
 .readOnlyTag { color: var(--warning); }
 .content { min-width: 0; min-height: 0; flex: 1; overflow: auto; }
-.rehearsalNotice { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem .55rem; padding: .55rem 1.25rem; border-bottom: 1px solid var(--gray-border); background: var(--accent-dim); color: var(--gray-fg); font-size: .76rem; }
-.rehearsalNotice strong { color: var(--accent-text); }
+/* XA (xs-leads): a sentence from Pebble on paper, not a tinted banner. */
+.rehearsalNotice { padding: 10px 24px; border-bottom: 1px solid var(--st-line, var(--gray-border)); }
+.rehearsalNotice strong { color: var(--st-text, inherit); font-weight: 600; }
 .noticeIcon { color: var(--accent-text); }
 .noticeDetail { color: var(--gray-muted); }
 .feedback { max-width: var(--st-column); margin: 16px auto 0; padding: 0 24px; }
@@ -370,7 +371,7 @@
 .membershipList li { display: flex; flex-wrap: wrap; justify-content: space-between; gap: .5rem; border-bottom: 1px solid var(--gray-border); padding: .7rem 0; }
 .membershipList li strong { color: var(--warm-black); font-size: .8rem; }
 .membershipList li span { color: var(--gray-muted); font-size: .75rem; }
-.unavailablePage { display: grid; min-height: 100dvh; place-items: center; background: var(--surface-base); color: var(--warm-black); padding: 1.5rem; }
+.unavailablePage { display: grid; min-height: 100dvh; place-items: center; background: var(--st-canvas, var(--surface-base)); color: var(--st-text, var(--warm-black)); }
 .unavailablePanel { display: grid; max-width: 34rem; gap: .8rem; border-top: 1px solid var(--gray-border); padding-top: 1rem; }
 .unavailablePanel h1 { margin: 0; font-size: 2rem; font-weight: 400; }
 .unavailablePanel p { margin: 0; color: var(--gray-muted); }

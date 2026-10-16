@@ -1,8 +1,13 @@
-import { StEmpty, StHead, StLabel, StMono, StNotice, StPage, StPillLink, StRow, StRows, StSection, StSkeleton, StSurface, StTextButton } from "@/components/ui/strelva/Kit";
+import type { ComponentProps } from "react";
+import { XA_PLACE_LABELS } from "@/platform/presentation/place-labels";
+import { StrelvaShell } from "@/experience/app-frame/StrelvaShell";
+import { XaEmpty, XaLabel, XaRow, XaRows, XaSays, XaTextLink } from "@/components/ui/strelva/Xa";
+import { XaFigure, XaLinkSegmented, XaNote, XaPlace, XaPlaceHead, XaPlaceLoading, XaPlaceNotMember, XaPlaceTrouble, xaShortDate } from "@/experience/places/XaPlace";
+import place from "@/experience/places/xa-place.module.css";
 import type { RecapView, SiteRecaps } from "@/products/recaps/server";
 import type { OwnerCareReportItem } from "@/platform/care-reports";
 import { careMonthLabel, careShortDate } from "@/platform/care-reports/model";
-import styles from "@/experience/publishing/publishing.module.css";
+import styles from "./recaps.module.css";
 
 export type RecapPeriodFilter = "all" | "week" | "month";
 /** Reports an agency shared with this business. Absent while Care plan reports is off. */
@@ -22,58 +27,106 @@ function dateLabel(value: string, options: Intl.DateTimeFormatOptions): string {
 export function recapTitle(recap: RecapView): string {
   return recap.period === "month" ? dateLabel(recap.start, { month: "long", year: "numeric" }) : `Week of ${dateLabel(recap.start, { month: "short", day: "numeric", year: "numeric" })}`;
 }
-function delta(value: number): string {
-  if (!Number.isFinite(value) || value === 0) return "Same as before";
-  return `${value > 0 ? "Up" : "Down"} ${Math.abs(Math.round(value))}%`;
+function delta(value: number, period: RecapView["period"]): string {
+  if (!Number.isFinite(value) || value === 0) return `Same as the ${period} before`;
+  return `${value > 0 ? "Up" : "Down"} ${Math.abs(Math.round(value))}% from the ${period} before`;
 }
+const count = (value: number) => value.toLocaleString("en-US");
 
+/**
+ * One saved recap, shaped like the Monday email (XA · E3): the clays, one
+ * big number, what came of it, what changed, and one idea. Every count says
+ * where it came from; a missing count is said in words, never shown as zero.
+ */
 export function RecapOutcome({ recap, outcome, siteName }: { recap: RecapView; outcome?: OutcomeRecap; siteName: string }) {
   const proof = recap.inquiryOutcome?.status === "available" ? recap.inquiryOutcome : undefined;
   const inquiryMissing = recap.inquiryOutcome?.status === "unavailable" ? "Inquiry evidence couldn't be read when this recap was saved" : "Not counted in this saved recap";
   const metrics = [
-    { label: `Visits to ${siteName}`, value: recap.visits, detail: delta(recap.visitsDelta) },
     { label: "Inquiries", value: outcome?.inquiries ?? proof?.inquiries, detail: outcome?.inquiryDetail ?? (proof ? "Recorded form submissions" : undefined), missing: inquiryMissing },
     { label: "Answered", value: outcome?.answered ?? proof?.answered, detail: outcome?.answeredDetail ?? (proof ? "First business replies accepted by the mail provider · delivery not verified" : undefined), missing: inquiryMissing },
     { label: "Bookings", value: outcome?.bookings, detail: outcome?.bookingDetail },
     { label: "New reviews", value: outcome?.reviews ?? recap.newReviews, detail: outcome?.reviewDetail ?? "Recorded review events; provider isn't identified in this recap" },
   ];
-  return <article className={styles.stack} aria-label={recapTitle(recap)}>
-    <StSection title={recapTitle(recap)} meta={recap.period === "month" ? "Monthly recap" : "Weekly recap"}>
-      {recap.summary ? <p className={styles.copy}>{recap.summary}</p> : null}
-      <StRows label="Visits to reviews">{metrics.map(metric => <StRow key={metric.label} stackOnPhone={false} lead={<StMono size="value">{metric.value == null ? "—" : metric.value.toLocaleString("en-US")}</StMono>} title={metric.label} detail={metric.value == null ? metric.missing || "Not counted in this saved recap" : metric.detail} />)}</StRows>
-      {!outcome ? <p className={styles.copy}><StMono>{recap.customerActions}</StMono> booking-link and phone-link clicks were recorded. These are clicks, not confirmed bookings or answered calls.</p> : null}
-      {recap.highlights.length ? <StRows label="What changed">{recap.highlights.map((highlight, index) => <StRow key={index} title={highlight} />)}</StRows> : null}
-      {recap.nextAction ? <StSurface label="Suggested next step"><StLabel>{recap.nextAction.title}</StLabel><p className={styles.copy}>{recap.nextAction.description}</p><p className={styles.copy}>A suggestion. Nothing starts from this recap.</p></StSurface> : null}
-      <p className={styles.copy}>Counts come from the saved site recap. Strelva doesn&apos;t count walk-ins or calls made away from the site. A dash means unavailable, not zero.</p>
-    </StSection>
+  const range = `${dateLabel(recap.start, { month: "short", day: "numeric" })} to ${dateLabel(recap.end, { month: "short", day: "numeric" })}`;
+  return <article className={styles.recap} aria-label={recapTitle(recap)}>
+    <div className={place.stack}>
+      <p className={place.quiet}>{recap.period === "month" ? "Monthly recap" : "Weekly recap"} · {range}</p>
+      <h2 className={styles.recapTitle}>{recapTitle(recap)}</h2>
+    </div>
+    <XaFigure value={count(recap.visits)} label={`visits to ${siteName}`} note={delta(recap.visitsDelta, recap.period)} />
+    {recap.summary ? <p className={styles.summary}>{recap.summary}</p> : null}
+    <section className={place.stack} aria-label="What came of it">
+      <XaLabel as="h3">What came of it</XaLabel>
+      <dl className={styles.counts}>{metrics.map(metric => <div key={metric.label} className={styles.count}>
+        <dt>{metric.label}</dt>
+        <dd className={styles.countValue} data-counted={metric.value != null || undefined}>{metric.value == null ? "" : count(metric.value)}</dd>
+        <dd className={styles.countDetail}>{metric.value == null ? metric.missing || "Not counted in this saved recap" : metric.detail}</dd>
+      </div>)}</dl>
+      {!outcome ? <p className={place.quiet}>{count(recap.customerActions)} booking-link and phone-link clicks were recorded. These are clicks, not confirmed bookings or answered calls.</p> : null}
+    </section>
+    {recap.highlights.length ? <section className={place.stack} aria-label="What changed">
+      <XaLabel as="h3">What changed</XaLabel>
+      <XaRows label="What changed">{recap.highlights.map((highlight, index) => <XaRow key={index} title={highlight} />)}</XaRows>
+    </section> : null}
+    {recap.nextAction ? <XaSays><b>{recap.nextAction.title}.</b> {recap.nextAction.description} A suggestion. Nothing starts from this recap.</XaSays> : null}
+    <p className={place.quiet}>Counts come from the saved site recap. Strelva doesn&apos;t count walk-ins or calls made away from the site.</p>
   </article>;
 }
 
 function AgencyReports({ workspaceId, reports }: { workspaceId: string; reports: OwnerCareReportsState }) {
-  return <StSection title="Reports from your agency">
-    {reports.kind === "unavailable" ? <StNotice>Agency reports couldn&apos;t load. Reload to try again.</StNotice>
-      : !reports.items.length ? <StEmpty>No reports from your agency yet.</StEmpty>
-        : <StRows label="Reports from your agency">{reports.items.map(item => <StRow key={item.reportId} title={`${careMonthLabel(item.month)} report`}
+  return <section className={place.stack} aria-labelledby="recaps-agency-reports">
+    <XaLabel as="h2" id="recaps-agency-reports">Reports from your agency</XaLabel>
+    {reports.kind === "unavailable" ? <XaNote tone="trouble" pebble role="alert">Agency reports couldn&apos;t load. Reload to try again.</XaNote>
+      : !reports.items.length ? <XaNote>No reports from your agency yet.</XaNote>
+        : <XaRows label="Reports from your agency">{reports.items.map(item => <XaRow key={item.reportId} title={`${careMonthLabel(item.month)} report`}
           detail={`From ${item.agencyName} · Release ${item.latestRelease.number} · shared ${careShortDate(item.latestRelease.publishedAt)}`}
-          end={<StTextButton href={`/workspace/care-reports/${item.reportId}?workspaceId=${encodeURIComponent(workspaceId)}`}>Open</StTextButton>} />)}</StRows>}
-  </StSection>;
+          meta="Open" href={`/workspace/care-reports/${item.reportId}?workspaceId=${encodeURIComponent(workspaceId)}`} />)}</XaRows>}
+  </section>;
 }
 
-export function WorkspaceRecaps({ workspaceId, state, period, outcomes, preview = false, releaseLabel, careReports }: { workspaceId: string; state: WorkspaceRecapsState; period: RecapPeriodFilter; outcomes?: Record<string, OutcomeRecap>; preview?: boolean; releaseLabel?: string; careReports?: OwnerCareReportsState }) {
+type ShellChrome = Partial<Omit<ComponentProps<typeof StrelvaShell>, "children">>;
+
+export function WorkspaceRecaps({ workspaceId, state, period, outcomes, preview = false, releaseLabel, careReports, recapId, chrome, hrefBase }: { workspaceId: string; state: WorkspaceRecapsState; period: RecapPeriodFilter; outcomes?: Record<string, OutcomeRecap>; preview?: boolean; releaseLabel?: string; careReports?: OwnerCareReportsState; recapId?: string; chrome?: ShellChrome; hrefBase?: string }) {
   const homeHref = `/workspace?workspaceId=${encodeURIComponent(workspaceId)}`;
-  const filterHref = (value: RecapPeriodFilter) => `${preview ? "/preview/strelva/recaps" : "/workspace/recaps"}?workspaceId=${encodeURIComponent(workspaceId)}${value === "all" ? "" : `&period=${value}`}`;
-  return <main className={styles.paper} data-dashboard data-workspace-theme="linen"><StPage>
-    <StHead crumb={{ label: "Back to Home", href: homeHref }} title="Recaps" meta={<>What Strelva saw on your site each week and month.{releaseLabel ? <> · <StMono>{releaseLabel}</StMono></> : null}</>} />
-    {state.kind === "loading" ? <><StSkeleton label="Loading recaps" width="70%" /><StSkeleton /></> : state.kind === "permission" ? <StNotice tone="critical"><strong>These recaps belong to another business</strong><p>Your account isn&apos;t a member of this business. Ask its owner to invite you, or open your own workspace.</p><StTextButton href="/workspace">Open your workspace</StTextButton></StNotice> : state.kind === "error" ? <StNotice tone="critical"><strong>Recaps couldn&apos;t load</strong><p>Your saved recaps are kept. Reload the page to try again.</p><StTextButton href={filterHref(period)}>Reload recaps</StTextButton></StNotice> : <>
-      {careReports ? <AgencyReports workspaceId={workspaceId} reports={careReports} /> : null}
-      <nav aria-label="Recap period" className={styles.actions}>{FILTERS.map(filter => <StPillLink key={filter.value} current={period === filter.value} variant="soft" href={filterHref(filter.value)}>{filter.label}{period === filter.value ? " · selected" : ""}</StPillLink>)}</nav>
-      {!state.sites.length ? <StEmpty>No site is connected to this business yet. Recaps start once a website is connected or published here.</StEmpty> : state.sites.map(site => {
-        const recaps = site.recaps.filter(recap => period === "all" || recap.period === period);
-        return <section key={site.tenantId} aria-label={site.siteName} className={styles.stack}>
-          {state.sites.length > 1 ? <StLabel as="h3">{site.siteName}</StLabel> : null}
-          {site.unavailable ? <StNotice tone="critical">Recaps for {site.siteName} couldn&apos;t be read right now.</StNotice> : !recaps.length ? <StEmpty>{period === "month" ? "No monthly recap yet." : period === "week" ? "No weekly recap yet." : `No recaps for ${site.siteName} yet.`}</StEmpty> : recaps.map(recap => <RecapOutcome key={`${recap.period}:${recap.id}`} recap={recap} siteName={site.siteName} outcome={outcomes?.[recap.id]} />)}
-        </section>;
-      })}
-    </>}
-  </StPage></main>;
+  const base = hrefBase ?? (preview ? "/preview/strelva/recaps" : "/workspace/recaps");
+  const href = (value: RecapPeriodFilter, recap?: string) => `${base}?workspaceId=${encodeURIComponent(workspaceId)}${value === "all" ? "" : `&period=${value}`}${recap ? `&recap=${encodeURIComponent(recap)}` : ""}`;
+  const head = <XaPlaceHead title="Recaps" back={{ href: homeHref, label: `Back to ${XA_PLACE_LABELS.today}` }}
+    status={<span>What Strelva saw on your site each week and month.{releaseLabel ? ` · ${releaseLabel}` : ""}</span>} />;
+  return <StrelvaShell title="Recaps" workspaceId={workspaceId} active="system" {...chrome}>
+    <XaPlace label="Recaps">
+      {head}
+      {state.kind === "loading" ? <XaPlaceLoading label="Loading recaps" />
+        : state.kind === "permission" ? <XaPlaceNotMember title="These recaps belong to another business." />
+          : state.kind === "error" ? <XaPlaceTrouble title="Recaps couldn't load." quiet="Your saved recaps are kept." action={<XaTextLink href={href(period)}>Reload recaps</XaTextLink>} />
+            : (() => {
+              const single = state.sites.length === 1 ? state.sites[0]! : null;
+              const pick = (site: SiteRecaps) => { const recaps = site.recaps.filter(recap => period === "all" || recap.period === period); return { recaps, current: recaps.find(recap => recap.id === recapId) ?? recaps[0] }; };
+              const others = (site: SiteRecaps) => { const { recaps, current } = pick(site); return recaps.length > 1 && current ? <section className={place.stack} aria-label={`Other recaps for ${site.siteName}`}>
+                <XaLabel as="h3">Other recaps</XaLabel>
+                <XaRows label="Other recaps">{recaps.filter(recap => recap !== current).map(recap => <XaRow key={`${recap.period}:${recap.id}`} title={recapTitle(recap)}
+                  detail={`${count(recap.visits)} visits · ${recap.period === "month" ? "Monthly" : "Weekly"}`} meta={xaShortDate(recap.end)} href={href(period, recap.id)} />)}</XaRows>
+              </section> : null; };
+              const singleOthers = single && !single.unavailable ? others(single) : null;
+              return <div className={place.columns} data-rail-first="true">
+                {careReports || singleOthers ? <aside className={place.rail} aria-label="Reports and other recaps">
+                  {careReports ? <AgencyReports workspaceId={workspaceId} reports={careReports} /> : null}
+                  {singleOthers}
+                </aside> : null}
+                <div className={place.sectionGap}>
+                  <XaLinkSegmented label="Recap period" options={FILTERS.map(filter => ({ href: href(filter.value), label: filter.label, current: period === filter.value }))} />
+                  {!state.sites.length ? <XaEmpty pose="website" title="No site is connected to this business yet." job="Pebble starts counting once a site is here">Recaps start once a website is connected or published here.</XaEmpty>
+                    : state.sites.map(site => {
+                      const { current } = pick(site);
+                      return <section key={site.tenantId} aria-label={site.siteName} className={place.stack}>
+                        {state.sites.length > 1 ? <XaLabel as="h2">{site.siteName}</XaLabel> : null}
+                        {site.unavailable ? <XaPlaceTrouble title={`Recaps for ${site.siteName} couldn't be read right now.`} quiet="Nothing is lost. Reload to try again." />
+                          : !current ? <XaEmpty size="sm" pose="resting" title={period === "month" ? "No monthly recap yet." : period === "week" ? "No weekly recap yet." : `No recaps for ${site.siteName} yet.`} job="Pebble writes the first one after a full week of visits" />
+                            : <><RecapOutcome recap={current} siteName={site.siteName} outcome={outcomes?.[current.id]} />{single ? null : others(site)}</>}
+                      </section>;
+                    })}
+                </div>
+              </div>;
+            })()}
+    </XaPlace>
+  </StrelvaShell>;
 }

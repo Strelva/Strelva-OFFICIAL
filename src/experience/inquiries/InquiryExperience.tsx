@@ -8,7 +8,9 @@ import { InquiryProvider, type InquiryExperienceProps, useInquiry } from "./cont
 import type { InquiryView } from "./contracts";
 import { ViewRouter } from "./views";
 import styles from "./inquiry.module.css";
-import { StEmpty, StHead, StNotice, StPage, StPill, StSteps, StTextButton } from "@/components/ui/strelva/Kit";
+import { StPill, StTextButton } from "@/components/ui/strelva/Kit";
+import { XaLines, XaTextLink } from "@/components/ui/strelva/Xa";
+import { XaNote, XaPlace, XaPlaceTrouble } from "@/experience/places/XaPlace";
 import { inquiryActorLabel } from "./recorded-actors";
 
 export type { InquiryExperienceProps } from "./context";
@@ -79,7 +81,7 @@ export function InquiryWorkspaceExperience({
 }
 
 function MissingAdapter() {
-  return <main className={styles.unavailablePage} data-workspace-theme="linen"><StPage><StHead title="This business could not be loaded." /><StNotice tone="critical">Refresh to try again. No preview data was substituted for the authorized business state.</StNotice><StTextButton href="/business">Choose another business</StTextButton></StPage></main>;
+  return <main className={styles.unavailablePage} data-workspace-theme="linen"><XaPlace width="read" label="Your business"><XaPlaceTrouble title="This business could not be loaded." quiet="Refresh to try again." action={<XaTextLink href="/business">Choose another business</XaTextLink>}><p>No preview data was substituted for the authorized business state.</p></XaPlaceTrouble></XaPlace></main>;
 }
 
 function titleForView(view: InquiryView, audience: "business" | "agency"): string {
@@ -157,17 +159,14 @@ export function InquirySurfaceContent() {
 }
 
 function UnavailableBusiness() {
-  return <StPage><StHead titleId="inquiries-unavailable-title" title="This business could not be loaded." /><StNotice tone="critical">The authorized inquiry state is unavailable right now. No preview data was substituted.</StNotice><StTextButton href="/business">Choose another business</StTextButton></StPage>;
+  return <XaPlace width="read" label="Your business"><XaPlaceTrouble title="This business could not be loaded." quiet="No preview data was substituted." action={<XaTextLink href="/business">Choose another business</XaTextLink>}><p id="inquiries-unavailable-title">The authorized inquiry state is unavailable right now.</p></XaPlaceTrouble></XaPlace>;
 }
 
 export function InquiryNotice() {
   const { snapshot, view } = useInquiry();
   return snapshot.rehearsal || view === "rehearsal" ? (
     <div className={styles.rehearsalNotice} role="note">
-      <span className={styles.noticeIcon} aria-hidden="true">✦</span>
-      <strong>Rehearsal.</strong>
-      <span>Nothing here is real.</span>
-      <span className={styles.noticeDetail}>Synthetic customers, test inboxes, and blocked external writes only.</span>
+      <XaNote pebble><strong>Rehearsal.</strong> Nothing here is real. Synthetic customers, test inboxes, and blocked external writes only.</XaNote>
     </div>
   ) : null;
 }
@@ -175,17 +174,22 @@ export function InquiryNotice() {
 function Feedback() {
   const { message, error } = useInquiry();
   if (!message && !error) return null;
-  return <div className={styles.feedback} role={error ? undefined : "status"}><StNotice tone={error ? "critical" : undefined}>{error || message}</StNotice></div>;
+  return <div className={styles.feedback} role={error ? "alert" : "status"}><XaNote pebble tone={error ? "trouble" : undefined}>{error || message}</XaNote></div>;
 }
 
 function RecordTimelineRail() {
   const { selectedRecord, snapshot } = useInquiry();
   if (!selectedRecord) return null;
   const events = snapshot.state.timeline.filter((event) => event.inquiryId === selectedRecord.id).sort((left, right) => Date.parse(left.at) - Date.parse(right.at));
-  return <section className={styles.recordRailContent}><h2>Record timeline</h2><p>Each event is retained with the inquiry record.</p>{snapshot.deliveryEvidence?.available === false ? <StNotice>Delivery evidence is unavailable right now. Provider outcomes may be missing.</StNotice> : null}{events.length > 0 ? <StSteps label="Inquiry record history" steps={events.map(event => ({ title: event.type.replaceAll("_", " "), state: event.outcome === "failed" || event.outcome === "blocked" ? "failed" : "done", detail: <>{event.summary}<small className={styles.timelineMeta}>{inquiryActorLabel(event.actor)} · {formatRailDate(event.at)} · {event.outcome}</small></> }))} /> : <StEmpty>No timeline events are recorded for this inquiry.</StEmpty>}</section>;
+  return <section className={styles.recordRailContent}><h2>Record timeline</h2><p>Each event is kept with the inquiry. Each line names whoever acted.</p>
+    {snapshot.deliveryEvidence?.available === false ? <XaNote pebble>Delivery evidence is unavailable right now. Provider outcomes may be missing.</XaNote> : null}
+    {events.length > 0 ? <XaLines label="Inquiry record history" lines={events.map(event => ({ time: formatRailDate(event.at), dateTime: event.at,
+      text: <>{inquiryActorLabel(event.actor)}: {event.summary}{event.outcome === "failed" || event.outcome === "blocked" ? ` (${event.outcome === "failed" ? "did not finish" : "held back"})` : ""}</> }))} />
+      : <XaNote>No timeline events are recorded for this inquiry.</XaNote>}
+  </section>;
 }
 
 function formatRailDate(value: string): string {
   const time = Date.parse(value);
-  return Number.isFinite(time) ? new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(time) : "Time not recorded";
+  return Number.isFinite(time) ? new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }).format(time) : "Time not recorded";
 }

@@ -4,7 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 import { InquiryExperience, InquiryWorkspaceExperience, type InquiryExperienceProps } from "./InquiryExperience";
 import type { InquirySurfaceAdapter, InquirySurfaceResult, InquirySurfaceSnapshot } from "./contracts";
 import styles from "./inquiry.module.css";
-import { StHead, StNotice, StPage, StPill, StTextButton } from "@/components/ui/strelva/Kit";
+import { XaButton, XaTextLink, XaWorking } from "@/components/ui/strelva/Xa";
+import { XaPlace, XaPlaceTrouble } from "@/experience/places/XaPlace";
 
 export type InquiryServerExperienceProps = Omit<InquiryExperienceProps, "adapter" | "initialSnapshot" | "scenario"> & {
   tenantId: string;
@@ -118,6 +119,11 @@ function readResult(value: unknown): InquirySurfaceResult | null {
   return readSnapshot(candidate.snapshot) ? result as InquirySurfaceResult : null;
 }
 
-function ServerStatus({ error }: { error: string }) {
-  return <main className={styles.unavailablePage} data-workspace-theme="linen" role={error ? "alert" : "status"}><StPage><StHead title={error ? "This business could not be loaded." : "Loading inquiries…"} meta={error || "Checking the authorized inquiry state."} />{error ? <><StNotice tone="critical">No preview data was substituted.</StNotice><StPill variant="soft" onClick={() => window.location.reload()}>Try again</StPill><StTextButton href="/business">Choose another business</StTextButton></> : null}</StPage></main>;
+/** Loading and failure for one business, in XA: Pebble is reading it, or Pebble is in frame with what failed. */
+export function ServerStatus({ error }: { error: string }) {
+  return <main className={styles.unavailablePage} data-workspace-theme="linen" id="strelva-main"><XaPlace width="read" label="Your business">
+    {error ? <XaPlaceTrouble title="This business could not be loaded." quiet="No preview data was substituted." action={<><XaButton variant="primary" onClick={() => window.location.reload()}>Try again</XaButton><XaTextLink href="/business">Choose another business</XaTextLink></>}>
+      <p>{error}</p>
+    </XaPlaceTrouble> : <XaWorking title="Loading inquiries…" steps={[{ id: "auth", label: "Checking the authorized inquiry state", state: "active" }]} />}
+  </XaPlace></main>;
 }

@@ -9,6 +9,7 @@ import { readWorkspaceRecaps, recapView, type RecapDependencies } from "@/produc
 import { WorkspaceRecaps, recapTitle } from "@/experience/recaps/WorkspaceRecaps";
 import { DASHBOARD_DISPOSITIONS } from "@/platform/owner-entry/dispositions";
 import { routeDashboardRequest } from "@/platform/owner-entry/decision";
+vi.mock("@/experience/app-frame/StrelvaShell", () => ({ StrelvaShell: ({ children }: { children: React.ReactNode }) => children }));
 
 const WS = "7f000000-0000-4000-8000-000000000010";
 const ACTOR = { userId: "7f000000-0000-4000-8000-000000000002", verifiedEmail: "Owner@Example.test" };

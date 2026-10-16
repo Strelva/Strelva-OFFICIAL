@@ -38,10 +38,15 @@ export function morningNeedsYouEmail(input: EmailIdentity & { subject: string; i
   ] };
 }
 
+/**
+ * A new inquiry with nothing to decide (XA · E1 voice): who wrote and how,
+ * their words, then one sentence naming whoever already acted, and one
+ * button. No boxed receipt.
+ */
 export function newInquiryEmail(input: EmailIdentity & { person: string; source: string; inquiry: string; recordedOutcome: string; policyNote: string; open: PaperAction }): PaperEmail {
-  return { ...input, subject: `New inquiry from ${input.person}`, footer: "You get one of these per inquiry. Change this in Who decides.", blocks: [
-    { kind: "label", text: `${input.person} · ${input.source}` }, p(input.inquiry),
-    { kind: "draft", label: "Already done", text: input.recordedOutcome, note: input.policyNote }, a([{ ...input.open, style: "soft" }]),
+  return { ...input, subject: `New inquiry from ${input.person}`, preheader: input.recordedOutcome, footer: `${input.policyNote} You get one of these per inquiry. Change this in Who decides.`, blocks: [
+    { kind: "label", text: `${input.person} · ${input.source}` }, p(`“${input.inquiry}”`),
+    { kind: "rule" }, p(input.recordedOutcome), a([{ ...input.open, style: "primary" }], false),
   ] };
 }
 

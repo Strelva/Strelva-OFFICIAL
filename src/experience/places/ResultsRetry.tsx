@@ -1,8 +1,8 @@
 "use client";
 
-import { StTextButton } from "@/components/ui/strelva/Kit";
+import { XaButton } from "@/components/ui/strelva/Xa";
 
 /** Preserve the complete selected window when retrying a failed read. */
 export function ResultsRetry() {
-  return <StTextButton onClick={() => window.location.reload()}>Reload results</StTextButton>;
+  return <XaButton onClick={() => window.location.reload()}>Reload results</XaButton>;
 }

@@ -13,6 +13,7 @@ import { UnsubscribeView } from "@/experience/publishing/UnsubscribeView";
 import { PUBLISHING_RECAP, PUBLISHING_RECAP_OUTCOME } from "@/experience/workspace/preview/publishing-fixture";
 import { recapView } from "@/products/recaps/server";
 import type { WeeklyBrief } from "@/lib/types";
+vi.mock("@/experience/app-frame/StrelvaShell", () => ({ StrelvaShell: ({ children }: { children: React.ReactNode }) => children }));
 
 const workspaceId = "5e000000-0000-4000-8000-000000000010";
 const initial = (): ContentWorkspaceData => ({ permissions: { canCompose: true, canApprove: true }, content: {
@@ -109,7 +110,7 @@ describe("publishing distinguishes evidence and unavailable state", () => {
     expect(html.match(/Not counted in this saved recap/g)).toHaveLength(4);
     expect(html).toContain("clicks, not confirmed bookings");
     const fixture = renderToStaticMarkup(<RecapOutcome recap={PUBLISHING_RECAP} siteName="Fixture site" outcome={PUBLISHING_RECAP_OUTCOME} />);
-    expect(fixture).not.toContain("Not counted in this saved recap"); expect(fixture).toContain("New reviews"); expect(fixture).toContain('data-size="value">0');
+    expect(fixture).not.toContain("Not counted in this saved recap"); expect(fixture).toContain("New reviews"); expect(fixture).toContain('data-counted="true">0<');
   });
 
   it("uses already saved inquiry proof and review events without claiming bookings, delivery or a review provider", () => {

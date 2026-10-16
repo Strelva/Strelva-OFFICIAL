@@ -20,6 +20,20 @@ exported. API, Pen node per part, motion and the anti-slop checklist:
 [design-notes/XA-FOUNDATION.md](../../design-notes/XA-FOUNDATION.md). Preview:
 `/preview/strelva/xa`.
 
+### XA places: Leads, Reviews, Recaps, Results, Prospects (lane xs-leads, October 15)
+
+`@/experience/places/XaPlace` composes the kit into the XA · S3 place shape
+and is server-safe: `XaPlace` (paper and padding), `XaPlaceHead` (clay, title,
+one status line, the one view switch on the right), `XaLinkSegmented` (a
+segmented control whose options are addresses), `XaFigure` (the one big number,
+XA · E3), `XaPlaceTrouble` / `XaPlaceNotMember` / `XaPlaceLoading` (Pebble in
+frame for bad news), `XaNote` (one inline sentence), `XaStars` and
+`xaShortDate`. The list-beside-detail layout is `.split` / `.list` / `.pick` /
+`.detail` in `xa-place.module.css`; on a phone the picked item opens as its
+own screen with Back. Email: the paper renderer gains an additive `figure`
+block (DM Sans, no mono). Preview every screen and state at
+`/preview/strelva/xa/xs-leads/<screen>?state=…`.
+
 ## October 11 coherence amendment
 
 [GLOSSARY.md](../../GLOSSARY.md) and

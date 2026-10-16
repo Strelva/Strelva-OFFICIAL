@@ -1,6 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import { StrelvaShell } from "@/experience/app-frame/StrelvaShell";
-import { StHead, StNotice, StPage } from "@/components/ui/strelva/Kit";
+import { XaButtonLink } from "@/components/ui/strelva/Xa";
+import { XaPlace, XaPlaceHead, XaPlaceTrouble } from "@/experience/places/XaPlace";
 import { workspaceReleaseEnabled } from "@/platform/workspace-release";
 import { workspaceReturnTarget } from "@/platform/workspaces/location";
 import { workspaceHttpActor } from "@/platform/workspaces/http";
@@ -21,11 +22,15 @@ export default async function LeadsPage({ searchParams }: { searchParams: Promis
   }
   let agency;
   try { agency = await leadAgency(actor, workspaceId); }
-  catch { return <StrelvaShell title="" workspaceId={workspaceId}><StPage><StHead title="Leads" /><StNotice tone="critical">Only a verified owner or admin of this agency can manage its leads.</StNotice></StPage></StrelvaShell>; }
+  catch {
+    return <StrelvaShell title="" workspaceId={workspaceId}><XaPlace label="Leads"><XaPlaceHead title="Leads" />
+      <XaPlaceTrouble pose="waving" title="These leads belong to an agency team." action={<XaButtonLink href="/workspace">Open your workspace</XaButtonLink>}>
+        <p>Only a verified owner or admin of this agency can manage its leads.</p>
+      </XaPlaceTrouble>
+    </XaPlace></StrelvaShell>;
+  }
   const brand = await resolveOwnerBrand(agency.id);
   return <StrelvaShell title="" workspaceId={agency.id} workspaceName={brand.agencyId === agency.id ? brand.name : "Agency identity unavailable"} ownerBrand={brand} agencyNavigation={{ leadsCurrent: true, leadsAvailable: true }}>
-    <StPage><StHead title="Leads" crumb={{ label: "Agency clients", href: `/workspace?workspaceId=${encodeURIComponent(agency.id)}&agencyView=clients` }} />
-      <AgencyLeads agencyWorkspaceId={agency.id} />
-    </StPage>
+    <AgencyLeads agencyWorkspaceId={agency.id} />
   </StrelvaShell>;
 }

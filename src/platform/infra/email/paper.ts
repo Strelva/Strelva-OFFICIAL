@@ -13,7 +13,9 @@ export type PaperBlock =
   | { kind: "decision"; category: string; title: string; detail: string; actions: readonly PaperAction[] }
   | { kind: "file"; name: string; detail: string }
   | { kind: "possibility"; title: string; detail: string; action: PaperAction }
-  | { kind: "rule" };
+  | { kind: "rule" }
+  /** XA · E3: the one number an email is about, in DM Sans, beside what it counts. */
+  | { kind: "figure"; value: string; label: string; note?: string };
 
 /** Presentation only. URLs are supplied by existing issuance/authorization paths.
  * Rendering never creates a signed link, claims an item or sends mail. */
@@ -60,6 +62,7 @@ function block(b: PaperBlock): string {
     case "paragraph": return text(b.text, b.muted);
     case "label": return label(b.text);
     case "rule": return `<div style="height:1px;background:${t.line};"></div>`;
+    case "figure": return table(`<tr><td valign="middle" style="padding:8px 18px 8px 0;font-family:${t.font};font-size:64px;line-height:64px;font-weight:300;letter-spacing:-2px;color:${t.text};white-space:nowrap;">${e(b.value)}</td><td valign="middle" style="padding:8px 0;"><p style="margin:0;font-size:18px;line-height:24px;font-weight:500;color:${t.text};overflow-wrap:anywhere;">${e(b.label)}</p>${b.note ? `<p style="margin:4px 0 0;font-size:14px;line-height:20px;color:${t.muted};overflow-wrap:anywhere;">${e(b.note)}</p>` : ""}</td></tr>`, "", "");
     case "actions": return actions(b.actions, b.full);
     case "draft": return table(`<tr><td style="padding:16px;background:${b.surface ? t.surface : t.inset};border-radius:12px;${b.surface ? `border:1px solid ${t.line};` : ""}">${label(b.label)}${text(b.text)}${b.note ? `<p style="margin:8px 0 0;font-size:12px;line-height:18px;color:${t.faint};">${e(b.note)}</p>` : ""}</td></tr>`);
     case "rows": return table(b.rows.map(r => `<tr><td style="padding:12px 16px;border-bottom:1px solid ${t.line};font-size:14px;line-height:20px;color:${t.muted};">${e(r.label)}</td><td align="right" style="padding:12px 16px;border-bottom:1px solid ${t.line};font-size:13px;line-height:20px;color:${r.tone ? t[r.tone] : t.text};overflow-wrap:anywhere;">${e(r.value)}</td></tr>`).join(""), `border-top:1px solid ${t.line};`);
@@ -98,6 +101,7 @@ export function renderPaperEmailText(email: PaperEmail): string {
       case "file": lines.push(b.name, b.detail); break;
       case "possibility": lines.push(b.title, b.detail, `${b.action.label}: ${b.action.url}`); break;
       case "rule": break;
+      case "figure": lines.push(`${b.value} ${b.label}`, b.note ?? ""); break;
     }
     lines.push("");
   }

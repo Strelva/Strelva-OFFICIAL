@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { vi } from "vitest";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { WorkspaceInquiries } from "@/experience/places/WorkspaceInquiries";
@@ -10,6 +11,7 @@ import { SiteSummarySection } from "@/experience/workspace/SiteSummarySection";
 import { replyErrorMessage } from "@/experience/places/ReviewReplyForm";
 import type { BusinessRecord } from "@/platform/business-record/contracts";
 import type { ReviewView } from "@/products/google-listing/linked-reviews";
+vi.mock("@/experience/app-frame/StrelvaShell", () => ({ StrelvaShell: ({ children }: { children: React.ReactNode }) => children }));
 
 const WS = "7f000000-0000-4000-8000-000000000010";
 const STABLE = "7f000000-0000-4000-8000-0000000000b2";

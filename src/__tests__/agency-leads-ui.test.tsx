@@ -59,7 +59,7 @@ it.each(["no membership", "ordinary member", "super-admin without membership"])(
   pageMocks.agency.mockRejectedValueOnce(new Error("Not authorized"));
   const page = renderToStaticMarkup(await LeadsPage({ searchParams: Promise.resolve({ workspaceId: agency }) }));
   expect(page).toContain("Only a verified owner or admin of this agency");
-  expect(page).not.toContain("Reading leads"); expect(page).not.toContain("Refresh leads"); expect(page).not.toContain("Convert");
+  expect(page).not.toContain("Reading leads"); expect(page).not.toContain("Refresh leads"); expect(page).not.toContain("Add as client");
   expect(pageMocks.brand).not.toHaveBeenCalled();
 });
 
@@ -81,8 +81,7 @@ it("updates status and dismisses through actor-bound ordinary agency commands", 
     const body = JSON.parse(String(init.body)); bodies.push(body); return Response.json(receipt(body));
   });
   const node = await render(request);
-  (node.querySelector('[name="status"]') as HTMLSelectElement).value = "contacted";
-  await act(async () => button(node, "Save status").click());
+  await act(async () => button(node, "Mark contacted").click());
   expect(bodies[0]).toMatchObject({ action: "status", status: "contacted", token, agencyWorkspaceId: agency, expectedActorId: actor });
   await act(async () => button(node, "Dismiss").click()); expect(bodies[1]).toMatchObject({ action: "status", status: "dismissed" });
   expect(bodies[1]?.idempotencyKey).not.toBe(bodies[0]?.idempotencyKey);
@@ -107,7 +106,7 @@ it("hands conversion to the ordinary client flow and keeps conversion distinct f
     if (init?.method !== "POST") return Response.json(snapshot({ leads: [current] }));
     const body = JSON.parse(String(init.body)); const saved = receipt(body); current = saved as typeof row; return Response.json(saved);
   });
-  const node = await render(request); await act(async () => button(node, "Convert").click());
+  const node = await render(request); await act(async () => button(node, "Add as client").click());
   expect(node.textContent).toContain("The lead stays Converting until the client business is created");
   expect([...node.querySelectorAll("a")].map(link => link.getAttribute("href"))).toContain(href("/workspace/agency/clients/new"));
   expect(node.textContent).not.toContain("Converted"); expect(node.querySelector('a[href*="/admin"]')).toBeNull();
@@ -115,9 +114,11 @@ it("hands conversion to the ordinary client flow and keeps conversion distinct f
 
 it("holds conversion when client creation is unavailable and after actual conversion", async () => {
   const node = await render(vi.fn<typeof fetch>().mockResolvedValue(Response.json(snapshot({ conversionAvailable: false }))));
-  expect(button(node, "Convert").disabled).toBe(true); expect(node.textContent).toContain("Adding a client is currently unavailable");
+  expect(button(node, "Add as client").disabled).toBe(true); expect(node.textContent).toContain("Adding a client is currently unavailable");
   const converted = await render(vi.fn<typeof fetch>().mockResolvedValue(Response.json(snapshot({ leads: [{ ...row, workflow: { ...row.workflow, status: "converted" }, lead: { ...row.lead, deliveryStatus: "launched" } }] }))));
-  expect(button(converted, "Convert").disabled).toBe(true); expect(button(converted, "Dismiss")).toBeUndefined();
+  // A converted lead is Done: it leaves the open list, and its own page keeps conversion held.
+  expect(converted.textContent).toContain("Nothing open"); await act(async () => button(converted, "Done 1").click());
+  expect(button(converted, "Add as client").disabled).toBe(true); expect(button(converted, "Dismiss")).toBeUndefined();
 });
 
 it("holds exact lost-response terms across GET refresh and refused retry", async () => {
@@ -148,8 +149,8 @@ it.each(["missing key", "wrong token", "wrong status", "wrong href", "incomplete
       ...(fault === "wrong status" ? { workflow: { ...saved.workflow, status: "converted" } } : {}),
       ...(fault === "wrong href" ? { href: "/admin/onboard?email=coffee@example.test" } : {}) });
   });
-  const node = await render(request); await act(async () => button(node, "Convert").click());
-  expect(node.textContent).toContain("awaiting confirmation"); expect(button(node, "Convert").disabled).toBe(true);
+  const node = await render(request); await act(async () => button(node, "Add as client").click());
+  expect(node.textContent).toContain("awaiting confirmation"); expect(button(node, "Add as client").disabled).toBe(true);
   expect(node.querySelector('a[href*="/clients/new"]')).toBeNull(); expect(node.textContent).not.toContain("Ready to add this client");
 });
 
@@ -157,6 +158,6 @@ it("disables stale writes and handoffs after refresh failure while retaining the
   const request = vi.fn<typeof fetch>().mockResolvedValueOnce(Response.json(snapshot())).mockRejectedValueOnce(new Error("Read unavailable"));
   const node = await render(request); await act(async () => button(node, "Refresh leads").click());
   expect(node.textContent).toContain("Buffalo Coffee"); expect(node.textContent).toContain("Retained leads may be out of date");
-  expect(button(node, "Convert").disabled).toBe(true); expect(button(node, "Add note").disabled).toBe(true);
+  expect(button(node, "Add as client").disabled).toBe(true); expect(button(node, "Add note").disabled).toBe(true);
   expect(node.querySelector('a[href*="payment-links"]')).toBeNull();
 });

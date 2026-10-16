@@ -1,15 +1,18 @@
 "use client";
 
 import { useState } from "react";
-import { TextArea } from "@/components/ui/TextInput";
-import { StLabel, StNotice, StPill, StState, StTextButton } from "@/components/ui/strelva/Kit";
-import styles from "@/experience/publishing/publishing.module.css";
+import { XaButton, XaTextArea, XaTextLink } from "@/components/ui/strelva/Xa";
+import { XaNote } from "./XaPlace";
+import styles from "./xa-place.module.css";
 
 /**
  * Reply to one review from the workspace. Posts to
  * /api/workspace/reviews/reply, which checks membership and tenant access and
  * then takes the same governed path as /dashboard/reviews: published on
  * Google when the listing is connected, saved to copy by hand otherwise.
+ *
+ * XA (lane xs-leads): a drafted reply reads as words already written (moss
+ * tint), Edit opens it in place, and the one ink pill says where it goes.
  */
 
 export type ReplyOutcome =
@@ -27,7 +30,7 @@ export function replyErrorMessage(status: number, body: { error?: string } | nul
   return body?.error ? `${body.error} Nothing was posted.` : "The reply didn't go through. Nothing was posted.";
 }
 
-export function ReviewReplyForm({ workspaceId, tenantId, reviewId, author, initial, postsToGoogle, readOnly = false, primary = true, request = fetch }: {
+export function ReviewReplyForm({ workspaceId, tenantId, reviewId, author, initial, postsToGoogle, readOnly = false, primary = true, request = fetch, sentAs }: {
   workspaceId: string;
   tenantId: string;
   reviewId: string;
@@ -37,18 +40,18 @@ export function ReviewReplyForm({ workspaceId, tenantId, reviewId, author, initi
   readOnly?: boolean;
   primary?: boolean;
   request?: typeof fetch;
+  /** Who the reply appears from, e.g. the business name. */
+  sentAs?: string;
 }) {
   const [text, setText] = useState(initial);
   const [outcome, setOutcome] = useState<ReplyOutcome>({ kind: "idle" });
   const [editing, setEditing] = useState(!initial);
 
   if (outcome.kind === "done") {
-    return (
-      <div className={styles.draft} role="status"><StNotice><div className={styles.stack}>
-        <StLabel>{outcome.published ? "Posted on Google" : "Your reply, saved. Copy it into the review site to post it."}</StLabel>
-        <p className={styles.copy}>{outcome.reply}</p>
-      </div></StNotice></div>
-    );
+    return <div className={styles.stack} role="status">
+      <p className={styles.said}>{outcome.reply}</p>
+      <XaNote pebble>{outcome.published ? `Posted on Google. ${author} sees it under their review.` : "Your reply is saved. Copy it into the review site to post it."}</XaNote>
+    </div>;
   }
 
   async function send() {
@@ -70,17 +73,17 @@ export function ReviewReplyForm({ workspaceId, tenantId, reviewId, author, initi
     }
   }
 
-  return (
-    <div className={styles.draft}><StNotice><div className={styles.stack}>
-      <StState kind={initial ? "need" : "draft"}>{initial ? "Reply drafted · not posted" : "Your reply · not posted"}</StState>
-      {editing ? <TextArea label={`Your reply to ${author}`} value={text} disabled={readOnly || outcome.kind === "sending"} onChange={event => setText(event.target.value)} rows={3} maxLength={4000} /> : <p className={styles.copy}>{text}</p>}
-      {readOnly ? <p className={styles.copy}>Only an authorized owner can post this reply.</p> : <div className={styles.actions}>
-        <StTextButton disabled={outcome.kind === "sending"} onClick={() => setEditing(!editing)}>{editing ? "Preview reply" : "Edit"}</StTextButton>
-        <StPill variant={primary ? "primary" : "soft"} title={postsToGoogle ? "Reply on Google" : "Save reply"} busy={outcome.kind === "sending"} disabled={!text.trim()} onClick={() => void send()}>
-          {outcome.kind === "sending" ? "Sending…" : postsToGoogle ? "Post reply" : "Save reply"}
-        </StPill>
-      </div>}
-      {outcome.kind === "error" ? <StNotice tone="critical">{outcome.message}</StNotice> : null}
-    </div></StNotice></div>
-  );
+  return <div className={styles.stack}>
+    {editing
+      ? <XaTextArea label={`Your reply to ${author}`} value={text} disabled={readOnly || outcome.kind === "sending"} onChange={event => setText(event.target.value)} rows={4} maxLength={4000} />
+      : <><p className={styles.quiet}>{initial ? "Reply drafted, not posted" : "Your reply, not posted"}</p><p className={styles.said}>{text}</p></>}
+    {readOnly ? <p className={styles.quiet}>Only an authorized owner can post this reply.</p> : <div className={styles.detailFoot}>
+      <XaButton variant={primary ? "primary" : "secondary"} title={postsToGoogle ? "Reply on Google" : "Save reply"} busy={outcome.kind === "sending"} disabled={!text.trim()} onClick={() => void send()}>
+        {outcome.kind === "sending" ? "Sending…" : postsToGoogle ? "Post reply" : "Save reply"}
+      </XaButton>
+      <XaTextLink onClick={() => setEditing(!editing)}>{editing ? "Preview reply" : "Edit"}</XaTextLink>
+      <span className={styles.detailFootNote}>{postsToGoogle ? `Posts on Google${sentAs ? ` as ${sentAs}` : ""}` : "Saved here to copy by hand"}</span>
+    </div>}
+    {outcome.kind === "error" ? <XaNote tone="trouble" pebble role="alert">{outcome.message}</XaNote> : null}
+  </div>;
 }
