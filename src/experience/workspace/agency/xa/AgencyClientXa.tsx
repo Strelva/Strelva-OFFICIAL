@@ -2,7 +2,7 @@
 /**
  * XA · AG3 · Inside one client (Pen GtI53).
  *
- * What waits on the owner, then what the agency may do in this business,
+& in this business,
  * grouped by who makes a change live, as the owner set it. The page reads the client's shared
  * Systems, the shared decision status (agency-client-home) and, when the
  * server lets the agency read it, the owner's area choices
@@ -19,7 +19,7 @@ import { actorPresentation } from "@/platform/presentation/actor";
 import { clientDecisionHref } from "@/platform/workspaces/location";
 import type { SystemView } from "@/experience/systems/model";
 import type { AgencyClientHomeState } from "../../useAgencyClientHome";
-import { clientColor } from "./client-color";
+import { clientColor } from "@/platform/presentation/client-color";
 import styles from "./agency-xa.module.css";
 
 const SCOPE_OF_KIND: Partial<Record<SystemView["kind"], AgencyScope>> = {
@@ -91,7 +91,7 @@ export function AgencyClientXa({ clientName, workspaceId, agencyName, agencyHref
   const changes = shared.status === "ready" ? shared.data.changes.slice(0, 5) : [];
   const live = systems.filter(system => system.lifecycle === "live").length;
   const meta = [ownerName ? `${ownerName} owns it` : null, systemsLoading ? null : live ? `${live} ${live === 1 ? "System" : "Systems"} live` : systems.length ? "Nothing live yet" : null, `Shared with ${agencyName}`].filter(Boolean).join(" · ");
-  const groups = levelGroups(systems, grants, owner, agencyName);
+  const groups = levelGroups(systems, grants, owner, agencyName, ownerName);
 
   return <div className={styles.client}>
     <nav aria-label="Breadcrumb"><ol className={styles.crumbs}><li><a href={agencyHref}>Clients</a></li><li aria-current="page">{clientName}</li></ol></nav>
@@ -106,8 +106,7 @@ export function AgencyClientXa({ clientName, workspaceId, agencyName, agencyHref
       {shared.status === "loading" || shared.status === "disabled" ? <p role="status" className={styles.note}>Checking what waits on {owner}…</p>
         : shared.status === "error" ? <div role="alert"><XaSays links={[<XaTextLink key="again" onClick={onRetryShared}>Check again</XaTextLink>]}>What waits on {owner} could not be checked. Nothing changed.</XaSays></div>
           : open.length ? <XaRows label={`Waiting on ${clientName}`}>{open.map(item => <XaRow key={item.id} title={item.title}
-            detail={`Sent ${new Date(item.since).toLocaleDateString("en-US", { month: "short", day: "numeric" })}. Only ${owner} can say yes.`}
-            action={<XaTextLink href={clientDecisionHref(workspaceId, item.id)} aria-label={`See it: ${item.title}`}>See it</XaTextLink>} />)}</XaRows>
+            detail={<>Sent {new Date(item.since).toLocaleDateString("en-US", { month: "short", day: "numeric" })}. Only {owner} can say yes. <XaTextLink href={clientDecisionHref(workspaceId, item.id)} aria-label={`See it: ${item.title}`}>See it</XaTextLink></>} />)}</XaRows>
             : <p className={styles.note}>Nothing waits on {owner}. What you send for a yes shows here until it&apos;s decided.</p>}
     </section>
 
@@ -145,7 +144,8 @@ export function AgencyClientXa({ clientName, workspaceId, agencyName, agencyHref
 }
 
 /** Areas grouped by who makes a change live there. Areas with neither a System nor a level stay out. */
-function levelGroups(systems: readonly SystemView[], grants: AgencyGrants, owner: string, agencyName: string): Group[] {
+function levelGroups(systems: readonly SystemView[], grants: AgencyGrants, owner: string, agencyName: string, ownerName?: string | null): Group[] {
+  const keptLabel = ownerName ? `${ownerName} keeps` : "Owner keeps";
   const areas = AGENCY_SCOPES.map(scope => ({
     scope,
     systems: systems.filter(system => SCOPE_OF_KIND[system.kind] === scope),
@@ -161,12 +161,14 @@ function levelGroups(systems: readonly SystemView[], grants: AgencyGrants, owner
   const groups: Group[] = [
     { key: "full_control", title: "Full control", note: `You make changes live. ${owner.charAt(0).toUpperCase()}${owner.slice(1)} sees each one in What changed.`, items: areas.filter(area => area.grant?.level === "full_control").flatMap(items) },
     { key: "prepare", title: "Prepare", note: `You build and stage changes. ${owner.charAt(0).toUpperCase()}${owner.slice(1)} makes them live.`, items: areas.filter(area => area.grant?.level === "prepare").flatMap(items) },
-    { key: "kept", title: `${owner.charAt(0).toUpperCase()}${owner.slice(1)} keeps`, items: areas.filter(area => !area.grant).flatMap(items) },
+    // The client is named in the page title, so the label says only who keeps it and stays on one line.
+    { key: "kept", title: keptLabel, items: areas.filter(area => !area.grant).flatMap(items) },
   ];
   return groups.filter(group => group.items.length);
 }
 
+/** Who made the change. The platform credit ("Runs on Strelva") has no job for the agency here, so it stays out. */
 function byLine(actor: unknown): string {
-  const { name, credit } = actorPresentation(actor);
-  return name ? `By ${name}${credit ? ` · ${credit}` : ""}` : "Who made this change wasn't recorded";
+  const { name } = actorPresentation(actor);
+  return name ? `By ${name}` : "Who made this change wasn't recorded";
 }

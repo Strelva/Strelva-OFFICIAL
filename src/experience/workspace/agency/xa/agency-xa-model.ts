@@ -194,9 +194,9 @@ export interface ClientMinutes {
   byPerson: { name: string; minutes: number }[];
 }
 
-/** "Logged by Maya 60 · Jonah 36 min". */
+/** "Logged by Maya 60 min · Jonah 36 min": every figure carries its unit. */
 export function peopleMinutesLine(row: Pick<ClientMinutes, "byPerson">): string {
-  return row.byPerson.length ? `Logged by ${row.byPerson.map(person => `${person.name} ${person.minutes}`).join(" · ")} min` : "";
+  return row.byPerson.length ? `Logged by ${row.byPerson.map(person => `${person.name} ${person.minutes} min`).join(" · ")}` : "";
 }
 
 /** Notes keep their own capitals, so they are joined with a middle dot, never mid-sentence. */

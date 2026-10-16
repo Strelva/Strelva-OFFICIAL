@@ -37,7 +37,7 @@ describe("XA-6 words", () => {
 
   it("says where every client stands in one paragraph, naming who waits on whom", () => {
     expect(todaySentence(page.clients, page.queue)).toBe("North Coast Realty and Lakeview Mediation need you. Harbor Dental and Fieldwork Studio wait on their owners.");
-    expect(clientStanding(page.clients[0]!, page.queue)).toEqual({ standing: "owner", line: "Waiting on Harbor Dental · New cleaning prices on harbordental.com/services" });
+    expect(clientStanding(page.clients[0]!, page.queue)).toEqual({ standing: "owner", line: "Waiting on Harbor Dental · New cleaning prices on the Services page" });
     const done = xaAgencyClients("done", NOW);
     expect(todaySentence(done.clients, done.queue)).toBe("Harbor Dental and Fieldwork Studio wait on their owners. North Coast Realty and Lakeview Mediation are quiet.");
     expect(todaySentence([], [])).toContain("No clients yet");
@@ -61,7 +61,7 @@ describe("XA-6 words", () => {
 
   it("says who logged the minutes and joins notes without capitals mid-sentence", () => {
     const harbor = clientMinutes(XA_CLIENT.harbor, "Harbor Dental", XA_MINUTES[XA_CLIENT.harbor]!);
-    expect(peopleMinutesLine(harbor)).toBe("Logged by Maya 58 · Jonah 38 min");
+    expect(peopleMinutesLine(harbor)).toBe("Logged by Maya 58 min · Jonah 38 min");
     expect(notesLine(harbor.notes)).toBe("Cleaning prices · Thanksgiving hours · Two inquiry follow-ups");
   });
 
@@ -123,7 +123,7 @@ describe("XA-6 screens", () => {
     const ready = await mount(createElement(AgencyMinutes, { agencyName: "North Studio", state: { status: "ready", rows, failed: ["Lakeview Mediation"], partial: false }, now: new Date(2026, 9, 14), onOpenClient: () => undefined, onRetry: () => undefined }));
     expect(ready.querySelector("h1")?.textContent).toBe("96 minutes across 1 client. October 1 to 14, by Maya and Jonah.");
     expect(ready.querySelector('[role="alert"]')?.textContent).toContain("Time for Lakeview Mediation could not be read");
-    expect(ready.textContent).toContain("Logged by Maya 58 · Jonah 38 min");
+    expect(ready.textContent).toContain("Logged by Maya 58 min · Jonah 38 min");
     // One Pebble, doing a job, on every width: no felt scene beside a second avatar.
     expect(ready.querySelectorAll('img[src*="pebble"]')).toHaveLength(1);
     expect(ready.querySelectorAll('img[src*="scene"], img[src*="pose"]')).toHaveLength(0);

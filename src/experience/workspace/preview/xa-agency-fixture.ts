@@ -76,7 +76,7 @@ export function xaAgencyClients(state: XaAgencyState, now: number = XA_DAY.now):
     ...(fixed ? [] : [{ id: "health:north", kind: "health" as const, workspaceId: XA_CLIENT.north, clientName: "North Coast Realty", title: "Showings calendar stopped syncing with Google Calendar", systemId: sys(4), workId: null, since: hoursAgo(3, now), label: "Google signed North Studio out" }]),
     ...(fixed ? [] : [{ id: "request:lakeview", kind: "request" as const, workspaceId: XA_CLIENT.lakeview, clientName: "Lakeview Mediation", title: "Ruth asked for a Spanish version of the intake form", systemId: null, workId: null, since: hoursAgo(26, now) }]),
     { id: "improvement:harbor", kind: "improvement", workspaceId: XA_CLIENT.harbor, clientName: "Harbor Dental", title: "After-hours reply is ready to offer", systemId: null, workId: null, since: hoursAgo(22, now) },
-    { id: "decision:harbor", kind: "needs_you", workspaceId: XA_CLIENT.harbor, clientName: "Harbor Dental", title: "New cleaning prices on harbordental.com/services", systemId: sys(1), workId: null, since: hoursAgo(30, now) },
+    { id: "decision:harbor", kind: "needs_you", workspaceId: XA_CLIENT.harbor, clientName: "Harbor Dental", title: "New cleaning prices on the Services page", systemId: sys(1), workId: null, since: hoursAgo(30, now) },
     { id: "decision:fieldwork", kind: "needs_you", workspaceId: XA_CLIENT.fieldwork, clientName: "Fieldwork Studio", title: "Confirm print prices before the intake form goes public", systemId: sys(6), workId: null, since: hoursAgo(18, now) },
   ];
   return { agencyWorkspaceId: XA_AGENCY, clients, queue, team: [], total: clients.length, nextCursor: null, providersRead: true, queueComplete: true };

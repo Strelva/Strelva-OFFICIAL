@@ -37,7 +37,10 @@ describe("agency v2 document drafts", () => {
       {op:"replace",path:"/nodes/services/props",value:{...initial.website!.rebuild.candidate!.document.nodes.services!.props,title:"[Agency's proposed services]"}},
       {op:"replace",path:"/nodes/services/children",value:["service-two","service-one"]},
     ]);
-    expect(container.textContent).toContain("The client can now review it");
+    expect(container.textContent).toContain("Sent · waiting on the client");
+    // The panel says it once: no Pebble sentence repeating the status, and no raw field editor for the agency.
+    expect(container.textContent).not.toContain("can now review it");
+    expect(container.textContent).not.toContain("Every field in this part of the page");
   });
   it("stays on what it sent, then Undo sends the exact inverse and hands the edits back",async()=>{
     const initial=agencyDocumentFixture();
@@ -60,9 +63,24 @@ describe("agency v2 document drafts", () => {
     expect(save).toHaveBeenCalledTimes(2);
     expect(save.mock.calls[1]![3]).toEqual([{op:"replace",path:"/nodes/service-two/props",value:original}]);
     expect(save.mock.calls[1]![1].rebuild.candidate!.revision).toBe(initial.website!.rebuild.candidate!.revision+1);
-    expect(container.textContent).toContain("Taken back.");
+    expect(container.textContent).toContain("Taken back. The draft the client reviews reads as it did before you sent this.");
+    // What the client reviews now is the draft as it was before the send: the inverse landed, nothing else changed.
+    const reviewed=(save.mock.results[1]!.value as Promise<{website:NonNullable<typeof initial.website>}>);
+    expect((await reviewed).website.rebuild.candidate!.document.nodes["service-two"]!.props).toEqual(original);
     expect(container.querySelector("textarea")!.value).toBe("[Second service, renamed]");
     expect(button("Send to the client")).toBeDefined();
+    expect(button("Keep editing")).toBeUndefined();
+  });
+  it("says Undo closed when editing goes on during its window, instead of dropping it silently",async()=>{
+    const initial=agencyDocumentFixture();
+    const save=vi.fn(async (_binding:string,record:NonNullable<typeof initial.website>) => { const next=structuredClone(record); next.rebuild.candidate!.revision+=1; return {website:next}; });
+    await mount({read:async()=>initial,save});
+    await change(container.querySelector("textarea")!,"[Agency's proposed services]");
+    await act(async()=>button("Send to the client").click());
+    expect(button("Undo")).toBeDefined();
+    await change(container.querySelector("textarea")!,"[Agency's proposed services, again]");
+    expect(button("Undo")).toBeUndefined();
+    expect(container.textContent).toContain("Undo closed because you kept editing. The client still has what you sent; send again to replace it.");
   });
   it.each(["agency-expired","agency-revoked","agency-no-permission"])("withholds editing for %s",async scenario=>{
     const initial=agencyDocumentFixture(scenario); const save=vi.fn();

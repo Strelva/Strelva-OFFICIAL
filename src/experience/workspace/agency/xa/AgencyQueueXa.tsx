@@ -14,7 +14,7 @@ import { AgencyFold } from "./AgencyFold";
 import { lapseLabel } from "@/platform/owner-reach/model";
 import type { AgencyQueueItem } from "../../agency-clients";
 import { clockLabel, queueActionLabel, queueDetail, queueHeadline, splitQueue } from "./agency-xa-model";
-import { clientColor } from "./client-color";
+import { clientColor } from "@/platform/presentation/client-color";
 import styles from "./agency-xa.module.css";
 
 export interface AgencyQueueXaProps {

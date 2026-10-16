@@ -22,6 +22,8 @@
 .group { display: flex; flex-direction: column; gap: 4px; }
 /* The Queue's docked composer starts and ends where the column's rows do. */
 .columnDock { box-sizing: border-box; width: 100%; max-width: 1040px; margin-right: auto; padding: 0 120px 0 72px; }
+/* On the clients table the composer starts and ends where the table does (the dock row adds 24 px each side). */
+.everyDock { box-sizing: border-box; width: 100%; max-width: 1096px; margin-right: auto; padding: 0 72px 0 72px; }
 .queueLead { flex-shrink: 0; }
 /* The fold: label, count, chevron. Opens in place, never a modal. */
 .more { padding-top: 4px; }
@@ -80,7 +82,7 @@ a.systemLink:focus-visible { outline: 2px solid var(--st-accent); outline-offset
 /* AG4 prepare and send. */
 /* Brief and editor on the left, the send panel beside them. Below 1180 the
    panel moves up under the brief, so Send is in the first screen and the
-   editor sits behind "Keep editing". */
+   editor follows it. */
 .prepare { box-sizing: border-box; display: grid; width: 100%; grid-template-columns: minmax(0, 1fr) minmax(0, 540px); grid-template-areas: "brief side" "editor side"; align-items: start; gap: 24px 48px; padding: 24px 24px 140px 72px; }
 .prepareBrief { grid-area: brief; display: flex; flex-direction: column; gap: 24px; padding-top: 72px; }
 .prepareEditor { grid-area: editor; display: flex; min-width: 0; flex-direction: column; gap: 18px; scroll-margin-top: 16px; }
@@ -93,10 +95,12 @@ a.systemLink:focus-visible { outline: 2px solid var(--st-accent); outline-offset
 .editor { display: flex; flex-direction: column; gap: 18px; }
 .preview { width: 100%; height: 560px; border: 1px solid var(--st-line); border-radius: var(--st-r-md, 12px); background: #ffffff; }
 /* Every row here is a change, so none is tinted: hairlines between rows, the new words in clay. */
-.changes { width: 100%; border-collapse: collapse; font-size: 15px; }
+/* Fixed layout: Part takes a fifth, Now and After share the rest equally, so neither wraps a word onto a line alone. */
+.changes { width: 100%; border-collapse: collapse; font-size: 15px; table-layout: fixed; }
+.changes th.changesPart { width: 20%; }
 .changes th { padding: 0 12px 8px 0; border-bottom: 1px solid var(--st-line); color: var(--st-text-3); font-size: 13px; font-weight: 500; text-align: left; }
-.changes td { padding: 12px 12px 12px 0; border-bottom: 1px solid var(--st-line); color: var(--st-text); vertical-align: top; overflow-wrap: anywhere; }
-.changes td:first-child { width: 24%; color: var(--st-text-2); font-size: 14px; }
+.changes td { padding: 12px 12px 12px 0; overflow-wrap: break-word; hyphens: manual; border-bottom: 1px solid var(--st-line); color: var(--st-text); vertical-align: top; overflow-wrap: anywhere; }
+.changes td:first-child { color: var(--st-text-2); font-size: 14px; overflow-wrap: normal; }
 .changes td[data-after] { color: var(--st-need); font-weight: 500; }
 .changes td[data-before] { color: var(--st-text-3); }
 .changes td[data-empty] { font-style: normal; font-weight: 400; color: var(--st-text-3); }
@@ -132,6 +136,7 @@ a.systemLink:focus-visible { outline: 2px solid var(--st-accent); outline-offset
   .today { gap: 40px; padding: 40px 32px 56px 48px; }
   .column, .client, .every { padding-left: 48px; padding-right: 32px; }
   .columnDock { padding: 0 8px 0 24px; }
+  .everyDock { padding: 0 32px 0 24px; }
   .minutes { padding: 48px 32px 120px 48px; }
   .library { grid-template-columns: minmax(0, 1fr); padding: 24px 32px 120px 48px; }
   .libraryLead { padding-top: 16px; }
@@ -150,7 +155,7 @@ a.systemLink:focus-visible { outline: 2px solid var(--st-accent); outline-offset
   .phoneBadNews { display: flex; align-items: flex-start; gap: 12px; }
   .checks { width: 100%; }
   .column, .client, .state, .every { padding: 20px 16px 140px; gap: 22px; }
-  .columnDock { padding: 0; }
+  .columnDock, .everyDock { padding: 0; }
   .minutes { padding: 20px 16px 120px; }
   .library { padding: 16px 16px 120px; gap: 20px; }
   .sourcePanel { padding: 20px 18px; border-radius: var(--st-r-lg, 16px); }
@@ -159,6 +164,8 @@ a.systemLink:focus-visible { outline: 2px solid var(--st-accent); outline-offset
   /* Send stays in reach while the diff scrolls. */
   .sendActions { position: sticky; bottom: calc(12px + var(--st-phone-navigation-height, 0px) + var(--st-workspace-safe-area, 0px)); z-index: 1; padding: 8px 0; background: var(--st-surface); }
   .preview { height: 420px; }
+  /* While the Undo toast is up, the page can scroll its last line clear of it. */
+  .prepare[data-undo-open] { padding-bottom: 200px; }
 }
 
 @media (max-width: 640px) {
@@ -171,6 +178,8 @@ a.systemLink:focus-visible { outline: 2px solid var(--st-accent); outline-offset
 @media (max-width: 520px) {
   .clientTitle h1 { font-size: 24px; }
   .resolve { padding-left: 0; }
-  .changes { font-size: 14px; }
-  .changes td, .changes th { padding-left: 8px; padding-right: 8px; }
+  .changes { font-size: 13px; }
+  .changes th.changesPart { width: 22%; }
+  .changes td:first-child { font-size: 13px; }
+  .changes td, .changes th { padding-left: 0; padding-right: 8px; }
 }

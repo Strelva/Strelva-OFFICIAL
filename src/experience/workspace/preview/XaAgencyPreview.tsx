@@ -13,7 +13,7 @@ import { WorkspaceRequestContext } from "../WorkspaceRequest";
 import { useAgencyClientHome } from "../useAgencyClientHome";
 import { AgencyClientXa, useAgencyGrants } from "../agency/xa/AgencyClientXa";
 import { AgencyClientTools } from "../agency/xa/AgencyClientTools";
-import { clientColor } from "../agency/xa/client-color";
+import { clientColor } from "@/platform/presentation/client-color";
 import { splitQueue } from "../agency/xa/agency-xa-model";
 import { AgencyWebsiteDocumentDraftExperience, type AgencyDocumentTransport } from "@/experience/agency-website/AgencyWebsiteDocumentDraftExperience";
 import { agencyDocumentFixture } from "@/experience/agency-website/agency-document-fixture";
@@ -87,7 +87,7 @@ function fixtureRouter(screen: XaAgencyScreen, state: XaAgencyState, client: XaC
       return Response.json({
         workspaceId: XA_CLIENT.harbor,
         decisions: [
-          { id: "f0000000-0000-4000-8000-000000000001", title: "New cleaning prices on harbordental.com/services", systemId: "b0000000-0000-4000-8000-000000000001", since: "2026-11-21T15:42:00.000Z", state: open ? "open" : "approved" },
+          { id: "f0000000-0000-4000-8000-000000000001", title: "New cleaning prices on the Services page", systemId: "b0000000-0000-4000-8000-000000000001", since: "2026-11-21T15:42:00.000Z", state: open ? "open" : "approved" },
           { id: "f0000000-0000-4000-8000-000000000002", title: "Thanksgiving week hours", systemId: "b0000000-0000-4000-8000-000000000002", since: "2026-11-22T17:12:00.000Z", state: state === "waiting" ? "open" : "approved" },
         ],
         changes: [
@@ -96,6 +96,8 @@ function fixtureRouter(screen: XaAgencyScreen, state: XaAgencyState, client: XaC
         deliveryChecks: [], deliveries: [],
       });
     }
+    // Care plan reports have their own preview (xs-apps-care); here they read as switched off, the way the route answers when they are.
+    if (path === "/api/workspace/care-reports") return Response.json({ error: "Care plan reports are not enabled." }, { status: 503 });
     if (path === "/api/service-requests") return Response.json({ requests: [] });
     if (path === "/api/workspace/provider-client-queue") return Response.json({ agencyWorkspaceId: XA_AGENCY, items: [], nextCursor: null });
     if (path === "/api/workspace/agency-proposals") return Response.json({ proposals: [], listing: { listed: false, summary: null } });

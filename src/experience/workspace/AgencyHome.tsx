@@ -32,7 +32,7 @@ import { AgencyVersionCreate } from "./agency/AgencyVersionCreate";
 import { StComposerBar, StComposerDock, StHead, StMono, StNotice, StPage, StPill, StPillLink, StSection, StTextButton } from "@/components/ui/strelva/Kit";
 import type { AgencyLastGoodRead } from "./agency/AgencyViews";
 import { AgencyCareReports } from "@/experience/care-reports/AgencyCareReports";
-import { XaComposer, XaComposerDock } from "@/components/ui/strelva/Xa";
+import { AgencyAskDock } from "./agency/xa/AgencyAskDock";
 import { AgencyToday } from "./agency/xa/AgencyToday";
 import { AgencyQueueXa } from "./agency/xa/AgencyQueueXa";
 import { AgencyMinutes } from "./agency/xa/AgencyMinutes";
@@ -396,11 +396,11 @@ export function AgencyHome({
       proposals={<AgencyProposals key={snapshot.workspaceId} quietWhenEmpty onAccepted={retry} agencyWorkspaceId={snapshot.workspaceId} agencyName={agencyName} canManage={current?.role === "owner" || current?.role === "admin"} transport={request} showListing={false} />}
       checks={queueChecks}
       more={{ count: moreCount, content: <><ProviderClientQueue workspaceId={snapshot.workspaceId} onWorkspace={onWorkspace} onCount={setProviderCount} />{serviceRequests}{applicationDraftSection}{websiteDraftSection}</> }} />
-  </section><XaComposerDock><div className={xaStyles.columnDock}><XaComposer value={ask} onChange={setAsk} onSubmit={() => { onStart(ask); setAsk(""); }} placeholder="Ask Strelva about any client" inputLabel={`Ask Strelva about ${agencyName}'s clients`} /></div></XaComposerDock></div>;
+  </section><AgencyAskDock agencyName={agencyName} value={ask} onChange={setAsk} onSubmit={() => { onStart(ask); setAsk(""); }} /></div>;
 
   if (xaView && view === "library") return <div aria-busy={busy || undefined}><section aria-label="Library">
-    <AgencyLibraryView request={request} agencyWorkspaceId={snapshot.workspaceId} onWorkspace={onWorkspace} />
-    {current?.role === "owner" || current?.role === "admin" ? <div className={xaStyles.column} style={{ paddingTop: 0 }}><AgencyFold label="Adapt a source for another client"><AgencyVersionCreate request={request} agencyWorkspaceId={snapshot.workspaceId} clients={combined?.clients ?? []} /></AgencyFold></div> : null}
+    <AgencyLibraryView request={request} agencyWorkspaceId={snapshot.workspaceId} onWorkspace={onWorkspace}
+      leadExtra={current?.role === "owner" || current?.role === "admin" ? <AgencyFold label="Adapt a source for another client"><AgencyVersionCreate request={request} agencyWorkspaceId={snapshot.workspaceId} clients={combined?.clients ?? []} /></AgencyFold> : null} />
   </section></div>;
 
   if (xaView && view === "minutes") return <div aria-busy={busy || minutes.state.status === "loading" || undefined}><section aria-label="Minutes">
@@ -412,7 +412,7 @@ export function AgencyHome({
     {clientList}
     {clients.status === "ready" ? <AgencyCareReports agencyWorkspaceId={snapshot.workspaceId} agencyName={agencyName} request={request} /> : null}
     {snapshot.releases?.keepYourSite ? <AgencyClientSites agencyWorkspaceId={snapshot.workspaceId} request={request} /> : null}
-  </section><XaComposerDock><div className={xaStyles.columnDock}><XaComposer value={ask} onChange={setAsk} onSubmit={() => { onStart(ask); setAsk(""); }} placeholder="Ask Strelva about any client" inputLabel={`Ask Strelva about ${agencyName}'s clients`} /></div></XaComposerDock></div>;
+  </section><AgencyAskDock column="every" agencyName={agencyName} value={ask} onChange={setAsk} onSubmit={() => { onStart(ask); setAsk(""); }} /></div>;
 
   const tab = (value: AgencyView) => ({ id: `${id}-${value}-tab`, panelId: `${id}-${value}-panel` });
   const choose = (value: string) => {

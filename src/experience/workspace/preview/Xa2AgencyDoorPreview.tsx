@@ -7,7 +7,8 @@
  * that answers only its own two routes and only inside this preview.
  */
 import { useState } from "react";
-import { XaComposer, XaComposerDock } from "@/components/ui/strelva/Xa";
+import { AgencyAskDock } from "@/experience/workspace/agency/xa/AgencyAskDock";
+import { clientColor } from "@/platform/presentation/client-color";
 import { CONTROL_PLANE_URL } from "@/platform/infra/brand";
 import doorStyles from "@/experience/workspace/agency/agency-door.module.css";
 import { SignUpDoor } from "@/experience/getting-started/SignUpDoor";
@@ -23,11 +24,13 @@ import type { AddAgencyClientResult, AgencyClientListItem, ClaimReview, ClaimRev
 
 import type { Xa2Screen } from "./xa2-screens";
 import { XA_CLIENTS, XA_DAY, xaHoursAgo } from "./xa-day";
+import { XA_CLIENT } from "./xa-agency-fixture";
 import xaStyles from "@/experience/workspace/agency/xa/agency-xa.module.css";
 
 const BASE = "/preview/strelva/xa/xa2-agency-door";
 const AGENCY = "00000000-0000-4000-8000-0000000000a2";
-const HARBOR = "00000000-0000-4000-8000-0000000000b1";
+/** The shared fixture's client ids, so each client keeps its colour on every agency screen. */
+const HARBOR = XA_CLIENT.harbor;
 const notice = <p className={doorStyles.previewNotice}>Fictional preview. Nothing here reaches a real business.</p>;
 const in14 = () => new Date(XA_DAY.now + 14 * 86_400_000).toISOString();
 const ago = (hours: number) => xaHoursAgo(hours);
@@ -44,11 +47,11 @@ const onboarding = (clients: number, role: "owner" | "admin" | "member" = "owner
 } as unknown as AgencyOnboarding);
 
 const sidebarClients = (mode: "light" | "dark") => [
-  { id: "harbor", name: "Harbor Dental", href: `${BASE}/a5-client-added?state=ready${mode === "dark" ? "&mode=dark" : ""}`, detail: "New", color: "#2f5236" },
-  { id: "north", name: "North Coast Realty", href: "#", color: "#9c522c" },
-  { id: "lakeview", name: "Lakeview Mediation", href: "#", waits: true, color: "#4f7590" },
-  { id: "fieldwork", name: "Fieldwork Studio", href: "#", color: "#6b6f68" },
-];
+  { id: XA_CLIENT.harbor, name: "Harbor Dental", href: `${BASE}/a5-client-added?state=ready${mode === "dark" ? "&mode=dark" : ""}`, detail: "New" },
+  { id: XA_CLIENT.north, name: "North Coast Realty", href: "#" },
+  { id: XA_CLIENT.lakeview, name: "Lakeview Mediation", href: "#", waits: true },
+  { id: XA_CLIENT.fieldwork, name: "Fieldwork Studio", href: "#" },
+].map(link => ({ ...link, color: clientColor(link.id) }));
 
 const delivery = { status: "not_sent" as const, reason: "gated", decision: "R08", agencyEmailVerified: false };
 const addition = { additionId: "00000000-0000-4000-8000-0000000000c1", agencyWorkspaceId: AGENCY, customerWorkspaceId: HARBOR, name: "Harbor Dental", sourceKind: "url" as const, sourceUrl: "https://harbordental.com", prospectId: null, factsSeeded: 4, seatId: "00000000-0000-4000-8000-0000000000d1", addedBy: "00000000-0000-4000-8000-0000000000e1", addedAt: ago(0.1), replayed: false };
@@ -76,7 +79,7 @@ function installAddClientFetch(mode: "ready" | "submitting" | "loading" | "error
       if (mode === "loading") return new Promise<Response>(() => undefined);
       if (mode === "error") return Response.json({ error: "Your clients couldn’t be loaded." }, { status: 503 });
       if (mode === "signed-out") return Response.json({ error: "Sign in." }, { status: 401 });
-      return Response.json({ clients: [listItem({ additionId: "00000000-0000-4000-8000-0000000000c2", customerWorkspaceId: "00000000-0000-4000-8000-0000000000b2", name: "Fieldwork Studio", sourceUrl: "https://fieldwork.studio", ownerClaimed: true, pendingClaim: null, addedAt: ago(24 * 9) })] });
+      return Response.json({ clients: [listItem({ additionId: "00000000-0000-4000-8000-0000000000c2", customerWorkspaceId: XA_CLIENT.fieldwork, name: "Fieldwork Studio", sourceUrl: "https://fieldwork.studio", ownerClaimed: true, pendingClaim: null, addedAt: ago(24 * 9) })] });
     }
     if (url.startsWith("/api/workspace/prospects")) return Response.json({ prospects: [
       { id: "00000000-0000-4000-8000-0000000000a8", business: "Harbor Dental", url: "harbordental.com", name: "Dr. Amy Lin", email: "dr.lin@harbordental.com", grade: "C", score: 64 },
@@ -91,9 +94,10 @@ function installAddClientFetch(mode: "ready" | "submitting" | "loading" | "error
   }) as typeof fetch;
 }
 
+const ROW_IDS = [XA_CLIENT.harbor, XA_CLIENT.north, XA_CLIENT.lakeview, XA_CLIENT.fieldwork] as const;
 function row(index: number, name: string, over: Partial<AgencyClientRow> = {}): AgencyClientRow & { pageIndex: number } {
   return {
-    workspaceId: `00000000-0000-4000-8000-00000000010${index}`, name, reach: "agency", role: "agency", provider: true, status: "ready", pageIndex: 0,
+    workspaceId: ROW_IDS[index - 1]!, name, reach: "agency", role: "agency", provider: true, status: "ready", pageIndex: 0,
     systems: [{ id: `00000000-0000-4000-8000-00000000020${index}`, name: `${name.split(" ")[0]!.toLowerCase()}.com`, kind: "website", lifecycle: "live", versionContext: null, health: { status: "healthy", summary: "Passed", lastVerifiedAt: ago(1.5) } }],
     needsYou: { count: 0, oldestAt: null }, openRequests: 0, improvementsWaiting: 0, lastReceiptAt: ago(30), ...over,
   };
@@ -163,14 +167,15 @@ export function Xa2AgencyDoorPreview({ screen, state, mode }: { screen: Xa2Scree
   if (screen === "a6-every-client") {
     const rows = state === "empty" ? [] : everyClientRows(state);
     const body = state === "loading" ? <AgencyEveryClientLoading /> : state === "error" ? <AgencyEveryClientError onRetry={() => undefined} />
-      : <AgencyEveryClient clients={rows} total={rows.length} agencyName="North Studio" minutes={new Map(rows.map((item, index) => [item.workspaceId, XA_CLIENTS[index]!.minutes]))} hasMore={false} loadingMore={false} moreError={false} retrying={new Set()} now={now}
-        onOpen={() => undefined} onRetryPage={() => undefined} onMore={() => undefined} addClientHref={`${BASE}/a4-add-client?state=ready`}
+      // Harbor Dental was just added and nobody has claimed it, so no time is logged for it yet.
+      : <AgencyEveryClient clients={rows} total={rows.length} agencyName="North Studio" minutes={new Map(rows.filter(item => item.workspaceId !== HARBOR).map(item => [item.workspaceId, XA_CLIENTS.find(entry => XA_CLIENT[entry.key] === item.workspaceId)!.minutes]))} hasMore={false} loadingMore={false} moreError={false} retrying={new Set()} now={now}
+        onOpen={() => undefined} onRetryPage={() => undefined} onMore={() => undefined} addClientHref={`${BASE}/a4-add-client?state=ready`} agencyWorkspaceId={AGENCY}
         lastGoodReads={state === "stale" ? new Map([[rows[3]!.workspaceId, { client: everyClientRows("ready")[3]!, readAt: ago(0.5) }]]) : undefined} />;
     return <AgencyFrame agencyName="North Studio" title="Clients" {...frame} clients={state === "empty" ? [] : sidebarClients(mode)} signOut={null} active="clients">
       {/* The same column AgencyHome gives the client table. */}
       <section aria-label="Clients" className={xaStyles.every}>{body}</section>
-      {/* The agency's composer, as AgencyHome docks it under the client table. */}
-      {state !== "empty" ? <XaComposerDock><XaComposer value={ask} onChange={setAsk} onSubmit={() => setAsk("")} onAdd={() => undefined} placeholder="Ask Strelva about any client" /></XaComposerDock> : null}
+      {/* The agency's one composer, docked exactly as AgencyHome docks it under the client table. */}
+      {state !== "empty" ? <AgencyAskDock column="every" agencyName="North Studio" value={ask} onChange={setAsk} onSubmit={() => setAsk("")} /> : null}
     </AgencyFrame>;
   }
 

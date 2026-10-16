@@ -57,7 +57,7 @@ export function OperatorUsageControls({ tenantId, request = fetch }: { tenantId:
   }
   return <section aria-label="Operator usage controls" className="grid gap-4">
     <StLabel>Operator usage controls</StLabel>
-    <UsageControlsPanel key={view.budget.controls.revision} client={view} enforcement={{ budgetEnforced: state.budgetEnforced, freeCapUsd: state.freeCapUsd }} clientName={view.name} who="operator" canChange save={save} saved={saved} onEdit={() => setSaved(false)} />
+    <UsageControlsPanel key={view.budget.controls.revision} client={view} enforcement={{ budgetEnforced: state.budgetEnforced, freeCapUsd: state.freeCapUsd }} clientName={view.name} who="operator" amounts canChange save={save} saved={saved} onEdit={() => setSaved(false)} />
     {view.history.length ? <StRows label="Recent usage control changes">{view.history.map(change => <StRow key={`${change.at}:${change.reason}`} title={change.reason} detail={`${change.kind === "agency" ? change.agencyName ?? "An agency" : "A Strelva operator"} · ${when(change.at)}`} />)}</StRows> : null}
   </section>;
 }

@@ -1,31 +1,33 @@
 "use client";
 /**
  * XA · A6, every client. The headline counts what waits on the agency; the
- * line under it names a different fact (what broke, or what waits on an
- * owner), so it never repeats the table. Then one table: who the client is,
- * where its owner stands (claimed, not claimed yet, can't be reached, with the
- * fix beside the exception), what waits and on whom, the last change and,
- * when time is on, this month's time. Health shows only when something is
- * wrong, as what waits on the agency. The whole row opens the client, where
- * its decisions, responsibility and time live (AG3), so no row repeats a
- * "Details" link and nothing under the table picks a client again.
+ * line under it names every client that waits on its owner, so it never
+ * repeats the headline. Then one table: who the client is, an owner exception
+ * when there is one (not claimed yet, can't be reached, with the fix beside
+ * it; a claimed owner leaves the cell empty, and with no exception the column
+ * stays out), what waits and on whom, the last change and, when time is on,
+ * this month's time. Health shows only when something is wrong, as what waits
+ * on the agency, with Pebble's line on that row. The whole row opens the
+ * client, where its decisions, responsibility and time live (AG3).
+ *
+ * Phone keeps every fact: under the name, what waits, then a meta line with
+ * the owner exception, the last change and this month's time.
  *
  * Data is the same batched agency read as before (`agency_client_overview`):
  * rows are scoped exactly as opening that client would be, a client that
  * failed to load is named, and a last good read stays visibly stale.
  *
- * Not drawn yet, pending an addition to `agency_client_overview`: the owner's
- * first name once claimed. Until then a claimed owner reads "Claimed".
+ * Usage across clients is not drawn here while the money call is open: its
+ * only measure is dollars, and no figure shows until pricing is decided.
  */
 import type { MouseEvent, ReactNode } from "react";
-import { PebbleHoldingEmptyTile } from "./AgencyDayOne";
-import { XaButton, XaButtonLink, XaHeadline, XaInitial, XaPebbleScene, XaStatus, XaTextLink } from "@/components/ui/strelva/Xa";
+import { XaButton, XaButtonLink, XaHeadline, XaInitial, XaPebbleAvatar, XaPebbleScene, XaStatus, XaTextLink } from "@/components/ui/strelva/Xa";
 import { StSkeleton } from "@/components/ui/strelva/Kit";
-import { AgencyUsageSummary } from "./AgencyUsageSummary";
+import { clientColor } from "@/platform/presentation/client-color";
 import type { AgencyLastGoodRead } from "./AgencyViews";
 import { daysWaiting, type AgencyClientRow } from "../agency-clients";
 import { openRequestsLabel, type AgencyClientsView } from "../agency-home";
-import { countWord } from "./xa/agency-xa-model";
+import { countWord, listNames } from "./xa/agency-xa-model";
 import styles from "./agency-every-client.module.css";
 
 type ClientRow = AgencyClientsView["clients"][number];
@@ -59,8 +61,36 @@ function ownerDecisions(client: AgencyClientRow, now: number): string {
 
 /** What waits on the client's owner. Empty when nothing does. */
 export function ownerWaits(client: AgencyClientRow, now: number): string {
-  if (client.ownerClaimWaiting) return client.needsYou.count ? `claim link · ${ownerDecisions(client, now)}` : "claim link";
+  if (client.ownerClaimWaiting) return client.needsYou.count ? `to claim it · ${ownerDecisions(client, now)}` : "to claim it";
   return client.needsYou.count ? ownerDecisions(client, now) : "";
+}
+
+/**
+ * The line under the headline: every client that waits on its owner, never
+ * just the first. "Harbor Dental and Fieldwork Studio each wait on an owner
+ * for one decision." With more than two, or mixed reasons, it names the
+ * oldest and counts the rest.
+ */
+export function ownerWaitsSentence(clients: readonly AgencyClientRow[]): string | null {
+  const waiting = clients.filter(client => client.ownerClaimWaiting || client.needsYou.count > 0);
+  if (!waiting.length) return null;
+  const one = (client: AgencyClientRow) => client.ownerClaimWaiting ? `${client.name} waits for its owner to claim it` : `${client.name} waits on its owner for ${client.needsYou.count === 1 ? "one decision" : `${countWord(client.needsYou.count, false)} decisions`}`;
+  if (waiting.length === 1) return `${one(waiting[0]!)}.`;
+  const allClaims = waiting.every(client => client.ownerClaimWaiting && !client.needsYou.count);
+  const allDecisions = waiting.every(client => !client.ownerClaimWaiting);
+  if (waiting.length === 2 && allClaims) return `${listNames(waiting.map(client => client.name))} wait for their owners to claim them.`;
+  if (waiting.length === 2 && allDecisions) {
+    const counts = new Set(waiting.map(client => client.needsYou.count));
+    const [count] = [...counts];
+    return counts.size === 1 ? `${listNames(waiting.map(client => client.name))} each wait on an owner for ${count === 1 ? "one decision" : `${countWord(count!, false)} decisions`}.`
+      : `${listNames(waiting.map(client => client.name))} wait on their owners for ${countWord(waiting.reduce((sum, client) => sum + client.needsYou.count, 0), false)} decisions.`;
+  }
+  // Two for different reasons: name both.
+  if (waiting.length === 2) return `${one(waiting[0]!)}. ${one(waiting[1]!)}.`;
+  // The oldest wait first; a claim that waits counts as the oldest.
+  const at = (client: AgencyClientRow) => client.ownerClaimWaiting ? -Infinity : client.needsYou.oldestAt ? Date.parse(client.needsYou.oldestAt) : Infinity;
+  const [oldest, ...rest] = [...waiting].sort((a, b) => at(a) - at(b));
+  return `${one(oldest!)}. ${rest.length === 1 ? "One more waits on its owner." : `${countWord(rest.length)} more wait on their owners.`}`;
 }
 
 /** The one sentence about the first client that waits on the agency, naming the client and the thing. */
@@ -74,7 +104,7 @@ export function waitsOnYouSentence(client: AgencyClientRow): string {
   return `${client.name} needs a look.`;
 }
 
-/** The owner cell: an exception, or "Claimed" once the owner took it up, or nothing when it isn't known. */
+/** The owner cell shows exceptions only: a claimed owner, or one not known, leaves it empty. */
 function ownerException(client: AgencyClientRow): string {
   if (client.ownerClaimWaiting) return "Not claimed yet";
   if (client.ownerReach && !client.ownerReach.reachable) return "Can’t be reached";
@@ -83,9 +113,12 @@ function ownerException(client: AgencyClientRow): string {
 
 /** The fix sits beside the exception it fixes, never as a column of its own. */
 function ownerFix(client: AgencyClientRow, agencyWorkspaceId?: string): ReactNode {
+  const clientHref = agencyWorkspaceId ? `/workspace/agency/clients/new?${new URLSearchParams({ workspaceId: agencyWorkspaceId, client: client.workspaceId })}` : null;
+  // A claim link is shown once, when it is made; the client's page makes a fresh one to copy.
+  if (client.ownerClaimWaiting) return clientHref ? <XaTextLink href={clientHref} aria-label={`Make a new claim link for ${client.name}`}>Make a new claim link</XaTextLink> : null;
   const reach = client.ownerReach;
   if (!reach || reach.reachable) return null;
-  if (reach.canIssueClaim && agencyWorkspaceId) return <XaTextLink href={`/workspace/agency/clients/new?${new URLSearchParams({ workspaceId: agencyWorkspaceId, client: client.workspaceId })}`}>Fix owner contact</XaTextLink>;
+  if (reach.canIssueClaim && clientHref) return <XaTextLink href={clientHref}>Fix owner contact</XaTextLink>;
   if (client.reach === "member") return <XaTextLink href={`/workspace/business-details?workspaceId=${encodeURIComponent(client.workspaceId)}`}>Add the owner’s email</XaTextLink>;
   return <small>Ask {client.name} for the owner’s email.</small>;
 }
@@ -118,15 +151,7 @@ function lastCheck(clients: readonly AgencyClientRow[]): Date | null {
 
 const when = (at: Date | string) => new Date(at).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
 
-/** Same client colors everywhere a client appears by its initial. */
-const CLIENT_COLORS = ["#2f5236", "#9c522c", "#4f7590", "#6b6f68", "#7a5c3e", "#5b6b3a"] as const;
-export function clientColor(id: string): string {
-  let hash = 0;
-  for (const char of id) hash = (hash * 31 + char.charCodeAt(0)) >>> 0;
-  return CLIENT_COLORS[hash % CLIENT_COLORS.length]!;
-}
-
-export function AgencyEveryClient({ clients, total, agencyName, hasMore, loadingMore, moreError, retrying, now, onOpen, onRetryPage, onMore, agencyWorkspaceId, request, lastGoodReads, addClientHref, minutes, importHref, onBuild }: {
+export function AgencyEveryClient({ clients, total, agencyName, hasMore, loadingMore, moreError, retrying, now, onOpen, onRetryPage, onMore, agencyWorkspaceId, lastGoodReads, addClientHref, minutes, importHref, onBuild }: {
   clients: ClientRow[]; total: number; agencyName: string; hasMore: boolean; loadingMore: boolean; moreError: boolean;
   retrying: ReadonlySet<number>; now: number; onOpen: (workspaceId: string) => void; onRetryPage: (pageIndex: number) => void;
   onMore: () => void; agencyWorkspaceId?: string; viewerEmail?: string; canManage?: boolean; request?: typeof fetch;
@@ -138,10 +163,9 @@ export function AgencyEveryClient({ clients, total, agencyName, hasMore, loading
   onBuild?: () => void;
 }) {
   if (!clients.length) return <div className={styles.empty}>
-    <PebbleHoldingEmptyTile size={220} />
     <XaHeadline size="md" quiet={`A business appears here once you add it, or once it shares work with ${agencyName}.`}>No clients yet.</XaHeadline>
     {addClientHref ? <div><XaButtonLink variant="primary" href={addClientHref}>Add a client</XaButtonLink></div> : null}
-    <p className={styles.checked}>Pebble reads their website the moment you add one.</p>
+    {addClientHref ? <p className={styles.checked}>Strelva reads their website as soon as you add them.</p> : null}
   </div>;
 
   const reads = clients.map(client => {
@@ -150,19 +174,18 @@ export function AgencyEveryClient({ clients, total, agencyName, hasMore, loading
   });
   const waiting = reads.filter(({ client, read }) => client.status === "ready" && agencyWaits(read));
   const onYou = waiting.length;
-  const firstOwner = reads.find(({ client, read }) => client.status === "ready" && ownerWaits(read, now));
-  const broken = reads.find(({ client, read }) => client.status === "ready" && brokenSystems(read).length);
   const checked = lastCheck(reads.map(({ read }) => read));
   const staleCheck = checked ? now - checked.getTime() > STALE_CHECK_MS : false;
   const countWords = `${countWord(total)} ${total === 1 ? "client" : "clients"}.`;
   const showMinutes = Boolean(minutes);
   const waitWords = onYou === 0 ? "Nothing waits on you." : `${countWord(onYou)} ${onYou === 1 ? "waits" : "wait"} on you.`;
-  // The line under the headline says something the headline doesn't: who waits on an owner, else the next client that waits on you.
-  const ownerLine = firstOwner ? firstOwner.read.ownerClaimWaiting ? `${firstOwner.client.name} waits for its owner to claim it.` : `${firstOwner.client.name} waits on its owner for ${firstOwner.read.needsYou.count === 1 ? "one decision" : `${countWord(firstOwner.read.needsYou.count, false)} decisions`}.` : null;
-  // When Pebble is on something broken, its caption names it, so the line under the headline names something else.
-  const otherLead = waiting.find(item => item !== broken);
-  const quiet = ownerLine ?? (otherLead ? waitsOnYouSentence(otherLead.read) : broken ? "Everything else is running." : "Every client is running.");
-  const brokenSystem = broken ? brokenSystems(broken.read)[0] : undefined;
+  // The line under the headline says something the headline doesn't: every client that waits on its owner, else the next client that waits on you.
+  const ownerLine = ownerWaitsSentence(reads.filter(({ client }) => client.status === "ready").map(({ read }) => read));
+  const quiet = ownerLine ?? (waiting[0] ? waitsOnYouSentence(waiting[0].read) : "Every client is running.");
+  // Exceptions only: the owner column stays out when every owner has claimed their business.
+  const exceptionOf = (client: ClientRow, read: AgencyClientRow, lastGood: AgencyLastGoodRead | undefined) => client.status === "unavailable" && !lastGood ? "Unknown" : ownerException(read);
+  const showOwner = reads.some(({ client, read, lastGood }) => exceptionOf(client, read, lastGood));
+  const allLoaded = clients.length >= total;
   // A click anywhere on a row opens the client, except on its own controls.
   const openRow = (event: MouseEvent<HTMLTableRowElement>, workspaceId: string) => {
     if ((event.target as HTMLElement).closest("button, a, input, select, summary")) return;
@@ -176,35 +199,39 @@ export function AgencyEveryClient({ clients, total, agencyName, hasMore, loading
         {checked ? staleCheck ? <XaStatus kind="waits" size="sm">Last checked {when(checked)}. Strelva checks again within the hour.</XaStatus>
           : <p className={styles.checked}>Last checked {when(checked)}</p> : null}
       </div>
-      {/* Pebble is in frame only while it is fixing something; a caption that repeats the headline is decoration. */}
-      {broken ? <figure className={styles.pebble}>
-        <XaPebbleScene pose="fixing" size={260} bare label={`Pebble working on ${broken.client.name}`} />
-        <figcaption className={styles.pebbleJob}>{brokenSystem ? `Pebble is on ${brokenSystem.name} at ${broken.client.name}.` : `Pebble is on ${broken.client.name}.`}</figcaption>
-      </figure> : null}
     </header>
 
     <table className={styles.table} aria-label="Clients">
-      <thead><tr><th scope="col">Client</th><th scope="col">Owner</th><th scope="col">Waiting on</th><th scope="col">Last change</th>{showMinutes ? <th scope="col" className={styles.right}>Time this month</th> : null}</tr></thead>
+      <thead><tr><th scope="col">Client</th>{showOwner ? <th scope="col">Owner</th> : null}<th scope="col">Waiting on</th><th scope="col">Last change</th>{showMinutes ? <th scope="col" className={styles.right}>Time this month</th> : null}</tr></thead>
       <tbody>{reads.map(({ client, lastGood, read }) => {
         const unavailable = client.status === "unavailable";
         const you = agencyWaits(read);
         const owner = ownerWaits(read, now);
-        const exception = unavailable && !lastGood ? "Unknown" : ownerException(read);
+        const exception = exceptionOf(client, read, lastGood);
         const down = read.systems.some(system => system.health?.status === "blocked");
-        // On a phone the row keeps one line under the name: the most important exception, if any.
-        const phoneLine = unavailable ? "" : you ? `You · ${you}` : exception || (owner ? `Owner · ${owner}` : "");
+        const broken = unavailable ? undefined : brokenSystems(read)[0];
+        const lastChange = unavailable && !lastGood ? "Unknown" : lastChangeLabel(read.lastReceiptAt, now);
+        const time = showMinutes ? minuteLabel(minutes!.get(client.workspaceId)) : null;
+        // On a phone nothing is dropped: what waits, then the owner exception, the last change and this month's time.
+        const phoneLine = unavailable ? "" : you ? `You · ${you}` : owner ? `Owner · ${owner}` : "";
+        // "Owner · to claim it" already says the claim waits, so the meta line doesn't say it again.
+        const phoneMeta = [unavailable || (read.ownerClaimWaiting && phoneLine.startsWith("Owner")) ? null : exception, lastChange === "None yet" ? "No changes yet" : lastChange === "Unknown" ? "Last change unknown" : lastChange, time === null ? null : time === "None yet" ? "No time this month" : time].filter(Boolean).join(" · ");
+        // Pebble is in frame for bad news, on the row it is about, saying what it knows that the row doesn't.
+        const pebble = broken ? <span className={styles.pebbleLine}><XaPebbleAvatar size={22} /><span>{broken.health?.summary || `Pebble keeps checking ${broken.name}.`} <XaTextLink onClick={() => onOpen(client.workspaceId)} aria-label={`Fix ${broken.name} at ${client.name}`}>Fix it</XaTextLink></span></span> : null;
         return <tr key={client.workspaceId} data-stale={unavailable || undefined} className={styles.row} onClick={event => openRow(event, client.workspaceId)}>
           <th scope="row" className={styles.client}>
             <div className={styles.clientLine}>
               <XaInitial name={client.name} color={clientColor(client.workspaceId)} size={36} />
               <button type="button" className={styles.open} onClick={() => onOpen(client.workspaceId)} aria-label={`Open ${client.name}`}>
                 <span className={styles.name}>{client.name}</span><span className={styles.summary}>{summary(read)}</span>
-                {phoneLine ? <span className={styles.phoneLine} data-tone={unavailable || you ? down ? "down" : "waits" : exception ? "waits" : undefined}>{phoneLine}</span> : null}
+                {phoneLine ? <span className={styles.phoneLine} data-tone={you ? down ? "down" : "waits" : undefined}>{phoneLine}</span> : null}
+                <span className={styles.phoneMeta}>{phoneMeta}</span>
               </button>
             </div>
+            {pebble ? <div className={styles.phoneOnly}>{pebble}</div> : null}
+            {exception && !unavailable && ownerFix(read, agencyWorkspaceId) ? <div className={styles.phoneOnly}><span className={styles.fix}>{ownerFix(read, agencyWorkspaceId)}</span></div> : null}
           </th>
-          <td data-label="Owner">{exception ? <div className={styles.waits}><span className={styles.state} data-tone="waits">{exception}</span>{unavailable ? null : <span className={styles.fix}>{ownerFix(read, agencyWorkspaceId)}</span>}</div>
-            : read.ownerClaimed ? <span className={styles.quietText}>Claimed</span> : null}</td>
+          {showOwner ? <td data-label="Owner">{exception ? <div className={styles.waits}><span className={styles.state} data-tone="waits">{exception}</span>{unavailable ? null : <span className={styles.fix}>{ownerFix(read, agencyWorkspaceId)}</span>}</div> : null}</td> : null}
           <td data-label="Waiting on">{unavailable ? <div className={styles.stale}>
             <XaStatus kind="waits" size="sm">{client.name} could not be loaded.</XaStatus>
             <small>{lastGood ? `Showing the last good read from ${when(lastGood.readAt)}.` : "No last good read is available in this visit."}</small>
@@ -212,20 +239,25 @@ export function AgencyEveryClient({ clients, total, agencyName, hasMore, loading
             <XaButton size="sm" busy={retrying.has(client.pageIndex)} onClick={() => onRetryPage(client.pageIndex)} aria-label={`Retry loading ${client.name}`}>Retry</XaButton>
           </div> : you || owner ? <div className={styles.waits}>
             {you ? <span className={styles.state} data-tone={down ? "down" : "waits"}>You · {you}</span> : null}
+            {pebble}
             {owner ? <span className={styles.state}>Owner · {owner}</span> : null}
           </div> : <span className={styles.quietText}>Nothing</span>}</td>
-          <td><span className={styles.quietText}>{unavailable && !lastGood ? "Unknown" : lastChangeLabel(read.lastReceiptAt, now)}</span></td>
-          {showMinutes ? <td className={styles.right}><span className={styles.quietText}>{minuteLabel(minutes!.get(client.workspaceId))}</span></td> : null}
+          <td><span className={styles.quietText}>{lastChange}</span></td>
+          {showMinutes ? <td className={styles.right}><span className={styles.quietText}>{time}</span></td> : null}
         </tr>;
       })}</tbody>
     </table>
 
-    <footer className={styles.foot}>
-      <p className={styles.quietText}>{clients.length < total ? `Showing ${clients.length} of ${total} clients` : `${total} ${total === 1 ? "client" : "clients"}`}{importHref ? <> · <XaTextLink href={importHref}>Import clients</XaTextLink></> : null}{onBuild ? <> · <XaTextLink onClick={onBuild}>Build for a client</XaTextLink></> : null}</p>
+    {/* The headline already counts every client; a count here only says how many of them are showing. */}
+    {!allLoaded || importHref || onBuild || hasMore ? <footer className={styles.foot}>
+      <p className={styles.quietText}>{[
+        !allLoaded ? <span key="count">Showing {clients.length} of {total} clients</span> : null,
+        importHref ? <XaTextLink key="import" href={importHref}>Import clients</XaTextLink> : null,
+        onBuild ? <XaTextLink key="build" onClick={onBuild}>Build for a client</XaTextLink> : null,
+      ].filter(Boolean).map((item, index) => <span key={index}>{index ? " · " : ""}{item}</span>)}</p>
       {hasMore ? <XaButton size="sm" busy={loadingMore} onClick={onMore}>Show more clients</XaButton> : null}
-    </footer>
+    </footer> : null}
     {moreError ? <p role="alert" className={styles.alert}>More clients could not be loaded. Access has not changed. Try again.</p> : null}
-    {agencyWorkspaceId ? <AgencyUsageSummary agencyWorkspaceId={agencyWorkspaceId} request={request} /> : null}
   </div>;
 }
 

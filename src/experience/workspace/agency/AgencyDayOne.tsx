@@ -1,13 +1,14 @@
 "use client";
 /**
- * XA · A3, day one for an agency. One thing to do (add the first client), two
- * plain sentences for what comes after, and Pebble holding the empty client
- * tile it fills the moment the first client's site is read. Used by the agency setup page and by the agency's Today
- * while it has no clients. Presentation only: every link it offers leads to a
+ * XA · A3, day one for an agency. One thing to do (add the first client), the
+ * sentence under it says what happens when they do (Strelva reads their
+ * website), then plain sentences for what comes after. No mark and no idle
+ * Pebble: nothing is being done yet. Used by the agency setup page and by the
+ * agency's Home while it has no clients. Presentation only: every link it offers leads to a
  * route that rechecks the session and the agency role.
  */
-import { useState, type CSSProperties, type ReactNode } from "react";
-import { XaButtonLink, XaComposer, XaHeadline, XaLede, XaMark, XaPebbleScene, XaTextLink } from "@/components/ui/strelva/Xa";
+import { useState, type ReactNode } from "react";
+import { XaButtonLink, XaComposer, XaHeadline, XaLede, XaTextLink } from "@/components/ui/strelva/Xa";
 import styles from "./agency-door.module.css";
 
 export interface AgencyDayOneProps {
@@ -32,14 +33,6 @@ export interface AgencyDayOneProps {
   children?: ReactNode;
 }
 
-/** Pebble holding the empty clay tile the first client fills. No felt, no status dot: the tile is the job. */
-export function PebbleHoldingEmptyTile({ size = 300 }: { size?: number }) {
-  return <div className={styles.holding} style={{ "--hold": `${size}px` } as CSSProperties} role="img" aria-label="Pebble holding an empty client tile">
-    <XaPebbleScene pose="alone" size={size} bare />
-    <span className={styles.emptyTile} aria-hidden="true" />
-  </div>;
-}
-
 /** Morning, afternoon or evening on this device's clock. */
 export function greetingFor(hour: number): string {
   return hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
@@ -54,7 +47,6 @@ export function AgencyDayOne({ agencyName, viewerFirstName, clients, addClientHr
   const verifiedAll = counted && verification.total! > 0 && verification.verified === verification.total;
   return <div className={styles.dayOne}>
     <div className={styles.dayLead}>
-      <XaMark size={40} />
       <div className={styles.greeting}>
         <XaHeadline size="lg">{viewerFirstName ? `${greetingFor(hour)}, ${viewerFirstName}.` : first ? `${agencyName} is ready.` : `${agencyName} has ${clients} ${clients === 1 ? "client" : "clients"}.`}</XaHeadline>
         <XaLede>{first
@@ -66,6 +58,7 @@ export function AgencyDayOne({ agencyName, viewerFirstName, clients, addClientHr
           : first ? null : <XaButtonLink variant="primary" size="lg" href={openAgencyHref}>Open {agencyName}</XaButtonLink>}
         {first && addClientHref && importHref ? <XaTextLink href={importHref}>or import the clients you have</XaTextLink> : null}
         {first && !addClientHref && addClientBlocked ? <p className={styles.sentence}>{addClientBlocked}</p> : null}
+        {first && addClientHref ? <p className={`${styles.sentence} ${styles.dayPromise}`}>Strelva reads their website as soon as you add them, and the owner confirms what it found.</p> : null}
         {!first && addClientHref ? <XaTextLink href={addClientHref}>Add a client</XaTextLink> : null}
       </div>
       <ul className={styles.after} aria-label="After this">
@@ -78,9 +71,5 @@ export function AgencyDayOne({ agencyName, viewerFirstName, clients, addClientHr
       {children}
       {onAsk ? <XaComposer value={ask} onChange={setAsk} onSubmit={() => { onAsk(ask); setAsk(""); }} placeholder="Ask Strelva for anything" /> : null}
     </div>
-    {first ? <aside className={styles.daySide} aria-label="Your first client">
-      <PebbleHoldingEmptyTile size={360} />
-      <p className={styles.caption}>Pebble reads their website the moment you add one.</p>
-    </aside> : null}
   </div>;
 }

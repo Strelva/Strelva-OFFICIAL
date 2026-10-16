@@ -301,7 +301,9 @@ it("lets the real sidebar own navigation and keeps Build accessible beside the p
   // XA · A6: the headline counts the clients and what waits; the table is the page.
   expect(node.querySelector('h1')?.textContent).toMatch(/^Two clients\. Nothing waits on you\./);
   expect(node.querySelector('section[aria-label="Clients"] table[aria-label="Clients"]')).not.toBeNull();
-  expect(node.textContent).toContain("2 clients");
+  // The headline already counts them: with every client loaded the footer repeats no count, and no owner column of "Claimed".
+  expect(node.textContent).not.toContain("2 clients");
+  expect([...node.querySelectorAll("th")].map(cell => cell.textContent)).not.toContain("Owner");
   expect(request.mock.calls.some(([url]) => String(url).includes("agency-proposals"))).toBe(false);
 });
 
