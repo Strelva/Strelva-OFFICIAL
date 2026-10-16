@@ -10,7 +10,7 @@
  * opens the item, and the yes happens there (XaYes or the signed email page).
  * Phone shell (header, account) comes from StrelvaShell's E6 header.
  */
-import { useState } from "react";
+import { useRef, useState, useSyncExternalStore } from "react";
 import { StSkeleton } from "@/components/ui/strelva/Kit";
 import { XaButton, XaComposer, XaEmpty, XaHeadline, XaLabel, XaLede, XaPebbleScene, XaRow, XaRows, XaStatus, XaSystemTile } from "@/components/ui/strelva/Xa";
 import { actorPresentation } from "@/platform/presentation/actor";
@@ -49,20 +49,50 @@ function exception(system: SystemView): { kind: "draft" | "down" | "waits"; labe
   return null;
 }
 
+type Recognition = { lang: string; interimResults: boolean; onresult: ((event: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void) | null; onend: (() => void) | null; start(): void; stop(): void };
+
+const noSubscribe = () => () => undefined;
+
+/** Dictation through the browser's own speech recognition. Null where the browser has none, so no dead mic is drawn. */
+function useDictation(onText: (text: string) => void): (() => void) | null {
+  const available = useSyncExternalStore(noSubscribe, () => "SpeechRecognition" in window || "webkitSpeechRecognition" in window, () => false);
+  const live = useRef<Recognition | null>(null);
+  if (!available) return null;
+  return () => {
+    if (live.current) { live.current.stop(); return; }
+    const Ctor = (window as unknown as { SpeechRecognition?: new () => Recognition; webkitSpeechRecognition?: new () => Recognition }).SpeechRecognition
+      ?? (window as unknown as { webkitSpeechRecognition?: new () => Recognition }).webkitSpeechRecognition;
+    if (!Ctor) return;
+    const recognition = new Ctor();
+    recognition.lang = "en-US"; recognition.interimResults = false;
+    recognition.onresult = event => { const text = Array.from(event.results).map(result => result[0]?.transcript ?? "").join(" ").trim(); if (text) onText(text); };
+    recognition.onend = () => { live.current = null; };
+    live.current = recognition; recognition.start();
+  };
+}
+
 export function OwnerPhoneToday({ greetingName, business, needs, systems, facts, onReview, onAsk, onOpenSystem, onRetry, onBringInWebsite, hour }: OwnerPhoneTodayProps) {
   const [ask, setAsk] = useState("");
   const hello = `${greeting(hour)}, ${greetingName}.`;
+  const voice = useDictation(text => setAsk(current => current.trim() ? `${current.trim()} ${text}` : text));
+  const submit = () => { if (ask.trim()) { onAsk(ask.trim()); setAsk(""); } };
+  // The ask bar stays under the thumb on a phone, whatever the page above it says.
+  const dock = <div className={styles.dock}>
+    <XaComposer value={ask} onChange={setAsk} onSubmit={submit} placeholder="Ask Strelva anything" inputLabel={`Ask Strelva about ${business}`} onVoice={voice ?? undefined} />
+  </div>;
 
   if (needs.status === "loading") return <div className={styles.page} aria-busy="true">
     <StSkeleton width="80%" label={`Loading ${business}`} /><StSkeleton width="60%" />
-    <XaComposer value="" onChange={() => undefined} onSubmit={() => undefined} placeholder="Ask Strelva for anything" disabled />
+    {dock}
   </div>;
 
   if (needs.status === "error") return <div className={styles.page}>
-    <XaPebbleScene pose="fixing" size={180} label="Pebble checking the connection" />
-    <XaHeadline size="sm" quiet="Your Systems keep running while this reloads.">{business} did not load just now.</XaHeadline>
-    <p className={styles.fact}>{needs.message}</p>
+    <div className={styles.trouble}>
+      <XaPebbleScene pose="fixing" size={132} bare label="Pebble checking the connection" />
+      <XaHeadline size="sm">{business} didn&rsquo;t load, but your Systems are still running.</XaHeadline>
+    </div>
     {onRetry ? <XaButton variant="primary" size="lg" block onClick={onRetry}>Try again</XaButton> : null}
+    <XaComposer value={ask} onChange={setAsk} onSubmit={submit} placeholder="Ask Strelva anything" inputLabel={`Ask Strelva about ${business}`} onVoice={voice ?? undefined} />
   </div>;
 
   const items = needs.status === "ready" ? needs.items.filter(item => item.state === "open") : [];
@@ -71,16 +101,16 @@ export function OwnerPhoneToday({ greetingName, business, needs, systems, facts,
   const running = systems.filter(system => system.lifecycle === "live");
   const lede = first
     ? `${items.length === 1 ? "One thing waits" : `${items.length} things wait`} for you. ${running.length ? "Everything else is running." : ""}`.trim()
-    : running.length ? "Nothing needs you. Everything is running." : "Nothing is running yet.";
+    : running.length ? "Nothing needs you. Everything is running." : "";
   const canDecide = needs.status === "ready" && needs.canDecide !== false;
 
   return <div className={styles.page}>
     <div className={styles.greeting}>
       <XaHeadline size="md">{hello}</XaHeadline>
-      <XaLede>{lede}</XaLede>
+      {lede ? <XaLede>{lede}</XaLede> : null}
     </div>
-    <XaComposer value={ask} onChange={setAsk} onSubmit={() => { if (ask.trim()) { onAsk(ask.trim()); setAsk(""); } }} placeholder="Ask Strelva for anything"
-      scope={{ label: business, state: first ? "waits" : "live" }}
+    <XaComposer value={ask} onChange={setAsk} onSubmit={submit} placeholder="Ask Strelva for anything" onVoice={voice ?? undefined}
+      scope={{ label: business }}
       waiting={first ? {
         kicker: from ? `Waits for you · from ${from}` : "Waits for you",
         title: first.title,
@@ -97,9 +127,10 @@ export function OwnerPhoneToday({ greetingName, business, needs, systems, facts,
             onClick={() => onOpenSystem(system.id)} />;
         })}
       </XaRows>
-    </section> : <XaEmpty pose="waving" size="sm" title="Nothing is running yet." job="Pebble is ready to read your website"
+    </section> : <XaEmpty pose="fixing" size="sm" bare title="Nothing is running yet." job="Pebble reads your website first, then shows you what it found"
       action={onBringInWebsite ? <XaButton variant={first ? "secondary" : "primary"} onClick={onBringInWebsite}>Bring in your website</XaButton> : undefined}>
       Bring in the website you already have. Nothing about it changes until you say so.
     </XaEmpty>}
+    {first || systems.length ? dock : null}
   </div>;
 }

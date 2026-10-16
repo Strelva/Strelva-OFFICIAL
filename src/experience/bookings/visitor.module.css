@@ -6,9 +6,9 @@
  */
 /* The visitor variables, for a full page (.shell) or a page shown inside the workspace (.frame). */
 .shell, .frame { --v-canvas: var(--visitor-canvas, #faf9f6); --v-surface: var(--visitor-surface, #ffffff); --v-text: var(--visitor-text, #161715); --v-muted: var(--visitor-muted, #6b6f68); --v-line: var(--visitor-line, #e6e5e0); --v-inset: var(--visitor-inset, #f1f0ec); --v-accent: var(--visitor-accent, #161715); --v-on-accent: var(--visitor-on-accent, #ffffff); --v-danger: var(--visitor-danger, #9c522c); }
-.frame { padding: 24px; border: 1px solid var(--v-line); border-radius: 16px; background: var(--v-canvas); color: var(--v-text); font-family: var(--visitor-font, var(--font-body, 'DM Sans', system-ui, sans-serif)); }
+.frame { padding: 24px 0 0; background: var(--v-canvas); color: var(--v-text); font-family: var(--visitor-font, var(--font-workspace, 'DM Sans', system-ui, sans-serif)); }
 .shell {
-  min-height: 100dvh; background: var(--v-canvas); color: var(--v-text); font-family: var(--visitor-font, var(--font-body, 'DM Sans', system-ui, sans-serif)); font-variant-numeric: tabular-nums; padding: 40px 24px 64px; }
+  min-height: 100dvh; background: var(--v-canvas); color: var(--v-text); font-family: var(--visitor-font, var(--font-workspace, 'DM Sans', system-ui, sans-serif)); font-variant-numeric: tabular-nums; padding: 40px 24px 64px; }
 .column { max-width: 560px; margin: auto; }
 .srOnly { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
 .wide { max-width: 1200px; margin: auto; }
@@ -47,7 +47,7 @@
 .block { width: 100%; }
 .text { display: inline-flex; align-items: center; min-height: 44px; border: 0; padding: 0; background: none; color: var(--v-accent); font: inherit; font-size: 15px; font-weight: 600; cursor: pointer; text-decoration: none; }
 .choice { display: inline-flex; min-height: 44px; align-items: center; padding: 10px 14px; border: 1px solid var(--v-line); background: var(--v-surface); border-radius: 999px; cursor: pointer; font-size: 14px; }
-.choice:has(input:checked) { background: var(--v-accent); border-color: var(--v-accent); color: var(--v-on-accent); }
+.choice:has(input:checked) { background: color-mix(in srgb, var(--v-accent) 10%, var(--v-surface)); border-color: var(--v-accent); color: var(--v-text); box-shadow: inset 0 0 0 1px var(--v-accent); font-weight: 500; }
 .choice input, .time input { position: absolute; opacity: 0; width: 1px; height: 1px; }
 .choices { display: flex; flex-wrap: wrap; gap: 8px; }
 .fieldset { min-width: 0; padding: 0; margin: 0; border: 0; }
@@ -70,6 +70,14 @@
 .time:hover { background: color-mix(in srgb, var(--v-accent) 16%, var(--v-surface)); }
 .time:has(input:checked) { background: var(--v-accent); color: var(--v-on-accent); }
 .noTimes { padding-top: 10px; text-align: center; color: var(--v-muted); font-size: 13px; }
+.closed { display: flex; align-items: center; justify-content: center; min-height: 40px; padding: 0 6px; border-radius: 10px; background: color-mix(in srgb, #c9773f 14%, var(--v-surface)); color: var(--v-danger); font-size: 13px; font-weight: 500; text-align: center; line-height: 1.25; }
+.day[data-closed] .dayHead b { color: var(--v-muted); font-weight: 500; }
+.call { color: var(--v-accent); font-weight: 600; text-decoration: underline; text-underline-offset: 3px; text-decoration-thickness: 1px; }
+.nowrap { white-space: nowrap; }
+.call:focus-visible { outline: 2px solid var(--v-accent); outline-offset: 3px; border-radius: 4px; }
+.choose { max-width: 760px; }
+.choose .title { max-width: 18em; }
+.picked { margin: 14px 0 0; min-height: 22px; font-size: 15px; font-weight: 500; }
 
 @media (max-width: 899px) {
   .split { display: block; }
@@ -90,5 +98,6 @@
   .times { flex: 1; flex-direction: row; flex-wrap: wrap; }
   .time { min-width: 76px; min-height: 44px; }
   .noTimes { padding-top: 12px; text-align: left; }
+  .closed { justify-content: flex-start; min-height: 44px; padding: 0 12px; }
 }
 @media (prefers-reduced-motion: reduce) { .button, .time { transition: none; } .button:active:not(:disabled) { transform: none; } }

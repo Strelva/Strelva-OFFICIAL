@@ -86,7 +86,7 @@ describe("/api/approve through Needs you", () => {
   it("POST decides through the item and keeps the link token as the authorization", async () => {
     const { review } = await tokens();
     const response = await post(review);
-    expect(await response.text()).toContain("Approved");
+    expect(await response.text()).toContain("You said yes.");
     expect(needsYou.decide).toHaveBeenCalledWith({
       workspaceId: WS, itemId: item().id, revision: "a".repeat(64), decision: "approve",
       by: { kind: "owner_link", recipient: "owner@example.test", legacyToken: review },

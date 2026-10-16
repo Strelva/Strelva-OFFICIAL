@@ -21,7 +21,7 @@ export const MAYA: RecordedActor = { kind: "agency", displayName: "Maya at North
 export function e1Mail(state: string): XaMail {
   return waitsForYouEmail({
     business: HARBOR.business, logoUrl: null, agencyName: "North Studio",
-    subject: "Close Harbor Dental for Thanksgiving?", question: "Close for Thanksgiving, Nov 26–27?", actor: MAYA,
+    subject: "Close Harbor Dental for Thanksgiving?", question: "Close for Thanksgiving, Nov\u00a026–27?", actor: MAYA,
     page: { address: `${HARBOR.site}/hours`, title: "Thanksgiving hours", change: "Closed Thursday and Friday, Nov 26–27. Back Saturday, Nov 28, 9–1.", note: "Replaces your usual hours for that week" },
     review: `${XA7_BASE}/phone-yes?state=confirm`,
     signInRequired: state === "sign-in",
@@ -37,12 +37,12 @@ export function e3Mail(state: string, origin: string): XaMail {
     business: HARBOR.business, agencyName: "North Studio", period: "Nov 9–15", weekOf: "Week of Nov 9",
     figure: { value: 14, label: "visits booked online", detail: "3 new patients · 11 returning · nothing went down" },
     changes: state === "quiet" ? [] : [
-      { date: "Nov 10", text: "Closed for Thanksgiving, Nov 26–27", who: "You said yes" },
+      { date: "Nov 10", text: "Closed for Thanksgiving, Nov\u00a026–27", who: "You said yes" },
       { date: "Nov 12", text: "Fixed the map link on the contact page", who: "Strelva" },
       { date: "Nov 13", text: "New-patient form asks for the insurance member ID", who: "You said yes" },
     ],
-    checks: `${HARBOR.site} passed all 2,016 checks. Slowest page: /services at 1.4 s.`,
-    artUrl: `${origin}/xa/pose-lineup.webp`,
+    checks: `Every check on ${HARBOR.site} passed. Your Services page was the slowest at 1.4 seconds.`,
+    artUrl: `${origin}/xa/pose-alone.webp`,
     open: { label: "Open Harbor Dental", url: `${XA7_BASE}/today-phone` },
     settingsUrl: `${XA7_BASE}/monday-email?state=settings`,
   });
@@ -50,8 +50,10 @@ export function e3Mail(state: string, origin: string): XaMail {
 
 /* ---------- E4 · public booking page ---------- */
 
+/** Thanksgiving in Harbor Dental's hours record, the same closure E2 asks about. */
+export const E4_CLOSURES = [{ date: "2026-11-26", label: "Thanksgiving" }, { date: "2026-11-27", label: "Thanksgiving" }];
 const at = (day: number, time: string) => `2026-11-${String(day).padStart(2, "0")}T${time}:00-05:00`;
-const SLOT_STARTS = [at(23, "08:00"), at(23, "10:30"), at(23, "14:00"), at(24, "09:15"), at(24, "13:30"), at(24, "15:45"), at(25, "08:30"), at(25, "11:00"), at(25, "14:15"), at(28, "09:00"), at(28, "11:00")];
+export const SLOT_STARTS = [at(23, "08:00"), at(23, "10:30"), at(23, "14:00"), at(24, "09:15"), at(24, "13:30"), at(24, "15:45"), at(25, "08:30"), at(25, "11:00"), at(25, "14:15"), at(28, "09:00"), at(28, "11:00")];
 
 export function e4Choice(state: string): InquiryBookingChoice | null {
   if (state === "expired-link" || state === "error") return null;
@@ -59,7 +61,7 @@ export function e4Choice(state: string): InquiryBookingChoice | null {
   const offer = { serviceId: "exam", services: [{ id: "exam", name: "New-patient exam", durationMinutes: 60 }], serviceName: "New-patient exam · 60 min", timeZone: HARBOR.timeZone, chooseUrl: "#", expiresAt: at(22, "20:00"), slots };
   const status = state === "held" || state === "requested" || state === "confirmed" ? state : null;
   const booking = status ? parseStoreBooking({ id: "fixture", status, serviceName: "New-patient exam", start: at(25, "10:30"), end: at(25, "11:30"), timeZone: HARBOR.timeZone, createdAt: "2026-11-20T14:00:00Z" }) : null;
-  return { businessName: HARBOR.business, offer, booking };
+  return { businessName: HARBOR.business, offer, booking, businessPhone: HARBOR.phone, closures: E4_CLOSURES };
 }
 
 /* ---------- E5 · patient form ---------- */
@@ -72,7 +74,7 @@ export function e5Form(): PublicIntakeForm {
 
 export const E5_FILLED: Record<string, string> = {
   name: "Priya Raman", phone: "(716) 555-0187", patient_status: "new", reason: "exam", insurance_carrier: "p_delta_dental_ppo",
-  insurance_member_id: "DDN 4471 2093", preferred_days: "tue,wed", preferred_times: "morning", note: "My lower left side is sensitive to cold.",
+  insurance_member_id: "DDN 4471 2093", preferred_days: "tue,wed", preferred_times: "morning", note: "Mornings work best, I have a 7-year-old.",
 };
 
 /* ---------- E6 · Today on the phone ---------- */

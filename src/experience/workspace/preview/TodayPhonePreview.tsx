@@ -22,7 +22,7 @@ export function TodayPhonePreview({ state, mode }: { state: TodayPhoneState; mod
   return <StrelvaShell appBase="/preview/strelva" signOut={null} systemsReleased mode={mode} workspaceName={HARBOR.business} accountName={HARBOR.ownerFull} title="Today" active="home"
     needsYou={{ count: needs.status === "ready" ? needs.items.length : 0 }} onNavigate={() => undefined}
     agency={{ name: "North Studio", person: "Maya", color: "#2f5236" }}
-    pinned={systems.map(system => ({ id: system.id, kind: system.kind, title: system.name, href: `${XA7_BASE}/today-phone`, detail: E6_FACTS[system.id as keyof typeof E6_FACTS] }))}>
+    pinned={systems.map(system => ({ id: system.id, kind: system.kind, title: system.name, href: `${XA7_BASE}/today-phone` }))}>
     <OwnerPhoneToday greetingName={HARBOR.owner} business={HARBOR.business} needs={needs} systems={systems} facts={E6_FACTS} hour={8}
       onReview={() => { window.open(`${XA7_BASE}/phone-yes?state=confirm`, "_self"); }}
       onAsk={setAsked} onOpenSystem={() => undefined} onRetry={() => window.location.reload()} onBringInWebsite={() => undefined} />

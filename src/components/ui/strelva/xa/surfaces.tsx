@@ -105,9 +105,9 @@ export function XaRow({ lead, title, detail, tone, meta, action, href, onClick, 
  * An empty or quiet state with Pebble doing a job. `job` says what Pebble is
  * doing right now; it is required because Pebble is never idle decoration.
  */
-export function XaEmpty({ pose, job, title, children, action, secondary, size = "md", align = "start" }: { pose: XaPose; job: ReactNode; title: ReactNode; children?: ReactNode; action?: ReactNode; secondary?: ReactNode; size?: "sm" | "md"; align?: "start" | "center" }) {
+export function XaEmpty({ pose, job, title, children, action, secondary, size = "md", align = "start", bare = false }: { pose: XaPose; job: ReactNode; title: ReactNode; children?: ReactNode; action?: ReactNode; secondary?: ReactNode; size?: "sm" | "md"; align?: "start" | "center"; /** Pebble straight on the canvas, without the felt disc. */ bare?: boolean }) {
   return <section className={styles.empty} data-size={size} data-align={align} aria-label={typeof title === "string" ? title : undefined}>
-    <XaPebbleScene pose={pose} size={size === "sm" ? 140 : 200} />
+    <XaPebbleScene pose={pose} size={size === "sm" ? 140 : 200} bare={bare} />
     <h2 className={styles.emptyTitle}>{title}</h2>
     {children ? <p className={styles.emptyBody}>{children}</p> : null}
     <p className={styles.emptyJob}><span className={styles.pulse} aria-hidden="true" />{job}</p>

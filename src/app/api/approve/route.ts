@@ -2,7 +2,8 @@ import { ModelBudgetPausedError, ModelBudgetUnavailableError } from "@/platform/
 import { actorCopy, actorPresentation } from "@/platform/presentation/actor";
 import { resolveOwnerBrand, resolveTenantBrand } from "@/platform/agency-brand/server";
 import { STRELVA_BRAND, type OwnerBrand } from "@/platform/infra/agency-brand";
-import { brandXaPage, xaDecisionPageHtml, xaYesLabel, type XaPageTone } from "./xa-page";
+import { brandXaPage, identifyXaPage, xaDecisionPageHtml, xaDoneInput, xaKeepWith, xaUndoable, xaYesLabel, type XaIdentity, type XaPageTone, type XaWeek } from "./xa-page";
+import { getSupabase } from "@/platform/infra/db/client";
 import { ownerNoticeUrl } from "@/lib/owner-notice-url";
 /**
  * One-click approve-from-email (with a confirm step).
@@ -42,7 +43,7 @@ import { ownerNoticeUrl } from "@/lib/owner-notice-url";
  *    rotating authority version; workspace publishing keeps its own token.
  */
 import { NextResponse } from "next/server";
-import { verifyAnyApproveToken, type ApproveLinkClaims, type WorkspaceApproveLinkClaims } from "@/lib/approve-link";
+import { APPROVE_LINK_TTL_MS, signWorkspaceApproveToken, verifyAnyApproveToken, type ApproveLinkClaims, type WorkspaceApproveLinkClaims } from "@/lib/approve-link";
 import { resolveEventAction } from "@/lib/event-actions";
 import { getTenantConfig } from "@/lib/tenants";
 import { getTenantDashboardUrl } from "@/lib/tenant-urls";
@@ -101,14 +102,55 @@ function confirmPage(params: {
   previewUrl?: string;
   /** Every value the confirm applies, in full (Needs you sources with a review). */
   lines?: readonly string[];
+  /** The visitor page the yes changes, when the source can draw it. */
+  week?: XaWeek | null;
+  /** The other answer on the same page, posting its own token ("Not now"). */
+  decline?: { label: string; token: string } | null;
+  /** A not-yet link: the decision is the text button, never the ink pill. */
+  notYet?: boolean;
+  foot?: string;
 }): NextResponse {
   return html(200, xaDecisionPageHtml({
     status: 200, tone: "waits", statusLabel: "Waits for you", heading: params.heading, body: params.body, by: params.by,
-    ...(params.lines?.length ? { lines: params.lines } : {}),
+    ...(params.week ? { week: params.week } : params.lines?.length ? { lines: params.lines } : {}),
     ...(params.previewUrl ? { preview: { url: params.previewUrl, label: "Review the complete website preview before deciding" } } : {}),
-    primary: { label: params.confirmLabel, token: params.token },
-    ...(params.dashboardUrl ? { secondary: { label: "Open your workspace instead", url: params.dashboardUrl } } : {}),
+    ...(params.notYet ? { decline: { label: params.confirmLabel, token: params.token } } : { primary: { label: params.confirmLabel, token: params.token } }),
+    ...(!params.notYet && params.decline ? { decline: params.decline } : {}),
+    // With "Not now" on the page, the workspace stays one tap away in the email; three answers would crowd one yes.
+    ...(params.dashboardUrl && (params.notYet || !params.decline) ? { secondary: { label: "Open your workspace instead", url: params.dashboardUrl } } : {}),
+    ...(params.foot ? { foot: params.foot } : {}),
   }));
+}
+
+/**
+ * The not-yet token for the same item, revision and recipient, expiring with
+ * the link it came from, so "Not now" sits on the confirm page. Only ever
+ * minted from an approve link: a not-yet link never grants a yes.
+ */
+function notYetSibling(token: string, claims: WorkspaceApproveLinkClaims): string | null {
+  if (claims.action !== "approve") return null;
+  try {
+    const exp = Number((JSON.parse(Buffer.from(token.slice(0, token.indexOf(".")), "base64url").toString("utf8")) as { exp?: unknown }).exp);
+    if (!Number.isFinite(exp) || exp <= Date.now()) return null;
+    return signWorkspaceApproveToken({ ...claims, action: "not-yet" }, exp - APPROVE_LINK_TTL_MS);
+  } catch { return null; }
+}
+
+/** The business a workspace link is for: the owner sees their business, not the platform. */
+async function workspaceIdentity(workspaceId: string): Promise<XaIdentity | null> {
+  try {
+    const db = getSupabase();
+    if (!db) return null;
+    const { data } = await db.from("workspaces").select("name").eq("id", workspaceId).maybeSingle();
+    const name = (data as { name?: unknown } | null)?.name;
+    return typeof name === "string" && name.trim() ? { name: name.trim() } : null;
+  } catch { return null; }
+}
+
+/** Pebble says what changed and who changed it, once. */
+function changedPage(item: OwnerDecision | null | undefined, dashboardUrl: string | undefined, buttonLabel = "Open"): NextResponse {
+  const { name } = actorPresentation(item?.actor);
+  return noticePage({ status: 200, heading: CHANGED.heading, body: `${name ? `${name} changed` : "Someone changed"} ${item?.title ? `\u201c${item.title.replace(/\?$/, "")}\u201d` : "it"} after this email went out. Open Strelva to see the new version.`, dashboardUrl, buttonLabel });
 }
 
 /** Who acted, in the owner's words; never a builder phrase when it wasn't recorded. */
@@ -120,7 +162,7 @@ function whoActed(actor: unknown): string {
 /** "Prepared by Maya at North Studio", when the source recorded who prepared it. */
 function preparedBy(actor: unknown): string | undefined {
   const { name } = actorPresentation(actor);
-  return name ? `Prepared by ${name}.` : undefined;
+  return name ? `${name} prepared this.` : undefined;
 }
 
 /** Google has not approved Strelva's Business Profile access yet: nothing failed, the reply is saved. */
@@ -155,10 +197,10 @@ function workspaceOpenUrl(origin: string, workspaceId: string, href?: string | n
   return `${origin.replace(/\/+$/, "")}${href ?? `/workspace?workspaceId=${encodeURIComponent(workspaceId)}`}`;
 }
 
-const MOVED = { heading: "Decide this in Strelva", body: "This business now decides in Strelva. Nothing was done. Open your workspace to decide it there." };
-const CHANGED = { heading: "This changed since we emailed you", body: "Nothing was done. Open Strelva to see the latest version and decide there." };
+const MOVED = { heading: "Decide this in Strelva", body: "This business now decides in Strelva. Open your workspace to decide it there." };
+const CHANGED = { heading: "This changed since we emailed you", body: "It changed after this email went out. Open Strelva to see the new version." };
 const HANDLED = { heading: "Already handled", body: "This was already taken care of. Nothing more to do." };
-const EXPIRED = { heading: "This link expired", body: "Nothing was done. Open Strelva to see what's waiting." };
+const EXPIRED = { heading: "This link expired", body: "Open Strelva to see what's waiting." };
 
 async function workspaceConfirm(token: string, claims: WorkspaceApproveLinkClaims): Promise<NextResponse> {
   const { needsYouAppOrigin, needsYouReleaseEnabled, needsYouStore, needsYouService } = await import("@/experience/workspace/needs-you-server");
@@ -166,21 +208,29 @@ async function workspaceConfirm(token: string, claims: WorkspaceApproveLinkClaim
   const item = await needsYouStore.read(claims.workspaceId, claims.itemId).catch(() => null);
   if (!item) return noticePage({ status: 400, ...INVALID.bad });
   const open = workspaceOpenUrl(needsYouAppOrigin(), claims.workspaceId, item.openHref);
-  if (item.state === "superseded" || item.revisionHash !== claims.revision) return noticePage({ status: 200, ...CHANGED, dashboardUrl: open, buttonLabel: "Open" });
+  if (item.state === "superseded" || item.revisionHash !== claims.revision) return changedPage(item, open);
   if (item.state !== "open") return noticePage({ status: 200, ...HANDLED, dashboardUrl: open, buttonLabel: "Open" });
   if (Date.parse(item.expiresAt) <= Date.now()) return noticePage({ status: 200, ...EXPIRED, dashboardUrl: open, buttonLabel: "Open" });
-  if (item.signInRequired) return noticePage({ status: 200, heading: "Sign in to decide this", body: "Decisions about access, money or leaving Strelva need you signed in. Nothing was done.", dashboardUrl: open, buttonLabel: "Sign in and open" });
+  if (item.signInRequired) return noticePage({ status: 200, heading: "Sign in to decide this", body: "Decisions about access, money or leaving Strelva need you signed in.", dashboardUrl: open, buttonLabel: "Sign in and open" });
   // A source whose detail can't hold every value shows the complete review
   // here, read for this exact revision; without it nothing is offered.
-  const lines = await needsYouService().review(item).catch(() => null);
-  if (lines === null) return noticePage({ status: 200, ...CHANGED, dashboardUrl: open, buttonLabel: "Open" });
+  const service = needsYouService();
+  const lines = await service.review(item).catch(() => null);
+  if (lines === null) return changedPage(item, open);
+  const week = await service.reviewWeek?.(item).catch(() => null) ?? null;
   const isApprove = claims.action === "approve";
+  const sibling = isApprove ? notYetSibling(token, claims) : null;
+  const preparer = actorPresentation(item.actor).name ?? undefined;
   return confirmPage({
     token,
     heading: item.title,
     by: preparedBy(item.actor),
-    body: `${process.env.STRELVA_INQUIRY_OWNER_NOTICES === "1" && (item.kind === "customer.message" || item.kind === "customer.commitment") && item.detail ? `${item.detail}\n\n` : ""}${actorCopy(isApprove ? item.approveEffect : item.notYetEffect, item.actor)} Nothing happens until you confirm.`,
-    confirmLabel: xaYesLabel(item.kind, isApprove ? "approve" : "not_yet"),
+    body: `${process.env.STRELVA_INQUIRY_OWNER_NOTICES === "1" && (item.kind === "customer.message" || item.kind === "customer.commitment") && item.detail ? `${item.detail}\n\n` : ""}${actorCopy(isApprove ? item.approveEffect : item.notYetEffect, item.actor)}`,
+    confirmLabel: isApprove ? xaYesLabel(item.kind, "approve") : xaKeepWith(preparer),
+    notYet: !isApprove,
+    decline: sibling ? { label: "Not now", token: sibling } : null,
+    week,
+    ...(isApprove && xaUndoable(item.kind) ? { foot: "Undo any time from Today." } : {}),
     dashboardUrl: open,
     ...(item.sourceLifecycle === "website_document" && ownerWebsitePreviewMayBeOn() ? { previewUrl: ownerWebsitePreviewHref(token) } : {}),
     ...(lines ? { lines } : {}),
@@ -216,24 +266,34 @@ function decisionPage(result: DecideResult, origin: string, workspaceId: string,
   const openItem = workspaceOpenUrl(origin, workspaceId, result.item?.openHref);
   switch (result.status) {
     case "done":
-    case "done_unverified":
-      return isApprove
-        ? noticePage({ status: 200, heading: "Approved", by: whoActed(result.receipt?.actor), body: result.receipt
-            ? `${result.receipt.sentence}\n${result.receipt.changed ?? result.item?.title ?? "Decision recorded"}\n${result.receipt.evidence?.readBack === "verified" ? "Confirmed live." : result.status === "done_unverified" ? "Accepted. Confirmation is still pending." : "Completion recorded. Live confirmation is not recorded here."}`
-            : `Decision recorded: ${result.item?.title ?? "your approval"}. ${result.status === "done_unverified" ? "Confirmation is still pending." : "Completion recorded; the change receipt is unavailable here."}`,
-          dashboardUrl: openItem, buttonLabel: result.item?.systemId ? "Open System" : "Open item" })
-        : noticePage({ status: 200, heading: "Not yet", body: "Nothing was done. It's still in Strelva when you want it.", dashboardUrl: openItem, buttonLabel: "Open" });
+    case "done_unverified": {
+      if (!isApprove) {
+        const preparer = actorPresentation(result.item?.actor).name;
+        return noticePage({ status: 200, heading: preparer ? `It stays with ${preparer}` : "Not yet", body: "Nothing changed. It waits in Strelva when you want it.", dashboardUrl: openItem, buttonLabel: "Open" });
+      }
+      const receipt = result.receipt;
+      const { name, credit } = actorPresentation(receipt?.actor ?? result.item?.actor);
+      const who = receipt?.sentence ?? (name ? `${name} prepared it` : undefined);
+      const done = xaDoneInput({
+        changed: receipt?.changed ?? null,
+        verified: result.status === "done" && receipt?.evidence?.readBack === "verified",
+        who: who && credit ? `${who.replace(/\.$/, "")} \u00b7 ${credit}` : who,
+        seeUrl: openItem,
+        undoUrl: receipt?.undo?.state === "undo" ? openItem : null,
+      });
+      return html(200, xaDecisionPageHtml(done));
+    }
     case "already_handled":
       return noticePage({ status: 200, ...HANDLED, dashboardUrl: openItem, buttonLabel: "Open" });
     case "changed":
-      return noticePage({ status: 200, ...CHANGED, dashboardUrl: openItem, buttonLabel: "Open" });
+      return changedPage(result.item, openItem);
     case "expired":
       return noticePage({ status: 200, ...EXPIRED, dashboardUrl: openItem, buttonLabel: "Open" });
     case "sign_in":
-      return noticePage({ status: 200, heading: "Sign in to decide this", body: "This one needs you signed in. Nothing was done.", dashboardUrl: openItem, buttonLabel: "Sign in and open" });
+      return noticePage({ status: 200, heading: "Sign in to decide this", body: "This one needs you signed in.", dashboardUrl: openItem, buttonLabel: "Sign in and open" });
     case "not_owner":
     case "forbidden":
-      return noticePage({ status: 403, heading: "This link isn't for this account", body: "Nothing was done.", dashboardUrl: open, buttonLabel: "Open" });
+      return noticePage({ status: 403, heading: "This link isn't for this account", body: "Open your workspace to see it there.", dashboardUrl: open, buttonLabel: "Open" });
     case "not_found":
       return noticePage({ status: 400, ...INVALID.bad });
     case "failed": {
@@ -325,13 +385,15 @@ async function getPage(request: Request): Promise<NextResponse> {
     const { needsYouService } = await import("@/experience/workspace/needs-you-server");
     const { item } = linked;
     const lines = await needsYouService().review(item).catch(() => null);
-    if (lines === null) return noticePage({ status: 200, ...CHANGED, dashboardUrl, buttonLabel: "Open your workspace" });
+    if (lines === null) return changedPage(item, dashboardUrl, "Open your workspace");
     return confirmPage({
       token,
       heading: item.title,
       by: preparedBy(item.actor),
-      body: `${actorCopy(isApprove ? item.approveEffect : item.notYetEffect, item.actor)} Nothing happens until you confirm.`,
-      confirmLabel: xaYesLabel(item.kind, isApprove ? "approve" : "not_yet"),
+      body: actorCopy(isApprove ? item.approveEffect : item.notYetEffect, item.actor),
+      confirmLabel: isApprove ? xaYesLabel(item.kind, "approve") : xaKeepWith(actorPresentation(item.actor).name ?? undefined),
+      notYet: !isApprove,
+      ...(isApprove && xaUndoable(item.kind) ? { foot: "Undo any time from Today." } : {}),
       dashboardUrl,
       ...(lines ? { lines } : {}),
     });
@@ -482,16 +544,27 @@ async function brandPage(response: NextResponse, brand: OwnerBrand): Promise<Nex
   if (!brand.agencyId) return response;
   return new NextResponse(brandXaPage(await response.text(), brand), { status: response.status, headers: response.headers });
 }
+/** The business heads every page a valid link reaches; a broken link names no one. */
+async function identifyPage(response: NextResponse, verified: ReturnType<typeof verifyAnyApproveToken>): Promise<NextResponse> {
+  if (!verified) return response;
+  const identity = verified.kind === "workspace"
+    ? await workspaceIdentity(verified.claims.workspaceId)
+    : await getTenantConfig(verified.claims.tenantId).then(t => t?.siteName?.trim() ? { name: t.siteName.trim() } : null).catch(() => null);
+  if (!identity) return response;
+  return new NextResponse(identifyXaPage(await response.text(), identity), { status: response.status, headers: response.headers });
+}
 export async function GET(request: Request): Promise<NextResponse> {
   const response = await getPage(request);
   const token = new URL(request.url).searchParams.get("token");
   const verified = token ? verifyAnyApproveToken(token) : null;
-  return verified?.kind === "tenant" ? brandPage(response, await resolveTenantBrand(verified.claims.tenantId).catch(() => STRELVA_BRAND)) : response;
+  const branded = verified?.kind === "tenant" ? await brandPage(response, await resolveTenantBrand(verified.claims.tenantId).catch(() => STRELVA_BRAND)) : response;
+  return identifyPage(branded, verified);
 }
 export async function POST(request: Request): Promise<NextResponse> {
   const copy = request.clone();
   const response = await postPage(request);
   const token = (await copy.formData().catch(() => null))?.get("token");
   const verified = typeof token === "string" ? verifyAnyApproveToken(token) : null;
-  return verified?.kind === "tenant" ? brandPage(response, await resolveTenantBrand(verified.claims.tenantId).catch(() => STRELVA_BRAND)) : response;
+  const branded = verified?.kind === "tenant" ? await brandPage(response, await resolveTenantBrand(verified.claims.tenantId).catch(() => STRELVA_BRAND)) : response;
+  return identifyPage(branded, verified);
 }

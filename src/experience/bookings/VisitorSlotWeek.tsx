@@ -1,75 +1,41 @@
 import styles from "./visitor.module.css";
 import { formatVisitorTime, visitorTimeZoneLabel } from "@/platform/bookings/public-admission-time";
+import { visitorWeek, type VisitorClosure } from "@/platform/bookings/visitor-week";
 
 /**
  * XA · E4. The open times as the visitor's week: one column per day on a
- * wide screen, one row per day on a phone, each time a choice. Days between
- * the first and last open day with nothing open say so in place ("No times"),
- * never a gray slab. One radio group, so the form has one submit.
+ * wide screen, one row per day on a phone, each time a choice. A day the
+ * hours record closes says so in place ("Closed, Thanksgiving"); any other
+ * day with nothing open says "Nothing open", never a gray slab. One radio
+ * group, so the form has one submit.
  *
  * `value` is what the form posts for a time: its index for a handoff link,
  * its ISO start for an offer link. Every choice's accessible name is the full
  * date and zone, so a screen reader never hears a bare "10:30".
  */
-export function VisitorSlotWeek({ slots, timeZone, name, value, legend }: {
+export function VisitorSlotWeek({ slots, timeZone, name, value, legend, closures = [] }: {
   slots: readonly { start: string }[];
   timeZone: string;
   name: string;
   value: (slot: { start: string }, index: number) => string;
   legend: string;
+  closures?: readonly VisitorClosure[];
 }) {
-  const zone = safeZone(timeZone);
-  const day = new Intl.DateTimeFormat("en-CA", { timeZone: zone, year: "numeric", month: "2-digit", day: "2-digit" });
-  const weekday = new Intl.DateTimeFormat("en-US", { timeZone: zone, weekday: "short" });
-  const date = new Intl.DateTimeFormat("en-US", { timeZone: zone, day: "numeric" });
-  const month = new Intl.DateTimeFormat("en-US", { timeZone: zone, month: "long" });
-  const time = new Intl.DateTimeFormat("en-US", { timeZone: zone, hour: "numeric", minute: "2-digit" });
-
-  const byDay = new Map<string, { start: string; index: number }[]>();
-  slots.forEach((slot, index) => {
-    const key = day.format(new Date(slot.start));
-    byDay.set(key, [...(byDay.get(key) ?? []), { start: slot.start, index }]);
-  });
-  const keys = [...byDay.keys()].sort();
-  // Fill the calendar days between the first and last open day, at most two weeks.
-  const days: string[] = [];
-  if (keys.length) {
-    const first = Date.parse(`${keys[0]}T12:00:00Z`);
-    const last = Date.parse(`${keys[keys.length - 1]}T12:00:00Z`);
-    for (let at = first; at <= last && days.length < 14; at += 86_400_000) days.push(new Date(at).toISOString().slice(0, 10));
-  }
+  const week = visitorWeek(slots, timeZone, closures);
   const firstStart = slots[0]?.start;
-  const range = keys.length ? rangeLabel(keys[0]!, keys[keys.length - 1]!, month) : "";
-
   return <fieldset className={styles.fieldset}>
     <legend className={styles.srOnly}>{legend}</legend>
-    {range ? <p className={styles.range}>{range}{firstStart ? <span className={styles.muted}>Times in {visitorTimeZoneLabel(firstStart, zone)}</span> : null}</p> : null}
-    <div className={styles.week} style={{ ["--visitor-days" as string]: String(Math.min(days.length, 7)) }}>
-      {days.map(key => {
-        const open = byDay.get(key) ?? [];
-        const noon = new Date(`${key}T12:00:00Z`);
-        return <div key={key} className={styles.day} data-empty={open.length ? undefined : true}>
-          <p className={styles.dayHead}><span>{weekday.format(noon)}</span><b>{date.format(noon)}</b></p>
-          <div className={styles.times}>
-            {open.length ? open.map(slot => <label key={slot.start} className={styles.time}>
-              <input type="radio" name={name} value={value(slot, slot.index)} required aria-label={formatVisitorTime(slot.start, zone)} />
-              <span aria-hidden="true">{time.format(new Date(slot.start))}</span>
-            </label>) : <span className={styles.noTimes}>No times</span>}
-          </div>
-        </div>;
-      })}
+    {week.range ? <p className={styles.range}>{week.range}{firstStart ? <span className={styles.muted}>Times in {visitorTimeZoneLabel(firstStart, week.zone)}</span> : null}</p> : null}
+    <div className={styles.week} style={{ ["--visitor-days" as string]: String(Math.min(week.days.length, 7)) }}>
+      {week.days.map(day => <div key={day.key} className={styles.day} data-empty={day.times.length ? undefined : true} data-closed={day.closed ? true : undefined}>
+        <p className={styles.dayHead}><span>{day.weekday}</span><b>{day.date}</b></p>
+        <div className={styles.times}>
+          {day.times.length ? day.times.map(slot => <label key={slot.start} className={styles.time}>
+            <input type="radio" name={name} value={value(slot, slot.index)} required aria-label={formatVisitorTime(slot.start, week.zone)} />
+            <span aria-hidden="true">{slot.label}</span>
+          </label>) : <span className={day.closed ? styles.closed : styles.noTimes}>{day.closed ?? "Nothing open"}</span>}
+        </div>
+      </div>)}
     </div>
   </fieldset>;
-}
-
-function safeZone(zone: string): string {
-  try { new Intl.DateTimeFormat("en-US", { timeZone: zone }).format(); return zone; } catch { return "UTC"; }
-}
-
-function rangeLabel(first: string, last: string, month: Intl.DateTimeFormat): string {
-  const a = new Date(`${first}T12:00:00Z`), b = new Date(`${last}T12:00:00Z`);
-  const ma = month.format(a), mb = month.format(b);
-  const da = Number(first.slice(8)), db = Number(last.slice(8));
-  if (first === last) return `${ma} ${da}`;
-  return ma === mb ? `${ma} ${da} to ${db}` : `${ma} ${da} to ${mb} ${db}`;
 }

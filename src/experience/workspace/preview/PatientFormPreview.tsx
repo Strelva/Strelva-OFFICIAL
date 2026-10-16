@@ -9,7 +9,7 @@ import { E5_FILLED, HARBOR, e5Form } from "./xa7-outside-fixture";
 export function PatientFormPreview({ state }: { state: "filled" | "blank" | "urgent" | "sent" | "sent-urgent" | "error" | "panel" }) {
   const form = e5Form();
   const harbor = { "--visitor-accent": "#1f4e6b", "--visitor-text": "#152230" } as CSSProperties;
-  if (state === "panel") return <div style={{ maxWidth: 720, margin: "40px auto", padding: "0 16px" }}><p style={{ fontSize: 13, color: "#6b6f68" }}>What patients see, inside Dental intake on Inquiries</p><div className={visitor.frame}><VisitorIntakeForm form={form} /></div></div>;
+  if (state === "panel") return <div style={{ maxWidth: 720, margin: "40px auto", padding: "0 16px", fontFamily: "var(--font-workspace), 'DM Sans', sans-serif" }}><h2 style={{ margin: 0, fontSize: 17, fontWeight: 600, color: "#161715" }}>What patients see on your website</h2><div className={visitor.frame} style={harbor}><VisitorIntakeForm form={form} /></div></div>;
   const initial = state === "blank" ? {} : state === "urgent" ? { ...E5_FILLED, reason: "urgent" } : E5_FILLED;
   return <div style={harbor}>
     <VisitorBookingShell siteName={HARBOR.business} navigation={<a href={`tel:${HARBOR.phone.replace(/[^0-9]/g, "")}`}>{HARBOR.phone}</a>}>

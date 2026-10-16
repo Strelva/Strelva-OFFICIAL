@@ -44,7 +44,7 @@ export type XaMailBlock =
   | { kind: "primary"; action: XaMailAction; note?: string; align?: "block" | "start" }
   | { kind: "art"; url: string; alt: string; width: number; height: number }
   | { kind: "period"; text: string }
-  | { kind: "figure"; value: string; label: string; detail?: string }
+  | { kind: "figure"; value: string; label: string; detail?: string; /** Pebble beside the number, holding the week. */ art?: { url: string; alt: string } }
   | { kind: "changes"; label: string; rows: readonly XaMailChange[] }
   | { kind: "sentence"; text: string; muted?: boolean }
   | { kind: "rule" };
@@ -68,12 +68,14 @@ function url(value: string): string {
   if (!["https:", "http:", "mailto:"].includes(parsed.protocol)) throw new Error("Unsafe email URL");
   return e(value);
 }
+/** The business's initial in a small ink tile, when it has no logo. Never Strelva's mark. */
+const monogram = (name: string) => `<span style="display:inline-block;width:24px;height:24px;margin-right:8px;border-radius:7px;background:${X.ink};color:${X.onInk};font-size:13px;line-height:24px;font-weight:600;text-align:center;vertical-align:1px;">${e((name.trim().match(/[\p{L}\p{N}]/u)?.[0] ?? "?").toUpperCase())}</span>`;
 const table = (body: string, style = "", width = "100%") => `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="${width}" style="border-collapse:separate;${style}">${body}</table>`;
 const pill = (action: XaMailAction, block: boolean) => table(`<tr><td align="center" bgcolor="${X.ink}" style="background:${X.ink};border-radius:999px;"><a href="${url(action.url)}" style="display:block;padding:15px 28px;font-family:${X.font};font-size:17px;line-height:22px;font-weight:600;color:${X.onInk};text-decoration:none;border-radius:999px;">${e(action.label)}</a></td></tr>`, "", block ? "100%" : "");
 
 function block(b: XaMailBlock): string {
   switch (b.kind) {
-    case "identity": return `<p style="margin:0;font-size:16px;line-height:24px;font-weight:600;color:${X.text};">${b.logoUrl ? `<img src="${url(b.logoUrl)}" alt="" width="24" height="24" style="vertical-align:-6px;margin-right:8px;border:0;">` : ""}${e(b.business)}</p>`;
+    case "identity": return `<p style="margin:0;font-size:16px;line-height:24px;font-weight:600;color:${X.text};">${b.logoUrl ? `<img src="${url(b.logoUrl)}" alt="" width="24" height="24" style="vertical-align:-6px;margin-right:8px;border:0;">` : monogram(b.business)}${e(b.business)}</p>`;
     case "waits": return `<p style="margin:0;font-size:15px;line-height:22px;color:${X.need};"><span style="display:inline-block;width:7px;height:7px;margin-right:8px;border-radius:999px;background:${X.needDot};vertical-align:1px;"></span>${e(b.label)}</p>`;
     case "headline": return `<h1 style="margin:0;font-size:28px;line-height:34px;font-weight:600;letter-spacing:-0.6px;color:${X.text};overflow-wrap:anywhere;">${e(b.text)}</h1>${b.lede ? `<p style="margin:12px 0 0;font-size:16px;line-height:24px;color:${X.muted};">${e(b.lede)}</p>` : ""}`;
     case "page": return table(`<tr><td align="center" style="padding:10px 16px;background:${X.inset};border-bottom:1px solid ${X.line};border-radius:16px 16px 0 0;font-size:13px;line-height:18px;color:${X.muted};">${e(b.page.address)}</td></tr>
@@ -83,7 +85,7 @@ function block(b: XaMailBlock): string {
     case "primary": return `${pill(b.action, b.align !== "start")}${b.note ? `<p style="margin:14px 0 0;text-align:center;font-size:13px;line-height:18px;color:${X.muted};">${e(b.note)}</p>` : ""}`;
     case "art": return `<p style="margin:0;text-align:center;"><img src="${url(b.url)}" alt="${e(b.alt)}" width="${b.width}" height="${b.height}" style="display:inline-block;max-width:100%;height:auto;border:0;"></p>`;
     case "period": return `<p style="margin:0;font-size:13px;line-height:18px;color:${X.faint};">${e(b.text)}</p>`;
-    case "figure": return table(`<tr><td valign="middle" style="padding-right:16px;font-size:64px;line-height:64px;font-weight:300;letter-spacing:-2px;color:${X.text};font-variant-numeric:tabular-nums;white-space:nowrap;">${e(b.value)}</td><td valign="middle" style="width:100%;"><p style="margin:0;font-size:19px;line-height:26px;color:${X.text};">${e(b.label)}</p>${b.detail ? `<p style="margin:2px 0 0;font-size:14px;line-height:20px;color:${X.muted};">${e(b.detail)}</p>` : ""}</td></tr>`);
+    case "figure": return table(`<tr>${b.art ? `<td valign="middle" style="padding-right:14px;"><img src="${url(b.art.url)}" alt="${e(b.art.alt)}" width="64" height="64" style="display:block;border:0;"></td>` : ""}<td valign="middle" style="padding-right:16px;font-size:64px;line-height:64px;font-weight:300;letter-spacing:-2px;color:${X.text};font-variant-numeric:tabular-nums;white-space:nowrap;">${e(b.value)}</td><td valign="middle" style="width:100%;"><p style="margin:0;font-size:19px;line-height:26px;color:${X.text};">${e(b.label)}</p>${b.detail ? `<p style="margin:2px 0 0;font-size:14px;line-height:20px;color:${X.muted};">${e(b.detail)}</p>` : ""}</td></tr>`);
     case "changes": return `<p style="margin:0 0 6px;font-size:13px;line-height:18px;color:${X.faint};">${e(b.label)}</p>${table(b.rows.map(r => `<tr><td valign="top" style="padding:8px 16px 8px 0;font-size:14px;line-height:22px;color:${X.faint};white-space:nowrap;">${e(r.date)}</td><td valign="top" style="padding:8px 0;width:100%;font-size:15px;line-height:22px;color:${X.text};overflow-wrap:anywhere;">${e(r.text)}</td><td valign="top" align="right" style="padding:8px 0 8px 16px;font-size:13px;line-height:22px;color:${X.muted};white-space:nowrap;">${e(r.who)}</td></tr>`).join(""))}`;
     case "sentence": return `<p style="margin:0;font-size:14px;line-height:22px;color:${b.muted ? X.faint : X.body};">${e(b.text)}</p>`;
     case "rule": return `<div style="height:1px;line-height:1px;font-size:1px;background:${X.line};">&nbsp;</div>`;
@@ -184,9 +186,9 @@ export interface MondayEmailInput {
   /** The one number the week is about, with what it counts and where it came from. */
   figure: { value: number; label: string; detail?: string };
   changes: readonly XaMailChange[];
-  /** One plain sentence about checks, e.g. "harbordental.com passed all 2,016 checks." */
+  /** One plain sentence about checks in the owner's words, e.g. "Every check on harbordental.com passed." Never a path or an internal count. */
   checks?: string;
-  /** Pebble with the business's Systems, an absolute image URL on the app host. */
+  /** Pebble, shown beside the week's number: an absolute image URL on the app host. */
   artUrl?: string;
   open: XaMailAction;
   settingsUrl: string;
@@ -200,9 +202,9 @@ export function mondayEmail(input: MondayEmailInput): XaMail {
     preheader: input.figure.detail,
     fromName: input.agencyName ? `${input.agencyName} via Strelva` : "Strelva",
     blocks: [
-      ...(input.artUrl ? [{ kind: "art" as const, url: input.artUrl, alt: "Pebble with your Systems", width: 260, height: 104 }] : []),
+      { kind: "identity", business: input.business },
       { kind: "period", text: input.period },
-      { kind: "figure", value, label: input.figure.label, detail: input.figure.detail },
+      { kind: "figure", value, label: input.figure.label, detail: input.figure.detail, ...(input.artUrl ? { art: { url: input.artUrl, alt: `Pebble with this week's number for ${input.business}` } } : {}) },
       { kind: "rule" },
       ...(input.changes.length
         ? [{ kind: "changes" as const, label: "What changed", rows: input.changes }]

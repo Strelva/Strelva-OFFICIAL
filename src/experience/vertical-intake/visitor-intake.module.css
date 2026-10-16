@@ -16,3 +16,5 @@
 .send { margin-top: 32px; }
 .fine { margin: 10px 0 0; color: var(--v-muted, #6b6f68); font-size: 12px; line-height: 1.5; text-align: center; }
 .call { margin-top: 24px; }
+.after { margin: 20px 0 0; color: var(--v-muted, #6b6f68); font-size: 15px; line-height: 1.5; }
+.after .callLink { display: inline; min-height: 0; }

@@ -21,6 +21,13 @@ import { AUTO_REPLY_POLICY_ACTOR, KIND_RULES, OWNER_ONLY_KINDS, isConfigurableKi
 import { classifyTenantEvent, observedTenantRoute, tenantEventRevision } from "./tenant-classify";
 import type { ServiceSession } from "./service-actor";
 
+/** A read-only booking week for the phone yes (XA · E2): days, times and closures in place. */
+export interface ReviewWeek {
+  address: string;
+  days: { key: string; weekday: string; date: string; times: string[]; closed: string | null }[];
+  notes?: string[];
+}
+
 export interface AdapterContext {
   workspaceId: string;
   /** Present when a signed-in member is looking; some sources can only be read as a member. */
@@ -76,6 +83,12 @@ export interface SourceAdapter {
    * item's revision: nothing may be approved from it.
    */
   review?(ctx: AdapterContext, item: OwnerDecision): Promise<string[] | null>;
+  /**
+   * The page the yes changes, as the visitor sees it (a booking week with
+   * closures in place), for a source that can draw it. Null when it can't;
+   * the review lines then stand alone.
+   */
+  reviewWeek?(ctx: AdapterContext, item: OwnerDecision): Promise<ReviewWeek | null>;
   /** Pending asks for this business. `complete: false` means some sources could not be read. */
   propose(ctx: AdapterContext): Promise<{ items: ProposedItem[]; complete: boolean }>;
   /** The source's current revision, or null when it is no longer waiting on anyone. */

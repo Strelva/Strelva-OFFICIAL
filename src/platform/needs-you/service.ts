@@ -12,7 +12,7 @@ import type { EmailDecision, EmailOptions } from "@/platform/infra/email/layout"
 import { buildWorkspaceApproveUrl, type WorkspaceApproveLinkClaims } from "@/lib/approve-link";
 import type { WorkspaceActor } from "@/platform/workspaces/types";
 import { nextChaseStep, type Decision, type OwnerDecision, type PolicyItem } from "./contracts";
-import type { AdapterContext, ResolveBy, SourceAdapter } from "./adapters";
+import type { AdapterContext, ResolveBy, ReviewWeek, SourceAdapter } from "./adapters";
 import { ServiceSessionRefusedError, type ServiceSession } from "./service-actor";
 import { NeedsYouRefusedError, type DeliveryRow, type NeedsYouStore } from "./repository";
 
@@ -180,6 +180,13 @@ export function createNeedsYouService(deps: NeedsYouDeps) {
     if (!adapter?.review) return undefined;
     if (ctx.workspaceId !== item.workspaceId) return null;
     return adapter.review(ctx, item).catch(() => null);
+  }
+
+  /** The visitor page the yes changes, when the source can draw it. Never blocks the decision. */
+  async function reviewWeek(item: OwnerDecision): Promise<ReviewWeek | null> {
+    const adapter = adapterFor(item.sourceLifecycle);
+    if (!adapter?.reviewWeek) return null;
+    return adapter.reviewWeek({ workspaceId: item.workspaceId }, item).catch(() => null);
   }
 
   async function decide(input: {
@@ -596,7 +603,7 @@ export function createNeedsYouService(deps: NeedsYouDeps) {
     return summary;
   }
 
-  return { sync, list, review, decide, openForSource, recordPolicyDecision, chase, notifyBookingRequest, deliverUrgentSource };
+  return { sync, list, review, reviewWeek, decide, openForSource, recordPolicyDecision, chase, notifyBookingRequest, deliverUrgentSource };
 }
 
 export type NeedsYouService = ReturnType<typeof createNeedsYouService>;

@@ -22,6 +22,10 @@ import own from "./visitor-intake.module.css";
 export type IntakeSendResult = { ok: true; triage: "routine" | "urgent" } | { ok: false; message: string };
 
 const telHref = (phone: string) => `tel:${phone.replace(/[^0-9+]/g, "")}`;
+/** The form says "no medical details" once, in its notice; a field hint never repeats it. */
+const repeatsNotice = (hint: string, notice: string) => /medical/i.test(hint) && /medical/i.test(notice);
+const NUMBER_WORDS = ["No questions", "One question", "Two questions", "Three questions", "Four questions", "Five questions", "Six questions", "Seven questions", "Eight questions", "Nine questions", "Ten questions"];
+const countWords = (n: number) => NUMBER_WORDS[n] ?? `${n} questions`;
 
 export function VisitorIntakeForm({ form, onSend, initial, visitLine, initialState }: {
   form: PublicIntakeForm;
@@ -48,11 +52,13 @@ export function VisitorIntakeForm({ form, onSend, initial, visitLine, initialSta
   const phone = form.office.phone;
   const office = form.office.name ?? "The office";
 
+  // The patient's own number, repeated back so they know which phone will ring.
+  const theirPhone = values.phone?.trim();
   if (sent) return <section className={own.form} aria-live="polite">
-    <h1 className={styles.title}>{sent === "urgent" ? "Call the office now" : "Sent"}</h1>
-    <p className={styles.intro} role="status">{sent === "urgent" ? form.thanks.urgent : form.thanks.routine}</p>
-    {sent === "urgent" && phone ? <a className={`${styles.button} ${styles.block} ${own.call}`} href={telHref(phone)}>Call {phone}</a> : null}
-    <p className={own.fine}>Only {office}&rsquo;s team sees what you sent.</p>
+    <h1 className={styles.title}>{sent === "urgent" ? `Call ${office} now` : theirPhone ? `${office} will call ${theirPhone} to book` : `${office} will call you to book`}</h1>
+    <p className={styles.intro} role="status">{sent === "urgent" ? "Your answers reached the office, and they will call you back. If you're in pain now, calling is faster." : `Your answers reached the office. Only ${office}\u2019s team sees them.`}</p>
+    {sent === "urgent" && phone ? <a className={`${styles.button} ${styles.block} ${own.call}`} href={telHref(phone)}>Call {phone}</a>
+      : phone ? <p className={own.after}>Questions before then? <a className={own.callLink} href={telHref(phone)}>Call {phone}</a></p> : null}
   </section>;
 
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -80,12 +86,12 @@ export function VisitorIntakeForm({ form, onSend, initial, visitLine, initialSta
 
   return <form className={own.form} onSubmit={event => void submit(event)} noValidate aria-describedby={`${prefix}-notice`}>
     <h1 className={styles.title}>{visitLine ? "Before your first visit" : form.title}</h1>
-    <p className={styles.intro}>{visitLine ? `${visitLine} About three minutes.` : form.intro}</p>
+    <p className={styles.intro}>{visitLine ? `${visitLine} ${countWords(form.fields.filter(field => !hidden(field) && field.required).length)} need an answer; the rest are optional.` : form.intro}</p>
     <p id={`${prefix}-notice`} className={own.hint}>{form.notice}</p>
     <div className={own.fields}>
       {form.fields.filter(field => !hidden(field)).map(field => {
         const id = `${prefix}-${field.id}`;
-        const hintId = field.hint ? `${id}-hint` : undefined;
+        const hintId = field.hint && !repeatsNotice(field.hint, form.notice) ? `${id}-hint` : undefined;
         const errorId = error?.fieldId === field.id ? `${id}-error` : undefined;
         const describedBy = [hintId, errorId].filter(Boolean).join(" ") || undefined;
         const triageHere = rule && rule.field === field.id;
@@ -105,7 +111,7 @@ export function VisitorIntakeForm({ form, onSend, initial, visitLine, initialSta
               : field.kind === "textarea" ? <textarea id={id} className={`${styles.input} ${own.area}`} rows={3} maxLength={field.maxLength} value={values[field.id] ?? ""} aria-invalid={errorId ? true : undefined} aria-describedby={describedBy} onChange={event => set(field.id, event.target.value)} />
                 : <input id={id} className={styles.input} type={field.kind === "email" ? "email" : field.kind === "phone" ? "tel" : "text"} inputMode={field.kind === "phone" ? "tel" : field.kind === "email" ? "email" : undefined} autoComplete={field.autocomplete ?? (field.sensitive ? "off" : undefined)} maxLength={field.maxLength} required={field.required} value={values[field.id] ?? ""} aria-invalid={errorId ? true : undefined} aria-describedby={describedBy} onChange={event => set(field.id, event.target.value)} />}
           </>}
-          {field.hint ? <p id={hintId} className={own.hint}>{field.required ? field.hint : field.hint.replace(/^Optional\.\s*/, "")}</p> : null}
+          {field.hint && !repeatsNotice(field.hint, form.notice) ? <p id={hintId} className={own.hint}>{field.required ? field.hint : field.hint.replace(/^Optional\.\s*/, "")}</p> : null}
           {errorId ? <p id={errorId} className={own.fieldError} role="alert">{error!.text}</p> : null}
           {triageHere ? <div className={own.triage} role="note">
             <p className={own.triageTitle}>{rule.title}</p>
@@ -119,8 +125,8 @@ export function VisitorIntakeForm({ form, onSend, initial, visitLine, initialSta
     </div>
     {error && !error.fieldId ? <p className={own.fieldError} role="alert">{error.text}</p> : null}
     <div className={own.send}>
-      <button type="submit" className={`${styles.button} ${styles.block}`} disabled={!onSend || pending} aria-busy={pending || undefined}>{pending ? "Sending" : form.submitLabel}</button>
-      <p className={own.fine}>{onSend ? `Only ${office}'s team sees this.` : "Preview. Patients send this from your website."}</p>
+      <button type="submit" className={`${styles.button} ${styles.block}`} disabled={pending} aria-disabled={onSend ? undefined : true} aria-busy={pending || undefined}>{pending ? "Sending" : form.submitLabel}</button>
+      <p className={own.fine}>{onSend ? `Only ${office}\u2019s team sees this.` : "Preview. Patients send this from your website, so Send does nothing here."}</p>
     </div>
   </form>;
 }

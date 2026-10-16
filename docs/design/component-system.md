@@ -41,6 +41,19 @@ exported. API, Pen node per part, motion and the anti-slop checklist:
 - **E6, Today on the phone:** [OwnerPhoneToday](../../src/experience/workspace/OwnerPhoneToday.tsx)
   on `NeedsYouState` and `SystemView[]`. Not yet mounted by `BusinessHome`.
 - Previews: `/preview/strelva/xa/xa7-outside/{waits-email,phone-yes,monday-email,booking,patient-form,today-phone}`.
+- **October 16 fixes:** the business (name, owner, logo or initial) heads every
+  E2 page, never the platform's mark; an agency adds its logo or initial,
+  name and "Runs on Strelva." under the actions. The confirm page draws the
+  change as the visitor's week (`XaWeek`, built from `visitorWeek` in
+  `src/platform/bookings/visitor-week.ts`, the same data VisitorSlotWeek uses)
+  when the source offers one through the new `reviewWeek` adapter seam; no
+  source implements it yet, so live pages still show review lines. "Not now"
+  posts a not-yet token minted from the approve link (same claims, same
+  expiry; never the reverse). Done pages use `xaDoneInput`: one headline, who
+  prepared it and who said yes, then "See it · Undo". Visitor pages use
+  `--font-workspace` (DM Sans), label closures in place ("Closed,
+  Thanksgiving") from the booking context, and offer the office phone as a
+  tap-to-call link. `XaEmpty` takes `bare` to put Pebble straight on the canvas.
 
 ## October 11 coherence amendment
 

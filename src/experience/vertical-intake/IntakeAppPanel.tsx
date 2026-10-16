@@ -110,7 +110,7 @@ export function IntakeAppPanel({ workspaceId, initial }: { workspaceId: string; 
         end={row.state !== "done" && (row.id === "phone" || row.id === "insurance" || row.id === "hours") ? <StTextButton href={`/workspace/business-details?${new URLSearchParams({ workspaceId })}`}>Open Business details</StTextButton> : row.state !== "done" && row.id === "site" ? <StTextButton href={`/workspace/site?${new URLSearchParams({ workspaceId })}`}>Connect your website</StTextButton> : undefined} />)}</StRows>
     </StSection>
 
-    {view.previewForm?.fields ? <StSection title="What patients see">
+    {view.previewForm?.fields ? <StSection title="What patients see on your website">
       <div className={visitor.frame}><VisitorIntakeForm form={view.previewForm} /></div>
     </StSection> : null}
 
