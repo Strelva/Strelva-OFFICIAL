@@ -2,9 +2,10 @@
 
 import { useRef, useState } from "react";
 import { z } from "zod";
-import { StNotice, StPill, StRows, StRow, StSection, StTextButton } from "@/components/ui/strelva/Kit";
+import { Lock } from "lucide-react";
+import { XaButton, XaHeadline, XaSays, XaTextLink } from "@/components/ui/strelva/Xa";
 import type { GoogleConnectChoice } from "./GoogleConnect";
-import styles from "@/experience/publishing/publishing.module.css";
+import styles from "@/experience/connections/xa-connections.module.css";
 
 export type AgencyGoogleResult = "expired" | "forbidden" | "unavailable" | "access_pending" | "no_listings" | "refused";
 const messages: Record<AgencyGoogleResult, string> = {
@@ -49,18 +50,31 @@ export function AgencyGooglePicker({ workspaceId, choices, result, request = fet
     finally { inFlight.current = false; setBusy(null); }
   }
   const notice = failure === "signin" ? "Sign in again before connecting Google. Nothing was connected." : failure ? messages[failure] : result ? messages[result] : null;
-  return <div className={styles.stack}>
-    {notice ? <StNotice tone="critical"><p role="alert" className={styles.copy}>{notice}</p></StNotice> : null}
-    {choices && !closed ? <StSection title="Choose this business’s listing" meta={choices.googleEmail}>
-      <p className={styles.copy}>These listings are managed by your agency’s Google account. Choose the one for this business. Google asks you to confirm access once more. Nothing on the listing changes.</p>
-      <StRows label="Listings managed by your agency’s Google account">{choices.listings.map(listing => <StRow key={`${listing.accountId}/${listing.locationId}`} title={listing.title} detail={listing.address}
-        end={<StPill variant="soft" disabled={busy !== null} busy={busy === `${listing.accountId}/${listing.locationId}`} onClick={() => void choose(listing)} aria-label={`Connect ${listing.title}`}>Connect this listing</StPill>} />)}</StRows>
-      {choices.more ? <p className={styles.copy}>Only the first {choices.listings.length} listings are shown. Use another account if this business is missing.</p> : null}
-    </StSection> : null}
+  const showing = Boolean(choices && !closed);
+  return <div className={styles.section}>
+    <XaHeadline quiet={showing ? "Nothing on the listing changes." : "Nothing on the listing changed."}>{showing ? "Choose this business’s listing." : "This Google sign-in stopped."}</XaHeadline>
+    {notice ? <div role="alert"><XaSays>{notice}</XaSays></div> : null}
+    {choices && !closed ? <section className={styles.section} aria-labelledby="agency-google-listings">
+      <div className={styles.phoneOnly}>
+        <ul className={styles.lines} aria-label="How a Google connection works in Strelva">
+          <li className={styles.line}><span className={styles.lineText}>Strelva reads the listing with the account you choose.</span></li>
+          <li className={styles.line}><Lock size={14} aria-hidden="true" /><span className={styles.lineText}>Anything that changes on Google</span><span className={styles.lineEnd}>The owner’s yes</span></li>
+        </ul>
+      </div>
+      <div className={styles.sectionHead}><h2 id="agency-google-listings" className={styles.groupLabel}>Listings your agency’s Google account manages</h2><span className={styles.sectionMeta}>{choices.googleEmail} · Google asks you to confirm once more</span></div>
+      <ul className={styles.group} aria-label="Listings managed by your agency’s Google account">{choices.listings.map(listing => {
+        const key = `${listing.accountId}/${listing.locationId}`;
+        return <li key={key} className={styles.groupRow}>
+          <span className={styles.groupText}><span className={styles.groupTitle}>{listing.title}</span>{listing.address ? <span className={styles.groupDetail}>{listing.address}</span> : null}</span>
+          <span className={styles.groupEnd}><XaButton size="sm" disabled={busy !== null} busy={busy === key} onClick={() => void choose(listing)} aria-label={`Connect ${listing.title}`}>Connect this listing</XaButton></span>
+        </li>;
+      })}</ul>
+      <p className={styles.small}>No message is sent to the owner.{choices.more ? ` Only the first ${choices.listings.length} listings are shown; use another account if this business is missing.` : ""}</p>
+    </section> : null}
     <div className={styles.actions}>
-      {result !== "forbidden" && failure !== "forbidden" && failure !== "signin" ? <StTextButton href={restart}>{choices && !closed ? "Use a different Google account" : "Find your agency’s listings again"}</StTextButton> : null}
-      {failure === "signin" ? <StTextButton href={`/sign-in?${new URLSearchParams({ next: `/workspace/google/agency?workspaceId=${workspaceId}` })}`}>Sign in</StTextButton> : null}
-      <StTextButton href={back}>Back to this business’s Google listing</StTextButton>
+      {result !== "forbidden" && failure !== "forbidden" && failure !== "signin" ? <XaTextLink href={restart}>{choices && !closed ? "Use a different Google account" : "Find your agency’s listings again"}</XaTextLink> : null}
+      {failure === "signin" ? <XaTextLink href={`/sign-in?${new URLSearchParams({ next: `/workspace/google/agency?workspaceId=${workspaceId}` })}`}>Sign in</XaTextLink> : null}
+      <XaTextLink href={back}>Back to this business’s Google listing</XaTextLink>
     </div>
   </div>;
 }

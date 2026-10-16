@@ -40,7 +40,10 @@ describe("paper email presentation", () => {
   it("matches the email literal palette to the canonical light token boundary", () => {
     const source = readFileSync("src/app/styles/workspace-paper.css", "utf8");
     expect(source).toContain("--st-accent: #2f5236");
-    expect(renderPaperEmailHtml(example)).toContain("background:#2f5236");
+    // The primary is the XA ink pill (one per screen), not moss.
+    expect(readFileSync("src/app/styles/workspace-xa.css", "utf8")).toContain("--st-action: #161715");
+    expect(renderPaperEmailHtml(example)).toContain("background:#161715");
+    expect(renderPaperEmailHtml(example)).toContain("family=DM+Sans");
   });
 });
 describe("raw preview route", () => {

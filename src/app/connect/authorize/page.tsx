@@ -1,6 +1,6 @@
 import { notFound, redirect } from 'next/navigation';
 import { z } from 'zod';
-import { Card } from '@/components/ui/Card';
+import { AuthorizeStopped } from '@/experience/connections/AuthorizeAssistantView';
 import { workspaceHttpActor } from '@/platform/workspaces/http';
 import { oauthEnabled, oauthRpc, parseAuthorization } from '@/platform/agent-channel/oauth';
 import { AuthorizeAssistant } from './AuthorizeAssistant';
@@ -23,17 +23,16 @@ export default async function AuthorizePage({ searchParams }: {
         parsed = await parseAuthorization(params);
     }
     catch { }
-    const frame = (children: React.ReactNode) => <main className="min-h-dvh bg-canvas px-6 py-12 text-warm-black md:px-8"><div className="mx-auto max-w-[560px]"><Card padding="lg">{children}</Card></div></main>;
     if (!parsed)
-        return frame(<><h1 className="font-display text-2xl font-medium">This connection cannot continue</h1><p className="mt-4 text-base text-gray-muted">Start again from your assistant. Its client identity, redirect or requested permissions could not be verified.</p></>);
+        return <AuthorizeStopped title="This connection can’t continue.">Start again from your assistant. Strelva couldn’t verify its identity, where it returns you or what it asks to do.</AuthorizeStopped>;
     const actor = await workspaceHttpActor();
     if (!actor)
         redirect(`/sign-in?next=${encodeURIComponent(`/connect/authorize?${new URLSearchParams(params)}`)}`);
     try {
         const choices = z.array(z.object({ workspaceId: z.uuid(), name: z.string(), agencyId: z.uuid().nullable(), agencyName: z.string().nullable() })).parse(await oauthRpc('read_agent_oauth_choices', { p_user_id: actor.userId, p_verified_email: actor.verifiedEmail }));
-        return frame(<AuthorizeAssistant clientName={parsed.client.client_name} clientHost={new URL(parsed.params.client_id).host} returnHost={new URL(parsed.params.redirect_uri).host} params={params} scopes={parsed.scopes} choices={choices}/>);
+        return <AuthorizeAssistant clientName={parsed.client.client_name} clientHost={new URL(parsed.params.client_id).host} returnHost={new URL(parsed.params.redirect_uri).host} params={params} scopes={parsed.scopes} choices={choices}/>;
     }
     catch {
-        return frame(<><h1 className="font-display text-2xl font-medium">Your businesses could not be loaded</h1><p className="mt-4 text-base text-gray-muted">Reload to try again. No assistant access has been granted.</p></>);
+        return <AuthorizeStopped title="Your businesses couldn’t load.">Reload to try again.</AuthorizeStopped>;
     }
 }

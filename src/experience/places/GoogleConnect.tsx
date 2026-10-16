@@ -1,5 +1,7 @@
-import { StEmpty, StMono, StNotice, StPill, StRow, StRows, StSection, StState, StTextButton } from "@/components/ui/strelva/Kit";
-import styles from "@/experience/publishing/publishing.module.css";
+import { XaButton, XaButtonLink, XaSays, XaStatus, XaTextLink } from "@/components/ui/strelva/Xa";
+import { Clay } from "@/experience/connections/Clay";
+import { weeklyHoursWords } from "@/experience/connections/owner-words";
+import styles from "@/experience/connections/xa-connections.module.css";
 import { AgencyConnectLinkButton } from "./AgencyConnectLink";
 
 /**
@@ -54,55 +56,77 @@ const FACT_MESSAGES: Record<string, { text: string; tone?: "critical" }> = {
 };
 
 const LABEL: Record<GoogleFoundFactView["key"], string> = { hours: "Hours", phone: "Phone", website: "Website", description: "Description", categories: "Categories" };
-const DAY = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+/** A found fact in owner words: hours read "Mon and Tue 8 to 5, Sat 9 to 1". */
 export function foundFactText(fact: Pick<GoogleFoundFactView, "key" | "value">): string {
-  if (fact.key === "hours") {
-    const weekly = (fact.value as { weekly?: Array<{ day: number; opens: string; closes: string }> })?.weekly ?? [];
-    return weekly.map(item => `${DAY[item.day] ?? "?"} ${item.opens}–${item.closes}`).join(" · ") || "Closed every day";
-  }
+  if (fact.key === "hours") return weeklyHoursWords((fact.value as { weekly?: Array<{ day: number; opens: string; closes: string }> })?.weekly ?? []);
   if (fact.key === "categories") return Array.isArray(fact.value) ? fact.value.join(", ") : "";
   return typeof fact.value === "string" ? fact.value : "";
 }
 
+/** Strelva speaks one plain sentence about what just happened; bad news keeps Pebble in frame. */
 function Notice({ message }: { message?: { text: string; tone?: "critical" } }) {
-  return message ? <StNotice tone={message.tone}><p role="status" className={styles.copy}>{message.text}</p></StNotice> : null;
+  return message ? <div role="status"><XaSays>{message.text}</XaSays></div> : null;
 }
 
 export function GoogleConnect({ workspaceId, viewer, enabled, hasListing, params, choices, foundFacts = [], actions, agencyRequest, returnTo }: GoogleConnectProps) {
   const hidden = <input type="hidden" name="workspaceId" value={workspaceId} />;
+  const back = returnTo ? <input type="hidden" name="returnTo" value={returnTo} /> : null;
   const owner = viewer === "owner" && enabled;
   const choosing = !hasListing && owner && params.connect === "choose" && Boolean(choices);
-  return <div className={styles.stack}>
+  return <div className={styles.main}>
     <Notice message={params.connect ? CONNECT_MESSAGES[params.connect] : undefined} />
     <Notice message={params.read ? READ_MESSAGES[params.read] : undefined} />
     <Notice message={params.fact ? FACT_MESSAGES[params.fact] : undefined} />
-    {hasListing && returnTo ? <div className={styles.actions}><StTextButton href={returnTo}>Continue where you were</StTextButton></div> : null}
+    {hasListing && returnTo ? <div className={styles.actions}><XaButtonLink href={returnTo} variant="secondary">Continue where you were</XaButtonLink></div> : null}
 
-    {!hasListing && owner && params.connect === "choose" && choices ? <StSection title="Choose your listing" meta={choices.googleEmail}>
-      <p className={styles.copy}>These are the listings this Google account manages. Connect the one for this business. Google asks you to confirm once more.</p>
-      <StRows label="Listings on this Google account">{choices.listings.map(listing => <StRow key={`${listing.accountId}/${listing.locationId}`} title={listing.title} detail={listing.address}
-        end={<form action={actions.choose}>{hidden}<input type="hidden" name="accountId" value={listing.accountId} /><input type="hidden" name="locationId" value={listing.locationId} /><StPill variant="soft" type="submit">Connect this listing</StPill></form>} />)}</StRows>
-      {choices.more ? <p className={styles.copy}>This account manages more listings than fit here. Only the first {choices.listings.length} are shown.</p> : null}
-    </StSection> : null}
+    {choosing && choices ? <section className={styles.section} aria-labelledby="google-choose">
+      <div className={styles.sectionHead}><h2 id="google-choose" className={styles.sectionTitle}>Choose your listing</h2><span className={styles.sectionMeta}>{choices.googleEmail}</span></div>
+      <p className={styles.quiet}>These are the listings this Google account manages. Connect the one for this business. Google asks you to confirm once more.</p>
+      <ul className={styles.group} aria-label="Listings on this Google account">{choices.listings.map(listing => <li key={`${listing.accountId}/${listing.locationId}`} className={styles.groupRow}>
+        <span className={styles.groupText}><span className={styles.groupTitle}>{listing.title}</span>{listing.address ? <span className={styles.groupDetail}>{listing.address}</span> : null}</span>
+        <form action={actions.choose} className={styles.groupEnd}>{hidden}<input type="hidden" name="accountId" value={listing.accountId} /><input type="hidden" name="locationId" value={listing.locationId} /><XaButton size="sm" type="submit">Connect this listing</XaButton></form>
+      </li>)}</ul>
+      {choices.more ? <p className={styles.small}>This account manages more listings than fit here. Only the first {choices.listings.length} are shown.</p> : null}
+      <form action={actions.start}>{hidden}{back}<button type="submit" className={styles.textButton}>Use a different Google account</button></form>
+    </section> : null}
 
-    {!hasListing && !enabled ? <StSection title="Connect Google · Coming soon">
-      <p className={styles.copy}>Connecting your Google Business Profile in Strelva is not open for this business yet. You can manage your listing directly on Google today.</p>
-      <StTextButton href="https://business.google.com/" target="_blank" rel="noopener noreferrer">Open Google Business Profile</StTextButton>
-      {viewer === "owner" ? <StTextButton href={`/workspace/business-details?${new URLSearchParams({ workspaceId })}`}>Update business details in Strelva</StTextButton> : null}
-    </StSection> : !hasListing ? owner ? choosing ? <form action={actions.start}>{hidden}{returnTo ? <input type="hidden" name="returnTo" value={returnTo} /> : null}<StTextButton type="submit">Use a different Google account</StTextButton></form> : <StSection title="Connect Google">
-      <p className={styles.copy}>Sign in with the Google account that runs your Business Profile. Strelva reads your listing&apos;s hours, phone, website, description and categories for you to confirm. Nothing changes on Google until you approve it.</p>
-      {/* One click, never a GET: link scanners and prefetch can't start a Google sign-in. */}
-      <form action={actions.start} className={styles.actions}>{hidden}{returnTo ? <input type="hidden" name="returnTo" value={returnTo} /> : null}<StPill type="submit">Connect Google</StPill>{returnTo ? <StTextButton href={returnTo}>Skip for now</StTextButton> : null}</form>
-    </StSection> : viewer === "agency" && enabled ? <StSection title="Google isn't connected yet">
-      <p className={styles.copy}>Check how Google is available for this business. Your agency can connect its own account when it holds access, or copy a link for the owner. Strelva doesn&apos;t send it.</p>
+    {!hasListing && !enabled ? <div className={styles.object}>
+      <div className={styles.objectText}>
+        <p className={styles.objectLabel}>Google listing · Coming soon</p>
+        <h2 className={styles.objectTitle}>Connecting Google here isn&apos;t open yet.</h2>
+        <p className={styles.quiet}>Your listing keeps working on Google meanwhile. You can change it directly on Google today.</p>
+        <div className={styles.objectActions}><XaButtonLink href="https://business.google.com/" variant="secondary" target="_blank" rel="noopener noreferrer">Open Google Business Profile</XaButtonLink>
+          {viewer === "owner" ? <XaTextLink href={`/workspace/business-details?${new URLSearchParams({ workspaceId })}`}>Update business details in Strelva</XaTextLink> : null}</div>
+      </div>
+      <Clay pose="resting" width={220} decorative />
+    </div> : !hasListing && !choosing ? owner ? <div className={styles.object}>
+      <div className={styles.objectText}>
+        <p className={styles.objectLabel}>Google listing</p>
+        <h2 className={styles.objectTitle}>Bring in your Google listing.</h2>
+        <p className={styles.quiet}>Sign in with the Google account that runs your Business Profile. Pebble reads your hours, phone, website, description and categories for you to confirm. Nothing changes on Google until you say yes.</p>
+        <div className={styles.objectActions}><form action={actions.start}>{hidden}{back}{/* One click, never a GET: link scanners and prefetch can't start a Google sign-in. */}<XaButton variant="primary" size="lg" type="submit">Connect Google</XaButton></form>
+          {returnTo ? <XaTextLink href={returnTo}>Skip for now</XaTextLink> : null}</div>
+      </div>
+      <Clay pose="adds" width={260} label="Pebble adding the Google listing to your business" />
+    </div> : viewer === "agency" && enabled ? <section className={styles.section} aria-labelledby="google-agency">
+      <h2 id="google-agency" className={styles.sectionTitle}>Google isn&apos;t connected yet</h2>
+      <p className={styles.quiet}>Check how Google is available for this business. Your agency can connect its own account when it holds access, or copy a link for the owner. Strelva doesn&apos;t send it.</p>
       <AgencyConnectLinkButton workspaceId={workspaceId} request={agencyRequest} />
-    </StSection> : <StEmpty>No Google listing is connected here yet. The business owner connects it with their own Google account.</StEmpty> : null}
+    </section> : <XaSays>No Google listing is connected here yet. The business owner connects it with their own Google account.</XaSays> : null}
 
-    {foundFacts.length ? <StSection title="Found on your Google listing" meta="Not in your record until you add it" action={owner ? <form action={actions.reread}>{hidden}<StTextButton type="submit">Read again</StTextButton></form> : undefined}>
-      <StRows label="Found on Google">{foundFacts.map(fact => <StRow key={fact.id} title={LABEL[fact.key]} detail={<>{foundFactText(fact)}<br /><StMono>From Google · {fact.foundAt.slice(0, 10)}</StMono></>} align="start"
-        end={owner ? fact.key === "categories" ? <StState kind="draft">For reference</StState> : <form action={actions.decide} className={styles.actions}>{hidden}<input type="hidden" name="factId" value={fact.id} /><input type="hidden" name="commandId" value={crypto.randomUUID()} />
-          <StPill variant="soft" type="submit" name="decision" value="confirm">Add to your record</StPill><StTextButton type="submit" name="decision" value="dismiss">Not right</StTextButton></form>
-          : <StState kind="draft">Waiting for the owner</StState>} />)}</StRows>
-    </StSection> : hasListing && owner ? <form action={actions.reread} className={styles.actions}>{hidden}<StTextButton type="submit">Read details from Google</StTextButton></form> : null}
+    {foundFacts.length ? <section className={styles.section} aria-labelledby="google-found">
+      <div className={styles.sectionHead}><h2 id="google-found" className={styles.sectionTitle}>Found on your Google listing</h2>{owner ? <form action={actions.reread}>{hidden}<button type="submit" className={styles.textButton}>Read again</button></form> : null}</div>
+      <p className={styles.quiet}>Not in your record until you add it.</p>
+      <ul className={styles.group} aria-label="Found on Google">{foundFacts.map(fact => <li key={fact.id} className={styles.groupRow}>
+        <span className={styles.groupText}><span className={styles.groupDetail}>{LABEL[fact.key]}</span><span className={styles.groupTitle}>{foundFactText(fact)}</span><span className={styles.groupDetail}>From Google · <time dateTime={fact.foundAt}>{new Date(fact.foundAt).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" })}</time></span></span>
+        <span className={styles.groupEnd}>{owner ? fact.key === "categories" ? <XaStatus kind="draft" size="sm">For reference</XaStatus>
+          : <form action={actions.decide} className={styles.actions}>{hidden}<input type="hidden" name="factId" value={fact.id} /><input type="hidden" name="commandId" value={crypto.randomUUID()} />
+            <XaButton size="sm" type="submit" name="decision" value="confirm">Add to your record</XaButton><button type="submit" className={styles.textButton} name="decision" value="dismiss">Not right</button></form>
+          : <XaStatus kind="waits" size="sm">Waiting for the owner</XaStatus>}</span>
+      </li>)}</ul>
+    </section> : hasListing && owner ? <section className={styles.section} aria-labelledby="google-read">
+      <div className={styles.sectionHead}><h2 id="google-read" className={styles.sectionTitle}>Your listing and your record</h2><form action={actions.reread}>{hidden}<button type="submit" className={styles.textButton}>Read details from Google</button></form></div>
+      <p className={styles.quiet}>Strelva can read the hours, phone, website and description on Google, so you can add what&apos;s right to your business record.</p>
+    </section> : null}
   </div>;
 }

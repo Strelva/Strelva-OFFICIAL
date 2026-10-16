@@ -25,7 +25,7 @@ function ports() {
 }
 describe("website domain owner proposals",()=>{
   it("contains exact DNS records and remains owner-only",()=>{
-    expect(websiteDomainItem(row(),now)).toMatchObject({kind:"system.go_live",route:"owner_decides",adminMayDecide:false,sourceLifecycle:"website_domain",detail:"A fictional.example.test → 203.0.113.10"});
+    expect(websiteDomainItem(row(),now)).toMatchObject({kind:"system.go_live",route:"owner_decides",adminMayDecide:false,sourceLifecycle:"website_domain",detail:"A record fictional.example.test points to 203.0.113.10"});
     expect(websiteDomainItem({...row(),systemId:REQUEST},now)?.systemId).toBe(REQUEST);
     expect(websiteDomainItem({...row(),current:false},now)).toBeNull();
     expect(websiteDomainItem({...row(),expiresAt:new Date(now).toISOString()},now)).toBeNull();

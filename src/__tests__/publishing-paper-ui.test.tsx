@@ -134,8 +134,10 @@ describe("publishing distinguishes evidence and unavailable state", () => {
   it("pending Google access disables writes and retains exact command context and receipts", () => {
     const html = renderToStaticMarkup(<WorkspaceGoogle workspaceId={workspaceId} action={async () => {}} state={{ kind: "ready", data: [{ tenantId: "exact-tenant", locationId: "exact-location", name: "Fixture listing", connected: true, canManage: true, control: { workspaceId, locationId: "exact-location", accessPending: true, paused: false, updatedAt: null }, drafts: [{ id: "exact-event", title: "Hours", body: "Closed" }], receipts: [] }] }} />);
     const dom = document.createElement("div"); dom.innerHTML = html;
-    const approve = dom.querySelector<HTMLButtonElement>('button[value="approve"]');
+    // The one yes: its form carries the exact event, listing and decision.
+    const approve = dom.querySelector<HTMLButtonElement>("button[data-xa-primary]");
     expect(approve?.disabled).toBe(true);
+    expect(approve?.form?.querySelector<HTMLInputElement>('input[name="action"]')?.value).toBe("approve");
     expect(approve?.form?.querySelector<HTMLInputElement>('input[name="locationId"]')?.value).toBe("exact-location");
     expect(approve?.form?.querySelector<HTMLInputElement>('input[name="eventId"]')?.value).toBe("exact-event");
     expect(html).toContain("No Google changes have been sent yet");

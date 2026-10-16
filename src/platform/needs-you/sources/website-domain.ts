@@ -13,8 +13,9 @@ export function websiteDomainItem(request: WebsiteDomainRequest, now = Date.now(
   return {
     kind: "system.go_live", route: "owner_decides", title: `Connect your website to ${request.hostname}`,
     systemId: request.systemId ?? null,
-    detail: request.records.map(record => `${record.type} ${record.name} → ${record.value}`).join("\n").slice(0, 1000),
-    approveEffect: "Strelva attaches this exact domain to your published site. You or your registrar update these DNS records; routing waits for verification.",
+    // Each record as the sentence to act on, the same words the Website System uses.
+    detail: request.records.map(record => `${record.type} record ${record.name} points to ${record.value}`).join("\n").slice(0, 1000),
+    approveEffect: `Strelva connects ${request.hostname} to your published website. You add these records where the domain lives; visitors see it once they're in place.`,
     notYetEffect: "Nothing changes on your website or domain.", sourceLifecycle: "website_domain", sourceId: request.id,
     revisionHash: request.revisionHash, urgent: false, adminMayDecide: false,
     openHref: `/workspace?workspaceId=${request.workspaceId}&view=websites&work=${request.workId}`,

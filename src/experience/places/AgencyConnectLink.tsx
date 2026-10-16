@@ -2,8 +2,8 @@
 
 import { useRef, useState } from "react";
 import { z } from "zod";
-import { StNotice, StPill, StPillLink } from "@/components/ui/strelva/Kit";
-import styles from "@/experience/publishing/publishing.module.css";
+import { XaButton, XaButtonLink, XaSays } from "@/components/ui/strelva/Xa";
+import styles from "@/experience/connections/xa-connections.module.css";
 import { useWorkspaceRequest } from "@/experience/workspace/WorkspaceRequest";
 
 const reply = z.union([
@@ -41,13 +41,13 @@ export function AgencyConnectLinkButton({ workspaceId, request: supplied }: { wo
     try { await navigator.clipboard.writeText(text); setCopied(true); setCopyFailed(false); }
     catch { setCopyFailed(true); }
   }
-  return <div className={styles.stack}>
-    <div className={styles.actions}><StPill variant="soft" busy={state.kind === "busy"} onClick={() => void make()}>Check Google connection options</StPill></div>
+  return <div className={styles.section}>
+    <div className={styles.actions}><XaButton size="sm" busy={state.kind === "busy"} onClick={() => void make()}>Check Google connection options</XaButton></div>
     {state.kind === "ready" ? <>
       <p className={styles.copy} aria-label={state.agency ? "Agency Google connection" : "Message for the owner"}>{state.message}</p>
-      {state.link ? state.agency ? <div className={styles.actions}><StPillLink href={state.link}>Connect your agency’s Google account</StPillLink></div> : <div className={styles.actions}><StPill variant="soft" onClick={() => void copy(state.message)}>{copied ? "Copied" : "Copy message"}</StPill>{copied ? <span role="status" className={styles.copy}>Copied. Send it to the owner yourself.</span> : null}</div> : null}
-      {copyFailed ? <p role="status" className={styles.copy}>Copy is unavailable. Select the message above and copy it manually.</p> : null}
+      {state.link ? state.agency ? <div className={styles.actions}><XaButtonLink href={state.link} variant="secondary">Connect your agency’s Google account</XaButtonLink></div> : <div className={styles.actions}><XaButton size="sm" onClick={() => void copy(state.message)}>{copied ? "Copied" : "Copy message"}</XaButton>{copied ? <span role="status" className={styles.quiet}>Copied. Send it to the owner yourself.</span> : null}</div> : null}
+      {copyFailed ? <p role="status" className={styles.quiet}>Copy is unavailable. Select the message above and copy it manually.</p> : null}
     </> : null}
-    {state.kind === "error" ? <StNotice tone="critical"><p role="alert" className={styles.copy}>{state.message}</p></StNotice> : null}
+    {state.kind === "error" ? <div role="alert"><XaSays>{state.message}</XaSays></div> : null}
   </div>;
 }

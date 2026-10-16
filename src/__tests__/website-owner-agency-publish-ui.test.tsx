@@ -60,7 +60,7 @@ describe("owner consent at website approval", () => {
   it("routes the published agency client's domain question to the serving agency", async () => {
     const record = ownerRecord(true); record.publishedUrl = "https://website.example.test/";
     await mount(record);
-    expect(container.textContent).toContain("Ask Workflow Agency about domain setup and verification.");
+    expect(container.textContent).toContain("Ask Workflow Agency about your domain.");
     expect(container.textContent).not.toContain("Strelva handles your domain setup and verification.");
   });
   it("does not promise delivery or domain control without a selected agency", async () => {

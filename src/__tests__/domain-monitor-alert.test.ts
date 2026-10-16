@@ -32,14 +32,14 @@ describe("domain-monitor alert delivery", () => {
       expect.objectContaining({
         audience: "operator",
         to: ["jacob@strelva.com"],
-        subject: "Strelva ALERT: 1 site DOWN",
+        subject: "orangecrate.com is down",
       }),
     );
-    expect(sendEmailMock.mock.calls[0]![0]!.options).toMatchObject({
-      heading: "1 Strelva site DOWN",
-      rows: [{ label: "DOWN · Orange Crate", value: "orangecrate.com — HTTP 503" }],
-      button: { label: "Open uptime board", url: baseParams.boardUrl },
-    });
+    const paper = sendEmailMock.mock.calls[0]![0]!.options!.paper!;
+    expect(paper.blocks).toContainEqual({ kind: "rows", rows: [{ label: "Orange Crate", value: "orangecrate.com · HTTP 503", tone: "need" }] });
+    expect(paper.blocks).toContainEqual({ kind: "actions", full: true, actions: [{ label: "Open the uptime board", url: baseParams.boardUrl, style: "primary" }] });
+    // Plain sentences: no capitals for alarm, no dashes standing in for words.
+    expect(JSON.stringify(paper)).not.toMatch(/DOWN|ALERT|—/);
   });
 
   it("sends expiry alerts and uses the configured operator list", async () => {
@@ -54,7 +54,7 @@ describe("domain-monitor alert delivery", () => {
     expect(sendEmailMock.mock.calls[0]![0]).toMatchObject({
       audience: "operator",
       to: ["ops@strelva.com", "owner@strelva.com"],
-      subject: "Strelva: 1 domain expiring soon",
+      subject: "rohlax.com expires within 30 days",
     });
   });
 
@@ -64,11 +64,10 @@ describe("domain-monitor alert delivery", () => {
     expect(sent).toBe(true);
     expect(sendEmailMock.mock.calls[0]![0]).toMatchObject({
       audience: "operator",
-      subject: "Strelva: all monitored sites recovered",
+      subject: "Every monitored site is back up",
       options: {
-        heading: "Strelva sites recovered",
-        paragraphs: ["All monitored sites are back up and no domains are within 30 days of expiry."],
-        rows: undefined,
+        heading: "Every monitored site is back up",
+        paper: { blocks: [{ kind: "paragraph", text: "Every monitored site answers again, and no domain expires within 30 days." }, { kind: "actions", full: true, actions: [{ label: "Open the uptime board", url: baseParams.boardUrl, style: "primary" }] }] },
       },
     });
   });

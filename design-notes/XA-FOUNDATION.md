@@ -232,3 +232,14 @@ Each screen needs one dominant element and a reason to remember it.
    during rollout, so this was left for the email lane.
 3. **Minutes for agencies.** Minutes for an agency links to the agency
    workspace's `ongoing` view until an AG6 route exists.
+
+## Lane XS · Connections (October 15)
+
+Google listing, agency Google picker, assistants, assistant consent, website
+domain, forwarding and the two domain emails, in `src/experience/connections`
+(lane CSS, `FocusedPage`, `CopyButton`, `AssistantsPlace`,
+`AuthorizeAssistantView`, `assistant-scopes`). Kit untouched. Two small shared
+edits: `ReviewRows` takes `quiet` so the Google listing keeps one primary, and
+`websites/client` and `domain-monitor` export the new email templates.
+Preview: `/preview/strelva/xa/xs-connections/<google|google-agency|assistants|authorize|domain|forwarding>?state=…&mode=dark`
+and `/preview/strelva/xa/xs-connections/email?which=domain-connected|monitor-down|monitor-several|monitor-recovered`.

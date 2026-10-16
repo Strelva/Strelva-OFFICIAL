@@ -13,7 +13,7 @@ describe("Connect Google on the Google place", () => {
   it("offers the owner Connect Google with their own account, and never routes to Strelva", () => {
     const page = render();
     expect(page).toContain("Connect Google"); expect(page).toContain("Sign in with the Google account that runs your Business Profile");
-    expect(page).toContain("Nothing changes on Google until you approve it");
+    expect(page).toContain("Nothing changes on Google until you say yes");
     expect(page).not.toMatch(/Ask Strelva|Strelva Agency/);
   });
   it("gives an agency an access check and says Strelva does not send a message", () => {
@@ -31,7 +31,7 @@ describe("Connect Google on the Google place", () => {
       const page = render({ viewer, enabled: false });
       expect(page).toContain("Coming soon");
       expect(page).toContain('href="https://business.google.com/"');
-      expect(page).toContain("manage your listing directly on Google today");
+      expect(page).toContain("change it directly on Google today");
       expect(page).not.toContain("<form");
       expect(page).not.toContain("connect link");
     }
@@ -51,7 +51,7 @@ describe("Connect Google on the Google place", () => {
     expect(owned).toContain("Add to your record"); expect(owned).toContain("Not right"); expect(owned).toContain("For reference");
     const member = render({ hasListing: true, viewer: "member", foundFacts });
     expect(member).toContain("Waiting for the owner"); expect(member).not.toContain("Add to your record");
-    expect(foundFactText({ key: "hours", value: { weekly: [{ day: 1, opens: "07:00", closes: "15:00" }] } })).toBe("Mon 07:00–15:00");
+    expect(foundFactText({ key: "hours", value: { weekly: [{ day: 1, opens: "07:00", closes: "15:00" }] } })).toBe("Mon 7 to 3");
   });
   it("keeps the listing page neutral when no connect panel is supplied", () => {
     const page = renderToStaticMarkup(createElement(WorkspaceGoogle, { workspaceId: WS, state: { kind: "ready", data: [] }, action }));
@@ -70,8 +70,8 @@ describe("Search Console and Analytics section", () => {
   });
   it("shows the summary to everyone and honest unavailable states", () => {
     const page = grant({ owner: false, view: view(true), summary: { gsc: { status: "unconfigured" }, ga4: { status: "ok", report: { users: 1200, sessions: 1500, pageviews: 4000 } } } });
-    expect(page).toContain("No Search Console site chosen yet."); expect(page).toContain("1,200"); expect(page).not.toContain("Disconnect");
-    expect(grant({ view: view(true), summary: { gsc: { status: "unavailable" }, ga4: { status: "unavailable" } } })).toContain("Couldn&#x27;t be read right now. The connection is kept.");
+    expect(page).toContain("Choose a Search Console site below"); expect(page).toContain("1,200"); expect(page).not.toContain("Disconnect");
+    expect(grant({ view: view(true), summary: { gsc: { status: "unavailable" }, ga4: { status: "unavailable" } } })).toContain("couldn&#x27;t be read just now. The connection is kept.");
   });
 });
 

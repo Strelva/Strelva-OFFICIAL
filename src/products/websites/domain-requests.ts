@@ -6,6 +6,7 @@ import { sendEmailWithReceipt, type SendEmailResult } from "@/platform/infra/ema
 import { changeHostedDomain, readHostedDomains, readHostedDomainRecords, validateHostedDomain } from "./rebuild-domains";
 import { checkWebsiteHealth } from "./site-health";
 import { websiteDocumentStore } from "./document-store";
+import { domainConnectedPaperEmail } from "./domain-receipt-email";
 import { websiteRebuildReleasedFor, websiteRebuildReleaseEnabledForWorkspace } from "./rebuild-release";
 
 import { createWebsiteDomainRequestStore, websiteDomainRequestStore, websiteDomainEmailAllowed, WebsiteDomainEffectUnconfirmedError, type WebsiteDomainRequest } from "@/platform/needs-you/sources/website-domain-store";
@@ -100,7 +101,7 @@ export async function sendWebsiteDomainReceipt(request: WebsiteDomainRequest, re
   const email: SendEmailResult = await websiteDomainEmailAllowed(request.tenantId)
     ? await sendEmailWithReceipt({ audience: "client", tenantId: request.tenantId!, to: recipient, fromAddress: "health@updates.strelva.com",
       subject: `${request.hostname} is connected`, idempotencyKey: `website-domain-receipt:${request.id}`,
-      options: { heading: "Your website domain is connected", paragraphs: [`Strelva confirmed ${request.hostname} is verified and routes to your published website.`], rows: [{ label: "Last check", value: request.result.checkedAt }], button: { label: "Open your website", url: `https://${request.hostname}` } } })
+      options: { heading: `${request.hostname} is connected`, paper: domainConnectedPaperEmail({ hostname: request.hostname, checkedAt: request.result.checkedAt }) } })
     : { status: "suppressed", reason: "website_domain_email_disabled" };
   return websiteDomainRequestStore.record(request, undefined, email);
 }

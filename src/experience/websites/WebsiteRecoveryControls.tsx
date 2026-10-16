@@ -2,7 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/Button";
-import { TextInput } from "@/components/ui/TextInput";
+import { XaButton, XaField } from "@/components/ui/strelva/Xa";
+import xs from "@/experience/connections/xa-connections.module.css";
 import { normalizeTenantDomain } from "@/platform/infra/domain-normalization";
 import { websiteDomainRequestSchema, websiteCutoverUndoReceiptSchema, type WebsiteDomainRequest as DomainReceipt, type WebsiteCutoverUndoReceipt } from "@/products/websites/client";
 import { beginFocusRecovery, type FocusRecovery } from "./focus-recovery";
@@ -64,14 +65,15 @@ function DomainRequestSession({ workId, workspaceId, request = fetch, readOnly =
       setNotice({ error: true, text: `${cause instanceof Error ? cause.message : "The domain request could not be confirmed."}${refused ? "" : " Check this exact saved request before preparing another."}` });
     } finally { websiteAttempt.finish(); }
   }
-  return <section ref={scopeRef} className="grid gap-3" aria-label="Owner domain request" aria-busy={busy || undefined}>
-    <form className="grid gap-3" onSubmit={event => { event.preventDefault(); void submit(); }}>
-      <TextInput ref={domainRef} label="Domain to request" placeholder="your-business.com" value={domain} disabled={busy || readOnly || disabled} readOnly={unknown || Boolean(saved)} onChange={event => { if (inFlight.current || attempt.current || readOnly || disabled) return; setDomain(event.target.value); requestId.current = crypto.randomUUID(); setNotice(null); }} />
-      <Button type="submit" variant="secondary" loading={busy} disabled={busy || readOnly || disabled || unknown || Boolean(saved) || !domain.trim()} className="justify-self-start">Ask owner to approve domain</Button>
+  return <section ref={scopeRef} className={xs.section} aria-label="Owner domain request" aria-busy={busy || undefined}>
+    <p className={xs.quiet}>Ask the owner to approve a domain for this website. Nothing changes at the domain until they say yes.</p>
+    <form className={xs.section} onSubmit={event => { event.preventDefault(); void submit(); }}>
+      <XaField ref={domainRef} label="Domain to request" placeholder="your-business.com" value={domain} disabled={busy || readOnly || disabled} readOnly={unknown || Boolean(saved)} autoComplete="off" spellCheck={false} onChange={event => { if (inFlight.current || attempt.current || readOnly || disabled) return; setDomain(event.target.value); requestId.current = crypto.randomUUID(); setNotice(null); }} />
+      <div className={xs.actions}><XaButton type="submit" busy={busy} disabled={busy || readOnly || disabled || unknown || Boolean(saved) || !domain.trim()}>Ask owner to approve domain</XaButton></div>
     </form>
-    {unknown ? <Button ref={checkRef} type="button" variant="secondary" disabled={busy} loading={busy} onClick={() => void submit(true)} className="justify-self-start">Check saved domain request</Button> : null}
-    {notice ? <p ref={receiptRef} tabIndex={-1} role={notice.error ? "alert" : "status"} className="text-sm text-gray-muted">{notice.text}</p> : null}
-    {saved ? <Button type="button" variant="secondary" disabled={busy || readOnly || disabled} className="justify-self-start" onClick={() => { if (inFlight.current || readOnly || disabled) return; focus.current?.cancel(); focus.current = beginFocusRecovery(scopeRef.current); attempt.current = null; requestId.current = crypto.randomUUID(); setSaved(null); setNotice(null); }}>Prepare another domain request</Button> : null}
+    {unknown ? <div className={xs.actions}><XaButton ref={checkRef} type="button" disabled={busy} busy={busy} onClick={() => void submit(true)}>Check saved domain request</XaButton></div> : null}
+    {notice ? <p ref={receiptRef} tabIndex={-1} role={notice.error ? "alert" : "status"} className={xs.copy}>{notice.text}</p> : null}
+    {saved ? <div className={xs.actions}><XaButton type="button" disabled={busy || readOnly || disabled} onClick={() => { if (inFlight.current || readOnly || disabled) return; focus.current?.cancel(); focus.current = beginFocusRecovery(scopeRef.current); attempt.current = null; requestId.current = crypto.randomUUID(); setSaved(null); setNotice(null); }}>Prepare another domain request</XaButton></div> : null}
   </section>;
 }
 

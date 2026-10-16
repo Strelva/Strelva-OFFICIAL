@@ -2,13 +2,13 @@ import type { Metadata } from "next";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { z } from "zod";
-import { StHead, StPage, StNotice, StTextButton } from "@/components/ui/strelva/Kit";
 import { AgencyGooglePicker, type AgencyGoogleResult, type AgencyGooglePickerProps } from "@/experience/places/AgencyGooglePicker";
 import { AGENCY_GOOGLE_CHOICES_COOKIE, admitAgencyGoogleConnect, readDiscoveryChoices } from "@/products/google-listing/server";
 import { workspaceHttpActor } from "@/platform/workspaces/http";
 import { WorkspaceAccessError } from "@/platform/workspaces/types";
 import { workspaceReleaseEnabled } from "@/platform/workspace-release";
-import styles from "@/experience/publishing/publishing.module.css";
+import { AgencyGoogleFrame } from "@/experience/places/AgencyGoogleFrame";
+import { XaButtonLink, XaHeadline, XaSays } from "@/components/ui/strelva/Xa";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Connect your agency’s Google account", robots: { index: false, follow: false }, referrer: "no-referrer" };
@@ -30,11 +30,11 @@ export default async function AgencyGooglePage({ searchParams }: { searchParams:
       result = choices ? undefined : parsed.success ? parsed.data : "expired";
     } catch (error) { result = error instanceof WorkspaceAccessError ? "forbidden" : "unavailable"; }
   }
-  return <main className={styles.paper} data-dashboard data-workspace-theme="linen"><StPage>
-    <StHead title="Connect your agency’s Google account" meta="For this business · no message is sent to the owner" />
+  return <AgencyGoogleFrame>
     {id.success && workspaceReleaseEnabled() ? <AgencyGooglePicker workspaceId={id.data} choices={choices} result={result} /> : <>
-      <StNotice tone="critical"><p role="alert" className={styles.copy}>This Google sign-in is unavailable or has expired. Open the business’s Google listing and start again.</p></StNotice>
-      <StTextButton href="/workspace">Back to your workspace</StTextButton>
+      <XaHeadline quiet="Nothing on the listing changed.">This Google sign-in stopped.</XaHeadline>
+      <div role="alert"><XaSays>This Google sign-in is unavailable or has expired. Open the business’s Google listing and start again.</XaSays></div>
+      <div><XaButtonLink href="/workspace" variant="secondary">Back to your workspace</XaButtonLink></div>
     </>}
-  </StPage></main>;
+  </AgencyGoogleFrame>;
 }

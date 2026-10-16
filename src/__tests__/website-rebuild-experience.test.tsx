@@ -92,7 +92,7 @@ describe("website rebuild review", () => {
     const transport: RebuildTransport = { read: async () => record, start: async () => record, mutate: async () => record };
     await mount(createElement(RebuildExperience, { workspaceId: record.workspaceId, initialRecord: record, transport }));
     expect(container.querySelector('[role="alert"]')?.textContent).toContain(domain!.error);
-    expect(container.textContent).toContain("Published, but readback failed.");
+    expect(container.textContent).toContain("Strelva couldn't confirm yet that it shows what you approved.");
     expect(container.textContent).toContain("no real inquiry, booking or visibility measurements");
   });
   it("sends the exact candidate identity through fact corrections", async () => {
