@@ -8,6 +8,7 @@
 import { releaseFlagMayBeOn } from "@/platform/release-flags/resolve";
 import { workspaceReleaseFlagEnabled } from "@/platform/release-flags/store";
 import { emailSendingEnabled } from "@/platform/infra/email/enabled";
+import { ownerEmailStreamOn } from "@/platform/infra/email/owner-streams";
 import { connectedSitesReleaseEnabled, connectedSitesReleasedFor } from "./release";
 
 /** The cheap early gate: keep-your-site could be on for at least one business. */
@@ -20,7 +21,8 @@ export async function keepYourSiteReleasedFor(actor: { userId: string }, workspa
   return workspaceReleaseFlagEnabled("keep_your_site", workspaceId, await releaseViewerFor(actor)).catch(() => false);
 }
 
-/** Built and default off: owner email for planned connected-site changes. */
+/** Built and default off: owner email for planned connected-site changes. The
+ * needs_you owner email stream (confirmed owners only) counts as sending. */
 export function connectedSiteChangeOwnerEmailEnabled(): boolean {
-  return emailSendingEnabled() && process.env.STRELVA_CONNECTED_SITE_CHANGE_OWNER_EMAIL === "1";
+  return (emailSendingEnabled() || ownerEmailStreamOn("needs_you")) && process.env.STRELVA_CONNECTED_SITE_CHANGE_OWNER_EMAIL === "1";
 }

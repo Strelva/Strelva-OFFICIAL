@@ -18,6 +18,7 @@ import { getSupabase } from "@/platform/infra/db/client";
 import { publishingDecisionDeliveryAllowed } from "@/platform/needs-you/publishing-delivery";
 import { customerEmailEnabled, emailSendingEnabled } from "@/platform/infra/email/enabled";
 import { getClientEmailOverride } from "@/platform/infra/email/client-override";
+import { ownerEmailSince } from "@/platform/infra/email/owner-streams";
 import { DeliveryCommitmentService, PostgresServiceRequestStore, mutateServiceRequestCommitment } from "@/platform/service-requests";
 import type { WorkspaceActor } from "@/platform/workspaces/types";
 import { serviceRequestAdapter, tenantEventAdapter } from "@/platform/needs-you/adapters";
@@ -103,6 +104,7 @@ export function needsYouService(store: NeedsYouStore = PostgresNeedsYouStore, ef
       if (error) throw error;
       return typeof data === "string";
     },
+    ownerEmailSince: () => ownerEmailSince(),
     urgentInquiryAllowed: async (tenantId) => process.env.STRELVA_INQUIRY_OWNER_NOTICES === "1" && needsYouReleaseEnabled()
       && emailSendingEnabled() && customerEmailEnabled() && (!tenantId || await getClientEmailOverride(tenantId) !== "off"),
     adapters: [

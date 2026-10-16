@@ -369,6 +369,7 @@ function claimDeliverySentence(claim: OwnerClaim): string {
   const to = claim.recipientEmail;
   if (claim.delivery.status === "accepted") return `Strelva emailed the link to ${to}. You can also send it yourself. ${until}`;
   if (claim.delivery.status === "sending" || claim.delivery.status === "unknown") return `Strelva couldn’t confirm its email to ${to}. Copy the link and send it yourself. ${until}`;
+  if (claim.delivery.reason === "owner_email_unconfirmed") return `Strelva didn’t email ${to}: Strelva hasn’t confirmed it’s the owner’s address yet. Copy the link and send it yourself. ${until}`;
   if (claim.delivery.reason === "permission_or_email_gate") return `Strelva didn’t email ${to}: your agency can’t send owner email yet. Copy the link and send it yourself. ${until}`;
   return `Strelva doesn’t email owners yet. Copy the link and send it to ${to} yourself. ${until}`;
 }

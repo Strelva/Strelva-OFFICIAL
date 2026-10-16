@@ -269,6 +269,7 @@ export const MIGRATION_SENTINELS: Record<string, string> = {
   "20261028100300": "listing_sync_checks",
   "20261028100400": "care_reports",
   "20261028100700": "app_intake_installs",
+  "20261028120000": "owner_email_confirmations",
 };
 
 /** Env names reported. Secrets: presence only. Flags: normalized value. */
@@ -310,6 +311,8 @@ export const FLAG_ENV = [
   "STRELVA_SYSTEMS_RELEASE",
   "STRELVA_AGENCY_SIGNUP_RELEASE",
   "STRELVA_AGENCY_OWNER_CLAIM_EMAIL_RELEASE",
+  "STRELVA_OWNER_EMAIL_STREAMS",
+  "STRELVA_OWNER_EMAIL_SINCE",
   "STRELVA_OWNER_REACH_RELEASE",
   "STRELVA_BUSINESS_SIGNUP_RELEASE",
   "STRELVA_INTERNAL_TOOL_NOTICES_RELEASE",

@@ -11,6 +11,9 @@
  *
  * To resume: set EMAIL_SENDING_ENABLED=true in Vercel prod and do a fresh
  * `vercel deploy --prod` (env changes need a fresh deploy, not a redeploy).
+ *
+ * Narrower than that: owner claim and Needs you mail can go out on their own
+ * streams while this stays off (owner-streams.ts, design-notes/SWITCH-ON.md).
  */
 export function emailSendingEnabled(): boolean {
   return process.env.EMAIL_SENDING_ENABLED === "true";

@@ -12,9 +12,12 @@ function ports() { return { rpc: vi.fn().mockResolvedValue({ data: true, error: 
 afterEach(() => vi.unstubAllEnvs());
 describe("explicit agency owner-link email", () => {
   it("defaults off and obeys workspace kill switch", () => {
-    vi.stubEnv("STRELVA_WORKSPACE_RELEASE", "1");
+    vi.stubEnv("STRELVA_WORKSPACE_RELEASE", "1"); vi.stubEnv("STRELVA_OWNER_EMAIL_STREAMS", "owner_claim");
     vi.stubEnv("STRELVA_AGENCY_OWNER_CLAIM_EMAIL_RELEASE", ""); expect(agencyClaimEmailReleased()).toBe(false);
     vi.stubEnv("STRELVA_AGENCY_OWNER_CLAIM_EMAIL_RELEASE", "1"); expect(agencyClaimEmailReleased()).toBe(true);
+    // The release alone is not enough: the owner_claim email stream must be on too.
+    vi.stubEnv("STRELVA_OWNER_EMAIL_STREAMS", "needs_you"); expect(agencyClaimEmailReleased()).toBe(false);
+    vi.stubEnv("STRELVA_OWNER_EMAIL_STREAMS", "owner_claim");
     vi.stubEnv("STRELVA_WORKSPACE_RELEASE", "0"); expect(agencyClaimEmailReleased()).toBe(false);
   });
   it("does nothing while off", async () => {

@@ -49,7 +49,7 @@ describe("issueWorkspaceInvitation", () => {
 });
 
 describe("deliverWorkspaceInvitation", () => {
-  const invitation = { id: row.id, workspaceId: WS, recipientEmail: "person@example.test", role: "admin" as const };
+  const invitation = { id: row.id, workspaceId: WS, recipientEmail: "person@example.test", role: "admin" as const, createdAt: "2026-10-16T15:00:00Z" };
   const input = { invitation, acceptUrl: "https://app.example.test/workspace/invitations/accept/tok", workspaceName: "Fixture Firm", inviterLabel: "Owner" };
   const accepted: SendEmailResult = { status: "accepted", providerMessageId: "msg_1", acceptedAt: "2026-10-01T00:00:00Z" };
 

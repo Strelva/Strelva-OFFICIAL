@@ -35,6 +35,7 @@
     "check:agency-workflow": "bash scripts/check-agency-workflow-sql.sh",
     "check:agency-door": "bash scripts/check-agency-door-sql.sh",
     "check:owner-reach-sql": "bash scripts/check-owner-reach-sql.sh",
+    "check:owner-email-sql": "bash scripts/check-owner-email-confirmations-sql.sh",
     "check:sites-by-code": "bash scripts/check-sites-by-code-sql.sh",
     "check:app-events-sql": "bash scripts/check-app-events-sql.sh",
     "check:listings-sync-sql": "bash scripts/check-listings-sync-sql.sh",

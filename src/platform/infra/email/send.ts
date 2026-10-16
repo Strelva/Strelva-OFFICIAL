@@ -12,6 +12,7 @@ import {
 import { getClientEmailOverride } from "@/platform/infra/email/client-override";
 import { agencyEmailSendAllowed, senderDomain, type EmailAgency } from "@/platform/infra/email/provider-gate";
 import { renderEmailHtml, renderEmailText, type EmailOptions } from "@/platform/infra/email/layout";
+import { logOwnerStream, ownerEmailStreamOn, ownerStreamHold, type OwnerStreamSend } from "@/platform/infra/email/owner-streams";
 
 /** The four people Strelva can address. These are relationship roles, not
  * interchangeable synonyms: each has an independent delivery policy. */
@@ -57,6 +58,10 @@ export type SendEmailInput = RenderedEmail & {
   /** Provider idempotency key for sends that must be safe across retries. */
   idempotencyKey?: string;
   attachments?: Array<{ filename: string; content: string }>;
+  /** Owner mail that may go out while client email is otherwise off (owner-streams.ts).
+   * Its own switch opens the client gate for this stream only, and the transport then
+   * requires a confirmed recipient and an event after the switch time. */
+  ownerStream?: OwnerStreamSend;
 };
 
 export type SendEmailResult =
@@ -111,7 +116,9 @@ async function audiencePolicyEnabled(input: SendEmailInput): Promise<boolean> {
   } catch { return false; }
   if (audience === "prospect") return prospectEmailsEnabled();
   if (audience === "customer") return !customerEmailPaused();
-  return armed || !emailSendingPaused();
+  // A named owner stream opens the client gate for itself only; a per-business
+  // "off" above has already returned.
+  return armed || !emailSendingPaused() || (input.ownerStream ? ownerEmailStreamOn(input.ownerStream.stream) : false);
 }
 
 /** Would client mail for this business pass the audience policy right now?
@@ -169,10 +176,34 @@ async function customerBusinessIdentity(input: EmailBusinessScope): Promise<Emai
  * API for existing senders.
  */
 export async function sendEmailWithReceipt(input: SendEmailInput): Promise<SendEmailResult> {
+  if (!input.ownerStream) return sendThroughTransport(input);
+  const stream = input.ownerStream;
+  let result: SendEmailResult;
+  try {
+    result = await sendThroughTransport(input);
+  } catch (error) {
+    // Provider messages can quote the address, so the log keeps only the kind.
+    logOwnerStream(stream, input.to, { status: "failed", reason: "provider_error" });
+    throw error;
+  }
+  logOwnerStream(stream, input.to, result);
+  return result;
+}
+
+async function ownerStreamCheck(input: SendEmailInput): Promise<SendEmailResult | null> {
+  if (!input.ownerStream) return null;
+  if (input.audience !== "client") return { status: "suppressed", reason: "owner_stream_audience" };
+  const hold = await ownerStreamHold(input.ownerStream, input);
+  return hold ? { status: "suppressed", reason: hold } : null;
+}
+
+async function sendThroughTransport(input: SendEmailInput): Promise<SendEmailResult> {
   if (!(await audiencePolicyEnabled(input))) {
     console.warn(`[email] ${input.audience} email disabled — skipped send`);
     return { status: "suppressed", reason: "email_suppressed_or_unconfigured" };
   }
+  const streamHeld = await ownerStreamCheck(input);
+  if (streamHeld) return streamHeld;
 
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) {
@@ -248,6 +279,8 @@ export async function sendEmailWithReceipt(input: SendEmailInput): Promise<SendE
     return { status: "suppressed", reason: "provider_not_cleared" };
   }
   if (!(await audiencePolicyEnabled(input))) return { status: "suppressed", reason: "email_policy_changed" };
+  const streamHeldLate = await ownerStreamCheck(input);
+  if (streamHeldLate) return streamHeldLate;
   const { Resend } = await import("resend");
   const resend = new Resend(apiKey);
   const result = input.idempotencyKey
@@ -256,6 +289,8 @@ export async function sendEmailWithReceipt(input: SendEmailInput): Promise<SendE
   if (result.error || !result.data?.id) {
     throw new Error(result.error?.message || "Resend did not return an email id.");
   }
+  // Every accepted send leaves one line: the audience, the stream and the provider id. Never the address.
+  console.info(`[email] accepted audience=${input.audience}${input.ownerStream ? ` stream=${input.ownerStream.stream}` : ""} message=${result.data.id}`);
   return { status: "accepted", providerMessageId: result.data.id, acceptedAt: new Date().toISOString() };
 }
 

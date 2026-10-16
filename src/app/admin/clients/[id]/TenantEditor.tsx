@@ -214,7 +214,7 @@ export function TenantEditor({ tenant }: { tenant: EditableTenant }) {
       if (!res.ok) throw new Error(data.error || `Failed (${res.status})`);
       if (data.workspaceInvitation) {
         // A business workspace is joined by workspace invitation; client email is off, so the link is the delivery.
-        setAssignNote(`Invitation created for ${form.ownerEmail.trim()}. ${data.delivery?.status === "accepted" ? "Emailed." : "Client email is off, so nothing was emailed. Copy this link and send it yourself:"} ${data.acceptUrl ?? ""}`.trim());
+        setAssignNote(`Invitation created for ${form.ownerEmail.trim()}. ${data.delivery?.status === "accepted" ? "Emailed." : "Not emailed: owner email is off, or this address isn't confirmed for the business. Copy this link and send it yourself:"} ${data.acceptUrl ?? ""}`.trim());
       } else if (data.emailed === false) {
         setAssignNote("Invite recorded. Client email is off, so nothing was emailed.");
       } else {

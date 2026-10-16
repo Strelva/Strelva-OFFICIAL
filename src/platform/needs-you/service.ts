@@ -9,6 +9,7 @@ import { actorCopy, actorSentence } from "@/platform/presentation/actor";
 import { bookingRemindersEnabled, bookingOwnerNoticeEnabled } from "@/platform/bookings/flags";
 import type { SendEmailInput, SendEmailResult } from "@/platform/infra/email/send";
 import type { EmailDecision, EmailOptions } from "@/platform/infra/email/layout";
+import { waitsForYouEmail } from "@/platform/infra/email/xa-mail";
 import { buildWorkspaceApproveUrl, type WorkspaceApproveLinkClaims } from "@/lib/approve-link";
 import type { WorkspaceActor } from "@/platform/workspaces/types";
 import { decisionPreviewSchema, nextChaseStep, type Decision, type DecisionPreview, type OwnerDecision, type PolicyItem } from "./contracts";
@@ -41,6 +42,10 @@ export interface NeedsYouDeps {
   urgentInquiryAllowed?(tenantId: string | null): Promise<boolean>;
   /** True when the trusted recipient is platform or agency staff (#524). Errors hold the send. */
   recipientIsStaff?(workspaceId: string, email: string): Promise<boolean>;
+  /** The owner email switch time (STRELVA_OWNER_EMAIL_SINCE). A decision opened
+   * before it is never mailed, so turning email on cannot blast what already
+   * waits. Null: unset, and the transport holds every Needs you email anyway. */
+  ownerEmailSince?(): number | null;
 }
 
 export type DecideStatus =
@@ -79,6 +84,12 @@ export interface ChaseSummary {
 interface SourceDiscovery { lifecycle: string; complete: boolean; proposed: number }
 
 const DIGEST_HOUR = 7;
+
+/** The earliest opening among the rows, as an ISO instant. Unreadable: the epoch, which no switch time admits. */
+function earliestOpened(rows: readonly { openedAt: string }[]): string {
+  const times = rows.map(row => Date.parse(row.openedAt));
+  return times.every(Number.isFinite) ? new Date(Math.min(...times)).toISOString() : new Date(0).toISOString();
+}
 
 function localHour(now: number, timezone: string): number {
   try {
@@ -356,6 +367,27 @@ export function createNeedsYouService(deps: NeedsYouDeps) {
   }
 
   function email(kind: "urgent" | "digest" | "reminder", business: string, rows: DeliveryRow[], recipient: string): EmailOptions {
+    const legacy = legacyEmail(kind, business, rows, recipient);
+    // One decision, not a reminder: the XA "Waits for you" email (E1), with the
+    // same signed link the legacy layout carries. Several decisions keep the list.
+    if (kind === "reminder" || rows.length !== 1) return legacy;
+    const row = rows[0]!;
+    const decision = legacy.decisions![0]!;
+    const signIn = !decision.approve;
+    return {
+      ...legacy,
+      xa: waitsForYouEmail({
+        business,
+        question: row.title,
+        actor: row.actor ?? null,
+        review: signIn ? decision.open.url : decision.approve!.url,
+        signInRequired: signIn,
+        settingsUrl: legacy.manageUrl!,
+      }),
+    };
+  }
+
+  function legacyEmail(kind: "urgent" | "digest" | "reminder", business: string, rows: DeliveryRow[], recipient: string): EmailOptions {
     const count = rows.length;
     const heading = kind === "urgent" ? "A customer is waiting on you" : kind === "reminder" ? `Still waiting on you: ${count === 1 ? "1 decision" : `${count} decisions`}` : actorSentence(null, `needs ${count === 1 ? "1 decision" : `${count} decisions`}`, `${count === 1 ? "1 decision needs" : `${count} decisions need`} you`);
     return {
@@ -382,6 +414,15 @@ export function createNeedsYouService(deps: NeedsYouDeps) {
       }
       rows = allowed;
       if (!rows.length) return;
+    }
+    const since = deps.ownerEmailSince?.() ?? null;
+    if (since !== null) {
+      // Opened before owner email was switched on: it stays on Home and is never mailed.
+      const before = rows.filter(row => !(Date.parse(row.openedAt) >= since));
+      for (const row of before) await deps.store.recordDelivery(row.workspaceId, row.id, kind, "suppressed", null, null, "opened_before_owner_email_on");
+      summary.ownerNotTold += before.length;
+      rows = rows.filter(row => !before.includes(row));
+      if (!rows.length) return "suppressed";
     }
     const first = rows[0]!;
     // A source that accepts only the trusted owner never mails anyone else.
@@ -449,6 +490,8 @@ export function createNeedsYouService(deps: NeedsYouDeps) {
         return "failed";
       }
     }
+    // A customer's inquiry keeps its own words in the plain layout.
+    if (inquiryNotice || inquiryRows.length) delete options.xa;
     if (inquiryNotice) options.paragraphs = [
       `New inquiry from ${inquiryNotice.name.slice(0, 160)}.`,
       ...(inquiryNotice.message ? [inquiryNotice.message.slice(0, 2000)] : []),
@@ -466,6 +509,13 @@ export function createNeedsYouService(deps: NeedsYouDeps) {
         subject,
         options,
         idempotencyKey: `needs-you:${kind}:${rows.map(row => row.id).sort().join(",")}`.slice(0, 256),
+        // The transport sends this only to an owner address confirmed for this
+        // business, and only for decisions opened after the switch time.
+        ownerStream: {
+          stream: kind === "reminder_1" || kind === "reminder_2" ? "needs_you_reminders" : "needs_you",
+          workspaceId: first.workspaceId,
+          eventAt: earliestOpened(rows),
+        },
         tags: { stream: "needs_you", kind, ...(rows.every(row => row.sourceLifecycle === "booking_request") ? { lifecycle: "booking_request", bookingWorkspaceId: first.workspaceId } : {}), ...(durableUrgent ? { strelva_inquiry_decision_id: first.id, strelva_workspace_id: first.workspaceId } : {}) },
       });
     } catch (error) {
