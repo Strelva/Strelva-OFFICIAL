@@ -8,6 +8,7 @@ import type { ActivityEntry } from "@/lib/storage/activity-store";
 import type { OwnerRetentionSignals } from "@/lib/retention";
 import type { UnifiedEvent } from "@/lib/types";
 import type { DashboardSurface } from "@/lib/dashboard-surfaces";
+import { xaHoursAgo } from "./xa-day";
 
 export const LEGACY_BASE = "/preview/strelva/xa/xs-legacy-dashboard";
 export const LEGACY_TENANT = "harbor-dental";
@@ -24,9 +25,9 @@ export function legacyState(value: string | undefined): LegacyState {
   return LEGACY_STATES.find((state) => state === value) ?? "ready";
 }
 
-const HOUR = 3_600_000;
+/** `hours` before 8:14 am on the shared fixture day (Monday, November 23, 2026), never the wall clock. */
 export function ago(hours: number): string {
-  return new Date(Date.now() - hours * HOUR).toISOString();
+  return xaHoursAgo(hours);
 }
 
 export const LEGACY_SURFACES: DashboardSurface[] = [

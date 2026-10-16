@@ -27,6 +27,7 @@ import {
 } from "./legacy-dashboard-screen-data";
 import { LegacyBrandKit, LegacyChat, LegacyCollections, LegacyConnectionDetail, LegacyConnections, LegacyHistoryFrame, LegacyPhotos, LegacySettings, LegacySite } from "./LegacyDashboardClientBits";
 import { LegacyDashboardShell } from "./LegacyDashboardShell";
+import { XA_DAY } from "./xa-day";
 import { LegacyConfirmPreview, LegacyErrorPreview } from "./LegacyDashboardClientBits";
 import {
   LEGACY_BASE, LEGACY_BUSINESS, LEGACY_OWNER, LEGACY_TENANT, legacyActivity, legacyLeads, legacyPending, legacyResolved, legacyRetention, type LegacyState,
@@ -54,6 +55,7 @@ function today(state: LegacyState) {
     suggestion={state === "ready" ? { title: "Add a page for same-week emergency visits", prompt: "Add a page for same-week emergency visits" } : null}
     leads={legacyLeads(state)}
     retentionSignals={legacyRetention()}
+    now={XA_DAY.now}
     hrefs={{ reports: href("/dashboard/reports"), analytics: href("/dashboard/analytics"), history: href("/dashboard/history"), leads: href("/dashboard/leads"), site: href("/dashboard/site"), live: null }}
   />;
 }

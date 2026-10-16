@@ -283,9 +283,9 @@ describe("the pages that moved (owner-entry spec §5)", () => {
     expect(route("/dashboard?checkout=success", ["needs_you"])).toMatchObject({ location: `/workspace?view=settings&workspaceId=${WS}` });
   });
 
-  it("moves Today and the approval queue to Home whether or not Needs you is on", () => {
-    expect(route("/dashboard")).toEqual({ kind: "redirect", location: `/workspace?workspaceId=${WS}`, route: "/" });
-    expect(route("/dashboard/review")).toEqual({ kind: "redirect", location: `/workspace?workspaceId=${WS}`, route: "/review" });
+  it("moves Today and the approval queue only while Needs you is on; off, the restyled page stays with a way back", () => {
+    expect(route("/dashboard")).toMatchObject({ kind: "render-with-back", route: "/" });
+    expect(route("/dashboard/review")).toMatchObject({ kind: "render-with-back", route: "/review" });
     expect(route("/dashboard", ["needs_you"])).toEqual({ kind: "redirect", location: `/workspace?workspaceId=${WS}`, route: "/" });
     expect(route("/dashboard/review", ["needs_you"])).toMatchObject({ kind: "redirect", location: `/workspace?workspaceId=${WS}` });
   });
@@ -293,8 +293,8 @@ describe("the pages that moved (owner-entry spec §5)", () => {
   it("routes /chat through the same gate type as needs_you (ask)", () => {
     const only = (gate: string) => (flag: string) => flag === gate;
     expect(routeDashboardRequest({ decision: moved, pathWithSearch: "/dashboard/chat", flagOn: only("ask") })).toMatchObject({ kind: "redirect", location: `/workspace?view=ask&workspaceId=${WS}` });
-    // Ask off for this business: its equivalent is not on, so the chat lands on Home, never the old chat.
-    expect(routeDashboardRequest({ decision: moved, pathWithSearch: "/dashboard/chat", flagOn: only("needs_you") })).toEqual({ kind: "redirect", location: `/workspace?workspaceId=${WS}`, route: "/chat" });
+    // Ask off for this business: Home has no chat, so the restyled chat stays with a way back.
+    expect(routeDashboardRequest({ decision: moved, pathWithSearch: "/dashboard/chat", flagOn: only("needs_you") })).toMatchObject({ kind: "render-with-back", route: "/chat" });
   });
 
   it("lets an operator keep the old page, and keeps everyone else on /dashboard when not moved", () => {

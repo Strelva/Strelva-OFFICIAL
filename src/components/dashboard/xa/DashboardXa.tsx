@@ -88,6 +88,15 @@ export function DashEmpty({ pose, job, title, children, action, secondary }: { p
 
 export const dashStyles = styles;
 
+/**
+ * One placeholder rule for both dashboard composers, the workspace's
+ * (OwnerToday, AskStrelva): Home asks "for anything"; a scoped Ask names what
+ * it is about ("Ask Strelva about your website").
+ */
+export function dashboardAskPlaceholder(about?: string): string {
+  return about ? `Ask Strelva about ${about}` : "Ask Strelva for anything";
+}
+
 /** The minute, on the client only; the server and hydration greet without a clock. */
 function subscribeMinute(onChange: () => void) {
   const timer = window.setInterval(onChange, 30_000);

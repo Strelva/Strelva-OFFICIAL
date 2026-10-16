@@ -1,10 +1,10 @@
 "use client";
 
 import { useState, useCallback, useMemo, useTransition } from "react";
-import { XaLabel, XaSays, XaSegmented, XaTextLink } from "@/components/ui/strelva/Xa";
-import { QueueCard } from "./QueueCard";
+import { XaLabel, XaSays, XaSegmented, XaTextLink, XaYes, type XaYesState } from "@/components/ui/strelva/Xa";
+import { QueueCard, queueEventUndoable } from "./QueueCard";
 import { EmptyQueue } from "./EmptyQueue";
-import { DashNote, DashPage } from "./xa/DashboardXa";
+import { DashPage } from "./xa/DashboardXa";
 import queueStyles from "./queue.module.css";
 import type { UnifiedEvent } from "@/lib/types";
 import { useDashboardOptional } from "./DashboardContext";
@@ -29,6 +29,8 @@ interface QueuePageProps {
   isOperator?: boolean;
 }
 
+type Settled = { id: string; title: string; action: "approved" | "dismissed"; undoable: boolean; state: XaYesState; note?: string };
+
 export function QueuePage({ initialPending, initialResolved, pendingCount: initialCount, staleSectionCount = 0, compact = false, isOperator = false }: QueuePageProps) {
   const dashboard = useDashboardOptional();
   const dashboardHref = useMemo(
@@ -44,7 +46,7 @@ export function QueuePage({ initialPending, initialResolved, pendingCount: initi
   const [processingIds, setProcessingIds] = useState<Set<string>>(new Set());
   // One decision open at a time: the first thing that waits, until the owner opens another.
   const [openId, setOpenId] = useState<string | null>(initialPending.find((event) => event.status === "pending" && event.type !== "change_request")?.id ?? null);
-  const [settled, setSettled] = useState<{ title: string; action: "approved" | "dismissed" } | null>(null);
+  const [settled, setSettled] = useState<Settled | null>(null);
 
   const handleResolve = useCallback(async (id: string, action: QueueAction) => {
     const event = pending.find((e) => e.id === id);
@@ -90,7 +92,7 @@ export function QueuePage({ initialPending, initialResolved, pendingCount: initi
           setOpenId((current) => current === id ? rest.find((e) => e.status === "pending" && e.type !== "change_request")?.id ?? null : current);
           setResolved((prev) => [updatedEvent, ...prev]);
           setPendingCount((prev) => Math.max(0, prev - 1));
-          if (action === "approved" || action === "dismissed") setSettled({ title: event.title, action });
+          if (action === "approved" || action === "dismissed") setSettled({ id, title: event.title, action, undoable: action === "approved" && queueEventUndoable(event), state: action === "approved" && queueEventUndoable(event) ? "live" : "expired" });
         }
       } catch {
         setDecisionError("That didn't go through. Nothing changed.");
@@ -105,6 +107,25 @@ export function QueuePage({ initialPending, initialResolved, pendingCount: initi
     });
   }, [dashboardHref, pending]);
 
+  // Undo right after Make it live: the section goes back to the version before it.
+  const handleUndo = useCallback(async () => {
+    const current = settled;
+    if (!current || current.action !== "approved" || !current.undoable) return;
+    setSettled({ ...current, state: "going" });
+    try {
+      const res = await fetch(dashboardHref(`/api/queue/${current.id}/undo`), { method: "POST" });
+      if (res.ok) {
+        setSettled({ ...current, state: "undone" });
+        setResolved((prev) => prev.map((e) => e.id === current.id ? { ...e, metadata: { ...e.metadata, undoneAt: new Date().toISOString() } } as UnifiedEvent : e));
+      } else {
+        const error = ((await res.json().catch(() => null)) as { error?: string } | null)?.error;
+        setSettled({ ...current, state: "expired", note: error || "Undo didn't go through. The change is still live." });
+      }
+    } catch {
+      setSettled({ ...current, state: "expired", note: "Undo didn't go through. The change is still live." });
+    }
+  }, [dashboardHref, settled]);
+
   const handleApprove = useCallback((id: string) => handleResolve(id, "approved"), [handleResolve]);
   const handleDismiss = useCallback((id: string) => handleResolve(id, "dismissed"), [handleResolve]);
   const handleWorkflowAction = useCallback((id: string, action: Exclude<QueueAction, "approved" | "dismissed">) => {
@@ -112,7 +133,7 @@ export function QueuePage({ initialPending, initialResolved, pendingCount: initi
   }, [handleResolve]);
 
   const currentEvents = tab === "pending" ? pending : resolved;
-  const monthAgo = Date.now() - 30 * 86_400_000;
+  const monthAgo = (dashboard?.fixtureNow ?? Date.now()) - 30 * 86_400_000;
   const aiHandledThisMonth = resolved.filter((event) => {
     const resolvedAt = event.resolvedAt || event.createdAt;
     return event.source === "ai" && new Date(resolvedAt).getTime() >= monthAgo;
@@ -122,15 +143,28 @@ export function QueuePage({ initialPending, initialResolved, pendingCount: initi
     : "Nothing waits on you.";
 
   const list = <div className="flex flex-col gap-4">
-    {decisionError ? <DashNote tone="down" role="alert">{decisionError}</DashNote> : null}
-    {settled && tab === "pending" ? <XaSays links={settled.action === "approved" ? [<XaTextLink key="history" href={dashboardHref("/dashboard/history")}>See it in History</XaTextLink>] : undefined}>
-      {settled.action === "approved" ? `Made live: ${settled.title}.` : `Not yet: ${settled.title}. Nothing changed on your site.`}
-    </XaSays> : null}
+    {decisionError ? <div role="alert"><XaSays>{decisionError}</XaSays></div> : null}
+    {settled && tab === "pending" ? <>
+      {/* The yes's own done state: Undo rises for its window, then one settled sentence. */}
+      {settled.action === "approved" ? <XaYes
+        state={settled.state}
+        onYes={() => undefined}
+        onUndo={settled.undoable ? () => void handleUndo() : undefined}
+        onUndoExpired={() => setSettled((prev) => prev && prev.id === settled.id && prev.state === "live" ? { ...prev, state: "expired" } : prev)}
+        liveLabel={`Made live: ${settled.title}`}
+        working={settled.state === "going" ? { title: "Putting it back", steps: [] } : undefined}
+        settled={settled.state === "undone" ? `Undone: ${settled.title}. Your site is back to how it was.` : undefined}
+        block={false}
+      /> : null}
+      {settled.state === "expired" ? <XaSays links={settled.action === "approved" ? [<XaTextLink key="history" href={dashboardHref("/dashboard/history")}>See it in What changed</XaTextLink>] : undefined}>
+        {settled.note ? settled.note : settled.action === "approved" ? `Made live: ${settled.title}.` : `Not yet: ${settled.title}. Nothing changed on your site.`}
+      </XaSays> : null}
+    </> : null}
     {tab === "resolved" && aiHandledThisMonth > 0 ? (
       <p className="m-0 text-[14px] text-[var(--st-text-2)]">Strelva finished {aiHandledThisMonth} update{aiHandledThisMonth === 1 ? "" : "s"} this month.</p>
     ) : null}
     {currentEvents.length === 0 ? (
-      tab === "pending" ? <EmptyQueue staleSectionCount={staleSectionCount} recent={resolved.slice(0, 3)} compact={compact} />
+      tab === "pending" ? <EmptyQueue staleSectionCount={staleSectionCount} recent={resolved.slice(0, 3)} compact={compact} onShowDone={compact ? undefined : () => setTab("resolved")} doneHref={compact ? dashboardHref("/dashboard/review") : undefined} />
         : <p className="m-0 text-[15px] text-[var(--st-text-2)]">Nothing finished yet. Changes you make live, or say not yet to, land here.</p>
     ) : (
       <ul className={queueStyles.list} aria-label={tab === "pending" ? "Needs you" : "Done"}>

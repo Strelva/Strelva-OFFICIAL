@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useDashboardOptional } from "@/components/dashboard/DashboardContext";
 import { getCurrentPlanDisplay } from "@/components/dashboard/billing-display";
 import { BillingBanner } from "@/components/dashboard/BillingBanner";
-import { ConfirmDialog } from "@/components/dashboard/ConfirmDialog";
+import { ConfirmInPlace } from "@/components/dashboard/ConfirmInPlace";
 import { OwnershipSection } from "@/components/dashboard/OwnershipSection";
 import { ContentAutonomyPanel } from "@/components/dashboard/ContentAutonomyPanel";
 import { DomainsClient } from "./DomainsClient";
@@ -96,8 +96,52 @@ const BUSINESS_FIELDS: readonly IdentityField[] = [
       { value: "hybrid", label: "Both" },
     ],
   },
-  { key: "bookingUrl", label: "Where your main button goes", hint: "The page or booking link your site's main button opens.", placeholder: "https://" },
 ];
+
+/** The site's own pages, named the way an owner says them, never as a path. */
+export function mainButtonPageName(href: string, menuLabel?: string): string {
+  const path = href.split(/[?#]/, 1)[0]!.replace(/\/+$/, "") || "/";
+  if (path === "/") return "Your homepage";
+  if (/^\/(book|booking|bookings|schedule|appointments?)$/i.test(path)) return "Your booking page";
+  if (/^\/contact(-us)?$/i.test(path)) return "Your contact page";
+  const words = (menuLabel?.trim() || path.slice(1).split("/").pop()!.replace(/[-_]+/g, " ")).trim();
+  return `Your ${words} page`;
+}
+
+const OUTSIDE = "__outside__";
+
+/**
+ * Where the site's main button goes (October 16): a choice of the site's own
+ * pages and its booking page by name. A pasted address shows only for a
+ * booking link on another site, so no owner ever reads a path like "/book".
+ */
+function MainButtonField({ value, disabled, error, onPick, onOutside, onOutsideBlur }: { value: string; disabled?: boolean; error?: string; onPick: (href: string) => void; onOutside: (href: string) => void; onOutsideBlur: () => void }) {
+  const apiPath = useDashboardApiPath();
+  const [pages, setPages] = useState<{ href: string; label?: string }[]>([]);
+  const [outside, setOutside] = useState(/^https?:\/\//i.test(value));
+  useEffect(() => {
+    let live = true;
+    fetch(apiPath("/api/content/navigation"), { credentials: "same-origin" })
+      .then((res) => res.ok ? res.json() as Promise<NavigationData> : null)
+      .then((nav) => { if (live && nav) setPages([...(nav.ctaHref ? [{ href: nav.ctaHref }] : []), ...nav.menuItems.map((item) => ({ href: item.href, label: item.label }))]); })
+      .catch(() => undefined);
+    return () => { live = false; };
+  }, [apiPath]);
+  const internal = (href: string) => href.startsWith("/") && !href.startsWith("//");
+  const seen = new Set<string>();
+  const options = [{ href: "/" }, ...pages, ...(internal(value) ? [{ href: value }] : [])]
+    .filter((page) => internal(page.href) && !seen.has(page.href.replace(/\/+$/, "") || "/") && seen.add(page.href.replace(/\/+$/, "") || "/"))
+    .map((page) => ({ value: page.href, label: mainButtonPageName(page.href, page.label) }));
+  const selected = outside ? OUTSIDE : internal(value) ? value : "";
+  return <div className="flex flex-col gap-3">
+    <XaSelectField label="Where your main button goes" hint="The page your site's main button opens." value={selected} disabled={disabled}
+      options={[...(selected ? [] : [{ value: "", label: "Choose a page" }]), ...options, { value: OUTSIDE, label: "A booking link on another site" }]}
+      onChange={(next) => { if (next === OUTSIDE) { setOutside(true); return; } setOutside(false); if (next) onPick(next); }} />
+    {outside ? <XaField label="Booking link on another site" placeholder="https://" value={internal(value) ? "" : value} disabled={disabled} error={error}
+      onChange={(event) => onOutside(event.target.value)} onBlur={onOutsideBlur}
+      onKeyDown={(event) => { if (event.key === "Enter") (event.target as HTMLElement).blur(); }} /> : null}
+  </div>;
+}
 
 // ---------------------------------------------------------------------------
 // Settings sections
@@ -235,6 +279,10 @@ function ProfileSection({
           onBlur={() => handleBlurSave(field.key)}
           onKeyDown={(event) => { if (event.key === "Enter") (event.target as HTMLElement).blur(); }} />
       ))}
+      <MainButtonField value={settings.bookingUrl || ""} disabled={readOnly} error={fieldErrors.bookingUrl}
+        onPick={(href) => { handleChange("bookingUrl", href); setFieldErrors((prev) => { const next = { ...prev }; delete next.bookingUrl; return next; }); saveSettings(latestRef.current); }}
+        onOutside={(href) => handleChange("bookingUrl", href)}
+        onOutsideBlur={() => handleBlurSave("bookingUrl")} />
     </div>
   );
 }
@@ -463,14 +511,14 @@ function CustomComponentsSection() {
               <XaField label="Name people see" value={component.label} onChange={(event) => update(index, "label", event.target.value)} onBlur={() => saveComponents(components)} />
             </div>
             <div className={dash.listEnd}><XaTextLink onClick={() => setConfirmRemoveIndex(index)} aria-label={`Remove ${component.label}`}>Remove</XaTextLink></div>
+            {confirmRemoveIndex === index ? <div className="w-full"><ConfirmInPlace open title={`Remove ${component.label || "this part"}?`}
+              message="The site stops offering it to Strelva. The code that draws it stays in the site's repo." confirmLabel="Remove it" cancelLabel="Keep it" busy={saveStatus === "saving"}
+              onConfirm={() => { const next = components.filter((_, i) => i !== index); setComponents(next); saveComponents(next); setConfirmRemoveIndex(null); }}
+              onCancel={() => setConfirmRemoveIndex(null)} /></div> : null}
           </li>
         ))}
       </ul> : !error ? <p className="m-0 text-[15px] text-[var(--st-text-2)]">No parts made only for this site yet.</p> : null}
       <p className="m-0 text-[14px]"><XaTextLink onClick={() => { const next = [...components, { id: "custom-component", label: "Custom part", adminOnly: true }]; setComponents(next); saveComponents(next); }}>Add a part</XaTextLink></p>
-      <ConfirmDialog open={confirmRemoveIndex !== null} title={`Remove ${confirmRemoveIndex !== null ? components[confirmRemoveIndex]?.label ?? "this part" : "this part"}?`}
-        message="The site stops offering it to Strelva. The code that draws it stays in the site's repo." confirmLabel="Remove it" cancelLabel="Keep it" destructive busy={saveStatus === "saving"}
-        onConfirm={() => { if (confirmRemoveIndex !== null) { const next = components.filter((_, i) => i !== confirmRemoveIndex); setComponents(next); saveComponents(next); setConfirmRemoveIndex(null); } }}
-        onCancel={() => setConfirmRemoveIndex(null)} />
     </div>
   );
 }

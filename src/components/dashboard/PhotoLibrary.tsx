@@ -4,8 +4,9 @@ import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { Upload } from "lucide-react";
 import Image from "next/image";
 import { StSkeleton } from "@/components/ui/strelva/Kit";
-import { XaButton, XaEmpty, XaRow, XaRows } from "@/components/ui/strelva/Xa";
-import { DashNote, DashPage } from "@/components/dashboard/xa/DashboardXa";
+import { XaButton, XaEmpty, XaRow, XaRows, XaSays, XaTextLink, XaUndo, XaUndoDock } from "@/components/ui/strelva/Xa";
+import { strelvaUndoWindowMs } from "@/platform/infra/motion";
+import { DashEmpty, DashNote, DashPage } from "@/components/dashboard/xa/DashboardXa";
 import styles from "./website-library.module.css";
 import { cn } from "@/lib/cn";
 import type { MediaAsset } from "@/lib/media";
@@ -21,7 +22,15 @@ type UploadResult = {
   message: string;
 };
 
-export function PhotoLibrary() {
+/** A delete held for the Undo window: nothing leaves the store until it ends. */
+type HeldDelete = { asset: MediaAsset; index: number };
+
+export function PhotoLibrary({ initialSelectedId, askDeleteFirst = false }: {
+  /** Preview harnesses only: open this photo once the library loads. */
+  initialSelectedId?: string;
+  /** Preview harnesses only: open it with the delete question asked. */
+  askDeleteFirst?: boolean;
+}) {
   const dashboard = useDashboardOptional();
   const apiHref = useMemo(
     () => dashboard?.dashboardHref ?? ((path: string) => path),
@@ -36,20 +45,34 @@ export function PhotoLibrary() {
   const [dragging, setDragging] = useState(false);
   const [uploadResults, setUploadResults] = useState<UploadResult[]>([]);
   const [uploadProgress, setUploadProgress] = useState<{ current: number; total: number } | null>(null);
+  const [held, setHeld] = useState<HeldDelete | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [attempt, setAttempt] = useState(0);
+  const heldRef = useRef<HeldDelete | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dragCounterRef = useRef(0);
-  const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).getTime();
+  const today = new Date(dashboard?.fixtureNow ?? Date.now());
+  const monthStart = new Date(today.getFullYear(), today.getMonth(), 1).getTime();
   const thisMonth = assets.filter((asset) => new Date(asset.createdAt || 0).getTime() >= monthStart).length;
 
-  // Fetch assets on mount
+  // Fetch assets on mount, and again on Try again.
   useEffect(() => {
+    let live = true;
     fetch(apiHref("/api/media"), { credentials: "same-origin" })
       // Read the refusal's body too, so the request ends instead of hanging open.
       .then(async (res) => { if (!res.ok) { await res.text().catch(() => ""); throw new Error("Photos could not be read."); } return res.json(); })
-      .then((data) => setAssets(data.assets || []))
-      .catch(() => { setAssets([]); setLoadError(true); })
-      .finally(() => setLoading(false));
-  }, [apiHref]);
+      .then((data) => {
+        if (!live) return;
+        const list: MediaAsset[] = data.assets || [];
+        setAssets(list);
+        setLoadError(false);
+        if (initialSelectedId) setSelected(list.find((asset) => asset.id === initialSelectedId) ?? null);
+      })
+      .catch(() => { if (live) { setAssets([]); setLoadError(true); } })
+      .finally(() => { if (live) setLoading(false); });
+    return () => { live = false; };
+  }, [apiHref, attempt, initialSelectedId]);
+  const retryLoad = () => { setLoading(true); setLoadError(false); setAttempt((n) => n + 1); };
 
   // Upload handler
   const uploadFiles = useCallback(async (files: FileList | File[]) => {
@@ -129,21 +152,54 @@ export function PhotoLibrary() {
     setUploading(false);
   }, [apiHref, readOnly]);
 
-  // Delete handler — invoked from PhotoDetail after the user confirms.
-  const deleteAsset = useCallback(
-    async (asset: MediaAsset) => {
-      const res = await fetch(
-        apiHref(`/api/media?id=${encodeURIComponent(asset.id)}`),
-        { method: "DELETE", credentials: "same-origin" },
-      );
-      if (!res.ok) {
-        throw new Error("Delete failed");
-      }
-      setAssets((prev) => prev.filter((a) => a.id !== asset.id));
-      setSelected((current) => (current?.id === asset.id ? null : current));
-    },
-    [apiHref],
-  );
+  // Delete, held for the Undo window (October 16). The photo leaves the
+  // library at once with Undo beside it; the store delete runs only when the
+  // window ends (or the owner leaves the page), so Undo is a real reversal.
+  const sendDelete = useCallback((asset: MediaAsset, keepalive = false) => fetch(
+    apiHref(`/api/media?id=${encodeURIComponent(asset.id)}`),
+    { method: "DELETE", credentials: "same-origin", keepalive },
+  ), [apiHref]);
+
+  const commitHeld = useCallback(async () => {
+    const current = heldRef.current;
+    if (!current) return;
+    heldRef.current = null;
+    setHeld(null);
+    try {
+      const res = await sendDelete(current.asset);
+      if (!res.ok) throw new Error("Delete failed");
+    } catch {
+      // Put it back where it was and say so: nothing was deleted.
+      setAssets((prev) => { const next = [...prev]; next.splice(Math.min(current.index, next.length), 0, current.asset); return next; });
+      setDeleteError(`${photoCaption(current.asset.filename)} wasn't deleted. It's back in your library.`);
+    }
+  }, [sendDelete]);
+
+  const deleteAsset = useCallback(async (asset: MediaAsset) => {
+    // A second delete inside the window commits the first one now.
+    if (heldRef.current) void commitHeld();
+    setDeleteError(null);
+    const entry = { asset, index: Math.max(0, assets.findIndex((a) => a.id === asset.id)) };
+    heldRef.current = entry;
+    setHeld(entry);
+    setAssets((prev) => prev.filter((a) => a.id !== asset.id));
+    setSelected((current) => (current?.id === asset.id ? null : current));
+  }, [assets, commitHeld]);
+
+  const undoDelete = useCallback(() => {
+    const current = heldRef.current;
+    if (!current) return;
+    heldRef.current = null;
+    setHeld(null);
+    setAssets((prev) => { const next = [...prev]; next.splice(Math.min(current.index, next.length), 0, current.asset); return next; });
+  }, []);
+
+  // Leaving the page inside the window still deletes what the owner deleted.
+  useEffect(() => {
+    const flush = () => { const current = heldRef.current; if (current) { heldRef.current = null; void sendDelete(current.asset, true).catch(() => undefined); } };
+    window.addEventListener("pagehide", flush);
+    return () => { window.removeEventListener("pagehide", flush); flush(); };
+  }, [sendDelete]);
 
   const uploadSummary = uploadResults.length
     ? {
@@ -192,7 +248,7 @@ export function PhotoLibrary() {
     <DashPage
       title="Photos."
       quiet={assets.length ? `${assets.length} ${assets.length === 1 ? "photo" : "photos"} Strelva can use on your site.` : "Photos Strelva can use on your site."}
-      actions={assets.length > 0 || loading || loadError ? <XaButton busy={uploading} disabled={readOnly} onClick={upload}><Upload size={15} aria-hidden="true" />{uploading ? "Uploading" : "Add photos"}</XaButton> : undefined}
+      actions={(assets.length > 0 || loading) && !loadError ? <XaButton busy={uploading} disabled={readOnly} onClick={upload}><Upload size={15} aria-hidden="true" />{uploading ? "Uploading" : "Add photos"}</XaButton> : undefined}
       width="wide"
       label="Photos"
     >
@@ -203,9 +259,11 @@ export function PhotoLibrary() {
         <DashNote tone={uploadSummary.failed ? "waits" : "live"} role="status">{uploadSummary.uploaded} uploaded, {uploadSummary.failed} failed or skipped</DashNote>
         {uploadSummary.failed ? <XaRows label="Upload results">{uploadResults.filter((result) => result.status !== "uploaded").map((result, index) => <XaRow key={`${result.name}-${index}`} title={result.name} detail={result.message} tone="waits" />)}</XaRows> : null}
       </section> : null}
+      {deleteError ? <div role="alert"><XaSays>{deleteError}</XaSays></div> : null}
       {dragging && !readOnly ? <DashNote tone="quiet">Drop the photos anywhere here to add them.</DashNote> : null}
       {loading ? <section className="flex flex-col gap-3" aria-busy="true" aria-label="Loading photos"><StSkeleton /><StSkeleton width="80%" /></section>
-        : loadError ? <DashNote tone="down" role="alert">The photos could not be read. Reload this page to try again; the library is unchanged.</DashNote>
+        : loadError ? <DashEmpty pose="fixing" title="Strelva could not read your photos just now." job="Nothing was changed. Your photos are where they were."
+            secondary={<XaTextLink onClick={retryLoad}>Try again</XaTextLink>} />
         : assets.length === 0 ? <XaEmpty pose="adds" title="No photos yet." job="Ready to place your photos on the site" action={<XaButton variant="primary" disabled={readOnly} onClick={upload}>Add your first photos</XaButton>}>Photos of your space, your team and your work. Images up to 5 MB.</XaEmpty>
         : <>
           <p className="m-0 text-[14px] text-[var(--st-text-2)]">{thisMonth === 0 ? "None added this month." : `${thisMonth} added this month.`} Drop photos anywhere here to add more.</p>
@@ -219,6 +277,7 @@ export function PhotoLibrary() {
           })}</div>
         </>}
     </DashPage>
-    <PhotoDetail asset={selected} onClose={() => setSelected(null)} onDelete={readOnly ? undefined : deleteAsset} />
+    <PhotoDetail asset={selected} onClose={() => setSelected(null)} onDelete={readOnly ? undefined : deleteAsset} askDeleteFirst={askDeleteFirst && selected?.id === initialSelectedId} />
+    {held ? <XaUndoDock><XaUndo key={held.asset.id} onUndo={undoDelete} windowMs={strelvaUndoWindowMs} onExpire={() => void commitHeld()} shortcut>Deleted {photoCaption(held.asset.filename)}</XaUndo></XaUndoDock> : null}
   </div>;
 }

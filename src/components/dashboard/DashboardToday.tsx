@@ -27,6 +27,8 @@ export interface DashboardTodayProps {
   leads: { count: number; recent: { id: string; name: string; email?: string | null; message?: string | null; createdAt: string }[] };
   retentionSignals: OwnerRetentionSignals;
   hrefs: { reports?: string; analytics?: string; history: string; leads: string; site: string; live?: string | null };
+  /** Preview harnesses only: the fixture day's clock. Real pages use the wall clock. */
+  now?: number;
 }
 
 function plural(n: number, one: string, many: string) { return `${n.toLocaleString()} ${n === 1 ? one : many}`; }
@@ -87,12 +89,12 @@ export function DashboardToday(props: DashboardTodayProps) {
               <XaLabel id="next-label">What happens next</XaLabel>
               <XaAnswers labelWidth={112} rows={[
                 ["This week", "Strelva keeps your site and Google listing healthy. Nothing for you to do."],
-                ["First report", "In about a week, here: who found you and what changed."],
+                ["First recap", "In about a week, here: who found you and what changed."],
                 ["Any time", "Ask Strelva in plain words. Bigger changes wait here on Home for your yes."],
               ]} />
             </section>
           ) : (
-            <ActivityFeed activity={strelvaWork} historyHref={hrefs.history} limit={4} />
+            <ActivityFeed activity={strelvaWork} historyHref={hrefs.history} limit={4} now={props.now} />
           )}
           {leads.recent.length > 0 ? (
             <section className="flex flex-col gap-2" aria-labelledby="leads-label">

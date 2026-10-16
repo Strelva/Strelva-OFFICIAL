@@ -52,10 +52,12 @@ export type DashboardRouting =
  *
  * October 16, 2026: the legacy dashboard is retired as a second owner app.
  * Once owner entry sends this person to the workspace, every `/dashboard`
- * page redirects: to its exact workspace home when that home is on for the
- * workspace, otherwise to workspace Home (the page's equivalent is not on
- * yet, and Home is where the business starts). Nothing renders the old page
- * for a moved person except an operator's `?legacy=1`. A person with no
+ * page whose exact workspace home is on for the workspace redirects there.
+ * A page whose equivalent is gated off (systems, needs_you or ask off for
+ * this business) renders the restyled page with a back link instead of
+ * landing on Home, because Home has no site editor, approvals or chat; the
+ * owner keeps every ability until the gate opens. An operator's `?legacy=1`
+ * also renders the old page. A person with no
  * workspace membership is never moved (decideOwnerEntry), so no redirect
  * sends anyone somewhere they cannot open.
  */
@@ -79,9 +81,14 @@ export function routeDashboardRequest(input: {
     : input.flagOn?.(flag) === true;
   if (legacy) return { kind: "render-with-back", homeHref, route, state: entry.state };
   const flagsReady = (entry.requires ?? []).every(gateOn);
-  // A target that wouldn't survive sign-in is never a redirect; Home always does.
-  const exact = flagsReady ? workspaceReturnTarget(entry.target(context)) : null;
-  return { kind: "redirect", location: exact ?? homeHref, route };
+  // A page whose workspace equivalent is gated off for this business keeps
+  // rendering the restyled page with a way back, so a moved owner never loses
+  // an ability (the site editor, approvals, chat) they had the day before.
+  if (!flagsReady || entry.state === "stay" || entry.state === "frozen") return { kind: "render-with-back", homeHref, route, state: entry.state };
+  // A target that wouldn't survive sign-in is never a redirect either.
+  const location = workspaceReturnTarget(entry.target(context));
+  if (!location) return { kind: "render-with-back", homeHref, route, state: entry.state };
+  return { kind: "redirect", location, route };
 }
 
 /** Where sign-in, sign-up and the admin root send someone after auth. */

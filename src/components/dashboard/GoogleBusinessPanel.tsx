@@ -38,7 +38,7 @@ export function GoogleBusinessPanel({ connected, state }: { connected: boolean; 
           ["Hours", "Change them once. Your site and your listing match."],
           ["Posts", "Updates and offers go to Google after your yes."],
           ["Reviews", "New reviews land here with a reply written in your voice."],
-          ["Search", "See how people find you on Google, in your weekly report."],
+          ["Search", "See how people find you on Google, in your weekly recap."],
         ]} />
         <XaSays>Connecting asks Google once for your listing, what people search, and who visits your site. Nothing posts until you say yes.</XaSays>
       </DashPage>

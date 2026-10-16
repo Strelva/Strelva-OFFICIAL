@@ -1,7 +1,7 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { managedSettingsHref, WorkspaceBusinessSettings } from "@/experience/workspace/WorkspaceBusinessSettings";
+import { managedSiteLinks, WorkspaceBusinessSettings } from "@/experience/workspace/WorkspaceBusinessSettings";
 import { WebsiteAssignmentHandoff } from "@/experience/workspace/WorkspaceOfferings";
 
 const site = { id: "website-a", title: "Harbor Dental", href: "/preview/strelva/website", productId: "managed_presence" as const, relationship: "client" as const };
@@ -22,24 +22,22 @@ function offeringState(canManage = true, mutationError?: string) {
 }
 
 describe("workspace business settings destinations", () => {
-  it("links an authorized managed-site dashboard to its native tenant-scoped settings", () => {
-    const dashboard = "https://app.strelva.com/client/gldf/dashboard";
-    expect(managedSettingsHref(dashboard, "business")).toBe("https://app.strelva.com/client/gldf/dashboard/settings#profile");
-    expect(managedSettingsHref(dashboard, "connections")).toBe("https://app.strelva.com/client/gldf/dashboard/integrations");
-    expect(managedSettingsHref(dashboard, "domains")).toBe("https://app.strelva.com/client/gldf/dashboard/settings#domains");
-    expect(managedSettingsHref(dashboard, "subscription")).toBe("https://app.strelva.com/client/gldf/dashboard/settings#plan");
+  it("links each website setting to its workspace home, never to /dashboard/settings anchors (October 16)", () => {
+    const links = managedSiteLinks({ ...site, href: "/client/gldf/dashboard", domain: "www.harbordental.com" }, "business-id");
+    expect(links.map((link) => [link.label, link.href])).toEqual([
+      ["Pages, photos and look", "/client/gldf/dashboard"],
+      ["Connections", "/workspace?view=connections&workspaceId=business-id"],
+      ["Web address: harbordental.com", "/workspace?view=help&workspaceId=business-id"],
+    ]);
+    for (const link of links) expect(link.href).not.toMatch(/\/dashboard\/settings/);
+    const html = renderToStaticMarkup(createElement(WorkspaceBusinessSettings, { workspace: { id: "business-id", kind: "customer" as const, name: "Harbor Dental", access: "member" as const }, sites: [site], siteAssignmentState: "known", accountHref: "/workspace/account" }));
+    expect(html).not.toContain("Website profile");
+    expect(html).not.toContain("Subscription");
+    expect(html).not.toContain("#domains");
   });
 
-  it("supports native app tenant paths and the gated local preview without changing authorization", () => {
-    expect(managedSettingsHref("/app/tenant-id/dashboard", "business")).toBe("/app/tenant-id/dashboard/settings#profile");
-    expect(managedSettingsHref("/app/tenant-id/dashboard", "connections")).toBe("/app/tenant-id/dashboard/integrations");
-    expect(managedSettingsHref("/preview/strelva/website", "domains")).toBe("/preview/strelva/website/dashboard/settings#domains");
-  });
-
-  it("rejects untrusted and non-dashboard destinations", () => {
-    expect(managedSettingsHref("https://evil.example/client/gldf/dashboard", "business")).toBeNull();
-    expect(managedSettingsHref("https://app.strelva.com/admin", "domains")).toBeNull();
-    expect(managedSettingsHref("javascript:alert(1)", "connections")).toBeNull();
+  it("drops an untrusted website link instead of rendering it", () => {
+    expect(managedSiteLinks({ ...site, href: "javascript:alert(1)" }, "business-id").map((link) => link.id)).toEqual(["connections", "address"]);
   });
 
   it("does not report a confirmed empty assignment while access is loading or unavailable", () => {

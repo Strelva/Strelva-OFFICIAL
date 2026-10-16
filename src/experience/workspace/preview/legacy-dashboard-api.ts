@@ -26,7 +26,7 @@ export async function legacyApiFixture(method: string, path: string, query: URLS
         { key: "business_type", label: "Say how patients find you", done: true, href: "#" },
         { key: "connect_google", label: "Connect your Google listing", done: false, href: "#" },
         { key: "first_edit", label: "Ask Strelva for one small change", done: false, href: "#" },
-        { key: "first_report", label: "Read your first weekly report", done: false, href: "#" },
+        { key: "first_report", label: "Read your first recap", done: false, href: "#" },
       ] }
       : { complete: true, steps: [] });
     case path === "threads": return ok(state === "empty" ? [] : [

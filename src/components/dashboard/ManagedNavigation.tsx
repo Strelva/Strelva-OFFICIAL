@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
-import { Building2, Eye, EyeOff, Plus, ScrollText, Shield, SquarePen, Sun, X } from "lucide-react";
+import { Building2, Eye, EyeOff, ScrollText, Shield, SquarePen, Sun, X } from "lucide-react";
 import { PLACE_LABELS, XA_PLACE_LABELS } from "@/platform/presentation/place-labels";
 import { XaGlideList, XaSystemTile } from "@/components/ui/strelva/Xa";
 import type { DashboardSurface, SurfaceId } from "@/lib/dashboard-surfaces";
@@ -120,7 +120,7 @@ function ManagedHistory() {
     const controller = new AbortController();
     fetch(dashboardHref("/api/threads"), { credentials: "same-origin", signal: controller.signal })
       .then(async (response) => {
-        if (!response.ok) throw new Error("Conversations could not be loaded.");
+        if (!response.ok) throw new Error("Requests could not be loaded.");
         const data: unknown = await response.json();
         const list = (Array.isArray(data) ? data : []) as Array<ThreadSummary & { messages?: Array<{ content?: string }> }>;
         if (!controller.signal.aborted) setThreads(list
@@ -128,7 +128,7 @@ function ManagedHistory() {
           .slice(0, 6)
           .map((thread) => ({ ...thread, preview: thread.preview || thread.messages?.at(-1)?.content || "" })));
       })
-      .catch(() => { if (!controller.signal.aborted) setError("Conversations could not be loaded. Reopen this page to try again."); })
+      .catch(() => { if (!controller.signal.aborted) setError("Your requests could not be loaded. Reopen this page to try again."); })
       .finally(() => { if (!controller.signal.aborted) setLoading(false); });
     return () => controller.abort();
   }, [dashboardHref]);
@@ -143,21 +143,21 @@ function ManagedHistory() {
       setThreads((current) => current.filter((thread) => thread.id !== threadId));
       if (activeThread === threadId) router.push(dashboardHref("/dashboard/chat"));
     } catch {
-      setError("This conversation could not be deleted. Try again.");
+      setError("This request could not be deleted. Try again.");
     } finally {
       setDeletingThreadId(null);
     }
   }
 
-  return <section aria-label="Recent conversations" className={styles.group}>
-    <h2 className={styles.head}>Recent conversations</h2>
-    <Link className={styles.item} href={dashboardHref("/dashboard/chat")} prefetch={false}><Plus size={17} strokeWidth={1.7} aria-hidden="true" /><span className={styles.label}>New conversation</span></Link>
-    {loading ? <p className={styles.quiet}>Loading conversations</p> : threads.length ? threads.map((thread) => <div className={styles.thread} key={thread.id}>
-      <Link className={styles.item} href={dashboardHref(`/dashboard/chat?thread=${encodeURIComponent(thread.id)}`)} prefetch={false} aria-current={activeThread === thread.id ? "page" : undefined} title={thread.title || "Conversation"}>
-        <span><strong>{thread.title || "Conversation"}</strong><small>{thread.preview}</small></span>
+  // The workspace's word for past asks (XaSidebar's Requests); "New request" above is the one way to start one.
+  return <section aria-label={PLACE_LABELS.requests} className={styles.group}>
+    <h2 className={styles.head}>{PLACE_LABELS.requests}</h2>
+    {loading ? <p className={styles.quiet}>Loading your requests</p> : threads.length ? threads.map((thread) => <div className={styles.thread} key={thread.id}>
+      <Link className={styles.item} href={dashboardHref(`/dashboard/chat?thread=${encodeURIComponent(thread.id)}`)} prefetch={false} aria-current={activeThread === thread.id ? "page" : undefined} title={thread.title || "Request"}>
+        <span><strong>{thread.title || "Request"}</strong><small>{thread.preview}</small></span>
       </Link>
-      <button className={styles.deleteThread} type="button" disabled={deletingThreadId !== null} onClick={() => void deleteThread(thread.id)} aria-label={`Delete ${thread.title || "conversation"}`}><X size={15} aria-hidden="true" /></button>
-    </div>) : !error ? <p className={styles.quiet}>Your conversations appear here after the first message.</p> : null}
+      <button className={styles.deleteThread} type="button" disabled={deletingThreadId !== null} onClick={() => void deleteThread(thread.id)} aria-label={`Delete ${thread.title || "this request"}`}><X size={15} aria-hidden="true" /></button>
+    </div>) : !error ? <p className={styles.quiet}>Your requests appear here after the first message.</p> : null}
     {error && <p className={styles.quiet} role="status">{error}</p>}
   </section>;
 }

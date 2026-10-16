@@ -14,6 +14,10 @@ import { segmentPill, segmentTrack } from "./segment-pill";
  * old per-page WebsiteSubnav was removed), so nothing means "editor" twice.
  * Brand Kit also keeps its Settings → Shortcuts entry; this is a second entry
  * point to the same page, not a second home. Routes are unchanged.
+ *
+ * October 16: History left this strip. It is What changed, its own place in
+ * the rail (as in the workspace), so one page never has two names or lives
+ * in two sections.
  */
 const WEBSITE_ROUTES = [
   "/dashboard/site",
@@ -21,7 +25,6 @@ const WEBSITE_ROUTES = [
   "/dashboard/assets",
   "/dashboard/brand-kit",
   "/dashboard/store",
-  "/dashboard/history",
 ];
 
 export function SectionSubNav({ hasStore = false }: { hasStore?: boolean }) {
@@ -40,7 +43,6 @@ export function SectionSubNav({ hasStore = false }: { hasStore?: boolean }) {
     { href: "/dashboard/assets", label: "Photos" },
     { href: "/dashboard/brand-kit", label: "Brand" },
     ...(hasStore ? [{ href: "/dashboard/store", label: "Store" }] : []),
-    { href: "/dashboard/history", label: "History" },
   ];
 
   return (

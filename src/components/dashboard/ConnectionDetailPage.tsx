@@ -4,7 +4,7 @@ import { useSearchParams } from "next/navigation";
 import { useState, useEffect, useMemo } from "react";
 import { XaAnswers, XaButton, XaField, XaSays, XaStatus, XaSystemTile, XaTextArea, XaTextLink } from "@/components/ui/strelva/Xa";
 import { DashEmpty, DashNote, DashPage } from "./xa/DashboardXa";
-import { ConfirmDialog } from "./ConfirmDialog";
+import { ConfirmInPlace } from "./ConfirmInPlace";
 import { connectionStatusWord } from "./ConnectionsPage";
 import {
   deriveIntelligenceStatus,
@@ -238,7 +238,7 @@ export function ConnectionDetailPage({ connectionId }: { connectionId: string })
       <XaSays>{setupPath}</XaSays>
 
       <XaAnswers labelWidth={160} rows={[
-        ["What it gives Strelva", <>{detail.addsIntelligence} {canUseNow ? "Strelva uses it when it answers you, suggests a change, and writes your weekly report." : "Until it is connected, Strelva shows no numbers from it."}</>],
+        ["What it gives Strelva", <>{detail.addsIntelligence} {canUseNow ? "Strelva uses it when it answers you, suggests a change, and writes your weekly recap." : "Until it is connected, Strelva shows no numbers from it."}</>],
         ...(detail.actionPaths?.length ? [["What Strelva can do", `${detail.actionPaths.join(". ")}.`] as const] : []),
       ]} />
 
@@ -268,7 +268,7 @@ export function ConnectionDetailPage({ connectionId }: { connectionId: string })
       {isConnected && detail.connectionProvider ? (
         <p className="m-0 text-[14px]"><XaTextLink onClick={() => setConfirmDisconnect(true)}>Disconnect {detail.displayName}</XaTextLink></p>
       ) : null}
-      <ConfirmDialog open={confirmDisconnect} busy={disconnecting} destructive title={`Disconnect ${detail.displayName}?`} confirmLabel="Disconnect" cancelLabel="Keep it connected"
+      <ConfirmInPlace open={confirmDisconnect} busy={disconnecting} destructive title={`Disconnect ${detail.displayName}?`} confirmLabel="Disconnect" cancelLabel="Keep it connected"
         message={`Strelva stops reading ${detail.displayName}. Nothing already on your site or listing changes, and you can connect it again any time.`}
         onCancel={() => setConfirmDisconnect(false)} onConfirm={async () => { await handleDisconnect(); setConfirmDisconnect(false); }} />
     </DashPage>

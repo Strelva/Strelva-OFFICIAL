@@ -2,7 +2,7 @@
 
 import { useMemo, useState, useTransition } from "react";
 import { XaRow, XaRows, XaTextLink } from "@/components/ui/strelva/Xa";
-import { ConfirmDialog } from "./ConfirmDialog";
+import { ConfirmInPlace } from "./ConfirmInPlace";
 import { DashNote, DashSection } from "./xa/DashboardXa";
 import type { SiteSnapshotSummary } from "@/lib/storage";
 import { useDashboardOptional } from "./DashboardContext";
@@ -111,18 +111,18 @@ export function SiteSafetyPanel({ snapshots: initialSnapshots }: SiteSafetyPanel
           ))}
         </XaRows>
       )}
-      {message ? <DashNote tone="live" role="status">{message}</DashNote> : null}
-      {error ? <DashNote tone="down" role="alert">{error}</DashNote> : null}
-      <ConfirmDialog
+      <ConfirmInPlace
         open={Boolean(confirming)}
         busy={Boolean(restoringId)}
         title={confirming ? `Go back to ${confirming.label.toLowerCase()} from ${formatSnapshotDate(confirming.createdAt)}?` : ""}
-        confirmLabel="Put this version live"
+        confirmLabel="Make this version live"
         cancelLabel="Keep the site as it is"
         message="Your live site becomes exactly this saved version. Strelva saves the current site first, so you can come back to it."
         onCancel={() => setConfirmingId(null)}
         onConfirm={() => { if (confirmingId) restore(confirmingId); }}
       />
+      {message ? <DashNote tone="live" role="status">{message}</DashNote> : null}
+      {error ? <DashNote tone="down" role="alert">{error}</DashNote> : null}
     </DashSection>
   );
 }

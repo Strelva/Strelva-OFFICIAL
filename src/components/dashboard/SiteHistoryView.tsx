@@ -42,7 +42,7 @@ export function SiteHistoryView({ heading, dashboardHref, historyHref, selectedR
     <div className="flex w-full max-w-[880px] flex-col gap-9">
       {heading ? <XaHeadline size="sm" quiet="Every saved version of your site is here to go back to.">What changed.</XaHeadline> : null}
 
-      <DashSection label="Recent changes" aside={<a href={dashboardHref("/dashboard/reports")} className="font-medium text-[var(--st-accent)] hover:underline">Weekly recaps</a>}>
+      <DashSection label="Recent changes" aside={<a href={dashboardHref("/dashboard/reports")} className="font-medium text-[var(--st-accent)] hover:underline">Recaps</a>}>
         {activity === null ? unavailable("Recent changes are temporarily unavailable.") : recentChanges.length > 0 ? (
           <XaLines label="Recent changes" lines={recentChanges.map((entry) => ({ time: when(entry.time), dateTime: entry.time, text: <>{entry.label}{entry.detail ? <span className="text-[var(--st-text-2)]">. {entry.detail}</span> : null}</> }))} />
         ) : (

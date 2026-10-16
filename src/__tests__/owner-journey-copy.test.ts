@@ -95,7 +95,7 @@ describe("owner journey copy and links", () => {
     expect(safetyPanel).toContain("Saved versions");
     expect(safetyPanel).toContain("Save one now");
     expect(safetyPanel).toContain("Go back to this");
-    expect(safetyPanel).toContain("<ConfirmDialog");
+    expect(safetyPanel).toContain("<ConfirmInPlace");
     expect(snapshotRoute).toContain("restoreSiteSnapshot");
     expect(snapshotRoute).toContain("Saved a full-site backup");
     expect(snapshotRoute).toContain("Restored full site from");
@@ -165,7 +165,7 @@ describe("owner journey copy and links", () => {
     // Verdict-first: lead with a plain-English verdict + the 30-day trend.
     expect(weeklyBrief).toContain("buildVerdict");
     expect(trendChart).toContain("Last 30 days");
-    expect(weeklyBrief).toContain("Your first report is on its way.");
+    expect(weeklyBrief).toContain("Your first recap is on its way.");
     // The empty report offers one useful next step instead of a wall of links.
     expect(weeklyBrief).toContain("Ask Strelva for a small change meanwhile");
   });
@@ -207,7 +207,9 @@ describe("owner journey copy and links", () => {
     expect(sources).toContain("lets Strelva see or do a little more");
     // Plain-English setup status, no provider jargon.
     expect(sources).toContain("Not connected yet");
-    expect(sources).toContain("Needs one manual step");
+    expect(sources).toContain("One step on your side: give Strelva read access");
+    expect(sources).toContain("Sign in again");
+    expect(sources).toContain("Strelva could not read your connections just now.");
     expect(sources).not.toContain("OAuth");
     expect(sources).not.toContain("Sources the AI can actually use");
     expect(detail).toContain("a key you paste in below, not a sign-in button");

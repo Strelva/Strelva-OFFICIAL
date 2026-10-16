@@ -6,7 +6,7 @@ import { TodayRoster, rosterHeadline } from "./RosterPanel";
 import { useDashboardOptional } from "./DashboardContext";
 import { DashNote, DashPage, DashSection, dashStyles as dash } from "./xa/DashboardXa";
 import type { Booking, BookingConfig, DateOverride, WeeklySlot } from "@/lib/types";
-import { ConfirmDialog } from "./ConfirmDialog";
+import { ConfirmInPlace } from "./ConfirmInPlace";
 
 const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 const inputClass =
@@ -144,7 +144,6 @@ function Appointments({ bookings, today }: { bookings: Booking[]; today: string 
     );
   }
 
-  const confirming = upcoming.find((b) => b.id === confirmId) ?? null;
   return (
     <>
       {error ? <DashNote tone="down" role="alert">{error}</DashNote> : null}
@@ -166,23 +165,22 @@ function Appointments({ bookings, today }: { bookings: Booking[]; today: string 
                   {b.clientEmail ? <><a className="font-medium text-[var(--st-accent)] hover:underline" href={`mailto:${b.clientEmail}`}>Email</a><span aria-hidden="true">·</span></> : null}
                   <XaTextLink onClick={() => setConfirmId(b.id)} aria-label={`Cancel ${b.clientName} at ${formatTime(b.startTime)}`}>Cancel this appointment</XaTextLink>
                 </p> : null}
+                {open && confirmId === b.id ? <div className="mt-3 pl-[90px] max-md:pl-0"><ConfirmInPlace
+                  open
+                  title={`Cancel ${b.clientName} at ${formatTime(b.startTime)}?`}
+                  message="The time opens up for someone else. This can't be undone from here."
+                  confirmLabel="Cancel the appointment"
+                  cancelLabel="Keep it"
+                  busy={busy}
+                  onConfirm={() => doCancel(b.id)}
+                  onCancel={() => !busy && setConfirmId(null)}
+                /></div> : null}
               </li>;
             })}
           </ul>
         </DashSection>
       ))}
 
-      <ConfirmDialog
-        open={confirming !== null}
-        title={confirming ? `Cancel ${confirming.clientName} at ${formatTime(confirming.startTime)}?` : "Cancel this appointment?"}
-        message="The time opens up for someone else. This can't be undone from here."
-        confirmLabel="Cancel the appointment"
-        cancelLabel="Keep it"
-        destructive
-        busy={busy}
-        onConfirm={() => confirmId && doCancel(confirmId)}
-        onCancel={() => !busy && setConfirmId(null)}
-      />
     </>
   );
 }

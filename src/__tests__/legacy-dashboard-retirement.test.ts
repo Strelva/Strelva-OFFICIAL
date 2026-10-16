@@ -8,11 +8,13 @@
  * Rule under test:
  * - A tenant with no business workspace keeps /dashboard ("render").
  * - A person on a linked tenant who is a member of that workspace, with owner
- *   entry on for them, is redirected on every /dashboard page: to the exact
- *   workspace home when that home is on, otherwise to workspace Home.
+ *   entry on for them, is redirected on every /dashboard page whose exact
+ *   workspace home is on. Where that home is gated off for the business
+ *   (systems, needs_you, ask), the restyled page stays with a way back, so
+ *   no ability is lost: Home has no site editor, approvals or chat.
  * - Anyone who could not open the workspace (no membership, entry off for
  *   them, signed out, read failed, the public demo) is never redirected.
- * - Only an operator's ?legacy=1 renders the old page for a moved person.
+ * - An operator's ?legacy=1 also renders the old page for a moved person.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { systemOriginId } from "@/platform/systems/invariants";
@@ -82,15 +84,24 @@ describe("a tenant with a business workspace: every /dashboard page redirects", 
     expect(await dashboardRoutingFor("fictional", "/dashboard/leads")).toMatchObject({ kind: "redirect", location: `/workspace/inquiries?workspaceId=${WS}` });
   });
 
-  it("lands on Home, never the old page, where the business's exact home is not on yet", async () => {
-    mocks.flag.mockResolvedValue(false); // systems off for this business
-    vi.stubEnv("STRELVA_NEEDS_YOU_RELEASE", "0");
-    vi.stubEnv("STRELVA_ASK_RELEASE", "0");
-    for (const path of ["/dashboard", "/dashboard/review", "/dashboard/chat", "/dashboard/site", "/dashboard/assets", "/dashboard/store", "/dashboard/members", "/dashboard/roster"]) {
-      expect(await dashboardRoutingFor("fictional", path), path).toMatchObject({ kind: "redirect", location: HOME });
+  // One table per gate: with that gate off, every page it guards keeps the
+  // restyled page (the ability the owner had yesterday) instead of landing on
+  // a Home that cannot do it, and every page it does not guard still moves.
+  const GATES: Array<[string, () => void, string[]]> = [
+    ["systems", () => mocks.flag.mockImplementation(async (flag: string) => flag !== "systems"),
+      ["/dashboard/site", "/dashboard/content", "/dashboard/assets", "/dashboard/brand-kit", "/dashboard/collections", "/dashboard/history", "/dashboard/integrations", "/dashboard/google", "/dashboard/sources/google", "/dashboard/store", "/dashboard/members", "/dashboard/roster", "/dashboard/schedule", "/dashboard/chat"]],
+    ["needs_you", () => vi.stubEnv("STRELVA_NEEDS_YOU_RELEASE", "0"), ["/dashboard", "/dashboard/review"]],
+    ["ask", () => vi.stubEnv("STRELVA_ASK_RELEASE", "0"), ["/dashboard/chat"]],
+  ];
+  it.each(GATES)("with %s off, the pages it guards keep their abilities and the rest still move", async (_gate, arrange, guarded) => {
+    arrange();
+    for (const path of guarded) {
+      expect(await dashboardRoutingFor("fictional", path), path).toMatchObject({ kind: "render-with-back", homeHref: HOME });
     }
-    // Pages with no gate keep their exact home.
-    expect(await dashboardRoutingFor("fictional", "/dashboard/leads")).toMatchObject({ kind: "redirect", location: `/workspace/inquiries?workspaceId=${WS}` });
+    for (const [path, location] of DEEP_LINKS) {
+      if (guarded.includes(path.split("?")[0] ?? path)) continue;
+      expect(await dashboardRoutingFor("fictional", path), path).toMatchObject({ kind: "redirect", location });
+    }
   });
 
   it("reads the trusted path the proxy saw when the caller passes none", async () => {

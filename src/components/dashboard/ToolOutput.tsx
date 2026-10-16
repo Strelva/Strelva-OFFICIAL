@@ -102,7 +102,7 @@ function ReportOutput({ data }: { data: ReportData }) {
   const dashboard = useDashboardOptional();
   const week = data.pageViews.thisWeek;
   const trend = data.trend?.percent ? ` That is ${Math.abs(data.trend.percent)}% ${data.trend.percent > 0 ? "more" : "fewer"} than last week.` : "";
-  return <XaSays links={[<XaTextLink key="report" href={dashboard?.dashboardHref("/dashboard/reports") || "/dashboard/reports"}>Read the report</XaTextLink>]}>
+  return <XaSays links={[<XaTextLink key="report" href={dashboard?.dashboardHref("/dashboard/reports") || "/dashboard/reports"}>Read the recap</XaTextLink>]}>
     {week > 0 ? `${plural(week, "person", "people")} found ${data.siteName} this week, and ${data.bookingClicks.thisWeek.toLocaleString()} clicked to book or called.${trend}` : `No one has found ${data.siteName} this week yet.`}
   </XaSays>;
 }

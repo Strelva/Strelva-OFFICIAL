@@ -105,9 +105,9 @@ describe("QueuePage approval-with-GBP-content", () => {
         "Google post draft",
       ),
     );
-    expect(html).toContain("What will be posted to Google");
+    expect(html).toContain("What will be posted on your Google listing");
     expect(html).toContain("Fall sale — 20% off every service through Sunday!");
-    expect(html).toContain("https://book.example.com/fall");
+    expect(html).toContain("button opens book.example.com/fall");
   });
 
   it("renders a Google post with no CTA and omits the button line", () => {
@@ -117,9 +117,9 @@ describe("QueuePage approval-with-GBP-content", () => {
         "Google post draft",
       ),
     );
-    expect(html).toContain("What will be posted to Google");
+    expect(html).toContain("What will be posted on your Google listing");
     expect(html).toContain("We&#x27;re open Labor Day, come say hi.");
-    expect(html).not.toContain("Button link");
+    expect(html).not.toContain("button opens");
   });
 
   it("renders the proposed Google hours in owner-friendly 12h time", () => {
@@ -135,7 +135,7 @@ describe("QueuePage approval-with-GBP-content", () => {
         "Google hours update",
       ),
     );
-    expect(html).toContain("New hours for Google");
+    expect(html).toContain("New hours on your Google listing");
     expect(html).toContain("Monday");
     expect(html).toContain("9:00 AM");
     expect(html).toContain("5:00 PM");

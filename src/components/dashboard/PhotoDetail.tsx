@@ -29,7 +29,7 @@ export function PhotoDetail({ asset, onClose, onDelete, askDeleteFirst = false }
   if (asset?.id !== prevAssetId) {
     setPrevAssetId(asset?.id);
     setCopied(false);
-    setConfirmingDelete(false);
+    setConfirmingDelete(askDeleteFirst);
     setDeleting(false);
   }
 

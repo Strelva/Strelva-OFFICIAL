@@ -46,7 +46,7 @@ export async function GET() {
     },
     {
       key: "report",
-      label: "See your first weekly report",
+      label: "Read your first recap",
       done: Boolean(brief),
       href: "/dashboard/reports",
     },

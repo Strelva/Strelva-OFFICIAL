@@ -19,10 +19,11 @@ import { workspaceSiteHref, type SiteTab } from "@/platform/workspaces/site-plac
  * Every target passes `workspaceReturnTarget`, so it survives sign-in.
  *
  * October 16, 2026 (legacy dashboard retired): every page is `ready`. For a
- * moved person a page whose gates are off, or a `stay`/`frozen` page should
- * one come back, redirects to workspace Home instead of rendering
- * (routeDashboardRequest). Only tenants with no workspace, and people with no
- * membership in the linked workspace, still see `/dashboard`.
+ * moved person a page whose gates are off (or a `stay`/`frozen` page, should
+ * one come back) renders the restyled page with a back link, never workspace
+ * Home, so no ability is lost before its workspace home is on
+ * (routeDashboardRequest). Tenants with no workspace, and people with no
+ * membership in the linked workspace, see `/dashboard` as before.
  */
 
 export type DispositionState = "ready" | "stay" | "retire" | "frozen";

@@ -1,10 +1,6 @@
 "use client";
 /** Client-only pieces of the legacy dashboard preview (functions cannot cross from the server page). */
-import { useState } from "react";
 import { DashboardErrorView } from "@/components/dashboard/DashboardErrorView";
-import { PhotoDetail } from "@/components/dashboard/PhotoDetail";
-import type { MediaAsset } from "@/lib/media";
-import { DashPage } from "@/components/dashboard/xa/DashboardXa";
 import type { ReactNode } from "react";
 import { ChatPageClient } from "@/app/dashboard/chat/ChatPageClient";
 import SettingsPage from "@/app/dashboard/settings/page";
@@ -22,16 +18,13 @@ export function LegacyErrorPreview() {
   return <DashboardErrorView onRetry={() => window.location.reload()} />;
 }
 
-/** Deleting a photo: the real PhotoDetail with its in-place question already asked (no sheet over the page). */
+/**
+ * Deleting a photo: the real PhotoLibrary with one photo open beside the grid
+ * (marked in it) and its in-place question already asked. Saying yes takes it
+ * out with Undo; the fixture API's delete only runs when the window ends.
+ */
 export function LegacyConfirmPreview() {
-  const [gone, setGone] = useState(false);
-  return <div className="flex h-full min-h-0 w-full">
-    <DashPage title="Photos." quiet={gone ? "1 photo Strelva can use on your site." : "2 photos Strelva can use on your site."}>
-      <p className="m-0 text-[15px] text-[var(--st-text-2)]">{gone ? "Deleted. Nothing on your site was using it." : "Dr. Lin at work is open beside the library."}</p>
-    </DashPage>
-    {gone ? null : <PhotoDetail askDeleteFirst asset={{ id: "m1", url: "/xa/photo-dentist.webp", filename: "Dr. Lin at work.webp", width: 1200, height: 1680, size: 182_000, createdAt: "2026-11-21T15:00:00.000Z" } as MediaAsset}
-      onClose={() => undefined} onDelete={() => new Promise<void>((resolve) => window.setTimeout(() => { setGone(true); resolve(); }, 700))} />}
-  </div>;
+  return <PhotoLibrary initialSelectedId="m1" askDeleteFirst />;
 }
 
 /* ---------- Real client components, fixture props ---------- */
@@ -51,9 +44,9 @@ export function LegacyBrandKit() {
 
 export function LegacyCollections({ state }: { state: LegacyState }) {
   return <CollectionsManager types={["blog", "product"]} initialType="blog" initialEntries={state === "empty" ? [] : [
-    { slug: "first-visit", status: "published", data: { title: "What happens at a child's first visit" }, updatedAt: "2026-10-14T15:00:00.000Z" },
-    { slug: "insurance", status: "draft", data: { title: "Which insurance we take" }, updatedAt: "2026-10-15T21:00:00.000Z" },
-    { slug: "emergency", status: "published", data: { title: "Same-week emergency visits" }, updatedAt: "2026-10-06T14:00:00.000Z" },
+    { slug: "first-visit", status: "published", data: { title: "What happens at a child's first visit" }, updatedAt: "2026-11-20T15:00:00.000Z" },
+    { slug: "insurance", status: "draft", data: { title: "Which insurance we take" }, updatedAt: "2026-11-22T21:00:00.000Z" },
+    { slug: "emergency", status: "published", data: { title: "Same-week emergency visits" }, updatedAt: "2026-11-12T14:00:00.000Z" },
   ]} />;
 }
 

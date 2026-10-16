@@ -82,7 +82,7 @@ export function GoalCard({ goal: initialGoal, stats }: GoalCardProps) {
       <section className="flex flex-col gap-2" aria-labelledby="goal-label">
         <XaLabel id="goal-label">Weekly goal</XaLabel>
         <p className="m-0 text-[15px] text-[var(--st-text-2)]">
-          No goal yet. Pick a number to chase and every report tracks it.{" "}
+          No goal yet. Pick a number to chase and every recap tracks it.{" "}
           {!readOnly ? <XaTextLink onClick={() => setEditing(true)}>Set a weekly goal</XaTextLink> : null}
         </p>
       </section>
