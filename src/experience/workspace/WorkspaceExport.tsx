@@ -1,8 +1,8 @@
 "use client";
 
-import { Check, Minus } from "lucide-react";
 import { useEffect, useState } from "react";
-import { StEmpty, StHead, StLabel, StMono, StNotice, StPage, StPill, StPillLink, StRow, StRows, StSplit, StSteps, StTextButton } from "@/components/ui/strelva/Kit";
+import { XaAnswers, XaButton, XaButtonLink, XaHeadline, XaLabel, XaPebbleScene, XaRow, XaRows, XaSays, XaSystemTile, XaTextLink, XaWorking } from "@/components/ui/strelva/Xa";
+import styles from "@/experience/record/record.module.css";
 
 import { ownerExportHistorySchema, type OwnerExportHistory } from "@/platform/workspace-exports/history-contracts";
 
@@ -21,6 +21,38 @@ const SCHEMA_3_SCOPE: ExportManifestRow[] = [
   { title: "Strelva’s internal notes", detail: "Strelva’s own records.", included: false },
   { title: "Records never imported", detail: "Export these from the provider that holds them.", included: false },
 ];
+/**
+ * The static scope, said the way an owner thinks of it (XA · R6): four
+ * groups instead of seven lines. A real manifest (with counts) is never
+ * regrouped, so its numbers stay attached to what they count.
+ */
+function groupForOwner(rows: ExportManifestRow[], group: boolean): ExportManifestRow[] {
+  if (!group) return rows;
+  const by = new Map(rows.map(row => [row.title, row]));
+  const groups: [string, string[], string][] = [
+    ["Your website", ["Website pages and photos"], "Every page, and where each original photo is."],
+    ["Inquiries and bookings", ["Inquiries and replies", "Bookings and requests"], "Every message, reply and booking, with dates."],
+    ["Business record and history", ["Business record", "History of every change"], "Your details and every change, with who made it."],
+    ["Documents, billing and payments", ["Documents and uploads", "Billing and payments"], "Your uploads, plus your billing and payment records."],
+  ];
+  const used = new Set<string>();
+  const out: ExportManifestRow[] = [];
+  for (const [title, members, detail] of groups) {
+    const present = members.filter(member => by.has(member));
+    if (!present.length) continue;
+    present.forEach(member => used.add(member));
+    out.push({ title, detail, included: true });
+  }
+  return [...out, ...rows.filter(row => !used.has(row.title))];
+}
+
+/** Which clay each part of the file wears (XA · R6). */
+const EXPORT_TILE: Record<string, string> = {
+  "Website pages and photos": "website", "Inquiries and replies": "inbox", "Bookings and requests": "bookings", "Business record": "documents",
+  "History of every change": "documents", "Documents and uploads": "documents", "Billing and payments": "payments",
+  "Workspace and saved results": "documents", "Uploads": "documents",
+  "Your website": "website", "Inquiries and bookings": "inbox", "Business record and history": "documents", "Documents, billing and payments": "payments",
+};
 const LEGACY_SCOPE: ExportManifestRow[] = [
   { title: "Workspace and saved results", detail: "Current identity, supported records, releases, onboarding and economics receipts.", included: true },
   { title: "Uploads", detail: "Size, digest, extraction status and authenticated download references; uploaded bytes stay out of the JSON.", included: true },
@@ -97,7 +129,7 @@ function WorkspaceExportScreen({ workspaceId, schema3 = false, request = fetch, 
       const blob = await response.blob();
       const match = response.headers.get("content-disposition")?.match(/filename="([^"]+)"/);
       const link = document.createElement("a"); link.href = URL.createObjectURL(blob); link.download = match?.[1] || "workspace-export.json"; link.click(); URL.revokeObjectURL(link.href);
-      setNotice("Workspace JSON prepared. The export action was recorded without storing its contents.");
+      setNotice("Your file is downloading. Strelva recorded that you downloaded it, not what was in it.");
     } catch (cause) {
       setError(true); setNotice(cause instanceof Error ? cause.message : "The workspace export could not be created.");
       // A lost POST response may still have started a build. Recover before retrying.
@@ -106,32 +138,42 @@ function WorkspaceExportScreen({ workspaceId, schema3 = false, request = fetch, 
     finally { setLoading(false); }
   }
   const rows = manifest ?? (schema3 ? SCHEMA_3_SCOPE : LEGACY_SCOPE);
-  return <StPage>
-    <StHead crumb={{ label: "Business details", href: `/workspace/business-details?workspaceId=${encodeURIComponent(workspaceId)}` }} title={businessName ? `Export ${businessName}` : "Export your business"} meta={schema3 ? "One file you can open anywhere · schema 3 · nothing changes or stops" : "A bounded workspace snapshot · nothing changes or stops"} />
-    <StSplit aside={<div className="flex min-w-0 flex-col gap-5">
-        <StLabel>{building ? "Running now" : "Your export"}</StLabel>
-        <StSteps label="Export progress" steps={[{ title: "Prepare business records", state: exports.some(row => row.status === "ready") ? "done" : building || loading ? "active" : "pending" }, { title: "Download archive", state: "pending" }]} />
-        <p className="text-[13px] leading-5 text-gray-muted">{schema3 ? "Large exports run in the background. Return here to download yours for seven days. Email delivery may be paused." : "The file includes the supported records stored in this workspace. It does not end service or delete anything."}</p>
-        <StPill busy={loading} disabled={building || schema3 && (historyLoading || Boolean(historyError))} onClick={() => void download()}>{schema3 ? "Prepare business export" : "Download workspace JSON"}</StPill>
-        {notice ? <div role={error ? undefined : "status"}><StNotice tone={error ? "critical" : undefined}>{notice}</StNotice></div> : null}
-        <StTextButton href={`/workspace/exit?workspaceId=${encodeURIComponent(workspaceId)}`}>Prepare to leave this workspace</StTextButton>
-      </div>}>
-      <div className="min-w-0">
-        {schema3 ? <section className="mb-8" aria-label="Recent exports">
-          <StLabel>Recent exports</StLabel>
-          {historyLoading ? <p role="status" className="mt-3 text-[13px] leading-5 text-gray-muted">Loading your exports…</p> : historyError ? <div className="mt-3"><StNotice tone="critical">{historyError}</StNotice><StTextButton onClick={() => { setHistoryLoading(true); setRefresh(value => value + 1); }}>Reload exports</StTextButton></div> : !exports.length ? <StEmpty>No recent exports. Prepare one to download your business records.</StEmpty> : <StRows label="Export history">{exports.map(row => <StRow key={row.buildId}
-            title={`Business export · ${exportDate(row.createdAt)}`}
-            detail={row.status === "ready" ? `Ready · Download until ${exportDate(row.expiresAt!)}` : row.status === "building" ? "Being prepared. You can leave and return here." : row.status === "expired" ? "Expired. Prepare a new export." : row.status === "stalled" ? "Preparation stopped. Prepare a new export." : "Preparation failed. Prepare a new export."}
-            end={row.status === "ready" ? <StPillLink href={`/api/workspace-export/v3/owner-download?build=${encodeURIComponent(row.buildId)}`}>Download business archive</StPillLink> : undefined}
-          />)}</StRows>}
-        </section> : null}
-        <StRows label={manifest ? "Export manifest" : "Export scope"}>{rows.map(row => <StRow key={row.title} lead={row.included ? <Check size={14} className="text-positive" aria-hidden="true" /> : <Minus size={14} className="text-gray-muted" aria-hidden="true" />} title={row.title} detail={row.detail} value={row.count ? <StMono>{row.count}</StMono> : undefined} />)}</StRows>
-        {!rows.length ? <StEmpty>No records were found in this export manifest.</StEmpty> : null}
-        {!manifest ? <p className="mt-3 text-[13px] leading-5 text-gray-muted">{schema3 ? "The downloaded manifest lists actual counts and names anything unavailable. Counts are not available on this page." : "Exports above 2 MB stop without creating a partial file or success receipt. Unknown costs remain unknown."}</p> : null}
+  const included = groupForOwner(rows.filter(row => row.included), !manifest);
+  const left = rows.filter(row => !row.included);
+  const failed = error && notice ? notice : historyError;
+  const scopeNote = !manifest ? schema3 ? "The downloaded file lists actual counts and names anything unavailable. Counts are not available on this page." : "Exports above 2 MB stop without creating a partial file or success receipt." : null;
+  return <div className={styles.take}>
+    <div className={styles.takeMain}>
+      <XaHeadline quiet={schema3 ? "Download it any time. Downloading changes nothing and stops nothing." : "Download a copy any time. Downloading changes nothing and stops nothing."}>{businessName ? `${businessName} is yours.` : "Everything is yours."}</XaHeadline>
+      <ul className={styles.contents} aria-label={manifest ? "Export manifest" : "Export scope"}>
+        {included.map(row => <li key={row.title} className={styles.content}><XaSystemTile kind={EXPORT_TILE[row.title] ?? "documents"} size={40} /><span className={styles.changeText}><span className={styles.changeTitle}>{row.title}</span><span className={styles.changeDetail}>{row.detail}</span></span><span className={styles.contentEnd}>{row.count ?? "Included"}</span></li>)}
+      </ul>
+      {!rows.length ? <p className={styles.quietNote}>No records were found in this export manifest.</p> : null}
+      <div className={styles.takeActions}>
+        <XaButton variant="primary" size="lg" busy={loading} disabled={building || schema3 && (historyLoading || Boolean(historyError))} onClick={() => void download()}>{schema3 ? "Prepare business export" : "Download everything"}</XaButton>
+        <XaTextLink href={`/workspace/exit?workspaceId=${encodeURIComponent(workspaceId)}`}>Leave Strelva</XaTextLink>
       </div>
-
-    </StSplit>
-  </StPage>;
+      {scopeNote ? <p className={styles.quietNote}>{scopeNote}</p> : null}
+      {building ? <XaWorking title="Preparing your export" steps={[{ id: "prepare", label: "Gathering every record into one file", state: "active" }, { id: "download", label: "Download it here for seven days", state: "pending" }]} /> : null}
+      {notice && !error ? <div role="status"><XaSays>{notice}</XaSays></div> : null}
+      {failed ? <div role="alert"><XaSays links={historyError ? [<XaTextLink key="reload" onClick={() => { setHistoryLoading(true); setRefresh(value => value + 1); }}>Reload exports</XaTextLink>] : undefined}>{failed}</XaSays></div> : null}
+      {schema3 ? <section className={styles.history} aria-label="Recent exports">
+        <XaLabel>Recent exports</XaLabel>
+        {historyLoading ? <p role="status" className={styles.quietNote}>Looking for your exports…</p> : historyError ? null : !exports.length ? <p className={styles.quietNote}>No recent exports. Prepare one to download your business records.</p> : <XaRows label="Export history">{exports.map(row => <XaRow key={row.buildId}
+          title={`Export from ${exportDate(row.createdAt)}`}
+          detail={row.status === "ready" ? `Ready · Download until ${exportDate(row.expiresAt!)}` : row.status === "building" ? "Being prepared. You can leave and return here." : row.status === "expired" ? "Expired. Prepare a new export." : row.status === "stalled" ? "Preparation stopped. Prepare a new export." : "Preparation failed. Prepare a new export."}
+          tone={row.status === "failed" || row.status === "stalled" ? "waits" : undefined}
+          action={row.status === "ready" ? <XaButtonLink size="sm" href={`/api/workspace-export/v3/owner-download?build=${encodeURIComponent(row.buildId)}`}>Download</XaButtonLink> : undefined}
+        />)}</XaRows>}
+      </section> : null}
+      {left.length ? <section className={styles.history} aria-label="Left out on purpose"><XaLabel>Left out on purpose</XaLabel><XaAnswers labelWidth={220} rows={left.map(row => [row.title, row.detail] as const)} /></section> : null}
+    </div>
+    <aside className={styles.takeSide} aria-label="What downloading does">
+      <XaPebbleScene pose="resting" size={320} label="Pebble resting beside the bookings calendar" />
+      <div><h2>Downloading changes nothing.</h2>
+      <p>Your Systems keep running while you download. Nothing is deleted unless you ask for it.</p></div>
+    </aside>
+  </div>;
 }
 
 function exportDate(value: string) {

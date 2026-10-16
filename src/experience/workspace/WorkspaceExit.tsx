@@ -1,7 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
-import { StEmpty, StHead, StHold, StMono, StNotice, StPage, StPill, StPillLink, StRow, StRows, StSection, StSegmented, StSkeleton, StState, StSurface, StTextButton } from "@/components/ui/strelva/Kit";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { StHold } from "@/components/ui/strelva/Kit";
+import { XaAnswers, XaButton, XaButtonLink, XaHeadline, XaLabel, XaRow, XaRows, XaSays, XaSegmented, XaStatus, XaSystemTile, XaTextLink } from "@/components/ui/strelva/Xa";
+import { RecordLoading, RecordTrouble } from "@/experience/record/RecordStates";
+import styles from "@/experience/record/record.module.css";
 import { SelectInput } from "@/components/ui/TextInput";
 import type { WorkspaceExitOptions, WorkspaceExitResponse } from "@/platform/workspace-exit/contracts";
 
@@ -84,58 +87,66 @@ export function WorkspaceExit({ workspaceId, request = fetch, businessBillingRel
     }
   }
 
-  const crumb = { label: "Business details", href: `/workspace/business-details?workspaceId=${encodeURIComponent(workspaceId)}` };
-  const head = <StHead crumb={crumb} title="Leaving Strelva" meta="Read every line before you go · you can stop at any step" />;
-  if (loading) return <StPage>{head}<StSkeleton label="Loading workspace exit options" /><StSkeleton width="70%" /><StSkeleton width="85%" /></StPage>;
-  if (error && !options) return <StPage>{head}<StNotice tone="critical">{error}</StNotice><div><StPill variant="soft" onClick={() => void load()}>Try again</StPill></div></StPage>;
+  const exportHref = `/workspace/export?workspaceId=${encodeURIComponent(workspaceId)}`;
+  const crumb = <nav className={styles.crumb} aria-label="Where you are"><a href={exportHref}>Take it with you</a><span aria-hidden="true">/</span><span>Leaving Strelva</span></nav>;
+  const billing = businessBillingReleased ? <XaTextLink href={`/workspace/billing?workspaceId=${encodeURIComponent(workspaceId)}`}>Manage payments or cancel your plan</XaTextLink> : null;
+  if (loading) return <RecordLoading title="Leaving Strelva" rows={4} label="Loading what leaving would change" />;
+  if (error && !options) return <RecordTrouble title="Leaving Strelva can't be read right now." quiet="Nothing changed. Everything keeps running." action={<XaButton onClick={() => void load()}>Try again</XaButton>}><p className={styles.quietNote} role="alert">{error}</p></RecordTrouble>;
 
   const state = options?.state;
-  if (state) return <StPage>
-    <StHead crumb={crumb} title={state.futureWork === "paused" ? "New work is paused." : "New work has been cancelled."} meta="Your choice is recorded. Retained records and unresolved results remain available for export." />
-    <StSurface label="Exit decision receipt">
-      <div className="flex flex-col gap-4">
-        <StState kind="live">Exit decision recorded</StState>
-        <p className="text-sm leading-6 text-gray-muted">Agency work was {state.providerParticipation}. {state.maintainedResources.kind === "successor" ? `A successor was named for ${state.maintainedResources.successorEmail} to review the resources.` : "Resources maintained in this workspace were stopped."}</p>
-        <StMono as="time" dateTime={state.completedAt}>{new Date(state.completedAt).toLocaleString()}</StMono>
-        <StRows label="Exit results"><Result label="Assignments revoked" value={state.summary.assignmentsRevoked} /><Result label="Scheduled checks paused" value={state.summary.investigationsPaused} /><Result label="Accepted obligations retained" value={state.summary.retainedAccepted} /><Result label="Unknown obligations retained" value={state.summary.retainedUnknown} /></StRows>
-      </div>
-    </StSurface>
-    <StNotice>This decision does not change billing or stop an outside provider service. {businessBillingReleased ? <StTextButton href={`/workspace/billing?workspaceId=${encodeURIComponent(workspaceId)}`}>Manage payments or cancel your plan</StTextButton> : "Billing controls are not open here. Contact your billing provider to end an existing agreement."}</StNotice>
+  if (state) return <div className={styles.screen}>
+    {crumb}
+    <XaHeadline quiet="Your records stay here for you to download.">{state.futureWork === "paused" ? "New work is paused." : "New work has been cancelled."}</XaHeadline>
+    <XaSays>{`You chose this on ${new Date(state.completedAt).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}. Agency work was ${state.providerParticipation}. ${state.maintainedResources.kind === "successor" ? `${state.maintainedResources.successorEmail} was named to look after what Strelva maintained.` : "What Strelva maintained here has stopped."}`}</XaSays>
+    <XaAnswers labelWidth={220} rows={[
+      ["Assignments ended", <Count key="a" value={state.summary.assignmentsRevoked} />],
+      ["Scheduled checks paused", <Count key="b" value={state.summary.investigationsPaused} />],
+      ["Accepted work kept", <Count key="c" value={state.summary.retainedAccepted} />],
+      ["Work with an unknown result kept", <Count key="d" value={state.summary.retainedUnknown} />],
+    ]} />
+    <p className={styles.quietNote}>This decision does not change billing or stop an outside service. {billing ?? "Billing controls are not open here. Contact your billing provider to end an existing agreement."}</p>
     {state.handoff ? <HandoffPlan plan={state.handoff} /> : null}
-    <StSection title="Still needs review">
-      {state.retainedObligations.length ? <StRows label="Retained obligations">{state.retainedObligations.map(item => <StRow key={item.workId} title={item.title} detail={obligationEffectLabel(item.effect)} end={<StState kind={item.status === "accepted" ? "live" : "need"}>{obligationStatusLabel(item.status)}</StState>} />)}</StRows> : <StEmpty>No accepted results or unresolved results were found in this exit choice.</StEmpty>}
-    </StSection>
-    <div className="flex flex-wrap gap-4"><StPillLink href={`/workspace/export?workspaceId=${encodeURIComponent(workspaceId)}`}>Export retained records</StPillLink><StTextButton href={`/workspace?workspaceId=${encodeURIComponent(workspaceId)}&view=access`}>Return to workspace</StTextButton></div>
-  </StPage>;
+    <section className={styles.section} aria-labelledby="exit-review">
+      <XaLabel as="h2" id="exit-review">Still needs a look</XaLabel>
+      {state.retainedObligations.length ? <XaRows label="Retained obligations">{state.retainedObligations.map(item => <XaRow key={item.workId} title={item.title} detail={`${obligationEffectLabel(item.effect)} · ${obligationStatusLabel(item.status)}`} tone={item.status === "accepted" ? undefined : "waits"} />)}</XaRows> : <p className={styles.quietNote}>Nothing accepted or unresolved was left open.</p>}
+    </section>
+    <div className={styles.takeActions}><XaButtonLink variant="primary" href={exportHref}>Download your records</XaButtonLink><XaTextLink href={`/workspace?workspaceId=${encodeURIComponent(workspaceId)}&view=access`}>Back to your workspace</XaTextLink></div>
+  </div>;
 
-  return <StPage>{head}
-    {error ? <StNotice tone="critical">{error}</StNotice> : null}
+  return <div className={styles.screen}>
+    {crumb}
+    <XaHeadline quiet="Read each line first. You can stop at any step.">Leaving Strelva</XaHeadline>
+    {error ? <div role="alert"><XaSays>{error}</XaSays></div> : null}
     {options?.handoff ? <HandoffPlan plan={options.handoff} /> : null}
-    <StRows label="What happens when you leave">
-      <StRow title="Future work" detail="Work already started, accepted, or unresolved stays available for review." end={<StTextButton onClick={() => setEditing(editing === "work" ? null : "work")}>Change</StTextButton>}><p className="text-sm leading-6">{futureWork === "pause" ? "New work pauses. Its history stays." : "Work that has not started closes. Its history stays."}</p></StRow>
-      <StRow title="Agency work" detail="This record cannot prove that an outside agency stopped work." end={<StTextButton onClick={() => setEditing(editing === "agency" ? null : "agency")}>Change</StTextButton>}><p className="text-sm leading-6">{agencyParticipation === "keep" ? "Recorded agency work stays available." : "New agency delivery from this workspace is revoked. History stays."}</p></StRow>
-      <StRow title="Resources Strelva maintains" detail="Naming someone records responsibility. It does not transfer ownership or access." end={<StTextButton onClick={() => setEditing(editing === "resources" ? null : "resources")}>Change</StTextButton>}><p className="text-sm leading-6">{resourceKind === "stop" ? "Offerings, applications and access maintained here stop. Their records stay." : "Resources stay for the named verified member to review."}</p></StRow>
-      <StRow title="Business record and History" detail="Your records stay available for export until you explicitly request deletion." />
-      <StRow title="Billing and outside services" detail="This choice does not change billing or stop an outside service." end={businessBillingReleased ? <StTextButton href={`/workspace/billing?workspaceId=${encodeURIComponent(workspaceId)}`}>Manage payments or cancel your plan</StTextButton> : undefined}>
-        {!businessBillingReleased ? <p className="text-sm text-gray-muted">Billing controls are not open here. Contact your billing provider to end an existing agreement.</p> : null}
-      </StRow>
-    </StRows>
-    {editing ? <StSurface label="Change exit choice"><div className="flex flex-col gap-4">
-      {editing === "work" ? <><StSection title="Future work"><StSegmented label="Future work" value={futureWork} onChange={setFutureWork} options={[{ value: "pause", label: "Pause new work" }, { value: "cancel", label: "Cancel new work" }]} /></StSection><p className="text-sm text-gray-muted">Only work that has not started can change here.</p></> : null}
-      {editing === "agency" ? <StSection title="Agency work"><StSegmented label="Agency work" value={agencyParticipation} onChange={setAgencyParticipation} options={[{ value: "keep", label: "Keep recorded work" }, { value: "revoke", label: "Revoke future work" }]} /></StSection> : null}
-      {editing === "resources" ? <><StSection title="Resources Strelva maintains"><StSegmented label="Resources Strelva maintains" value={resourceKind} onChange={setResourceKind} options={[{ value: "stop", label: "Stop resources" }, { value: "successor", label: "Name someone" }]} disabledValues={!options?.successors.length ? ["successor"] : []} disabledReason="No other verified workspace member is available to name." /></StSection>{resourceKind === "successor" ? <SelectInput label="Verified workspace member" value={successorUserId} onChange={event => setSuccessorUserId(event.target.value)} options={[{ value: "", label: "Choose a successor" }, ...(options?.successors.map(successor => ({ value: successor.userId, label: successor.email })) ?? [])]} helperText="Naming a person records responsibility; it does not transfer access." /> : null}{!options?.successors.length ? <StEmpty>No other verified workspace member is available to name. You can stop the resources and preserve their records.</StEmpty> : null}</> : null}
-      <StTextButton onClick={() => setEditing(null)}>Done</StTextButton>
-    </div></StSurface> : null}
-    <div className="flex flex-wrap items-center justify-between gap-5">
-      <p className="max-w-lg text-[13px] leading-5 text-gray-muted">This choice is permanent for this workspace. Export first if you need an offline copy. No records are deleted by this choice.</p>
-      <StHold label={busy ? "Recording your choice…" : "Hold to leave"} disabled={busy || (resourceKind === "successor" && !successorUserId)} onAccept={() => void complete()} />
-    </div>
-    <StTextButton href={`/workspace/export?workspaceId=${encodeURIComponent(workspaceId)}`}>Export before leaving</StTextButton>
-  </StPage>;
+    <section className={styles.section} aria-label="What happens when you leave">
+      <Choice title="Future work" open={editing === "work"} onToggle={() => setEditing(editing === "work" ? null : "work")} now={futureWork === "pause" ? "New work pauses. Its history stays." : "Work that has not started closes. Its history stays."} detail="Work already started, accepted, or unresolved stays here for you to review.">
+        <XaSegmented label="Future work" value={futureWork} onChange={setFutureWork} options={[{ value: "pause", label: "Pause new work" }, { value: "cancel", label: "Cancel new work" }]} />
+      </Choice>
+      <Choice title="Agency work" open={editing === "agency"} onToggle={() => setEditing(editing === "agency" ? null : "agency")} now={agencyParticipation === "keep" ? "Work your agency recorded stays here." : "Your agency can't start new work here. History stays."} detail="Strelva can't prove an outside agency stopped working.">
+        <XaSegmented label="Agency work" value={agencyParticipation} onChange={setAgencyParticipation} options={[{ value: "keep", label: "Keep recorded work" }, { value: "revoke", label: "Stop new agency work" }]} />
+      </Choice>
+      <Choice title="What Strelva maintains" open={editing === "resources"} onToggle={() => setEditing(editing === "resources" ? null : "resources")} now={resourceKind === "stop" ? "Offerings, applications and access maintained here stop. Their records stay." : "They stay, for the person you name to look after."} detail="Naming someone records who looks after them. It does not hand over ownership or access.">
+        <XaSegmented label="What Strelva maintains" value={resourceKind} onChange={setResourceKind} options={[{ value: "stop", label: "Stop them" }, { value: "successor", label: "Name someone", disabled: !options?.successors.length }]} />
+        {resourceKind === "successor" ? <SelectInput label="Who looks after them" value={successorUserId} onChange={event => setSuccessorUserId(event.target.value)} options={[{ value: "", label: "Choose someone" }, ...(options?.successors.map(successor => ({ value: successor.userId, label: successor.email })) ?? [])]} helperText="Only people already in this business with a confirmed email." /> : null}
+        {!options?.successors.length ? <p className={styles.quietNote}>No one else in this business has a confirmed email, so these stop and their records stay.</p> : null}
+      </Choice>
+      <div className={styles.choice}><span className={styles.canTitle}>Business record and History</span><span className={styles.canDetail}>They stay here for you to download until you ask for them to be deleted.</span></div>
+      <div className={styles.choice}><span className={styles.canTitle}>Billing and outside services</span><span className={styles.canDetail}>This choice does not change billing or stop an outside service. {billing ?? "Billing controls are not open here. Contact your billing provider to end an existing agreement."}</span></div>
+    </section>
+    <p className={styles.quietNote}>This is final for this workspace. Nothing is deleted. <XaTextLink href={exportHref}>Download everything first</XaTextLink></p>
+    <div><StHold label={busy ? "Recording your choice…" : "Hold to leave"} disabled={busy || (resourceKind === "successor" && !successorUserId)} onAccept={() => void complete()} /></div>
+  </div>;
 }
 
-function Result({ label, value }: { label: string; value: number }) {
-  return <StRow title={label} end={<StMono>{value}</StMono>} />;
+function Choice({ title, now, detail, open, onToggle, children }: { title: string; now: string; detail: string; open: boolean; onToggle: () => void; children: ReactNode }) {
+  return <div className={styles.choice}>
+    <div className={styles.choiceHead}><span><span className={styles.canTitle}>{title}</span><br /><span className={styles.choiceNow}>{now}</span><br /><span className={styles.canDetail}>{detail}</span></span><XaButton size="sm" variant="quiet" aria-expanded={open} onClick={onToggle}>{open ? "Done" : "Change"}</XaButton></div>
+    {open ? children : null}
+  </div>;
+}
+
+function Count({ value }: { value: number }) {
+  return <span className={styles.contentEnd}>{value}</span>;
 }
 
 function obligationStatusLabel(status: "running" | "waiting" | "needs_attention" | "accepted" | "unknown") {
@@ -143,16 +154,19 @@ function obligationStatusLabel(status: "running" | "waiting" | "needs_attention"
 }
 
 function obligationEffectLabel(effect: "none" | "accepted" | "unknown") {
-  return effect === "none" ? "No external effect confirmed" : effect === "accepted" ? "Accepted effect recorded" : "Effect is unknown";
+  return effect === "none" ? "Nothing outside Strelva changed" : effect === "accepted" ? "It changed something outside Strelva" : "Not known whether it changed anything outside Strelva";
 }
 
 function HandoffPlan({ plan }: { plan: NonNullable<WorkspaceExitOptions["handoff"]> }) {
-  return <StSection title="Your business goes with you">
-    <p className="text-[13px] leading-5 text-gray-muted">The business record and <StMono>{plan.systems.length}</StMono> Systems stay available. Completed steps have recorded evidence; pending steps still need attention.</p>
-    {!plan.sites.length && !plan.systems.length ? <StEmpty>No linked sites or Systems were found. The business record remains available.</StEmpty> : null}
-    {plan.homeFinder?.length ? <StRows label="Brokerage search and accepted inquiries">{plan.homeFinder.map(binding => <StRow key={binding.id} title={binding.brokerageName} detail={<>{binding.acceptedInquiries} accepted or unresolved inquiry records remain. Delivery and signed receipt obligations continue. {binding.buyerContentExport}</>}><p className="text-sm leading-6">Exit blocks new native intake. Approved website: {binding.approvedOrigin}</p></StRow>)}</StRows> : null}
-    {plan.sites.map(site => <StSection key={site.tenantStableId} title={site.siteName}>
-      <StRows label={`Handoff for ${site.siteName}`}>{site.steps.map(step => <StRow key={step.kind} title={step.kind === "files" ? "Website files and assets" : step.kind === "export" ? "Business export" : step.kind === "billing" ? "Billing" : "Domain"} detail={step.evidence ?? "No completed handoff evidence recorded."} end={<StState kind={step.status === "completed" ? "live" : "need"}>{step.status === "completed" ? "Completed" : "Pending"}</StState>}><p className="text-sm leading-6">{step.detail}</p></StRow>)}</StRows>
-    </StSection>)}
-  </StSection>;
+  return <section className={styles.section} aria-labelledby="exit-handoff">
+    <XaLabel as="h2" id="exit-handoff">Your business goes with you</XaLabel>
+    <p className={styles.quietNote}>{plan.systems.length ? `Your business record and ${plan.systems.length} ${plan.systems.length === 1 ? "System" : "Systems"} stay here.` : "Your business record stays here."} A step is done only when Strelva has proof it happened.</p>
+    {plan.homeFinder?.length ? <XaRows label="Brokerage search and accepted inquiries">{plan.homeFinder.map(binding => <XaRow key={binding.id} title={binding.brokerageName} detail={`${binding.acceptedInquiries} accepted or open inquiries stay, and their delivery promises continue. ${binding.buyerContentExport}`} />)}</XaRows> : null}
+    {plan.sites.map(site => <XaRows key={site.tenantStableId} label={`Handoff for ${site.siteName}`}>{site.steps.map(step => <XaRow key={step.kind}
+      lead={<XaSystemTile kind={step.kind === "billing" ? "payments" : step.kind === "export" ? "documents" : "website"} size={32} />}
+      title={`${site.siteName} · ${step.kind === "files" ? "website files" : step.kind === "export" ? "business export" : step.kind === "billing" ? "billing" : "domain"}`}
+      detail={step.status === "completed" ? step.evidence ?? step.detail : step.detail}
+      tone={step.status === "completed" ? undefined : "waits"}
+      meta={step.status === "completed" ? <XaStatus kind="live" size="sm">Done</XaStatus> : <XaStatus kind="waits" size="sm">Not yet</XaStatus>} />)}</XaRows>)}
+  </section>;
 }

@@ -2592,3 +2592,17 @@ and link controls; staff see none of the controls that change anything.
 minutes inside Responsibility and availability, each with an id made once per
 entry so a retry is recorded once. Previews: `/preview/strelva/care-report` and
 `/preview/strelva/agency-care-reports`.
+
+### October 15 · XA-8 business record, people, leaving (lane xa/lane-xa8-record)
+
+Built on the XA kit (`@/components/ui/strelva/Xa`); no kit part was forked or added.
+
+| Screen (Pen) | Component | Notes |
+|---|---|---|
+| R1 Business record | `places/WorkspaceBusinessDetails`, `places/BusinessDetailsForm` | Open rows: detail, Read by (only when the caller passes `readers`), Said by (`record/record-words.saidBy`). A row edits in place and submits only that field with the exact revision through the existing server action. |
+| R2 One day's hours | `publishing/RecordPublishingFields` (`/workspace/business-details?edit=hours`) | Usual week / One day; upcoming holidays as one-tap dates; "This will change" is the one large-shadow object. Same `/api/workspace/publishing/record` call and command id. |
+| R3 People, R4 What the agency can do, R5 Remove | `record/PeopleAndAccess` (used by `WorkspaceAccess` for business owners) | Reads `read_access_review`; removal uses the same revoke. An agency the review won't drop goes to the agency handoff. Invitations make a private link; nothing is emailed. R4 has no per-capability switches because the platform has none. |
+| R6 Take it with you, Leaving | `workspace/WorkspaceExport`, `workspace/WorkspaceExit` | Static scope grouped into four owner groups; a real manifest is never regrouped. Exit keeps `StHold` (no Undo exists for leaving). |
+
+Shared lane parts: `record/record.module.css`, `record/RecordStates` (loading, trouble with Pebble fixing), `record/record-words`.
+Preview: `/preview/strelva/xa/xa8-record/<record|hours|people|agency|remove|take|leave>?state=ready|empty|loading|error|waiting|done|readonly|week|handoff&mode=dark`.

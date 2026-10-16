@@ -1,22 +1,23 @@
 import { PLACE_LABELS } from "@/platform/presentation/place-labels";
-import { StPage, StHead, StSection, StRows, StRow, StNotice, StEmpty, StMono, StTextButton } from "@/components/ui/strelva/Kit";
-import { BusinessDetailsForm } from "./BusinessDetailsForm";
+import { XaButtonLink, XaEmpty, XaHeadline, XaLabel, XaSays, XaTextLink } from "@/components/ui/strelva/Xa";
+import { BusinessDetailsForm, type RecordReaders } from "./BusinessDetailsForm";
 import { ListingsSyncPanel } from "@/experience/listings-sync/ListingsSyncPanel";
-import { recordSource } from "./business-details-presentation";
 import { RecordPublishingFields } from "@/experience/publishing/RecordPublishingFields";
+import { RecordTrouble } from "@/experience/record/RecordStates";
+import styles from "@/experience/record/record.module.css";
 import type { RecordGoogleSummary } from "@/products/publishing/client";
 import type { BusinessRecord } from "@/platform/business-record/contracts";
-import { EDITABLE_DETAILS, detailsWriteSource, type EditableDetail } from "@/platform/business-record/details";
+import { detailsWriteSource, type EditableDetail } from "@/platform/business-record/details";
 import type { DetailsSaveOutcome } from "@/platform/business-record/details-save";
 import type { LinkedSite } from "@/platform/owner-entry/linked-sites";
 import { type PlaceState } from "./WorkspacePlace";
 
 /**
- * Business details, in the business menu: the home of /dashboard/settings.
- * The business record's facts (editable by the owner), who gets Strelva's
- * email, the people on the record, and where the rest of the old Settings
- * went. Each old `#anchor` (business, ownership, plan, domains…) has a
- * section here so a redirected link still lands somewhere that says so.
+ * XA · R1 Business record (the home of /dashboard/settings). The record's
+ * details as open rows, each edited in place; who said each one and when;
+ * one sentence from Strelva about what saving does. Hours open XA · R2 on
+ * the same route (`edit=hours`). Each old `#anchor` keeps an id here so a
+ * redirected link still lands on this page.
  */
 
 export interface BusinessDetailsData {
@@ -30,22 +31,31 @@ export interface BusinessDetailsData {
   denied: LinkedSite[];
 }
 
-const OUTCOME: Record<DetailsSaveOutcome, { tone: "status" | "alert"; text: string }> = {
-  saved: { tone: "status", text: "Saved to your business record. To change what your site or Google listing shows, ask Strelva from Home." },
-  unchanged: { tone: "status", text: "Nothing changed." },
-  conflict: { tone: "alert", text: "Someone changed these details while you were editing. Nothing was saved. Here is the latest; make your change again." },
-  invalid: { tone: "alert", text: "That wasn't saved." },
-  denied: { tone: "alert", text: "Only the owner can change these details. Nothing was saved." },
-  failed: { tone: "alert", text: "We couldn't confirm whether the save completed. Reload the page and review the latest details before saving again." },
+const OUTCOME: Record<DetailsSaveOutcome, string> = {
+  saved: "Saved to your business record.",
+  unchanged: "Nothing changed.",
+  conflict: "Someone changed these details while you were editing. Nothing was saved. Here is the latest; make your change again.",
+  invalid: "That wasn't saved.",
+  denied: "Only the owner can change these details. Nothing was saved.",
+  failed: "I couldn't confirm whether the save completed. Reload the page and check the latest details before saving again.",
 };
 
 const INVALID_HINT: Partial<Record<EditableDetail, string>> = {
   phone: "Use a phone number with 7 to 15 digits.",
   email: "Use a full email address.",
   owner_recipient: "Use a full email address. Strelva needs one to send your reports and alerts.",
+  insurance_accepted: "List up to 60 plans, one per line, each under 120 characters.",
 };
 
-export function WorkspaceBusinessDetails({ workspaceId, state, result, googleResult, field, action, listingsSync = false, showInsurance = false }: {
+const GOOGLE_RESULT: Record<RecordGoogleSummary, string> = {
+  needs_approval: "Saved. The Google change waits for your yes.",
+  confirmed: "Saved. Google shows the change; I read it back.",
+  unconfirmed: "Saved. Google accepted the change; I'm still waiting to read it back.",
+  failed: "Saved here, but at least one Google change did not land.",
+  unavailable: "Saved here. I couldn't read your Google listing, so no Google change is confirmed.",
+};
+
+export function WorkspaceBusinessDetails({ workspaceId, state, result, googleResult, field, action, listingsSync = false, showInsurance = false, edit, readers, agencyName, now, hours }: {
   workspaceId: string;
   state: PlaceState<BusinessDetailsData>;
   result?: DetailsSaveOutcome | null;
@@ -55,33 +65,56 @@ export function WorkspaceBusinessDetails({ workspaceId, state, result, googleRes
   action?: (formData: FormData) => Promise<void>;
   /** Show "Where your details appear". Off unless Listings in sync is on for this business. */
   listingsSync?: boolean;
-  /** Dental intake may be on for this deployment; shows the insurance plans row. */
+  /** Dental intake may be on for this deployment; shows the insurance row. */
   showInsurance?: boolean;
+  /** `hours` opens XA · R2 for this record. */
+  edit?: "hours" | null;
+  /** Which Systems read each detail, when known. Without it the column is not drawn. */
+  readers?: RecordReaders;
+  agencyName?: string | null;
+  now?: Date;
+  /** Hours screen options: previews pass a stub request; links may open a mode or date. */
+  hours?: { request?: typeof fetch; initialMode?: "week" | "day"; initialDate?: string; now?: Date };
 }) {
   const data = state.kind === "ready" ? state.data : null;
-  const workspaceHref = (view: string) => `/workspace?view=${view}&workspaceId=${encodeURIComponent(workspaceId)}`;
+  const query = (extra: Record<string, string> = {}) => `?${new URLSearchParams({ workspaceId, ...extra })}`;
+  const workspaceHref = (view: string) => `/workspace${query({ view })}`;
   const readOnly = !data || !detailsWriteSource(data.record.access, data.operator) || !action;
-  const notice = result ? OUTCOME[result] : null;
-  const services = data?.record.services.filter((service) => service.active) ?? [];
-  const people = data?.record.people.filter((person) => person.active) ?? [];
-  const remainingFacts = Object.entries(data?.record.facts ?? {}).filter(([key]) => !(EDITABLE_DETAILS as readonly string[]).includes(key) || (key === "insurance_accepted" && !showInsurance));
-  return <StPage>
-    <StHead crumb={{ label: "Business details", href: workspaceHref("settings") }} title="The business record" meta="What Strelva knows about your business. Each fact keeps its source." />
-    {state.kind === "permission" ? <StEmpty action={<StTextButton href="/workspace">Open your workspace</StTextButton>}>This belongs to another business. Ask its owner to invite you.</StEmpty> : state.kind === "error" ? <StNotice tone="critical">Business details couldn’t load. {result === "failed" ? OUTCOME.failed.text : "Nothing changed. Reload the page to try again."}</StNotice> : null}
-    {notice ? <StNotice tone={notice.tone === "alert" ? "critical" : undefined}>{notice.text}{result === "invalid" && field && INVALID_HINT[field] ? ` ${INVALID_HINT[field]}` : ""}</StNotice> : null}
-    {data?.denied.length ? <StNotice>Your account can’t open {data.denied.map(site => site.siteName).join(", ")} yet. Ask the owner to finish adding you.</StNotice> : null}
-    {data ? <>
-      <StSection id="business" title="About the business"><BusinessDetailsForm key={data.record.revision} record={data.record} workspaceId={workspaceId} readOnly={readOnly} approvalCopy={data.googleApprovalCopy} action={action} showInsurance={showInsurance} /></StSection>
-      {listingsSync ? <ListingsSyncPanel workspaceId={workspaceId} viewerIsOwner={data.record.access === "owner"} businessName={String((data.record.facts.display_name?.value as string | undefined) ?? "this business")} /> : null}
-      <span id="notifications" />
-      {remainingFacts.length ? <StSection title="Other recorded facts"><StRows>{remainingFacts.map(([key, fact]) => fact ? <StRow key={key} title={key.replaceAll("_", " ").replace(/^./, letter => letter.toUpperCase())} value={<StMono tone="text">{typeof fact.value === "string" ? fact.value : JSON.stringify(fact.value)}</StMono>} detail={`${recordSource(fact.source)} · ${fact.verified ? "Confirmed" : "Not confirmed"}`} end="Usage not recorded" /> : null)}</StRows></StSection> : null}
-      {data.publishing ? <StSection id="publishing-facts" title="Hours and website"><RecordPublishingFields record={data.record} approvalCopy={data.googleApprovalCopy} readOnly={readOnly || data.record.access !== "owner"} /></StSection> : null}
-      {data.publishing && googleResult ? <StNotice>{{ needs_approval: "Record saved. Google changes are waiting for your approval.", confirmed: "Record saved. Google changes read back successfully.", unconfirmed: "Record saved. Google accepted the changes; confirmation is pending.", failed: "Record saved. At least one Google change did not land; each result is kept separately.", unavailable: "Record saved. Google listings could not be read; no Google update is confirmed." }[googleResult]} <StTextButton href={`/workspace/google?workspaceId=${encodeURIComponent(workspaceId)}`}>Review each Google change and receipt</StTextButton></StNotice> : null}
-      <StSection id="services" title="Services and prices"><StRows>{services.map(service => <StRow key={service.id} title={service.name} value={service.priceText || "Price not recorded"} detail={`${recordSource(service.source)} · ${service.verified ? "Confirmed" : "Not confirmed"}`} />)}</StRows>{!services.length ? <StEmpty>No services have been recorded yet.</StEmpty> : null}</StSection>
-      <StSection id="people" title={PLACE_LABELS.access}><StRows>{people.map(person => <StRow key={person.id} title={person.name} detail={person.roleTitle} />)}<StRow title="Who can open this business and what they can do" href={workspaceHref("access")} end="Open People & access" /></StRows></StSection>
-      <StSection id="account" title="Your account"><StRows><StRow title="The email you sign in with" detail="It stays the same across every business you can open." href="/workspace/account?continue=public" end="Open your account" /></StRows></StSection>
-      <StSection id="plan" title="Plan, export and leaving"><span id="ownership" /><StRows><StRow title="What you pay and what you own" detail="Export your business data or review how to leave." href={workspaceHref("settings")} end="Open plan and ownership" /></StRows></StSection>
-      <StSection id="website" title="Your website"><span id="domains" /><span id="branding" /><span id="site-config" /><span id="dependencies" /><span id="shortcuts" /><StRows>{data.sites.map(site => <StRow key={site.tenantId} title={site.siteName} />)}<StRow title="Results and site health" detail="Open the website System for its connections and publishing access." href={`/workspace/results?workspaceId=${encodeURIComponent(workspaceId)}`} end="Open" /></StRows>{!data.sites.length ? <StEmpty>No website is connected to this business yet.</StEmpty> : null}</StSection>
-    </> : null}
-  </StPage>;
+
+  if (state.kind === "permission") return <div className={styles.center}>
+    <XaEmpty pose="waving" title="This belongs to another business." job="Pebble keeps each business's details apart" action={<XaButtonLink href="/workspace">Open your workspace</XaButtonLink>}>Ask its owner to invite you.</XaEmpty>
+  </div>;
+  if (state.kind === "error" || !data) return <RecordTrouble title="Your business record didn't load." quiet="Your Systems keep running on the last saved details." action={<XaButtonLink href={`/workspace/business-details${query()}`}>Try again</XaButtonLink>}>
+    <p className={styles.quietNote}>{result === "failed" ? OUTCOME.failed : "Nothing changed. Try again in a moment."}</p>
+  </RecordTrouble>;
+
+  const businessName = String((data.record.facts.display_name?.value as string | undefined) ?? "this business");
+  const ownerOnHours = data.publishing && !readOnly && data.record.access === "owner";
+
+  if (edit === "hours" && data.publishing) return <RecordPublishingFields record={data.record} approvalCopy={data.googleApprovalCopy} readOnly={!ownerOnHours} backHref={`/workspace/business-details${query()}`} listingConnected={Boolean(data.googleApprovalCopy) || listingsSync} {...hours} />;
+
+  const outcome = result ? `${OUTCOME[result]}${result === "invalid" && field && INVALID_HINT[field] ? ` ${INVALID_HINT[field]}` : ""}` : null;
+  const google = data.publishing && googleResult ? GOOGLE_RESULT[googleResult] : null;
+  return <div className={styles.screen} id="business">
+    <XaHeadline quiet="Your Systems work from these details.">Said once, here.</XaHeadline>
+    {outcome || google ? <div role="status"><XaSays links={google ? [<XaTextLink key="google" href={`/workspace/google${query()}`}>See each Google change</XaTextLink>] : undefined}>{google && result === "saved" ? google : outcome ?? google}</XaSays></div> : null}
+    {data.denied.length ? <p className={styles.quietNote}>Your account can’t open {data.denied.map(site => site.siteName).join(", ")} yet. Ask the owner to finish adding you.</p> : null}
+    <span id="notifications" />
+    <BusinessDetailsForm key={data.record.revision} record={data.record} workspaceId={workspaceId} readOnly={readOnly} approvalCopy={data.googleApprovalCopy} action={action} showInsurance={showInsurance}
+      readers={readers} hoursHref={ownerOnHours ? `/workspace/business-details${query({ edit: "hours" })}` : undefined} agencyName={agencyName} now={now}
+      invalid={result === "invalid" && field ? { field, message: INVALID_HINT[field] ?? "That value isn't allowed." } : null} />
+    {readOnly ? <p className={styles.quietNote}>Only the owner can change these details.</p> : null}
+    {listingsSync ? <ListingsSyncPanel workspaceId={workspaceId} viewerIsOwner={data.record.access === "owner"} businessName={businessName} /> : null}
+    <section className={styles.more} id="people" aria-labelledby="record-more">
+      <XaLabel as="h2" id="record-more">Also about {businessName}</XaLabel>
+      <span id="account" /><span id="plan" /><span id="ownership" /><span id="website" /><span id="domains" /><span id="branding" /><span id="site-config" /><span id="dependencies" /><span id="shortcuts" />
+      <p className={styles.quietNote}>
+        <XaTextLink href={workspaceHref("access")}>{PLACE_LABELS.access}</XaTextLink>{" · "}
+        <XaTextLink href={`/workspace/export${query()}`}>Take it with you</XaTextLink>{" · "}
+        <XaTextLink href="/workspace/account?continue=public">The email you sign in with</XaTextLink>
+        {data.sites.length ? <>{" · "}<XaTextLink href={`/workspace/results${query()}`}>{data.sites.length === 1 ? `${data.sites[0]!.siteName} results` : "Website results"}</XaTextLink></> : null}
+      </p>
+    </section>
+    <div className={styles.foot}><XaSays>{readOnly ? "These are the details your Systems use. The owner changes them here." : data.publishing && data.googleApprovalCopy ? "Change a detail here and I keep who said it and when. Saving also puts it on your Google listing." : data.publishing ? "Change a detail here and I keep who said it and when. Google gets a draft that waits for your yes." : "Change a detail here and I keep who said it and when."}</XaSays></div>
+  </div>;
 }

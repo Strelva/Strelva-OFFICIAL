@@ -109,8 +109,8 @@ describe("Business details", () => {
 
   it("is a form the owner can save, with a section for every old settings anchor", () => {
     const page = html(createElement(WorkspaceBusinessDetails, { workspaceId: WS, action, state: { kind: "ready", data: { record: record("owner"), operator: false, sites: [site], denied: [] } } }));
-    expect(page).toContain("Save details");
-    expect(page).toContain('value="2"');
+    expect(page).toContain('aria-label="Change business name: Lakeshore"');
+    expect(page).toContain("Said once, here.");
     for (const anchor of ["business", "notifications", "ownership", "plan", "domains", "branding", "site-config", "dependencies", "shortcuts", "account", "people"]) expect(page, anchor).toContain(`id="${anchor}"`);
     expect(page).toContain("view=access");
   });

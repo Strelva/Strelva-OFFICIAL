@@ -11,5 +11,5 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ w
   if (!workspaceReleaseEnabled()) redirect("/workspace");
   const workspaceId = (await searchParams).workspaceId;
   if (typeof workspaceId !== "string") redirect("/workspace");
-  return <StrelvaShell workspaceId={workspaceId} title="Business details" active="settings" detailsPlace="export" systemsReleased={process.env.STRELVA_SYSTEMS_RELEASE === "1"}><WorkspaceExit workspaceId={workspaceId} businessBillingReleased={process.env.STRELVA_BUSINESS_BILLING === "1"} /></StrelvaShell>;
+  return <StrelvaShell workspaceId={workspaceId} title="Take it with you" active="settings" detailsPlace="export" systemsReleased={process.env.STRELVA_SYSTEMS_RELEASE === "1"}><WorkspaceExit workspaceId={workspaceId} businessBillingReleased={process.env.STRELVA_BUSINESS_BILLING === "1"} /></StrelvaShell>;
 }
