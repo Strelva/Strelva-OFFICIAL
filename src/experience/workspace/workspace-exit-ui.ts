@@ -18,7 +18,7 @@ export function workspaceExitBlocksChanges(state: WorkspaceExitState | null | un
  * membership (not ownership) is what would allow creating work.
  */
 export function newWorkBlockedMessage(posture: { exitUnavailable: boolean; stopped: boolean; workspaceName: string }, thing: string): string {
-  if (posture.exitUnavailable) return "Workspace status is temporarily unavailable, so new work is paused.";
-  if (posture.stopped) return "Work in this workspace has stopped.";
+  if (posture.exitUnavailable) return "Status is temporarily unavailable, so new work is paused.";
+  if (posture.stopped) return "Work in this business has stopped.";
   return `${posture.workspaceName} shared this with your agency to review. Switch to a workspace you’re a member of to create ${thing}.`;
 }

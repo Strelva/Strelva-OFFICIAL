@@ -23,6 +23,7 @@ import { RunningChecksView } from "../today/OwnerRunning";
 import { greetingName } from "../today/today-model";
 import { type Xa3Screen, type Xa3State, HARBOR, NEXT_CHECK_MANDATE, NORTH_STUDIO, PREVIEW_NOW, SECOND_DECISION, SINCE, STRELVA_JOB_ROW, SYSTEM_IDS, decision, harborDeliveries, harborSystems, runningProof, yesReceipt } from "./xa-owner-today-fixture";
 import styles from "./xa-foundation-preview.module.css";
+import { xaSearchItems, XA_SYSTEM_HREFS } from "./xa-day";
 
 const BASE = "/preview/strelva/xa/xa3-owner-today";
 const MINUTE = Math.floor(PREVIEW_NOW / 60_000);
@@ -70,8 +71,9 @@ export function XaOwnerTodayPreview({ screen: initial, state, mode }: { screen: 
   const systems = state === "empty" ? [] : harborSystems({ bookingsDown: state === "down" && screen !== "o6" });
   const waits = needs.status === "ready" && needs.items.length > 0;
   const pinned: StrelvaPinnedItem[] = systems.map(system => ({
-    id: system.id, kind: system.kind === "inquiries" ? "inquiries" : system.kind === "listing" ? "listing" : system.kind === "bookings" ? "bookings" : "website",
-    title: system.name, href: href("o1"),
+    id: system.id, kind: system.kind === "inquiries" ? "inquiries" : system.kind === "app" ? "app" : system.kind === "bookings" ? "bookings" : "website",
+    // Each System opens its own preview screen (XA-4), the same Systems as every preview.
+    title: system.name, href: XA_SYSTEM_HREFS[system.kind === "inquiries" ? "inquiries" : system.kind === "app" ? "form" : system.kind === "bookings" ? "bookings" : "website"],
     ...(system.kind === "bookings" && waits ? { state: "waits" as const } : system.health.state === "degraded" ? { state: "down" as const } : system.lifecycle === "draft" ? { state: "draft" as const } : { detail: system.lifecycle === "live" && system.kind === "website" ? "Live" : system.detail }),
   }));
   const navigate = (section: StrelvaSection) => {
@@ -89,7 +91,7 @@ export function XaOwnerTodayPreview({ screen: initial, state, mode }: { screen: 
     const status: RequestsViewStatus = state === "loading" ? { status: "loading" } : state === "error" ? { status: "error", message: "Requests could not be checked. Nothing about them changed." } : { status: "ready" };
     const deliveries = harborDeliveries({ thanksgivingWaits: state === "waits" });
     const rows = state === "empty" || state === "error" ? [] : withDecisions([...businessRequestRows(deliveries, [], item => deliveryProviderName(item, new Map()), { viewerName: HARBOR.accountName }), STRELVA_JOB_ROW], needs);
-    return <StrelvaShell {...shell} title="Requests" active={active}>
+    return <StrelvaShell searchItems={xaSearchItems("owner")} {...shell} title="Requests" active={active}>
       <RequestsView businessName={HARBOR.name} rows={rows} state={status} readOnly={state === "member"} onRetry={() => undefined} onAsk={() => undefined} onOpenWork={() => undefined}
         systems={[...systems.map(entry => ({ id: entry.id, kind: entry.kind })), { id: SYSTEM_IDS.form, kind: "form" }]}
         onReview={() => go("o3")} onUndo={undo} pendingDecision={pending} initialView={state === "done" ? "done" : "open"} />
@@ -98,20 +100,20 @@ export function XaOwnerTodayPreview({ screen: initial, state, mode }: { screen: 
 
   if (screen === "o6") {
     const data = state === "loading" || state === "error" ? null : { ...runningProof({ slip: state === "down", empty: state === "empty" }), state: { ...runningProof().state, mandates: state === "offer" ? [NEXT_CHECK_MANDATE, { ...NEXT_CHECK_MANDATE, serviceRequestId: "e0000000-0000-4000-8000-000000000002" }] : [] } };
-    return <StrelvaShell {...shell} title="Running" active={active}>
+    return <StrelvaShell searchItems={xaSearchItems("owner")} {...shell} title="Running" active={active}>
       <RunningChecksView data={data} error={state === "error" ? "What Strelva keeps true could not be checked." : ""} busy={false} notice="" readOnly={state === "member"} locked={false} now={PREVIEW_NOW}
         onReload={() => undefined} onCadence={() => undefined} onKeepMeFound={() => undefined} />
     </StrelvaShell>;
   }
 
-  if (screen === "o3" || screen === "o4") return <StrelvaShell {...shell} title="Bookings" active={active}>
+  if (screen === "o3" || screen === "o4") return <StrelvaShell searchItems={xaSearchItems("owner")} {...shell} title="Bookings" active={active}>
     <OwnerDecisionView businessName={HARBOR.name} needs={needs} pending={pending} notices={notices} selectedId={screen === "o4" ? decision().id : undefined} initialDecided={screen === "o4" ? decision() : undefined} systems={systems} now={PREVIEW_NOW}
       onDecide={decide} onUndo={undo} onRetry={() => undefined} onToday={() => go("o1")} onWhatChanged={() => go("o1")} onOpenDecision={() => go("o3")} onAsk={() => undefined} />
   </StrelvaShell>;
 
-  return <StrelvaShell {...shell} title="Today" active={active}>
+  return <StrelvaShell searchItems={xaSearchItems("owner")} {...shell} title="Home" active={active}>
     <OwnerToday businessName={HARBOR.name} ownerName={greetingName(HARBOR.accountName)} minute={MINUTE} now={PREVIEW_NOW} needs={needs} notices={notices} systems={systems}
       readOnly={false} onAsk={() => undefined} onReview={() => go("o3")} onAllWaiting={() => go("o3")} onRetry={() => undefined} onWhatChanged={() => go("o1")} onRunning={() => go("o6")}
-      onBringAgency={() => undefined} systemHref={() => href("o1")} gettingStartedHref={state === "empty" ? href("o1") : null} />
+      onBringAgency={() => undefined} systemHref={id => XA_SYSTEM_HREFS[id === SYSTEM_IDS.bookings ? "bookings" : id === SYSTEM_IDS.inbox ? "inquiries" : id === SYSTEM_IDS.form ? "form" : "website"]} gettingStartedHref={state === "empty" ? href("o1") : null} />
   </StrelvaShell>;
 }

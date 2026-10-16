@@ -6,7 +6,8 @@ import { useEffect, useRef, type ReactNode, type RefObject } from "react";
 import { actorLabel, actorCopy, actorPresentation } from "@/platform/presentation/actor";
 import { beginFocusRecovery, type FocusRecovery } from "@/experience/websites/focus-recovery";
 import { Check } from "lucide-react";
-import { StBeacon, StEmpty, StHold, StMono, StNotice, StRow, StRows, StSection, StSkeleton, StTextButton } from "@/components/ui/strelva/Kit";
+import { StBeacon, StEmpty, StMono, StNotice, StRow, StRows, StSection, StSkeleton, StTextButton } from "@/components/ui/strelva/Kit";
+import { XaYes } from "@/components/ui/strelva/Xa";
 import type { HandledReceipt, OwnerDecision } from "@/platform/needs-you/contracts";
 import type { ItemNotice, NeedsYouState } from "./useNeedsYou";
 import { decisionCount, decisionPresentation } from "./needs-you-presentation";
@@ -39,14 +40,17 @@ interface NeedsYouProps {
   empty?: ReactNode;
   /** Mounted caller heading when the section heading is hidden or the complete empty section disappears. */
   retryFocusTarget?: RefObject<HTMLElement | null>;
+  /** The real reversal (POST /api/workspace/needs-you/undo). With it, a decided item offers Undo while its receipt allows one. */
+  onUndo?: (receipt: HandledReceipt) => void;
 }
 
 /**
- * Needs you: only the owner's decisions, oldest first, with the same Approve
- * and Not yet the email carries. Gone after a complete empty read. A member sees the asks but
+ * Needs you: only the owner's decisions, oldest first, with the one yes
+ * (XaYes: a click or ⌘↵) and Not yet the email carries, then Undo from the
+ * decision's own receipt. Gone after a complete empty read. A member sees the asks but
  * can't decide them; asks that need editing open their own page.
  */
-export function NeedsYouSection({ state, pending, notices, onDecide, onRetry, extra, extraCount = 0, appBase = "", variant = "rows", empty, retryFocusTarget, selectedId }: NeedsYouProps) {
+export function NeedsYouSection({ state, pending, notices, onDecide, onRetry, extra, extraCount = 0, appBase = "", variant = "rows", empty, retryFocusTarget, selectedId, onUndo }: NeedsYouProps) {
   const heading = useRef<HTMLHeadingElement>(null);
   const selectedItem = useRef<HTMLSpanElement>(null);
   const focusedId = useRef<string | undefined>(undefined);
@@ -102,9 +106,10 @@ export function NeedsYouSection({ state, pending, notices, onDecide, onRetry, ex
         const noteActor = actorPresentation(item.noteActor?.kind === "operator" ? item.noteActor : { kind: "operator" });
         const decidable = canDecide && item.review !== null;
         const actions = <div className={styles.actions}>
-          {decidable ? <StTextButton disabled={Boolean(pending)} onClick={() => onDecide(item, "not_yet")} aria-label={`Not yet: ${item.title}`}>Not yet</StTextButton> : null}
           {openHref ? <StTextButton href={openHref}>Open</StTextButton> : null}
-          {decidable ? <StHold label={busy ? "Working…" : look.verb} aria-label={`${look.verb}: ${item.title}`} disabled={Boolean(pending)} onAccept={() => onDecide(item, "approve")} /> : null}
+          {decidable ? <XaYes state={busy ? "going" : "waiting"} block={false} shortcut={state.items.length === 1} yesLabel={look.verb} yesAriaLabel={`${look.verb}: ${item.title}`}
+            notYetAriaLabel={`Not yet: ${item.title}`} disabled={Boolean(pending)} working={{ title: "Working…", steps: [] }}
+            onYes={() => onDecide(item, "approve")} onNotYet={() => onDecide(item, "not_yet")} /> : null}
         </div>;
         return <StRow key={item.id} align="start" lead={<StBeacon kind="need" />} kind={<>{look.source} · <StMono>{when(item.openedAt)}</StMono>{item.urgent ? " · Someone is waiting" : ""}</>} selected={item.id === selectedId} title={<span id={`decision-${item.id}`} ref={item.id === selectedId ? selectedItem : undefined} tabIndex={-1}>{item.title}</span>} end={actions}>
           <div className={styles.review} data-shape={look.shape}>
@@ -112,7 +117,7 @@ export function NeedsYouSection({ state, pending, notices, onDecide, onRetry, ex
             {item.review?.length ? <ul className={styles.reviewLines} aria-label="Every change you approve">{item.review.map((line, row) => <li key={row}>{line}</li>)}</ul>
               : item.detail ? <p className={look.shape === "message" ? styles.quote : undefined}>{item.detail}</p> : null}
             {actor.name ? <p className={styles.attribution}>{actor.name}{actor.credit ? ` · ${actor.credit}` : ""}</p> : null}
-            <p className={styles.effects}>Approve: {actorCopy(item.approveEffect, item.actor)} Not yet: {actorCopy(item.notYetEffect, item.actor)}{item.operatorNote ? ` ${noteActor.name ?? "Support"}: ${item.operatorNote}` : ""}</p>
+            <p className={styles.effects}>{look.verb}: {actorCopy(item.approveEffect, item.actor)} Not yet: {actorCopy(item.notYetEffect, item.actor)}{item.operatorNote ? ` ${noteActor.name ?? "Support"}: ${item.operatorNote}` : ""}</p>
             {canDecide && item.review === null ? <p role="status">This changed or couldn&apos;t be loaded. Refresh to see the latest before deciding.</p> : null}
             {notice ? <p role="status" data-error={notice.tone === "error" || undefined}>{notice.text}</p> : null}
           </div>
@@ -120,7 +125,12 @@ export function NeedsYouSection({ state, pending, notices, onDecide, onRetry, ex
       })}
       {extra}
     </StRows> : null}
-    {outcomes.length ? <ul className={styles.outcomes} aria-live="polite">{outcomes.map(([id, notice]) => <li key={id} data-error={notice.tone === "error" || undefined}>{notice.tone === "error" ? null : <Check size={14} aria-hidden="true" />}{notice.text}</li>)}</ul> : null}
+    {outcomes.length ? <ul className={styles.outcomes} aria-live="polite">{outcomes.map(([id, notice]) => {
+      const receipt = onUndo && notice.tone !== "error" && state.status === "ready" && canDecide && state.authority !== "agency" ? state.handled.find(entry => entry.id === `decision:${id}`) : undefined;
+      return <li key={id} data-error={notice.tone === "error" || undefined}>{notice.tone === "error" ? null : <Check size={14} aria-hidden="true" />}{notice.text}
+        {receipt?.undo.state === "undo" && onUndo ? <> <StTextButton disabled={Boolean(pending)} onClick={() => onUndo(receipt)} aria-label={`Undo: ${receipt.sentence}`}>{pending === receipt.id ? "Undoing…" : "Undo"}</StTextButton></> : null}
+      </li>;
+    })}</ul> : null}
   </section>;
 }
 

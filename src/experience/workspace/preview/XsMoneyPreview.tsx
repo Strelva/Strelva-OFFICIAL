@@ -65,6 +65,7 @@ import {
   versionGraph,
 } from "./xs-money-fixture";
 import { XS_MONEY_SCREENS, type XsMoneyScreen } from "./xs-money-screens";
+import { XA_HARBOR, XA_NORTH } from "./xa-day";
 export { XS_MONEY_SCREENS, type XsMoneyScreen };
 
 const BASE = "/preview/strelva/xa/xs-money";
@@ -159,9 +160,9 @@ export function XsMoneyPreview({
   const clients: StrelvaClientLink[] = [
     {
       id: "harbor",
-      name: "Harbor Dental",
+      name: XA_HARBOR.name,
       href: `${BASE}/billing`,
-      detail: "Dr. Lin",
+      detail: XA_HARBOR.ownerShort,
       color: CLIENT_COLORS.harbor,
       waits: screen === "billing-agency",
     },
@@ -194,13 +195,13 @@ export function XsMoneyPreview({
     <StrelvaShell
       {...shell}
       workspaceId={XS.harbor}
-      workspaceName="Harbor Dental"
-      accountName="Dr. Amy Lin"
+      workspaceName={XA_HARBOR.name}
+      accountName={XA_HARBOR.owner}
       active="settings"
       detailsPlace={detailsPlace}
       agency={{
-        name: "North Studio",
-        person: "Maya",
+        name: XA_NORTH.name,
+        person: XA_NORTH.first,
         color: CLIENT_COLORS.harbor,
       }}
     >
@@ -211,8 +212,8 @@ export function XsMoneyPreview({
     <StrelvaShell
       {...shell}
       workspaceId={XS.north}
-      workspaceName="North Studio"
-      accountName="Maya Okafor"
+      workspaceName={XA_NORTH.name}
+      accountName={XA_NORTH.person}
       ownerBrand={NORTH_BRAND}
       detailsPlace={paymentLinks ? undefined : "plan"}
       agencyNavigation={{
@@ -357,7 +358,7 @@ export function XsMoneyPreview({
                 workspaceId={XS.harbor}
                 canManage
                 billing={billing}
-                businessName="Harbor Dental"
+                businessName={XA_HARBOR.name}
                 backHref={`${BASE}/billing`}
                 transport={requests.portal}
                 navigate={() => undefined}
@@ -381,7 +382,7 @@ export function XsMoneyPreview({
               <WorkspacePayerTransition
                 workspaceId={XS.harbor}
                 canPropose
-                agencyChoices={[{ id: XS.north, name: "North Studio" }]}
+                agencyChoices={[{ id: XS.north, name: XA_NORTH.name }]}
                 request={requests.payer}
               />
               <nav
@@ -406,7 +407,7 @@ export function XsMoneyPreview({
                   invoiceId={harborRetail.id}
                   checkoutAvailability={UNRELEASED_CHECKOUT}
                   request={requests.invoice}
-                  agencyNames={{ [XS.north]: "North Studio" }}
+                  agencyNames={{ [XS.north]: XA_NORTH.name }}
                   planCents={harborBilling.monthlyCents}
                 />
               </aside>
@@ -435,7 +436,7 @@ export function XsMoneyPreview({
       return agency(
         <AgencyPayerRequests
           agencyWorkspaceId={XS.north}
-          agencyName="North Studio"
+          agencyName={XA_NORTH.name}
           request={
             state === "empty"
               ? fixtureFetch(() => ({ transitions: [] }))
@@ -575,7 +576,7 @@ export function XsMoneyPreview({
     case "pay": {
       const base = {
         slug: "harbor-dental-k3x9q",
-        clientName: "Harbor Dental",
+        clientName: XA_HARBOR.name,
         description:
           "Website care for November: booking page, hours and two inquiry follow-ups",
         amountCents: 125050 as number | null,
@@ -647,7 +648,7 @@ export function XsMoneyPreview({
                 number: 4,
                 snapshot: {
                   ...receiptDoc.snapshot,
-                  billTo: "Harbor Dental",
+                  billTo: XA_HARBOR.name,
                   description: invoiceDoc.snapshot.description,
                   amountPaidCents: 125050,
                 },
@@ -669,13 +670,13 @@ export function XsMoneyPreview({
             state === "paid"
               ? {
                   ...businessDepositFixture,
-                  businessName: "Harbor Dental",
+                  businessName: XA_HARBOR.name,
                   paid: true,
                   status: "paid",
                 }
               : {
                   ...businessDepositFixture,
-                  businessName: "Harbor Dental",
+                  businessName: XA_HARBOR.name,
                   acceptedTerms:
                     "Deposit for Ana R.'s cleaning on Mon Nov 23 at 10:30, at 1180 Elmwood Ave.",
                 }
@@ -778,7 +779,7 @@ export function XsMoneyPreview({
               workspaceId={XS.north}
               systemId={XS.system}
               creator={{
-                creatorName: "North Studio",
+                creatorName: XA_NORTH.name,
                 creatorWorkspaceId: XS.north,
               }}
             />,
@@ -794,7 +795,7 @@ export function XsMoneyPreview({
                 workspaceId={XS.harbor}
                 systemId={XS.system}
                 creator={{
-                  creatorName: "North Studio",
+                  creatorName: XA_NORTH.name,
                   creatorWorkspaceId: XS.north,
                 }}
               />

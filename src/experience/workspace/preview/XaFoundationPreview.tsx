@@ -16,6 +16,7 @@ import {
   type XaWorkingStep, type XaYesState,
 } from "@/components/ui/strelva/Xa";
 import styles from "./xa-foundation-preview.module.css";
+import { xaSearchItems, xaAgencyClientHref, xaOwnerPinned } from "./xa-day";
 
 export type XaPreviewScreen = "owner" | "yes" | "agency" | "record";
 export type XaPreviewState = "ready" | "empty" | "loading" | "error";
@@ -53,17 +54,13 @@ export function XaFoundationPreview({ screen: initialScreen, state, mode }: { sc
 
   const agencyView = screen === "agency";
   const yesWaiting = yes === "waiting" || yes === "going";
-  const pinned: StrelvaPinnedItem[] = [
-    { id: "website", kind: "website", title: "Website", href: href("owner", mode), detail: "Live" },
-    { id: "bookings", kind: "bookings", title: "Bookings", href: href("yes", mode), onOpen: () => go("yes"), current: screen === "yes", ...(yesWaiting ? { state: "waits" as const } : { detail: "31 this week" }) },
-    { id: "inbox", kind: "inquiries", title: "Inbox", href: href("owner", mode), detail: "3 new" },
-    { id: "listing", kind: "listing", title: "Google listing", href: href("owner", mode), state: "draft" },
-  ];
+  const pinned: StrelvaPinnedItem[] = xaOwnerPinned({ current: screen === "yes" ? "bookings" : undefined,
+    overrides: { bookings: { href: href("yes", mode), onOpen: () => go("yes"), ...(yesWaiting ? { state: "waits" as const } : {}) } } });
   const clients: StrelvaClientLink[] = [
     { id: "harbor", name: "Harbor Dental", href: href("owner", mode), onOpen: () => go("owner"), detail: "Dr. Lin", color: CLIENT_COLORS.harbor },
-    { id: "north", name: "North Coast Realty", href: href("agency", mode), detail: reconnected ? "Dana" : undefined, waits: !reconnected, color: CLIENT_COLORS.north },
-    { id: "lakeview", name: "Lakeview Mediation", href: href("agency", mode), detail: "Ruth", color: CLIENT_COLORS.lakeview },
-    { id: "fieldwork", name: "Fieldwork Studio", href: href("agency", mode), detail: "Ana", color: CLIENT_COLORS.fieldwork },
+    { id: "north", name: "North Coast Realty", href: xaAgencyClientHref("north"), detail: reconnected ? "Dana" : undefined, waits: !reconnected, color: CLIENT_COLORS.north },
+    { id: "lakeview", name: "Lakeview Mediation", href: xaAgencyClientHref("lakeview"), detail: "Ruth", color: CLIENT_COLORS.lakeview },
+    { id: "fieldwork", name: "Fieldwork Studio", href: xaAgencyClientHref("fieldwork"), detail: "Ana", color: CLIENT_COLORS.fieldwork },
   ];
   const navigate = (section: StrelvaSection) => {
     if (section === "home" || section === "needs-you") go("owner");
@@ -76,7 +73,7 @@ export function XaFoundationPreview({ screen: initialScreen, state, mode }: { sc
 
   const body = state === "loading" ? <LoadingState /> : state === "error" ? <ErrorState retryHref={href(screen, mode)} /> : state === "empty" && !agencyView ? <EmptyState /> : null;
 
-  if (agencyView) return <StrelvaShell {...shell} workspaceName="North Studio" title="Today" accountName="Maya Okafor" active="home" onNavigate={navigate}
+  if (agencyView) return <StrelvaShell searchItems={xaSearchItems("agency")} {...shell} workspaceName="North Studio" title="Home" accountName="Maya Okafor" active="home" onNavigate={navigate}
     agencyNavigation={{ active: "home", queueCount: reconnected ? 2 : 3, clients, hrefs: { home: href("agency", mode), queue: href("agency", mode), library: href("agency", mode), minutes: href("agency", mode) } }}>
     {body ?? <div className={styles.split}>
       <div className={styles.lead}>
@@ -109,11 +106,11 @@ export function XaFoundationPreview({ screen: initialScreen, state, mode }: { sc
 
   const owner = { ...shell, workspaceName: "Harbor Dental", accountName: "Dr. Amy Lin", pinned: state === "empty" ? [] : pinned, onNavigate: navigate, agency: { name: "North Studio", person: "Maya", color: CLIENT_COLORS.harbor } };
 
-  if (screen === "record") return <StrelvaShell {...owner} title="Business record" active="settings"><RecordScreen /></StrelvaShell>;
+  if (screen === "record") return <StrelvaShell searchItems={xaSearchItems("owner")} {...owner} title="Business record" active="settings"><RecordScreen /></StrelvaShell>;
 
   if (screen === "yes") {
     const live = yes === "live";
-    return <StrelvaShell {...owner} title="Bookings" active="system">
+    return <StrelvaShell searchItems={xaSearchItems("owner")} {...owner} title="Bookings" active="system">
       <div className={styles.yesLayout}>
         <div className={styles.yesBrief}>
           <XaSystemTile kind="bookings" size={56} label="Bookings" />
@@ -131,7 +128,7 @@ export function XaFoundationPreview({ screen: initialScreen, state, mode }: { sc
     </StrelvaShell>;
   }
 
-  return <StrelvaShell {...owner} title="Today" active="home" needsYou={{ count: yesWaiting && state === "ready" ? 1 : 0 }}>
+  return <StrelvaShell searchItems={xaSearchItems("owner")} {...owner} title="Home" active="home" needsYou={{ count: yesWaiting && state === "ready" ? 1 : 0 }}>
     {body ?? <div className={styles.split}>
       <div className={styles.lead}>
         <XaMark size={40} />

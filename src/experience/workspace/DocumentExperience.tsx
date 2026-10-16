@@ -113,7 +113,7 @@ function DocumentSession({ workspaceId, workId, readOnly, onSaved, transport = s
     </XaBlock> : null}
     {saved ? context ? <aside className={styles.context}>{context}</aside> : <XaNote>Anyone in this business can open it.</XaNote> : null}
   </>;
-  return <section aria-label="Workspace document" aria-busy={busy}><XaObjectPage phone="object-first" head={head} story={story} object={object ?? undefined} wide /></section>;
+  return <section aria-label="Document" aria-busy={busy}><XaObjectPage phone="object-first" head={head} story={story} object={object ?? undefined} wide /></section>;
 }
 
 function DocumentHistory({ saved, transport, receiptLabel, receiptActor }: { saved: DocumentSaved; transport: DocumentTransport; receiptLabel?: (receipt: DocumentReceipt) => ReactNode; receiptActor?: (receipt: DocumentReceipt) => ReactNode }) {

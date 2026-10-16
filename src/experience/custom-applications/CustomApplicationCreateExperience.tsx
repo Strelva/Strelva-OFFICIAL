@@ -87,7 +87,7 @@ export function CustomApplicationCreateExperience({ workspaceId, businessName = 
       }
       const workId = body && typeof body === "object" && typeof (body as { application?: { workId?: unknown } }).application?.workId === "string"
         ? (body as { application: { workId: string } }).application.workId : null;
-      if (!workId) throw new Error("The internal tool was created without a workspace record.");
+      if (!workId) throw new Error("The internal tool was made, but its record could not be saved. Reload to check.");
       if (onSaved) onSaved(workId);
       else router.push(`/custom-applications/${encodeURIComponent(workId)}/manage`);
     } catch (cause) {

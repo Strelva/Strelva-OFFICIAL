@@ -75,14 +75,17 @@ The result says what happened, including when only part of it became real.
 _Avoid_: activate everything, automatic approval, guaranteed success
 
 **Make it live**:
-The button for an owner approval that authorizes a live change. A press-and-hold
-control says **Hold to make it live**. The result records what landed, what is
-waiting and what could not be confirmed; the label promises no automatic success.
-An approval that only saves a private preview keeps its preview-specific wording.
-Other acts keep their own verbs: **Hold to confirm** for a booking, **Send to
-[business]** for agency work sent to owner review, **Not yet**, and **Undo**.
-_Avoid_: Make real, Make it real, Hold to publish, Approve and publish
-(as live-approval button labels)
+The button for an owner approval that authorizes a live change. It is one
+press (or ⌘↵), never a hold, and **Undo** follows wherever a real reversal
+exists (October 16: one yes gesture product-wide). The result records what
+landed, what is waiting and what could not be confirmed; the label promises no
+automatic success. An approval that only saves a private preview keeps its
+preview-specific wording. Other acts keep their own verbs: **Confirm** for a
+booking, **Send** for a reply, **Send to [business]** for agency work sent to
+owner review, **Not yet**, and **Undo**.
+_Avoid_: Make real, Make it real, Put it live, Hold to make it live, Hold to
+publish, Approve, Approve and publish, Save and make it live (as live-approval
+button labels)
 
 **Release / Releases**:
 A numbered revision on owner and agency screens: **Release 12**. A local change

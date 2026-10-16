@@ -183,7 +183,7 @@ export interface WaitsForYouInput {
   review: string;
   /** Access, money and leaving need the owner signed in; the note under the pill says so. */
   signInRequired: boolean;
-  /** Only when the source has a real reversal, e.g. "You can undo it any time from Today." */
+  /** Only when the source has a real reversal, e.g. "You can undo it any time from Home." */
   undoNote?: string;
   settingsUrl: string;
 }

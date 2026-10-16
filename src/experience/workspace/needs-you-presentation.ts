@@ -1,3 +1,4 @@
+import { XA_YES_LABELS } from "@/platform/presentation/place-labels";
 import { BadgeDollarSign, CalendarCheck, FileText, Globe, KeyRound, MessageSquareText, ShieldCheck, Star, type LucideIcon } from "lucide-react";
 import type { OwnerDecision } from "@/platform/needs-you/contracts";
 
@@ -48,10 +49,11 @@ function verb(item: OwnerDecision): string {
   if (item.sourceLifecycle === "website_document" && item.sourceId.endsWith(":approve")) return "Approve this preview";
   if (item.kind === "system.go_live" || item.kind === "system.change_live"
     || item.kind === "copy.routine" || item.kind === "copy.marketing" || item.kind === "structure"
-    || item.kind === "google.post" || item.kind === "google.photo") return "Hold to make it live";
-  if (item.kind === "customer.message" || item.kind.startsWith("review.reply")) return "Send";
-  if (isBooking(item)) return "Hold to confirm";
-  return "Approve";
+    || item.kind === "google.post" || item.kind === "google.photo") return XA_YES_LABELS.yes;
+  if (item.kind === "customer.message" || item.kind.startsWith("review.reply")) return XA_YES_LABELS.send;
+  if (isBooking(item)) return XA_YES_LABELS.confirm;
+  // One label set (October 16): there is no "Approve" yes; every other owner yes reads Make it live.
+  return XA_YES_LABELS.yes;
 }
 
 function icon(item: OwnerDecision): LucideIcon {

@@ -140,7 +140,7 @@ describe("The prepared change and right after (O3, O4)", () => {
   it("shows what changes, what each choice does and exactly one yes", () => {
     const html = decisionView();
     expect(html).toContain("Maya at North Studio closed online booking for Thanksgiving.");
-    expect(html).toContain("Your yes puts it live.");
+    expect(html).toContain("Your yes makes it live.");
     expect(html).toContain("If you say yes");
     // The dominant element: the booking page as patients will see it.
     expect(html).toContain("What patients will see");

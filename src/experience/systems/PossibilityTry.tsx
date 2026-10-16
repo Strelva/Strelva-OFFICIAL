@@ -66,7 +66,7 @@ export function PossibilityTryError({ onRetry, mode }: { onRetry: () => void } &
     felt={<XaEntryFelt object={<XaEntryBrokenLink address="Your preview link" title="The preview didn’t open.">Your live site is untouched. Nothing was published, sent or booked.</XaEntryBrokenLink>} />}>
     <XaHeadline quiet="Nothing was published, sent or booked.">This Possibility could not be opened.</XaHeadline>
     <XaButton variant="primary" size="lg" block onClick={onRetry}>Try again</XaButton>
-    <XaEntryNote>Still not opening? The same Possibility waits in your workspace. <XaTextLink href={WORKSPACE_HREF}>Open your workspace</XaTextLink></XaEntryNote>
+    <XaEntryNote>Still not opening? The same Possibility waits in your workspace. <XaTextLink href={WORKSPACE_HREF}>Go to Home</XaTextLink></XaEntryNote>
   </XaEntryFrame>;
 }
 
@@ -80,8 +80,8 @@ function Unavailable({ title, quiet, felt, from, mode }: { title: string; quiet:
     <XaEntryNote>{ask}</XaEntryNote>
     {from?.replyTo && sender
       ? <XaButtonLink href={`mailto:${from.replyTo}`} variant="primary" size="lg" block>Email {sender}</XaButtonLink>
-      : <XaButtonLink href={WORKSPACE_HREF} variant="primary" size="lg" block>Open your workspace</XaButtonLink>}
-    {from?.replyTo && sender ? <XaEntryNote>Or find it in <XaTextLink href={WORKSPACE_HREF}>your workspace</XaTextLink>.</XaEntryNote> : null}
+      : <XaButtonLink href={WORKSPACE_HREF} variant="primary" size="lg" block>Go to Home</XaButtonLink>}
+    {from?.replyTo && sender ? <XaEntryNote>Or find it in <XaTextLink href={WORKSPACE_HREF}>Strelva</XaTextLink>.</XaEntryNote> : null}
   </XaEntryFrame>;
 }
 

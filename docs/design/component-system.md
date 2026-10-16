@@ -324,6 +324,14 @@ in `src/app/styles/workspace-paper.css`. Specimen: `/preview/strelva/kit`
 `StHold`, `StToast`, `StSurface`, `StNotice`, `StEmpty`, `StSkeleton`,
 `StComposerBar`, `StComposerDock`, `StSplit`, `StField`, `StEntry`.
 
+October 16 coherence pass: there is one yes and one composer. `StHold` no
+longer presses and holds; it is a deprecated wrapper that renders `XaYes` (a
+click or ⌘↵, with the "Hold to" prefix dropped) for older preview harnesses,
+and every product caller uses `XaYes` directly, with `question` for an act that
+has no server Undo. `StComposerBar` is a deprecated wrapper that renders
+`XaComposer` (a string `scope` becomes its scope chip), and `WorkspaceComposer`
+draws `XaComposer` in every tone. See `design-notes/XA-FOUNDATION.md`.
+
 October 12 legacy adoption adds [StChoiceCards / StChoiceLink](../../src/components/ui/strelva/ChoiceCards.tsx):
 full-card account choices use native radio semantics, a shared group name, visible
 focus and kit-selected marks; route-backed choices use the same card with

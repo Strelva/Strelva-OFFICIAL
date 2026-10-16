@@ -112,7 +112,7 @@ it.each([true, false])("opens a registry-only inquiry in the released business i
     expect(request.mock.calls).toHaveLength(1);
     expect(request.mock.calls[0]![0]).toBe("/api/workspace/inquiries?workspaceId=33333333-3333-4333-8333-333333333333");
     expect(container.textContent).toContain("Your account isn't a member of this business. Ask its owner to invite you.");
-    expect([...container.querySelectorAll("a")].find(link => link.textContent === "Open your workspace")?.getAttribute("href")).toBe("/workspace");
+    expect([...container.querySelectorAll("a")].find(link => link.textContent === "Go to Home")?.getAttribute("href")).toBe("/workspace");
     expect(container.textContent).not.toContain("There is nothing to open");
   } else {
     expect(request).not.toHaveBeenCalled();
@@ -189,8 +189,8 @@ it("lets a member reserve workspace time while retaining native manager-only pau
   expect(container.querySelector('[aria-label="External calendar sync"]')).toBeNull();
   await fill(input("Reservation name"), "Member session");
   await fill(input("Starts"), "2030-01-01T10:00"); await fill(input("Ends"), "2030-01-01T11:00");
-  expect(button("Reserve in workspace").disabled).toBe(false);
-  await act(async () => button("Reserve in workspace").click());
+  expect(button("Reserve it").disabled).toBe(false);
+  await act(async () => button("Reserve it").click());
   expect(commands).toEqual([expect.objectContaining({ kind: "reserve", title: "Member session" })]);
   expect((await service.read(member, created.id)).payload.reservations).toHaveLength(1);
   await expect(service.command(member, created.id, { kind: "pause", expectedRevision: 1, reason: "Closed" })).rejects.toThrow(/Management access/);
@@ -202,7 +202,7 @@ it("keeps shared read-only System use disabled", async () => {
   const request = vi.fn(async (url: RequestInfo | URL, _init?: RequestInit) => new Response(JSON.stringify(String(url).startsWith("/api/bounded-work") ? created : { error: "Not simulated." }), { status: String(url).startsWith("/api/bounded-work") ? 200 : 403 }));
   await mountLayout(await snapshot(source(created), "member", "delegated_read"), request);
   expect(input("Reservation name").disabled).toBe(true);
-  expect(button("Reserve in workspace").disabled).toBe(true);
+  expect(button("Reserve it").disabled).toBe(true);
   expect(request.mock.calls.every(([, init]) => !init?.method)).toBe(true);
 });
 

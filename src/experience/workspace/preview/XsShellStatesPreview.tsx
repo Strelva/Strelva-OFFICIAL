@@ -17,6 +17,7 @@ import { StartBusinessFromCheck } from "@/experience/getting-started/StartBusine
 import { XaNotFound, XaNotOpenYet, XaPageBroke, XaSharedReadOnlyEmpty, XaWorkspaceOpening, XaWorkspaceUnopened } from "@/experience/states/XaStates";
 import { ACCOUNT_SITES, CLIENTS, HARBOR, NORTH, SEARCH_ITEMS, XS_BASE, accountWorkspaces, agencySnapshot, helpTransport, ownerSnapshot, type XsScreen, type XsState } from "./xs-shell-states-fixture";
 import styles from "./xa-foundation-preview.module.css";
+import { xaOwnerPinned } from "./xa-day";
 
 type Mode = "light" | "dark";
 
@@ -86,11 +87,7 @@ export function XsShellStatesPreview({ screen, state, mode }: { screen: XsScreen
     appBase="/preview/strelva" signOut={null} systemsReleased mode={mode} workspaceId={HARBOR.id}
     accountName={agency ? NORTH.person : HARBOR.owner} accountDetail={agency ? NORTH.email : HARBOR.email}
     businessContext={switcher} searchItems={state === "empty" ? [] : SEARCH_ITEMS} searchScopeName={current?.name || HARBOR.name}
-    pinned={agency || state === "empty" ? [] : [
-      { id: "web", kind: "website", title: "harbordental.com", href: XS_BASE + "/switcher", detail: "31 this week" },
-      { id: "book", kind: "bookings", title: "Bookings", href: XS_BASE + "/switcher", state: "waits" },
-      { id: "listing", kind: "listing", title: "Google listing", href: XS_BASE + "/switcher", detail: "4.9" },
-    ]}
+    pinned={agency || state === "empty" ? [] : xaOwnerPinned({ overrides: { bookings: { state: "waits" } } })}
     agency={agency ? undefined : { name: NORTH.name, person: "Maya", color: "#2f5236" }}
     agencyNavigation={agency ? { active: "home", clients: agencyClientLinks(live, "/preview/strelva", setWorkspaceId).map((client, index) => ({ ...client, detail: `${CLIENTS[index]?.minutes ?? 0} min`, waits: index === 1 })), queueCount: 3, agencyWorkspaceId: NORTH.id } : undefined}
     needsYou={{ count: agency || state === "empty" ? null : 1 }} notice={notice} title={title} {...extra}>{children}</StrelvaShell>;

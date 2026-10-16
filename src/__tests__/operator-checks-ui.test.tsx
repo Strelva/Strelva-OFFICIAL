@@ -45,8 +45,8 @@ describe("on-behalf fixture authority", () => {
     try {
       act(() => root.render(createElement(OperatorPreview, { surface: "ask" })));
       expect(container.textContent).toContain("Asked by Strelva Agency · Runs on Strelva");
-      const input = container.querySelector('input[aria-label="Ask Strelva"]') as HTMLInputElement;
-      await act(async () => { Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(input, "yes"); input.dispatchEvent(new Event("input", { bubbles: true })); });
+      const input = container.querySelector('textarea[aria-label="Ask Strelva"]') as HTMLInputElement;
+      await act(async () => { Object.getOwnPropertyDescriptor(Object.getPrototypeOf(input), "value")!.set!.call(input, "yes"); input.dispatchEvent(new Event("input", { bubbles: true })); });
       await act(async () => container.querySelector("form")!.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })));
       expect(container.textContent).toContain("A typed yes approves nothing");
       expect(network).not.toHaveBeenCalled();
@@ -64,7 +64,7 @@ describe("release switch changes", () => {
     expect(toggle.disabled).toBe(true);
     expect(request).not.toHaveBeenCalled();
     const reason = container.querySelector('input[id="release-reason-mooney"]') as HTMLInputElement;
-    await act(async () => { Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(reason, "All owner pages checked"); reason.dispatchEvent(new Event("input", { bubbles: true })); });
+    await act(async () => { Object.getOwnPropertyDescriptor(Object.getPrototypeOf(reason), "value")!.set!.call(reason, "All owner pages checked"); reason.dispatchEvent(new Event("input", { bubbles: true })); });
     expect(toggle.disabled).toBe(false);
     await act(async () => toggle.click());
     const init = request.mock.calls[0]?.[1];
@@ -114,7 +114,7 @@ describe("accepted release change with unavailable readback", () => {
   }
   async function reason(value: string) {
     const input = container.querySelector('input[id="release-reason-mooney"]') as HTMLInputElement;
-    await act(async () => { Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(input, value); input.dispatchEvent(new Event("input", { bubbles: true })); });
+    await act(async () => { Object.getOwnPropertyDescriptor(Object.getPrototypeOf(input), "value")!.set!.call(input, value); input.dispatchEvent(new Event("input", { bubbles: true })); });
     return input;
   }
   const toggle = () => container.querySelector('button[role="switch"][aria-label="Owner sign-in"]') as HTMLButtonElement;

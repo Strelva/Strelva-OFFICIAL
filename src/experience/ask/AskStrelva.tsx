@@ -304,7 +304,7 @@ export function AskStrelva({ workspaceId, businessName, systemId = null, systemN
   const onBehalf = canAskOnBehalf ? <div className={styles.onBehalf}><SelectInput label="Who asked for this?" value={askedOnBehalf} disabled={streaming || Boolean(blockedReason)}
     options={[{ value: "", label: "I am asking" }, { value: "email", label: "The owner, by email" }, { value: "phone", label: "The owner, by phone" }]}
     onChange={event => setAskedOnBehalf(event.target.value as "email" | "phone" | "")}
-    helperText={`The owner still decides, in ${XA_PLACE_LABELS.today}.`} /></div> : null;
+    helperText={`The owner still decides, on ${XA_PLACE_LABELS.today}.`} /></div> : null;
 
   // Strelva speaks with one action: the kept words go back with Try again.
   const errorLine = error ? <div className={styles.error} role="alert"><XaPebbleAvatar size={32} /><p>

@@ -162,7 +162,7 @@ it.each([[1, 500], [1, 503], [2, 500], [2, 503]] as const)("V%s deferred workspa
   await act(async () => release(Response.json({ error: "Snapshot temporarily unavailable." }, { status }))); await settle();
   expect(node.querySelector(selector)).toBe(tool);
   expect(tool.textContent).toContain(notice);
-  const retry = [...node.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "Retry workspace refresh");
+  const retry = [...node.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "Try again");
   expect(retry).toBeDefined();
   expect([...node.querySelectorAll("button")].some(button => button.textContent === "Dismiss")).toBe(false);
   await act(async () => retry!.click()); await settle();
@@ -192,7 +192,7 @@ it.each([[1, 500], [1, 503], [2, 500], [2, 503]] as const)("V%s deferred workspa
 it.each([1, 2] as const)("V%s failed workspace retry keeps accepted tool and can retry again", async version => {
   const { node, tool, release, releaseRetry, selector, notice, counts } = await savedWebsite(version, true);
   await act(async () => release(Response.json({ error: "Initial snapshot failure." }, { status: 500 }))); await settle();
-  const retry = () => [...node.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "Retry workspace refresh")!;
+  const retry = () => [...node.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "Try again")!;
   expect(retry()).toBeDefined();
   await act(async () => retry().click()); await settle();
   expect(node.querySelector(selector)).toBe(tool);
@@ -210,7 +210,7 @@ it.each([1, 2] as const)("V%s failed workspace retry keeps accepted tool and can
 it.each([1, 2] as const)("V%s retry403 discards retained access", async version => {
   const { node, tool, release, releaseRetry } = await savedWebsite(version, true);
   await act(async () => release(Response.json({ error: "Snapshot failure." }, { status: 503 }))); await settle();
-  const retry = [...node.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "Retry workspace refresh");
+  const retry = [...node.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "Try again");
   expect(retry).toBeDefined();
   expect([...node.querySelectorAll("button")].some(button => button.textContent === "Dismiss")).toBe(false);
   await act(async () => retry!.click()); await settle();
@@ -223,7 +223,7 @@ it.each([1, 2] as const)("V%s retry403 discards retained access", async version 
 it.each([1, 2] as const)("V%s navigation during retry rejects late snapshot and save callback", async version => {
   const { node, tool, release, releaseRetry, releaseMutation, snapshot, selector, counts } = await savedWebsite(version, true, true);
   await act(async () => release(Response.json({ error: "Snapshot failure." }, { status: 500 }))); await settle();
-  const retry = [...node.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "Retry workspace refresh");
+  const retry = [...node.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "Try again");
   expect(retry).toBeDefined();
   expect([...node.querySelectorAll("button")].some(button => button.textContent === "Dismiss")).toBe(false);
   await act(async () => retry!.click()); await settle();

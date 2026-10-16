@@ -37,7 +37,7 @@ describe("agency Full-control review", () => {
     expect(node.textContent).toContain("Monday: closed → 9–5");
     expect(node.textContent).toContain("Outside Agency");
     expect(node.textContent).toContain("Runs on Strelva");
-    await click("Hold to make it live");
+    await click("Make it live");
     expect(JSON.parse(String(request.mock.calls[1]![1]!.body))).toEqual({ workspaceId: WS, agencyWorkspaceId: AGENCY, itemId: decision.id, revision: decision.revisionHash, decision: "approve", asAgency: true });
     expect(node.textContent).toContain("Done.");
     expect(node.textContent).toContain("No open decisions");
@@ -48,7 +48,7 @@ describe("agency Full-control review", () => {
     const booking = { ...decision, kind: "customer.commitment" as const, sourceLifecycle: "booking_request" };
     const request = vi.fn<typeof fetch>().mockResolvedValueOnce(Response.json(page([booking]))).mockResolvedValueOnce(Response.json({ status: "done" })).mockResolvedValueOnce(Response.json(page([])));
     await mount(request);
-    expect(node.textContent).toContain("Hold to confirm");
+    expect(node.textContent).toContain("Confirm");
     await click("Not yet");
     expect(JSON.parse(String(request.mock.calls[1]![1]!.body)).decision).toBe("not_yet");
     expect(node.textContent).toContain("Not yet. Nothing changed.");
@@ -59,9 +59,9 @@ describe("agency Full-control review", () => {
     await mount(request);
     expect(node.textContent).toContain("exact reviews could not be loaded");
     const controls = [...node.querySelectorAll("button")].filter(button => button.textContent !== "Refresh decisions");
-    expect(controls).toHaveLength(2);
+    expect(controls).toHaveLength(1);
     expect(controls.every(button => button.disabled)).toBe(true);
-    await click("Hold to make it live");
+    await click("Make it live");
     expect(request).toHaveBeenCalledTimes(1);
   });
 
@@ -70,23 +70,23 @@ describe("agency Full-control review", () => {
     const request = vi.fn<typeof fetch>().mockResolvedValueOnce(Response.json(page())).mockRejectedValueOnce(new Error("lost response"))
       .mockImplementationOnce(() => new Promise(resolve => { finishRead = resolve; })).mockResolvedValueOnce(Response.json(page()));
     await mount(request);
-    await click("Hold to make it live");
+    await click("Make it live");
     expect(node.textContent).toContain("Outcome not confirmed");
     expect(node.textContent).not.toContain("Nothing changed");
     expect([...node.querySelectorAll("button")].every(button => button.disabled)).toBe(true);
     await act(async () => finishRead(Response.json({ authority: "agency", agencyWorkspaceId: AGENCY, item: decision })));
     expect(request.mock.calls[2]![0]).toContain(`itemId=${decision.id}&revision=${decision.revisionHash}`);
-    expect([...node.querySelectorAll("button")].find(button => button.textContent === "Hold to make it live")!.disabled).toBe(false);
+    expect([...node.querySelectorAll("button")].find(button => button.textContent === "Make it live")!.disabled).toBe(false);
   });
 
   it("keeps controls unavailable when the recovery read also fails, and recovers only by checking", async () => {
     const request = vi.fn<typeof fetch>().mockResolvedValueOnce(Response.json(page())).mockResolvedValueOnce(Response.json({ unexpected: true }))
       .mockRejectedValueOnce(new Error("read failed")).mockResolvedValueOnce(Response.json({ authority: "agency", agencyWorkspaceId: AGENCY, item: { ...decision, state: "approved", outcome: "done_unverified", decidedActor: { kind: "agency", agencyId: AGENCY, displayName: "Outside Agency" } } })).mockResolvedValueOnce(Response.json(page([])));
     await mount(request);
-    await click("Hold to make it live");
+    await click("Make it live");
     expect(node.textContent).toContain("Outcome not confirmed");
     expect(node.textContent).toContain("Approval controls stay unavailable");
-    expect(node.textContent).not.toContain("Hold to make it live");
+    expect(node.textContent).not.toContain("Make it live");
     await click("Check again");
     expect(node.textContent).toContain("No open decisions");
     expect(node.textContent).toContain("The action was accepted. Confirmation is still pending.");
@@ -103,10 +103,10 @@ describe("agency Full-control review", () => {
     const request = vi.fn<typeof fetch>().mockResolvedValueOnce(Response.json(page())).mockRejectedValueOnce(new Error("lost"))
       .mockResolvedValueOnce(Response.json({ authority: "agency", agencyWorkspaceId: AGENCY, item })).mockResolvedValueOnce(Response.json(page([])));
     await mount(request);
-    await click("Hold to make it live");
+    await click("Make it live");
     expect(node.textContent).toContain(copy);
     expect(node.textContent).not.toContain("Outcome not confirmed");
-    expect(node.textContent).not.toContain("Hold to make it live");
+    expect(node.textContent).not.toContain("Make it live");
     expect(request.mock.calls.filter(call => call[1]?.method === "POST")).toHaveLength(1);
   });
 
@@ -114,9 +114,9 @@ describe("agency Full-control review", () => {
     const request = vi.fn<typeof fetch>().mockResolvedValueOnce(Response.json(page())).mockRejectedValueOnce(new Error("lost"))
       .mockResolvedValueOnce(Response.json({ authority: "agency", agencyWorkspaceId: AGENCY, item: { ...decision, workspaceId: AGENCY } }));
     await mount(request);
-    await click("Hold to make it live");
+    await click("Make it live");
     expect(node.textContent).toContain("Approval controls stay unavailable");
-    expect(node.textContent).not.toContain("Hold to make it live");
+    expect(node.textContent).not.toContain("Make it live");
     expect(request).toHaveBeenCalledTimes(3);
   });
 
@@ -125,7 +125,7 @@ describe("agency Full-control review", () => {
       .mockResolvedValueOnce(Response.json(page([{ ...decision, workspaceId: "a0000000-0000-4000-8000-000000000002" }])));
     await mount(request);
     expect(node.textContent).toContain("Check the client assignment");
-    expect(node.textContent).not.toContain("Hold to make it live");
+    expect(node.textContent).not.toContain("Make it live");
     await click("Refresh decisions");
     expect(node.textContent).toContain("Approval controls stay unavailable");
     expect(node.textContent).not.toContain("Publish the new opening hours");
@@ -146,6 +146,6 @@ describe("agency Full-control review", () => {
   it("shows honest release-off copy", async () => {
     await mount(vi.fn<typeof fetch>().mockResolvedValue(Response.json({}, { status: 503 })));
     expect(node.textContent).toContain("Client decisions are currently unavailable");
-    expect(node.textContent).not.toContain("Hold to make it live");
+    expect(node.textContent).not.toContain("Make it live");
   });
 });

@@ -42,6 +42,6 @@ describe("invitation page presentation boundary", () => {
   it("presentation reads failing keep a neutral themed page without substituting another business", async () => {
     mocks.workspaces.mockRejectedValue(new Error("Unavailable")); mocks.systems.mockRejectedValue(new Error("Unavailable"));
     const html = renderToStaticMarkup(await InvitationsPage({ searchParams: Promise.resolve({ workspaceId }) }));
-    expect(html).toContain("Business workspace"); expect(html).toContain("Invite someone"); expect(html).not.toContain("Example Law Firm");
+    expect(html).toContain("Your business"); expect(html).toContain("Invite someone"); expect(html).not.toContain("Example Law Firm");
   });
 });

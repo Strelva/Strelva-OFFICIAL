@@ -230,7 +230,7 @@ async function workspaceConfirm(token: string, claims: WorkspaceApproveLinkClaim
     notYet: !isApprove,
     decline: sibling ? { label: "Not now", token: sibling } : null,
     week,
-    ...(isApprove && xaUndoable(item.kind) ? { foot: "Undo any time from Today." } : {}),
+    ...(isApprove && xaUndoable(item.kind) ? { foot: "Undo any time from Home." } : {}),
     dashboardUrl: open,
     ...(item.sourceLifecycle === "website_document" && ownerWebsitePreviewMayBeOn() ? { previewUrl: ownerWebsitePreviewHref(token) } : {}),
     ...(lines ? { lines } : {}),
@@ -393,7 +393,7 @@ async function getPage(request: Request): Promise<NextResponse> {
       body: actorCopy(isApprove ? item.approveEffect : item.notYetEffect, item.actor),
       confirmLabel: isApprove ? xaYesLabel(item.kind, "approve") : xaKeepWith(actorPresentation(item.actor).name ?? undefined),
       notYet: !isApprove,
-      ...(isApprove && xaUndoable(item.kind) ? { foot: "Undo any time from Today." } : {}),
+      ...(isApprove && xaUndoable(item.kind) ? { foot: "Undo any time from Home." } : {}),
       dashboardUrl,
       ...(lines ? { lines } : {}),
     });

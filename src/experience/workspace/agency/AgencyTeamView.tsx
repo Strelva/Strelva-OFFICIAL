@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { StEmpty, StHold, StNotice, StPill, StRow, StRows, StSection, StSkeleton, StSurface, StTextButton } from "@/components/ui/strelva/Kit";
+import { XaYes } from "@/components/ui/strelva/Xa";
+import { StEmpty, StNotice, StPill, StRow, StRows, StSection, StSkeleton, StSurface, StTextButton } from "@/components/ui/strelva/Kit";
 import { TextInput, SelectInput } from "@/components/ui/TextInput";
 import { useWorkspaceRequest } from "../WorkspaceRequest";
 import { parseAgencyTeam, teamRequest, type AgencyTeam, type AgencyTeamAction } from "../agency-team";
@@ -107,7 +108,9 @@ export function AgencyTeamView({ workspaceId }: { workspaceId: string }) {
           <div className="min-w-0 flex-1"><p className={`${note} mt-2`}>{clients.length ? `Client operator: ${clients.map(client => client.name).join(", ")}` : "No assigned clients"}</p></div>
           {team.canManage && !protectedMember ? <div className="flex w-full flex-wrap items-end gap-3 sm:w-auto"><SelectInput label="Agency role" aria-label={`Agency role for ${member.email}`} value={member.role} options={roles} disabled={disabled} onChange={event => void mutate({ action: "set_role", workspaceId, userId: member.userId, role: event.target.value as "admin" | "member" }, "Agency role updated.")} /><StPill variant="soft" disabled={disabled} onClick={() => setRemoving(member.userId)}>Remove staff</StPill></div> : null}
         </div>
-        {removing === member.userId ? <div className="space-y-3" role="group" aria-label={`Confirm removal of ${member.email}`}><p className="text-sm">Remove {member.email} from this agency? All their client assignments will end.</p><div className="flex flex-wrap gap-3"><StHold label="Confirm removal" disabled={disabled} onAccept={() => void mutate({ action: "remove", workspaceId, userId: member.userId }, "Staff removed. Their client assignments have ended.")} /><StPill variant="soft" disabled={busy} onClick={() => setRemoving(null)}>Cancel removal</StPill></div></div> : null}
+        {removing === member.userId ? <XaYes state={busy ? "going" : "waiting"} block={false} shortcut={false} question={`Remove ${member.email} from this agency? All their client assignments will end.`}
+          yesLabel="Remove them" notYetLabel="Keep them" yesAriaLabel={`Confirm removal of ${member.email}`} disabled={disabled} working={{ title: `Removing ${member.email}`, steps: [] }}
+          onYes={() => void mutate({ action: "remove", workspaceId, userId: member.userId }, "Staff removed. Their client assignments have ended.")} onNotYet={() => setRemoving(null)} /> : null}
         {team.canManage && team.clients.length ? <details><summary className="min-h-11 cursor-pointer break-all text-sm">Client assignments for {member.email}</summary><fieldset disabled={disabled} className="mt-2"><legend className="sr-only">Clients for {member.email}</legend>{team.clients.map(client => <label key={client.customerWorkspaceId} className={check}><input type="checkbox" checked={client.staff.some(staff => staff.userId === member.userId)} onChange={event => void mutate({ action: "assign", workspaceId, userIds: [member.userId], clientIds: [client.customerWorkspaceId], active: event.target.checked }, "Client assignment updated.")} />{client.name}</label>)}</fieldset></details> : null}
       </div></StRow>;
     })}</StRows>}</StSection>

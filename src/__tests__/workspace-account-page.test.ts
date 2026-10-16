@@ -163,7 +163,7 @@ describe("authenticated workspace account context", () => {
     expect(mocks.listWorkspaces).not.toHaveBeenCalled();
     expect(mocks.ensurePersonalWorkspace).not.toHaveBeenCalled();
     expect(text).toContain("Confirmation needed");
-    expect(text).toContain("Workspace access will appear after your email is confirmed");
+    expect(text).toContain("Your businesses appear after your email is confirmed");
     expect(text).not.toContain("Harbor Dental");
   });
 

@@ -42,7 +42,6 @@
   /* October 15 (XA): the seven moments in design/motion/xa-motion. */
   --kf-xa-halo: st-xa-halo;     /* Live dot: 1 → 2.6, .45 → 0, on ambient */
   --kf-xa-pulse: st-xa-pulse;   /* Working pulse dot */
-  --kf-xa-sweep: st-xa-sweep;   /* Working title shimmer */
   --kf-xa-drain: st-xa-drain;   /* Undo window bar */
   --kf-xa-palette: st-xa-palette; /* ⌘K arrives from .98 */
   --kf-xa-word: st-xa-word;     /* a streamed word arrives */
@@ -117,10 +116,6 @@
 }
 @keyframes st-xa-pulse {
   50% { opacity: .6; transform: scale(.7); }
-}
-@keyframes st-xa-sweep {
-  from { background-position: 100% 0; }
-  to { background-position: -150% 0; }
 }
 @keyframes st-xa-drain {
   from { transform: scaleX(1); }

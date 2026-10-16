@@ -13,7 +13,7 @@
 .error { display: flex; max-width: 460px; flex-direction: column; align-items: flex-start; gap: 20px; }
 
 .reply { display: flex; flex-direction: column; gap: 14px; color: var(--st-text); font-size: 15px; line-height: 1.5; }
-.bubble { align-self: flex-end; max-width: 420px; margin: 0; padding: 11px 16px; border-radius: 20px; background: var(--st-hover); }
+.bubble { align-self: flex-end; max-width: 420px; margin: 0; padding: 11px 16px; border-radius: 16px; background: var(--st-hover); }
 
 .yesLayout { box-sizing: border-box; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 540px); align-items: start; gap: 48px; padding: 96px 24px 140px 72px; }
 .yesBrief { display: flex; flex-direction: column; gap: 24px; padding-top: 24px; }

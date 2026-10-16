@@ -173,7 +173,7 @@ export function OfferingInstallationView({
 
     {installation.status === "draft" ? <section className={styles.section} aria-labelledby={`offering-activation-${installation.id}`}>
       <h3 id={`offering-activation-${installation.id}`}>Finish setup</h3>
-      <p>Open the business workspace, rehearse the internal tool, and publish it through the existing internal tool review. Then activate it so staff can use its released form.</p>
+      <p>Open the business, rehearse the internal tool, and publish it through the existing internal tool review. Then activate it so staff can use its released form.</p>
       {canManage ? <>
         <label className={styles.activationConfirm}>
           <input type="checkbox" checked={publicationConfirmed} onChange={(event) => setPublicationConfirmed(event.target.checked)} />

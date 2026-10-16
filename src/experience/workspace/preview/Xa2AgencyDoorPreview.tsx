@@ -22,13 +22,14 @@ import type { AgencyOnboarding } from "@/platform/workspaces/agency-onboarding";
 import type { AddAgencyClientResult, AgencyClientListItem, ClaimReview, ClaimReviewAccepted, OwnerClaimPreview } from "@/products/agency-clients/contracts";
 
 import type { Xa2Screen } from "./xa2-screens";
+import { XA_DAY, xaHoursAgo } from "./xa-day";
 
 const BASE = "/preview/strelva/xa/xa2-agency-door";
 const AGENCY = "00000000-0000-4000-8000-0000000000a2";
 const HARBOR = "00000000-0000-4000-8000-0000000000b1";
 const notice = <p className={doorStyles.previewNotice}>Fictional preview. Nothing here reaches a real business.</p>;
-const in14 = () => new Date(Date.now() + 14 * 86_400_000).toISOString();
-const ago = (hours: number) => new Date(Date.now() - hours * 3_600_000).toISOString();
+const in14 = () => new Date(XA_DAY.now + 14 * 86_400_000).toISOString();
+const ago = (hours: number) => xaHoursAgo(hours);
 
 function hrefs(mode: "light" | "dark") {
   const m = mode === "dark" ? "&mode=dark" : "";
@@ -124,7 +125,7 @@ export function Xa2AgencyDoorPreview({ screen, state, mode }: { screen: Xa2Scree
   const [choices, setChoices] = useState(() => initialClaimReviewChoices(review, "America/New_York"));
   const [accepted, setAccepted] = useState<ClaimReviewAccepted | null>(null);
   const [plainAccepted, setPlainAccepted] = useState(false);
-  const [now] = useState(() => Date.now());
+  const [now] = useState<number>(() => XA_DAY.now);
   void installed;
   const [ask, setAsk] = useState("");
   const frame = { appBase: "/preview/strelva", hrefs: hrefs(mode), mode, notice, accountName: "Maya Okafor" };

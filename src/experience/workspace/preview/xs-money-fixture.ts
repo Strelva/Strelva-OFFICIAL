@@ -24,6 +24,7 @@ import type {
   NeutralVersionMoneyGraph,
 } from "@/platform/connect/neutral-creator-contract";
 import type { CreatorMaintenanceGraph } from "@/platform/connect/creator-maintenance";
+import { XA_HARBOR, XA_NORTH } from "./xa-day";
 
 export const XS = {
   harbor: "a7000000-0000-4000-8000-000000000001",
@@ -43,7 +44,7 @@ export const XS = {
 
 export const NORTH_BRAND: OwnerBrand = {
   agencyId: XS.north,
-  name: "North Studio",
+  name: XA_NORTH.name,
   logoUrl: null,
   accentColor: "#2f5236",
   replyTo: null,
@@ -66,16 +67,16 @@ export const harborBilling: BusinessBilling = {
   planKey: "workspace",
   grandfatheredTerms: null,
   paidThrough: "2026-11-01",
-  payer: { email: "dr.lin@harbordental.com", name: "Dr. Amy Lin" },
+  payer: { email: "dr.lin@harbordental.com", name: XA_HARBOR.owner },
   payerParty: {
     kind: "business",
     workspaceId: XS.harbor,
-    name: "Harbor Dental",
+    name: XA_HARBOR.name,
   },
   sites: [
     {
       tenantId: "harbor-dental",
-      siteName: "harbordental.com",
+      siteName: XA_HARBOR.domain,
       amountCents: 15000,
     },
   ],
@@ -85,7 +86,7 @@ export const harborBilling: BusinessBilling = {
 export const harborBillingAgencyPays: BusinessBilling = {
   ...harborBilling,
   payer: null,
-  payerParty: { kind: "agency", workspaceId: XS.north, name: "North Studio" },
+  payerParty: { kind: "agency", workspaceId: XS.north, name: XA_NORTH.name },
 };
 
 export const harborBudget = {
@@ -147,10 +148,10 @@ export function agencyBilling(priced: boolean): AgencyBilling {
   return {
     workspaceId: XS.north,
     accountId: XS.account,
-    name: "North Studio",
+    name: XA_NORTH.name,
     paymentStatus: "active",
     clients: [
-      line(XS.harbor, "Harbor Dental", 4800, [harborRetail]),
+      line(XS.harbor, XA_HARBOR.name, 4800, [harborRetail]),
       line(XS.coast, "North Coast Realty", 3600, [coastRetail]),
       line(XS.fieldwork, "Fieldwork Studio", 2400),
       line(XS.lakeview, "Lakeview Mediation", 1200),
@@ -166,14 +167,14 @@ const transition = (over: Partial<PayerTransition>): PayerTransition => ({
   successorUserId: "",
   successorEmail: "",
   successorWorkspaceId: XS.north,
-  successorWorkspaceName: "North Studio",
+  successorWorkspaceName: XA_NORTH.name,
   proposerEmail: "dr.lin@harbordental.com",
-  proposerName: "Dr. Amy Lin",
+  proposerName: XA_HARBOR.owner,
   status: "pending",
   proposedAt: "2026-10-14T15:12:00Z",
   resolvedAt: null,
   acceptedAt: null,
-  workspaceName: "Harbor Dental",
+  workspaceName: XA_HARBOR.name,
   ...over,
 });
 export const payerPending = transition({});
@@ -220,7 +221,7 @@ export const agencyInbox: PayerTransitionSnapshot = {
     {
       id: "a7000000-0000-4000-8000-000000000301",
       workspaceId: XS.harbor,
-      workspaceName: "Harbor Dental",
+      workspaceName: XA_HARBOR.name,
       productId: "website",
       resourceKind: "job",
       estimateCents: 6000,
@@ -241,7 +242,7 @@ const link = (over: Partial<AgencyPayLink>): AgencyPayLink => ({
   rail: "connected_account",
   agencyWorkspaceId: XS.north,
   businessWorkspaceId: XS.harbor,
-  clientName: "Harbor Dental",
+  clientName: XA_HARBOR.name,
   description:
     "Website care for November: booking page, hours and two inquiry follow-ups",
   door: null,
@@ -249,7 +250,7 @@ const link = (over: Partial<AgencyPayLink>): AgencyPayLink => ({
   minCents: null,
   maxCents: null,
   currency: "usd",
-  agencyDisplayName: "North Studio",
+  agencyDisplayName: XA_NORTH.name,
   createdBy: null,
   createdAt: "2026-10-09T15:00:00Z",
   revokedAt: null,
@@ -301,7 +302,7 @@ export function paymentLinksSnapshot(
   links = connectedLinks,
 ) {
   return {
-    agency: { id: XS.north, name: "North Studio", role: "owner" },
+    agency: { id: XS.north, name: XA_NORTH.name, role: "owner" },
     currentActorId: XS.maya,
     legacyMerchant: false,
     checkoutAvailability:
@@ -324,7 +325,7 @@ export const invoiceDoc: MoneyDocument = {
   payment_id: null,
   issued_at: "2026-10-09T15:00:00Z",
   snapshot: {
-    issuerName: "North Studio",
+    issuerName: XA_NORTH.name,
     billTo: "Harbor Dental, 1180 Elmwood Ave, Buffalo, NY 14222",
     description:
       "Website care for November: booking page, hours and two inquiry follow-ups",
@@ -342,7 +343,7 @@ export const receiptDoc: MoneyDocument = {
   payment_id: "a7000000-0000-4000-8000-000000000601",
   issued_at: "2026-10-12T16:21:00Z",
   snapshot: {
-    issuerName: "North Studio",
+    issuerName: XA_NORTH.name,
     billTo: "Fieldwork Studio",
     description: "Intake form and print price list",
     amountPaidCents: 60000,

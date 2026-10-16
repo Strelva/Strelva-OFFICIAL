@@ -95,7 +95,7 @@ export function WorkspaceBusinessDetails({ workspaceId, state, result, googleRes
   const readOnly = !data || !detailsWriteSource(data.record.access, data.operator) || !action;
 
   if (state.kind === "permission") return <div className={styles.screen}>
-    <XaEmpty pose="waving" title="This belongs to another business." job="Pebble keeps each business's details apart" action={<XaButtonLink href="/workspace">Open your workspace</XaButtonLink>}>Ask its owner to invite you.</XaEmpty>
+    <XaEmpty pose="waving" title="This belongs to another business." job="Pebble keeps each business's details apart" action={<XaButtonLink href="/workspace">Go to Home</XaButtonLink>}>Ask its owner to invite you.</XaEmpty>
   </div>;
   if (state.kind === "error" || !data) return <RecordTrouble title="Your business record didn't load." quiet="Your Systems keep running on the last saved details." retry={{ label: "Try again", href: `/workspace/business-details${query()}` }}>
     {result === "failed" ? OUTCOME.failed : null}

@@ -137,7 +137,7 @@ function PaperSidebar({ connectionsAvailable = false, agencyNavigation, ownerBra
     {ownerBrand?.agencyId ? <p className={styles.brandCredit}>{name === ownerBrand.name || name.startsWith(`${ownerBrand.name} / `) ? "Runs on Strelva" : `${ownerBrand.name} · Runs on Strelva`}</p> : ownerBrand?.name === "Agency identity unavailable" ? <p className={styles.brandCredit}>Agency identity unavailable</p> : null}
     {businessContext && !contextName ? <div className={styles.businessContext}>{businessContext}</div> : null}
     <div className={styles.body}>
-      <div className={styles.utilities} aria-label="Workspace utilities">
+      <div className={styles.utilities} aria-label="Account and tools">
         {onStart ? <button type="button" className={styles.newAction} disabled={startDisabled} onClick={() => { onCloseMobile?.(); onStart(); }}><MessageSquareText size={18} aria-hidden="true" /><span>Ask Strelva</span></button> : <Link className={styles.newAction} href={newHref} aria-disabled={startDisabled || undefined} tabIndex={startDisabled ? -1 : undefined} onClick={event => { if (startDisabled) event.preventDefault(); onCloseMobile?.(); }}><MessageSquareText size={18} aria-hidden="true" /><span>Ask Strelva</span></Link>}
         {onSearch ? <button type="button" className={styles.navItem} onClick={() => { onCloseMobile?.(); onSearch(); }} title="Search (Ctrl or Command + K)"><Search size={18} aria-hidden="true" /><span>Search</span></button> : <Link className={styles.navItem} href={searchHref} onClick={onCloseMobile}><Search size={18} aria-hidden="true" /><span>Search</span></Link>}
       </div>

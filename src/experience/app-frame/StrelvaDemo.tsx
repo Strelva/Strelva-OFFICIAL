@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { StComposerBar, StComposerDock, StCopy, StHead, StHold, StNotice, StPage, StPillLink, StRow, StRows, StSection, StSegmented, StState, StTextButton } from "@/components/ui/strelva/Kit";
+import { XaYes } from "@/components/ui/strelva/Xa";
+import { StComposerBar, StComposerDock, StCopy, StHead, StNotice, StPage, StPillLink, StRow, StRows, StSection, StSegmented, StState, StTextButton } from "@/components/ui/strelva/Kit";
 import { StrelvaShell, type StrelvaSection } from "./StrelvaShell";
 
 /** Public 1.0 specimen. All actions use local state; no transport or real identity. */
@@ -37,8 +38,9 @@ export function StrelvaDemo({ startHref }: { startHref: string }) {
               <StNotice>{comparison === "before" ? "Call Harbor Dental to ask about an appointment." : "Request an appointment with Harbor Dental. Our team confirms your time."}</StNotice>
             </StSection>
             <StCopy>{live ? "Accepted in this demo. No live website changed." : "Accepting changes this fictional page only. No appointment is booked."}</StCopy>
-            <StHold label={live ? "Live in this demo" : "Hold to make it live"} disabled={live} onAccept={() => { setLive(true); setChanged(true); }} />
-            <StTextButton onClick={() => { setReview(false); setSection("home"); }}>Not now</StTextButton>
+            <XaYes state={live ? "live" : changed ? "undone" : "waiting"} block={false} liveLabel="Live in this demo" settled="Undone in this demo. Nothing else changed."
+              onYes={() => { setLive(true); setChanged(true); }} onUndo={() => { setLive(false); setChanged(true); }}
+              onNotYet={() => { setReview(false); setSection("home"); }} />
           </> : <><StCopy>No request has been sent. Try the example change to see its review.</StCopy><StTextButton onClick={example}>Review Possibility</StTextButton></>}
         </> : section === "system" || section === "apps" || section === "work" || section === "products" ? <>
           <StRows><StRow title="Appointments" detail="A booking page run by Harbor Dental" end={<StState kind="live">Live in this demo</StState>} /></StRows>
@@ -48,7 +50,7 @@ export function StrelvaDemo({ startHref }: { startHref: string }) {
         </> : section === "ongoing" ? <StCopy>No ongoing work has been agreed in this fictional business.</StCopy>
           : section === "settings" ? <StRows><StRow title="Harbor Dental" detail="Fictional dental practice · Buffalo" /><StRow title="Plan and billing" detail="No plan price is published yet. This demo has no subscription." /><StRow title="Export or leave" detail="Nothing is saved by this demo. Closing the tab discards its changes." /></StRows>
           : section === "access" ? <StRows><StRow title="Demo owner" detail="Owns the fictional business" /><StRow title="North Studio" detail="Fictional agency. A real business chooses the areas and access it grants." /></StRows>
-          : section === "help" ? <StCopy>You can run your business directly or choose an agency. In your real workspace, review its proposal and access before anything changes.</StCopy>
+          : section === "help" ? <StCopy>You can run your business directly or choose an agency. In your real business, review its proposal and access before anything changes.</StCopy>
           : <StCopy>This demo has no account. Sign in or start your own business from the links below.</StCopy>}
         <StSection title="Try it with your own business"><StPillLink href={startHref}>{startHref === "/audit" ? "Check your website" : "Start your business"}</StPillLink><StTextButton href="/">Back to the two doors</StTextButton></StSection>
       </StPage>

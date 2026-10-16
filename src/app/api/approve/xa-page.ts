@@ -12,6 +12,7 @@
  * and accent (`brandXaPage`); Strelva Agency is treated like any agency.
  */
 import { BRAND_CREDIT, brandColors, type OwnerBrand } from "@/platform/infra/agency-brand";
+import { XA_YES_LABELS } from "@/platform/presentation/place-labels";
 
 export type XaPageTone = "waits" | "done" | "quiet" | "bad";
 
@@ -217,20 +218,21 @@ export function brandXaPage(html: string, brand: OwnerBrand): string {
     .replaceAll(PILL_COLORS, `background:${colors.accent};color:${colors.onAccent}`);
 }
 
-/** The words on the ink pill: the consequence, not "Confirm". */
+/**
+ * The words on the ink pill, from the one label set (XA_YES_LABELS): "Make it
+ * live" for every owner yes, "Send" for a reply. No "Approve" or "Put it live".
+ */
 export function xaYesLabel(kind: string | undefined, action: "approve" | "not_yet"): string {
-  if (action === "not_yet") return "Not yet";
-  if (!kind) return "Approve";
-  if (putsLive(kind)) return "Put it live";
-  if (kind === "customer.message" || kind.startsWith("review.reply")) return "Send it";
-  return "Approve";
+  if (action === "not_yet") return XA_YES_LABELS.notYet;
+  if (kind && (kind === "customer.message" || kind.startsWith("review.reply"))) return XA_YES_LABELS.send;
+  return XA_YES_LABELS.yes;
 }
 
 function putsLive(kind: string): boolean {
   return kind === "system.go_live" || kind === "system.change_live" || kind.startsWith("copy.") || kind === "structure" || kind === "google.post" || kind === "google.photo";
 }
 
-/** A change that goes live can be undone from Today; a sent message cannot. */
+/** A change that goes live can be undone from Home; a sent message cannot. */
 export function xaUndoable(kind: string | undefined): boolean {
   return Boolean(kind && putsLive(kind) && !kind.startsWith("google."));
 }

@@ -39,7 +39,7 @@ export function GettingStartedPreview({ state, mode = "light" }: { state: string
   return <div data-workspace-theme="linen" data-workspace-mode={mode}>
     <WorkspaceRequestContext.Provider value={transport}>
       <GettingStarted key={state} account="Maya Ortiz" mode={mode === "dark" ? "dark" : "light"} business={{ workspaceId: BUSINESS, name: "Northside Bakery", website: state === "no-website" ? null : "https://northside-bakery.example/", canConfirm: state !== "member", revision: 2, waiting: [] }} links={links} />
-      {check ? <StartBusinessFromCheck resultId="scan_preview" workspaceName="Maya's workspace" savingHere={false} saveHereError="" onSaveHere={() => undefined} onClose={() => undefined} /> : null}
+      {check ? <StartBusinessFromCheck resultId="scan_preview" workspaceName="North Studio" savingHere={false} saveHereError="" onSaveHere={() => undefined} onClose={() => undefined} /> : null}
     </WorkspaceRequestContext.Provider>
     <p className="px-6 pb-6 text-xs text-gray-muted">Fictional preview · nothing is read, created or saved.</p>
   </div>;

@@ -37,25 +37,25 @@ import {
 } from "./xs-apps-care-fixture";
 
 import type { XsScreen } from "./xs-apps-care-fixture";
+import { xaOwnerPinned, xaSearchItems, XA_HARBOR, XA_NORTH } from "./xa-day";
 
 const BASE = "/preview/strelva/xa/xs-apps-care";
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
 const never = () => new Promise<Response>(() => undefined);
 
 function ownerShell(mode: "light" | "dark", title: string, children: ReactNode, current?: string) {
+  // The same four Systems as every preview, plus the care reports this lane is about.
   const pinned: StrelvaPinnedItem[] = [
-    { id: "website", kind: "website", title: "Website", href: "/preview/strelva/website", detail: "Live", current: current === "website" },
-    { id: "bookings", kind: "bookings", title: "Bookings", href: `${BASE}/app-use`, detail: "31 this week" },
-    { id: "intake", kind: "app", title: "New-patient intake", href: `${BASE}/app-use`, detail: "3 new", current: current === "intake" },
-    { id: "reports", kind: "document", title: "Care reports", href: `${BASE}/care-report-owner`, detail: "September", current: current === "reports" },
+    ...xaOwnerPinned({ current: current === "website" ? "website" : current === "intake" ? "form" : undefined, overrides: { form: { href: `${BASE}/app-use`, detail: "3 new" } } }),
+    { id: "reports", kind: "document", title: "Care reports", href: `${BASE}/care-report-owner`, detail: "October", current: current === "reports" },
   ];
-  return <StrelvaShell appBase="/preview/strelva" signOut={null} systemsReleased mode={mode} title={title} workspaceName="Harbor Dental" accountName="Dr. Amy Lin" active="system"
-    pinned={pinned} agency={{ name: "North Studio", person: "Maya", color: "#2f5236" }}>{children}</StrelvaShell>;
+  return <StrelvaShell searchItems={xaSearchItems("owner")} appBase="/preview/strelva" signOut={null} systemsReleased mode={mode} title={title} workspaceName={XA_HARBOR.name} accountName={XA_HARBOR.owner} active="system"
+    pinned={pinned} agency={{ name: XA_NORTH.name, person: XA_NORTH.first, color: "#2f5236" }}>{children}</StrelvaShell>;
 }
 
 function agencyShell(mode: "light" | "dark", title: string, children: ReactNode) {
   const clients: StrelvaClientLink[] = AGENCY_CLIENTS.map(client => ({ id: client.id, name: client.name, href: `${BASE}/care-report-agency`, detail: client.detail, color: client.color, waits: client.id === "north-coast" }));
-  return <StrelvaShell appBase="/preview/strelva" signOut={null} systemsReleased mode={mode} title={title} workspaceName="North Studio" accountName="Maya Okafor" active="home"
+  return <StrelvaShell searchItems={xaSearchItems("agency")} appBase="/preview/strelva" signOut={null} systemsReleased mode={mode} title={title} workspaceName={XA_NORTH.name} accountName={XA_NORTH.person} active="home"
     agencyNavigation={{ active: "clients", queueCount: 3, clients, hrefs: { home: BASE, queue: `${BASE}/delivery-queue`, library: BASE, minutes: BASE } }}>{children}</StrelvaShell>;
 }
 
@@ -77,7 +77,7 @@ export function XsAppsCarePreview({ screen, state, mode }: { screen: XsScreen; s
     if (state === "denied") return json({ error: "This internal tool link is no longer available to your account." }, 403);
     // Internal tools
     if (url.startsWith("/api/apps/")) return method === "GET" ? json(intakeSnapshot(state)) : json({ error: "This preview does not save records. Your draft is still here." }, 409);
-    if (url.startsWith("/api/custom-applications/")) return json({ workId: WORK_ID, title: "Chair schedule", releaseVersion: 2, artifactDigest: "fixture-digest", html: CUSTOM_TOOL_HTML, grant: { expiresAt: "2027-01-31T00:00:00Z" }, businessName: "Harbor Dental" });
+    if (url.startsWith("/api/custom-applications/")) return json({ workId: WORK_ID, title: "Chair schedule", releaseVersion: 2, artifactDigest: "fixture-digest", html: CUSTOM_TOOL_HTML, grant: { expiresAt: "2027-01-31T00:00:00Z" }, businessName: XA_HARBOR.name });
     if (url === "/api/custom-applications") return json({ error: "This preview does not build anything." }, 400);
     if (url.startsWith("/api/agency-application-draft-access")) return json({ grant: state === "read-only" ? null : { id: AMY_ID, applicationWorkId: WORK_ID, businessWorkspaceId: HARBOR_ID, installationId: AMY_ID, deliveryId: AMY_ID, assignmentId: AMY_ID, agencyWorkspaceId: NORTH_ID, operatorUserId: MAYA_ID, grantedBy: AMY_ID, status: "active", expiresAt: "2027-01-31T00:00:00Z", createdAt: "2026-10-09T12:00:00Z", updatedAt: "2026-10-09T12:00:00Z", revokedAt: null, revokedBy: null } });
     if (url.startsWith("/api/bounded-work")) {
@@ -113,7 +113,7 @@ export function XsAppsCarePreview({ screen, state, mode }: { screen: XsScreen; s
       // Maya (North Studio) sees the agency's states; Dr. Lin sees hers. The owner never has canOperate.
       const operator = state === "accepted" || state === "running" || state === "blocked" || state === "agency-submitted";
       const request = deliveryRequest(state === "agency-submitted" ? "submitted" : stage);
-      return json({ actorId: operator ? MAYA_ID : AMY_ID, request, people: deliveryPeople(operator), permissions: { canManage: !operator, canOperate: operator, stopped: false, websiteBindings: state === "running" ? [{ id: BINDING_ID, name: "harbordental.com", tenantId: "harbor-dental" }] : [] } });
+      return json({ actorId: operator ? MAYA_ID : AMY_ID, request, people: deliveryPeople(operator), permissions: { canManage: !operator, canOperate: operator, stopped: false, websiteBindings: state === "running" ? [{ id: BINDING_ID, name: XA_HARBOR.domain, tenantId: "harbor-dental" }] : [] } });
     }
     if (url.startsWith("/api/service-requests")) {
       if (method !== "GET") return json({ error: { message: "This preview does not save decisions." } }, 400);
@@ -121,7 +121,7 @@ export function XsAppsCarePreview({ screen, state, mode }: { screen: XsScreen; s
         { ...deliveryRequest("blocked", "2026-10-17T16:00:00Z"), id: "5c000000-0000-4000-8000-0000000000f4", outcome: "Insurance list on the booking page", request: "Show accepted insurance on the booking page." },
         { ...deliveryRequest("running", "2026-10-18T20:30:00Z"), id: "5c000000-0000-4000-8000-0000000000f2", outcome: "Thanksgiving hours", request: "Close online booking Nov 26 and 27." },
         { ...deliveryRequest("done", "2026-10-14T19:00:00Z"), id: "5c000000-0000-4000-8000-0000000000f3", outcome: "Insurance page fix", request: "Fix the broken Cigna link on the insurance page." }];
-      return json({ requests, askedBy: Object.fromEntries(requests.map(item => [item.id, "Dr. Amy Lin"])) });
+      return json({ requests, askedBy: Object.fromEntries(requests.map(item => [item.id, XA_HARBOR.owner])) });
     }
     // Contribution
     if (url.startsWith("/api/work-context")) return json({ version: 1, revision: 2, grants: [{ id: "g1", sourceWorkId: "s1", title: "Business record: hours and insurance", sourceRevision: "7", scope: ["read", "use_in_work"], purpose: "Use this source to complete the selected work", expiresAt: "2026-10-22T12:00:00Z", status: "active", grantedBy: AMY_ID, createdAt: "2026-10-15T12:00:00Z" }], facts: [], preferences: [], history: [] });
@@ -138,13 +138,13 @@ export function XsAppsCarePreview({ screen, state, mode }: { screen: XsScreen; s
     case "app-use": return wrap(<ApplicationUseExperience key={state} workId={WORK_ID} />);
     case "custom-app-use": return wrap(<CustomApplicationUseExperience key={state} workId={WORK_ID} />);
     case "agency-app-draft": return wrap(agencyShell(mode, "", <AgencyApplicationDraftExperience key={state} workId={WORK_ID} context={state === "outside" ? null : {
-      businessName: "Harbor Dental", businessHref: `${BASE}/care-report-agency`, ownerName: "Dr. Amy Lin", agencyName: "North Studio", personName: "Maya Okafor", clientsHref: `${BASE}/delivery-queue` }} />));
+      businessName: XA_HARBOR.name, businessHref: `${BASE}/care-report-agency`, ownerName: XA_HARBOR.owner, agencyName: XA_NORTH.name, personName: XA_NORTH.person, clientsHref: `${BASE}/delivery-queue` }} />));
     case "custom-app-new": return state === "builder"
-      ? wrap(agencyShell(mode, "New internal tool", <CustomApplicationCreateExperience workspaceId={HARBOR_ID} businessName="Harbor Dental" request={request} />))
-      : wrap(ownerShell(mode, "New internal tool", <CustomToolRequest workspaceId={HARBOR_ID} businessName="Harbor Dental" agency={state === "no-agency" ? null : { id: NORTH_ID, name: "North Studio" }} requestsHref={BASE} request={async () => json({ error: { message: "This preview doesn't send Requests." } }, 400)} />));
+      ? wrap(agencyShell(mode, "New internal tool", <CustomApplicationCreateExperience workspaceId={HARBOR_ID} businessName={XA_HARBOR.name} request={request} />))
+      : wrap(ownerShell(mode, "New internal tool", <CustomToolRequest workspaceId={HARBOR_ID} businessName={XA_HARBOR.name} agency={state === "no-agency" ? null : { id: NORTH_ID, name: XA_NORTH.name }} requestsHref={BASE} request={async () => json({ error: { message: "This preview doesn't send Requests." } }, 400)} />));
     case "agency-website": return agencyShell(mode, "Prepare a website update", <>
-      <AgencyManagedWebsiteDraftExperience key={state} bindingId={BINDING_ID} businessName="Harbor Dental" websiteAddress="harbordental.com" request={request}
-        crumbs={<XaCrumbs items={[{ label: "Harbor Dental", href: `${BASE}/care-report-agency` }, { label: "Website" }, { label: "Prepare an update" }]} />} />
+      <AgencyManagedWebsiteDraftExperience key={state} bindingId={BINDING_ID} businessName={XA_HARBOR.name} websiteAddress={XA_HARBOR.domain} request={request}
+        crumbs={<XaCrumbs items={[{ label: XA_HARBOR.name, href: `${BASE}/care-report-agency` }, { label: "Website" }, { label: "Prepare an update" }]} />} />
     </>);
     case "care-report-agency": return agencyShell(mode, "Care plan report", <CareReportEditor key={state}
       initial={previewAgencyView({ canWrite: state !== "staff", shared: state !== "never-shared", shareLink: state === "email-on" })} brand={PREVIEW_BRAND}
@@ -157,14 +157,14 @@ export function XsAppsCarePreview({ screen, state, mode }: { screen: XsScreen; s
       <CareReportDocument snapshot={state === "draft" ? { ...PREVIEW_FACTS, agencyNote: PREVIEW_NOTE } : PREVIEW_SNAPSHOT} brand={PREVIEW_BRAND} releaseNumber={state === "draft" ? null : 2} audience="shared"
         releases={PREVIEW_RELEASES} releaseHref={n => `${BASE}/care-report-shared?release=${n}`} />
     </XaOutside>;
-    case "home-finder-setup": return agencyShell(mode, "Home Finder", <HomeFinder key={state} workspaceId={HOME_FINDER_BINDING.workspaceId} agencies={[{ id: NORTH_ID, name: "North Studio" }]} request={request} />);
+    case "home-finder-setup": return agencyShell(mode, "Home Finder", <HomeFinder key={state} workspaceId={HOME_FINDER_BINDING.workspaceId} agencies={[{ id: NORTH_ID, name: XA_NORTH.name }]} request={request} />);
     case "home-finder-buyer": return <BuyerPreview state={state} mode={mode} request={request} />;
     case "home-finder-loading": return <XaOutside from={null} meta="Home search" mode={mode}><XaWorking title="Opening Home Finder" steps={[{ id: "entry", label: "Checking access from the brokerage website", state: "active" }]} /></XaOutside>;
     case "home-finder-unavailable": return <XaOutside from={null} meta="Home search" mode={mode}><div role="alert"><XaEmpty pose="alone" title="Open Home Finder on the brokerage website" job="New inquiries stay closed here until the brokerage link is used.">Home search only opens from the brokerage&apos;s own website, while its installation and listings provider are current.</XaEmpty></div></XaOutside>;
     case "units": return ownerShell(mode, "Businesses and locations", <Units key={state} organizationId={HARBOR_ID} businesses={UNIT_BUSINESSES} canManage={state !== "member"} request={request} />);
     case "delivery-status": {
       const status = (["received", "reviewing", "drafting", "owner_review", "launch_ready", "launched", "paused"] as const).find(value => value === state) ?? "drafting";
-      return <SiteDeliveryStatus businessName="Harbor Dental" status={status as DeliveryStatus} submittedAt="2026-10-09T15:00:00Z" maskedEmail="am**@harbordental.com" agencyName={state === "no-agency" ? null : "North Studio"} mode={mode} />;
+      return <SiteDeliveryStatus businessName={XA_HARBOR.name} status={status as DeliveryStatus} submittedAt="2026-10-09T15:00:00Z" maskedEmail="am**@harbordental.com" agencyName={state === "no-agency" ? null : XA_NORTH.name} mode={mode} />;
     }
     case "delivery-queue": return wrap(agencyShell(mode, "Delivery work", <ServiceDeliveryQueue key={state} scope={{ providerWorkspaceId: NORTH_ID }} />));
     case "delivery-request": {

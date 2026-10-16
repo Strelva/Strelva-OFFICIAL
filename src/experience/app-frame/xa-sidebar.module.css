@@ -94,7 +94,7 @@
 
 @media (max-width: 1023px) {
   .sidebar { display: none; }
-  .sidebar[data-open="true"] { display: flex; box-shadow: 0 16px 48px #00000024; }
+  .sidebar[data-open="true"] { display: flex; box-shadow: 0 1px 2px #0000001a, 0 4px 12px #0000001f; }
   .close { display: grid; }
   .sidebar[data-standalone="true"][data-open="true"] { position: fixed; inset: 0 auto 0 0; z-index: 100; width: min(290px, calc(100vw - 34px)); }
 }

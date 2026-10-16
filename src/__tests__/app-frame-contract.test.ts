@@ -82,7 +82,7 @@ describe("shared app frame accessibility contract", () => {
     const html = renderToStaticMarkup(createElement(StrelvaShell, { ...shellProps, systemsReleased: true, theme: "paper" }));
     // October 15 (XA, the default): Today, Requests and Running; details sit behind the business details control.
     const xa = renderToStaticMarkup(createElement(StrelvaShell, { ...shellProps, systemsReleased: true }));
-    for (const label of ['aria-label="Workspace utilities"', 'aria-label="Main"', ">Today<", ">Requests<", ">Running<", 'aria-label="Business details"', ">New request<", ">Search<", "All systems and files", "Sign out"]) expect(xa).toContain(label);
+    for (const label of ['aria-label="Account and tools"', 'aria-label="Main"', ">Home<", ">Requests<", ">Running<", 'aria-label="Business details"', ">New request<", ">Search<", "All systems and files", "Sign out"]) expect(xa).toContain(label);
     for (const href of ['href="/workspace?view=requests"', 'href="/workspace?view=ongoing"', 'href="/workspace?view=apps"', 'href="/workspace/business-details"', 'href="/workspace/account"']) expect(xa).toContain(href);
     // The XA business details control opens the rebuilt Business record route, not the old settings view.
     expect(xa).not.toContain('href="/workspace?view=settings"');
@@ -90,7 +90,7 @@ describe("shared app frame accessibility contract", () => {
 
     expect(html).toContain('aria-label="Workspace navigation"');
     expect(html).toContain('aria-label="Main"');
-    expect(html).toContain('aria-label="Workspace utilities"');
+    expect(html).toContain('aria-label="Account and tools"');
     for (const label of [">Home<", ">Requests<", ">Running<", ">Business details<", "People &amp; access", "Ask Strelva", "Search", "Help", "All systems and files"]) {
       expect(html).toContain(label);
     }

@@ -1,7 +1,8 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { z } from "zod";
-import { StEmpty, StHold, StLabel, StNotice, StRow, StRows, StSection, StSkeleton, StState, StSurface, StTextButton } from "@/components/ui/strelva/Kit";
+import { XaYes } from "@/components/ui/strelva/Xa";
+import { StEmpty, StLabel, StNotice, StRow, StRows, StSection, StSkeleton, StState, StSurface, StTextButton } from "@/components/ui/strelva/Kit";
 import { SelectInput, TextArea, TextInput } from "@/components/ui/TextInput";
 import { WorkPlanExperience } from "../WorkPlanExperience";
 import type { AgencyClientRow } from "../agency-clients";
@@ -84,7 +85,8 @@ function AgencyPackage({ request, workspaceId, url }: { request: typeof fetch; w
       <div className="space-y-7"><StSurface label="What owners will read"><TextArea label="What owners will read" value={summary} maxLength={500} required rows={3} disabled={busy || Boolean(pending.current)} onChange={event => setSummary(event.target.value)} /></StSurface>
         <StSection title="Rehearsal"><StNotice>Per-client rehearsal results are not available in this read. Publishing this source release does not qualify it or publish a client’s Version.</StNotice></StSection>
         <details><summary className="cursor-pointer text-sm text-gray-muted">Pushed standards</summary><div className="mt-3 space-y-3"><TextInput label="Pushed standards (optional field paths, separated by commas)" value={locks} disabled={busy || Boolean(pending.current)} onChange={event => setLocks(event.target.value)} placeholder="branding.name, policy.cancellation" /><StLabel>Locked fields must exist in this definition. Client Versions take the source value; their own accounts, data and local fields remain independent.</StLabel></div></details>
-      </div><div className="space-y-5"><StSection title="New things it needs"><StLabel>Accounts, records and permissions stay with each business. The new source release needs its own qualification.</StLabel></StSection><StSection title="Cost to run"><StLabel>Run cost is not available for this release.</StLabel></StSection><StHold label={pending.current && !receipt ? "Hold to retry this package" : "Hold to make it live"} disabled={busy || !summary.trim() || Boolean(receipt)} onAccept={() => void publish()} block /></div>
+      </div><div className="space-y-5"><StSection title="New things it needs"><StLabel>Accounts, records and permissions stay with each business. The new source release needs its own qualification.</StLabel></StSection><StSection title="Cost to run"><StLabel>Run cost is not available for this release.</StLabel></StSection>{receipt ? null : <XaYes state={busy ? "going" : pending.current && error ? "failed" : "waiting"} shortcut={false} working={{ title: "Publishing the release", steps: [] }} failure={error || undefined}
+        disabledReason={!summary.trim() ? "Write what owners will read first." : undefined} onYes={() => void publish()} />}</div>
     </div> : null}
     {receipt ? <div role="status"><StState kind="live">Release {receipt.revision} is published.</StState><StLabel>Open Library to prepare it for client review.</StLabel></div> : null}
     {state?.unavailable.length ? <StSection title="Systems that cannot be packaged yet"><StRows>{state.unavailable.map(item => <StRow key={item.systemId} title={item.name} detail="No reusable definition could be read." end={<StState kind="down">Could not read</StState>} />)}</StRows></StSection> : null}

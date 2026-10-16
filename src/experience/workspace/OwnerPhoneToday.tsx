@@ -78,7 +78,7 @@ export function OwnerPhoneToday({ greetingName, business, needs, systems, facts,
   const submit = () => { if (ask.trim()) { onAsk(ask.trim()); setAsk(""); } };
   // The ask bar stays under the thumb on a phone, whatever the page above it says.
   const dock = <div className={styles.dock}>
-    <XaComposer value={ask} onChange={setAsk} onSubmit={submit} placeholder="Ask Strelva anything" inputLabel={`Ask Strelva about ${business}`} onVoice={voice ?? undefined} />
+    <XaComposer value={ask} onChange={setAsk} onSubmit={submit} placeholder="Ask Strelva for anything" inputLabel={`Ask Strelva about ${business}`} onVoice={voice ?? undefined} />
   </div>;
 
   if (needs.status === "loading") return <div className={styles.page} aria-busy="true">
@@ -92,7 +92,7 @@ export function OwnerPhoneToday({ greetingName, business, needs, systems, facts,
       <XaHeadline size="sm">{business} didn&rsquo;t load, but your Systems are still running.</XaHeadline>
     </div>
     {onRetry ? <XaButton variant="primary" size="lg" block onClick={onRetry}>Try again</XaButton> : null}
-    <XaComposer value={ask} onChange={setAsk} onSubmit={submit} placeholder="Ask Strelva anything" inputLabel={`Ask Strelva about ${business}`} onVoice={voice ?? undefined} />
+    <XaComposer value={ask} onChange={setAsk} onSubmit={submit} placeholder="Ask Strelva for anything" inputLabel={`Ask Strelva about ${business}`} onVoice={voice ?? undefined} />
   </div>;
 
   const items = needs.status === "ready" ? needs.items.filter(item => item.state === "open") : [];
@@ -109,7 +109,7 @@ export function OwnerPhoneToday({ greetingName, business, needs, systems, facts,
       <XaHeadline size="md">{hello}</XaHeadline>
       {lede ? <XaLede>{lede}</XaLede> : null}
     </div>
-    <XaComposer value={ask} onChange={setAsk} onSubmit={submit} placeholder="Ask Strelva for anything" onVoice={voice ?? undefined}
+    <XaComposer value={ask} onChange={setAsk} onSubmit={submit} placeholder="Ask Strelva for anything" inputLabel={`Ask Strelva about ${business}`} onVoice={voice ?? undefined}
       scope={{ label: business }}
       waiting={first ? {
         kicker: from ? `Waits for you · from ${from}` : "Waits for you",
@@ -131,6 +131,6 @@ export function OwnerPhoneToday({ greetingName, business, needs, systems, facts,
       action={onBringInWebsite ? <XaButton variant={first ? "secondary" : "primary"} onClick={onBringInWebsite}>Bring in your website</XaButton> : undefined}>
       Bring in the website you already have. Nothing about it changes until you say so.
     </XaEmpty>}
-    {first || systems.length ? dock : null}
+    {/* One composer per screen: the card above already carries the ask and what waits. */}
   </div>;
 }

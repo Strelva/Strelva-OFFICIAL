@@ -2,7 +2,9 @@
 
 import { useEffect, useRef, useState } from "react";
 import { z } from "zod";
-import { StEmpty, StHold, StNotice, StPill, StRow, StRows, StSection, StTextButton } from "@/components/ui/strelva/Kit";
+import { StEmpty, StNotice, StPill, StRow, StRows, StSection, StTextButton } from "@/components/ui/strelva/Kit";
+import { XaYes } from "@/components/ui/strelva/Xa";
+import { XA_YES_LABELS } from "@/platform/presentation/place-labels";
 import { ownerDecisionSchema, type OwnerDecision } from "@/platform/needs-you/contracts";
 import { actorCopy, actorLabel } from "@/platform/presentation/actor";
 import { useWorkspaceRequest } from "../WorkspaceRequest";
@@ -18,7 +20,7 @@ const outcomes: Record<string, string> = {
 };
 
 export function agencyDecisionVerb(item: OwnerDecision) {
-  return item.sourceLifecycle.includes("booking") && item.kind === "customer.commitment" ? "Hold to confirm" : "Hold to make it live";
+  return item.sourceLifecycle.includes("booking") && item.kind === "customer.commitment" ? XA_YES_LABELS.confirm : XA_YES_LABELS.yes;
 }
 
 /** A Full-control grant is projected per item, never inferred from a broad agency role. */
@@ -26,13 +28,13 @@ export function AgencyDecisionRows({ items, busy, onDecide }: { items: OwnerDeci
   return <StRows label="Decisions your agency can make">{items.map(item => {
     const label = agencyDecisionVerb(item);
     return <StRow key={item.id} align="start" title={item.title} detail={actorLabel(item.actor)} end={<div className="flex flex-wrap items-center gap-3">
-      <StTextButton disabled={busy || item.review === null} onClick={() => onDecide(item, "not_yet")} aria-label={`Not yet: ${item.title}`}>Not yet</StTextButton>
       {item.openHref?.startsWith("/") ? <StTextButton href={item.openHref}>Open preview</StTextButton> : null}
-      <StHold label={label} aria-label={`${label}: ${item.title}`} disabled={busy || item.review === null} onAccept={() => onDecide(item, "approve")} />
+      <XaYes state={busy ? "going" : "waiting"} block={false} shortcut={items.length === 1} yesLabel={label} yesAriaLabel={`${label}: ${item.title}`} notYetAriaLabel={`Not yet: ${item.title}`}
+        disabledReason={item.review === null ? "The exact changes could not be loaded. Refresh before deciding." : undefined} disabled={busy} working={{ title: "Working…", steps: [] }}
+        onYes={() => onDecide(item, "approve")} onNotYet={item.review === null ? undefined : () => onDecide(item, "not_yet")} />
     </div>}>
       {item.review?.length ? <ul aria-label="Every change you approve" className="space-y-1">{item.review.map((line, index) => <li key={index} className="whitespace-pre-wrap break-words">{line}</li>)}</ul> : item.detail ? <p>{item.detail}</p> : null}
-      <p className="text-sm text-gray-muted">Make it live: {actorCopy(item.approveEffect, item.actor)} Not yet: {actorCopy(item.notYetEffect, item.actor)}</p>
-      {item.review === null ? <StNotice>The exact changes could not be loaded. Refresh before deciding.</StNotice> : null}
+      <p className="text-sm text-gray-muted">{label}: {actorCopy(item.approveEffect, item.actor)} Not yet: {actorCopy(item.notYetEffect, item.actor)}</p>
     </StRow>;
   })}</StRows>;
 }

@@ -352,7 +352,7 @@ export function WorkspaceHelp({ workspaceName, hasManagedService: _hasManagedSer
 
     <section className={styles.section} aria-labelledby="for-a-client">
       <XaLabel as="h2" id="for-a-client">Working for a client?</XaLabel>
-      <p className={styles.quiet}>An agency workspace prepares work and hands a copy to the client. It only sees what the client shared.{onAgency ? <> <XaTextLink onClick={onAgency}>Sharing &amp; agency access</XaTextLink></> : null}</p>
+      <p className={styles.quiet}>An agency prepares work and hands a copy to the client. It only sees what the client shared.{onAgency ? <> <XaTextLink onClick={onAgency}>Sharing &amp; agency access</XaTextLink></> : null}</p>
     </section>
   </div>;
 }

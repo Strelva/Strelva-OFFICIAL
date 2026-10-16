@@ -70,7 +70,7 @@ export function XaPlaceTrouble({ title, quiet, children, action, pose = "fixing"
 
 /** The permission state every owner place shares. */
 export function XaPlaceNotMember({ title = "This belongs to another business." }: { title?: string }) {
-  return <XaPlaceTrouble pose="waving" title={title} action={<XaButtonLink href="/workspace">Open your workspace</XaButtonLink>}>
+  return <XaPlaceTrouble pose="waving" title={title} action={<XaButtonLink href="/workspace">Go to Home</XaButtonLink>}>
     <p>Your account isn&apos;t a member of this business. Ask its owner to invite you, or open your own workspace.</p>
   </XaPlaceTrouble>;
 }

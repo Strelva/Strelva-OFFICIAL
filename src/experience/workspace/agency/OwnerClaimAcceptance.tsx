@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
 import { StSkeleton } from "@/components/ui/strelva/Kit";
-import { XaAnswers, XaButton, XaButtonLink, XaComposer, XaEntry, XaEntryCaption, XaEntryStack, XaHeadline, XaInitial, XaLabel, XaPebbleAvatar, XaPebbleScene, XaTextLink } from "@/components/ui/strelva/Xa";
+import { XaAnswers, XaButton, XaButtonLink, XaWaiting, XaEntry, XaEntryCaption, XaEntryStack, XaHeadline, XaInitial, XaLabel, XaPebbleAvatar, XaPebbleScene, XaTextLink } from "@/components/ui/strelva/Xa";
 import styles from "./agency-door.module.css";
 import type { ClaimReview, ClaimReviewAccepted, OwnerClaimAccepted, OwnerClaimPreview } from "@/products/agency-clients/contracts";
 import { ClaimNextSteps, ClaimReviewForm, claimReviewInput, initialClaimReviewChoices, type ClaimReviewChoices } from "./OwnerClaimReview";
@@ -74,7 +74,7 @@ export function OwnerClaimPresentation({ preview, accepted, loading, submitting,
     footnote={<>The link alone grants nothing. Only {preview.recipientEmail} can accept it.</>}>
     <XaEntryStack>
       <ClaimSetUpBy agencyName={preview.agencyName} />
-      <XaHeadline quiet="Claim it to own the workspace and its data.">{preview.workspaceName} is ready for its owner.</XaHeadline>
+      <XaHeadline quiet="Claim it to own the business and its records.">{preview.workspaceName} is ready for its owner.</XaHeadline>
       <XaAnswers labelWidth={124} rows={[
         [preview.agencyName, "Works through access you can end at any time."],
         ["This link", <>For {preview.recipientEmail}, until {expires}.</>],
@@ -122,8 +122,7 @@ export function ClaimOwned({ workspaceId, workspaceName, agencyName, lead, agenc
     {waiting ? <div className={styles.seen}>
       <XaLabel>The first thing you’ll see</XaLabel>
       <div className={styles.seenComposer} inert aria-hidden="true">
-        <XaComposer value="" onChange={() => undefined} onSubmit={() => undefined} onAdd={() => undefined} onVoice={() => undefined} placeholder="Ask Strelva for anything" scope={{ label: workspaceName, state: "live" }}
-          waiting={{ kicker: <>Waits for you · from {agency}</>, title: `Confirm ${details} read from your site`, from: { name: agency, color: "#2f5236" }, action: <span className={styles.fakeAction}>Confirm</span> }} />
+        <XaWaiting item={{ kicker: <>Waits for you · from {agency}</>, title: `Confirm ${details} read from your site`, from: { name: agency, color: "#2f5236" }, action: null }} />
       </div>
     </div> : <XaEntryCaption title={`${agency}’s changes come to you first.`} />}
   </>}>
@@ -269,7 +268,7 @@ export function OwnerClaimReviewPresentation({ preview, load, choices, accepted,
     return <ClaimEntry mode={mode} agencyName={preview.agencyName} businessName={preview.workspaceName} footnote="The link alone grants nothing and shows nothing private.">
       <XaEntryStack>
         <ClaimSetUpBy agencyName={preview.agencyName} />
-        <XaHeadline quiet="Claim it to own the workspace and its data.">{preview.workspaceName} is ready for its owner.</XaHeadline>
+        <XaHeadline quiet="Claim it to own the business and its records.">{preview.workspaceName} is ready for its owner.</XaHeadline>
         <XaAnswers labelWidth={124} rows={[
           ["Your details", `What ${preview.agencyName} found waits for you to confirm.`],
           [preview.agencyName, "Works with the access you choose."],

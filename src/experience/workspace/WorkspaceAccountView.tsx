@@ -65,10 +65,10 @@ export function accountHomeWorkspace(workspaces: readonly AccountWorkspace[]): A
  */
 export function WorkspaceAccountView({ appBase, signOut, managedHref = "/account?managed=1", sites, notice, continuation, payerInbox, name, email, emailConfirmed, releaseOpen, workspaces, workspacesUnavailable = false, mode }: WorkspaceAccountViewProps) {
   const base = appBase || "";
-  const placesNote = !releaseOpen ? "Workspaces open soon. Your sign-in is unchanged."
+  const placesNote = !releaseOpen ? "Strelva opens soon. Your sign-in is unchanged."
     : workspacesUnavailable ? "Strelva couldn’t read where you work just now. No access or billing changed."
-      : !emailConfirmed ? "Workspace access will appear after your email is confirmed."
-        : !workspaces.length ? "No workspace has invited this email yet. When one does, it appears here." : null;
+      : !emailConfirmed ? "Your businesses appear after your email is confirmed."
+        : !workspaces.length ? "No business or agency has invited this email yet. When one does, it appears here." : null;
   const places = placesNote ? [] : workspaces;
   const home = accountHomeWorkspace(places);
   const others = places.filter(item => item.id !== home?.id);
@@ -82,7 +82,7 @@ export function WorkspaceAccountView({ appBase, signOut, managedHref = "/account
     agencyNavigation={home?.kind === "agency" ? { agencyWorkspaceId: home.id, leadsAvailable: false } : undefined}
     unopened={!inBusiness} accountName={person} accountDetail={name ? email : undefined} notice={notice}>
     <div className={styles.page}>
-      {!inBusiness ? <a className={styles.back} href={`${base}/workspace`}>Back to workspace</a> : null}
+      {!inBusiness ? <a className={styles.back} href={`${base}/workspace`}>Back to Home</a> : null}
 
       <section className={styles.identity} aria-label="You">
         <XaInitial name={person} shape="round" size={56} />
@@ -92,7 +92,7 @@ export function WorkspaceAccountView({ appBase, signOut, managedHref = "/account
             {emailConfirmed ? <span>You sign in with a link sent to this email. There’s no password.</span> : <XaStatus kind="waits" size="sm">Confirmation needed</XaStatus>}
             {signOutControl ? <span className={styles.signOut}>{signOutControl}</span> : null}
           </p>
-          {!emailConfirmed ? <p className={styles.body}>Confirm this email from the link Strelva sent, then come back. Your workspaces stay hidden until then.</p> : null}
+          {!emailConfirmed ? <p className={styles.body}>Confirm this email from the link Strelva sent, then come back. Your businesses stay hidden until then.</p> : null}
         </div>
       </section>
 

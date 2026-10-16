@@ -135,22 +135,18 @@ export function ownerSystemRank(system: Pick<SystemView, "health" | "lifecycle">
   return system.health.state === "blocked" || system.health.state === "degraded" ? 0 : system.lifecycle !== "live" ? 1 : 2;
 }
 
-/** The yes label: the consequence, in the board's words (XA_YES_LABELS). */
 /**
- * The yes label, in GLOSSARY words. The XA yes is a press (with ⌘↵), not a
- * hold, so a "Hold to …" verb reads without "Hold to": Make it live, Confirm.
+ * The yes label, in GLOSSARY words (XA_YES_LABELS): Make it live, Confirm,
+ * Send. The yes is one press (with ⌘↵), never a hold.
  */
 export function yesLabel(item: OwnerDecision): string {
-  const verb = decisionPresentation(item).verb;
-  if (verb === "Hold to make it live") return XA_YES_LABELS.yes;
-  if (verb === "Hold to confirm") return "Confirm";
-  return verb;
+  return decisionPresentation(item).verb;
 }
 
 /** What the yes does, as the quiet half of the headline. Never a repeat of the title. */
 export function yesConsequence(item: OwnerDecision): string {
   const label = yesLabel(item);
-  if (label === XA_YES_LABELS.yes) return "Your yes puts it live.";
+  if (label === XA_YES_LABELS.yes) return "Your yes makes it live.";
   if (label === "Send") return "Your yes sends it.";
   if (label === "Confirm") return "Your yes confirms it.";
   if (label === "Approve this preview") return "Your yes approves the preview. Nothing goes live yet.";

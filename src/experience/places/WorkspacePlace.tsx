@@ -42,7 +42,7 @@ export function WorkspacePlace({ workspaceId, eyebrow, title, intro, state, erro
           <Card padding="lg" className="mt-8" role="alert">
             <h2 className="text-lg font-medium">This belongs to another business</h2>
             <p className="mt-2 text-sm leading-6 text-gray-muted">Your account isn&apos;t a member of this business. Ask its owner to invite you, or open your own workspace.</p>
-            <Link className="mt-4 inline-block text-sm font-medium underline-offset-4 hover:underline" href="/workspace">Open your workspace</Link>
+            <Link className="mt-4 inline-block text-sm font-medium underline-offset-4 hover:underline" href="/workspace">Go to Home</Link>
           </Card>
         ) : state.kind === "error" ? (
           <Card padding="lg" className="mt-8" role="alert">

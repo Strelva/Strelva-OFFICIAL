@@ -16,6 +16,7 @@ import type { BusinessRecord, FactValues } from "@/platform/business-record/cont
 import type { RecordGoogleEffect } from "@/products/publishing/client";
 import { clock, GOOGLE_APPROVAL_LINE, longDate, shortDate, upcomingHolidays, weeklySummary } from "@/experience/record/record-words";
 import styles from "@/experience/record/record.module.css";
+import { XA_YES_LABELS } from "@/platform/presentation/place-labels";
 
 type Hours = FactValues["hours"];
 type Override = NonNullable<Hours["overrides"]>[number];
@@ -117,7 +118,7 @@ export function RecordPublishingFields({ record, approvalCopy, readOnly = false,
     ...others.map(item => ({ key: `reader:${item.name}`, lead: <XaSystemTile kind={item.kind} size={40} />, title: item.name, detail: mode === "day" ? `Reads ${dayText} from your record` : "Reads your new week from your record", state: null })),
     ...googleRow,
   ];
-  const primaryLabel = approvalCopy ? "Save and make it live" : mode === "day" ? "Save this day" : "Save your week";
+  const primaryLabel = approvalCopy ? XA_YES_LABELS.yes : mode === "day" ? "Save this day" : "Save your week";
   const dateInput = useRef<HTMLInputElement>(null);
 
   return <div className={styles.hours}>

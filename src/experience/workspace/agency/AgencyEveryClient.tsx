@@ -152,13 +152,10 @@ export function AgencyEveryClient({ clients, total, agencyName, hasMore, loading
         {checked ? staleCheck ? <XaStatus kind="waits" size="sm">Last checked {when(checked)}. Strelva checks again within the hour.</XaStatus>
           : <p className={styles.checked}>Last checked {when(checked)}</p> : null}
       </div>
-      {lead ? <figure className={styles.pebble}>
-        {broken ? <XaPebbleScene pose="fixing" size={260} bare label={`Pebble working on ${broken.client.name}`} />
-          : <div className={styles.holding} role="img" aria-label={`Pebble holding ${lead.client.name}’s tile`}>
-            <XaPebbleScene pose="alone" size={260} bare />
-            <span className={styles.heldTile}><XaInitial name={lead.client.name} color={clientColor(lead.client.workspaceId)} size={52} /></span>
-          </div>}
-        <figcaption className={styles.pebbleJob}>{broken ? `On it: ${agencyWaits(broken.read)}` : `${lead.client.name} waits on you`}</figcaption>
+      {/* Pebble is in frame only while it is fixing something; a caption that repeats the headline is decoration. */}
+      {broken ? <figure className={styles.pebble}>
+        <XaPebbleScene pose="fixing" size={260} bare label={`Pebble working on ${broken.client.name}`} />
+        <figcaption className={styles.pebbleJob}>{`On it: ${agencyWaits(broken.read)}`}</figcaption>
       </figure> : null}
     </header>
 

@@ -7,27 +7,28 @@ import type { AuditResult } from "@/lib/audit/types";
 import type { AiVisibilityResult } from "@/products/ai-visibility/client";
 import type { AgencyAttribution } from "@/platform/infra/agency-attribution";
 import type { OwnerBrand } from "@/platform/infra/agency-brand";
+import { XA_HARBOR, XA_NORTH } from "./xa-day";
 
-export const XS_OWNER = { name: "Dr. Amy Lin", email: "dr.lin@harbordental.com" } as const;
-export const XS_BUSINESS = { name: "Harbor Dental", site: "https://harbordental.com", address: "1180 Elmwood Ave, Buffalo" } as const;
+export const XS_OWNER = { name: XA_HARBOR.owner, email: "dr.lin@harbordental.com" } as const;
+export const XS_BUSINESS = { name: XA_HARBOR.name, site: "https://harbordental.com", address: "1180 Elmwood Ave, Buffalo" } as const;
 
-export const XS_NORTH_STUDIO: OwnerBrand = { agencyId: "22222222-2222-4222-8222-222222222222", name: "North Studio", logoUrl: null, accentColor: "#2f5236", replyTo: "maya@northstudio.example", credit: "runs_on_strelva" };
+export const XS_NORTH_STUDIO: OwnerBrand = { agencyId: "22222222-2222-4222-8222-222222222222", name: XA_NORTH.name, logoUrl: null, accentColor: "#2f5236", replyTo: "maya@northstudio.example", credit: "runs_on_strelva" };
 export const XS_IDENTITY_UNAVAILABLE: OwnerBrand = { agencyId: null, name: "Agency identity unavailable", logoUrl: null, accentColor: "#565d64", replyTo: null, credit: "runs_on_strelva" };
 
 export const XS_AGENCY: AgencyAttribution = {
-  workspaceId: XS_NORTH_STUDIO.agencyId!, slug: "north-studio", name: "North Studio",
+  workspaceId: XS_NORTH_STUDIO.agencyId!, slug: "north-studio", name: XA_NORTH.name,
   contactUrl: "https://northstudio.example/contact?from=check", brand: { logoUrl: null, accentColor: "#2f5236" }, replyTo: "maya@northstudio.example",
 };
 
 export const XS_BUSINESSES = [
-  { id: "harbor-dental", name: "Harbor Dental", site: "harbordental.com", waiting: 1, href: "/preview/strelva/xa/xs-entry/no-access" },
+  { id: "harbor-dental", name: XA_HARBOR.name, site: XA_HARBOR.domain, waiting: 1, href: "/preview/strelva/xa/xs-entry/no-access" },
   { id: "elmwood-ortho", name: "Elmwood Orthodontics", site: "elmwoodortho.com", href: "/preview/strelva/xa/xs-entry/no-access" },
   { id: "lakeview-yoga", name: "Lakeview Yoga", site: null, href: "/preview/strelva/xa/xs-entry/no-access" },
 ] as const;
 
 export function xsAudit(agency?: AgencyAttribution): AuditResult {
   return {
-    businessName: "Harbor Dental", agency, url: "https://harbordental.com/", scannedAt: "2026-10-15T18:14:00.000Z", overallScore: 62, grade: "C",
+    businessName: XA_HARBOR.name, agency, url: "https://harbordental.com/", scannedAt: "2026-11-23T19:14:00.000Z", overallScore: 62, grade: "C",
     categories: [
       { name: "Search", slug: "seo", weight: 25, score: 58, guides: [{ slug: "local-seo-basics", title: "Local search basics" }], checks: [
         { name: "Opening hours in structured data", status: "fail", score: 0, priority: "high", message: "Your hours appear only as an image, so search engines and assistants can't read them.", impact: "People asking “is Harbor Dental open Saturday” get no answer from your site." },
@@ -54,7 +55,7 @@ export function xsAudit(agency?: AgencyAttribution): AuditResult {
 
 export function xsAi(agency?: AgencyAttribution): AiVisibilityResult {
   return {
-    agency, business: "Harbor Dental", url: "https://harbordental.com", score: 64, grade: "C", measurementStatus: "measured", readinessMeasured: true,
+    agency, business: XA_HARBOR.name, url: "https://harbordental.com", score: 64, grade: "C", measurementStatus: "measured", readinessMeasured: true,
     verdict: "Gemini found the practice but not its hours or services.",
     citation: { probed: true, mentioned: true, recommended: false, note: "Gemini named Harbor Dental for “family dentist on Elmwood Ave in Buffalo” but did not recommend it." },
     topFix: "Put your opening hours on the site as text, not an image, so Gemini can answer “are you open Saturday”.",

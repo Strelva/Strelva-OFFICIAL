@@ -24,7 +24,7 @@ async function renderNative(request: typeof fetch) {
 }
 async function fillName(value: string) {
   const input = container.querySelector<HTMLInputElement>('input[aria-label="Name"]')!;
-  await act(async () => { Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(input, value); input.dispatchEvent(new Event("input", { bubbles: true })); });
+  await act(async () => { Object.getOwnPropertyDescriptor(Object.getPrototypeOf(input), "value")!.set!.call(input, value); input.dispatchEvent(new Event("input", { bubbles: true })); });
 }
 
 describe("standalone recipient and delegated application surfaces", () => {
@@ -39,8 +39,8 @@ describe("standalone recipient and delegated application surfaces", () => {
     vi.stubGlobal("fetch", externalRequest);
     await act(async () => root.render(createElement(L13Applications, { kind: "native", state: "ready", mode: "light", ownerPreview: true })));
     expect(container.textContent).toContain("This Ask Strelva bar exists only in this preview");
-    const input = container.querySelector<HTMLInputElement>('input[aria-label="Ask Strelva"]')!;
-    await act(async () => { Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(input, "yes"); input.dispatchEvent(new Event("input", { bubbles: true })); });
+    const input = container.querySelector<HTMLTextAreaElement>('textarea[aria-label="Ask Strelva"]')!;
+    await act(async () => { Object.getOwnPropertyDescriptor(Object.getPrototypeOf(input), "value")!.set!.call(input, "yes"); input.dispatchEvent(new Event("input", { bubbles: true })); });
     await act(async () => container.querySelector<HTMLButtonElement>('button[aria-label="Send"]')!.click());
     expect(container.textContent).toContain("No change is saved or approved.");
     expect(input.value).toBe("");
@@ -116,7 +116,7 @@ describe("standalone recipient and delegated application surfaces", () => {
     expect(send()).toBeDefined();
     expect(button("Make it live")).toBeUndefined();
     const question = container.querySelector<HTMLInputElement>('input[aria-label="Question 1"]')!;
-    await act(async () => { Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(question, "Full legal name"); question.dispatchEvent(new Event("input", { bubbles: true })); });
+    await act(async () => { Object.getOwnPropertyDescriptor(Object.getPrototypeOf(question), "value")!.set!.call(question, "Full legal name"); question.dispatchEvent(new Event("input", { bubbles: true })); });
     expect([...container.querySelectorAll("label")].some(label => label.textContent?.includes("Full legal name"))).toBe(true);
     await act(async () => send().click());
     expect(container.textContent).toContain("This fictional preview does not save changes");

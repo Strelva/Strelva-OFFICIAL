@@ -48,7 +48,7 @@
   gap: 32px;
   overflow: hidden;
   padding: 40px 36px;
-  border-radius: 24px;
+  border-radius: 16px;
   background:
     linear-gradient(90deg, var(--home-dusk-scrim) 0%, var(--home-dusk-scrim-soft) 72%),
     url("/images/workspace/dusk.webp") center 42% / cover no-repeat,
@@ -183,7 +183,7 @@
   flex-direction: column;
   gap: 18px;
   padding: 28px;
-  border-radius: 24px;
+  border-radius: 16px;
   background:
     linear-gradient(var(--home-ink-overlay), var(--home-ink-overlay)),
     url("/images/workspace/ink-moss.webp") center / cover no-repeat,
@@ -390,14 +390,14 @@
 
 .decisions > li {
   border: 1px solid var(--home-line);
-  border-radius: 18px;
+  border-radius: 16px;
   background: var(--home-card);
   box-shadow: var(--home-card-shadow);
 }
 
 .decisions > li > .row {
   padding: 14px 18px;
-  border-radius: 18px;
+  border-radius: 16px;
 }
 
 .decision {
@@ -755,7 +755,7 @@ button.row:hover {
   gap: 20px;
   padding: 20px;
   border: 1px solid var(--home-line);
-  border-radius: 18px;
+  border-radius: 16px;
   background: var(--home-card);
 }
 
@@ -909,7 +909,7 @@ button.row:hover {
   flex-direction: column;
   overflow: hidden;
   border: 1px solid var(--home-line);
-  border-radius: 22px;
+  border-radius: 16px;
   background: var(--home-card);
   box-shadow: var(--home-card-shadow);
   animation: homeRise var(--motion-base) var(--ease-settle) both;
@@ -1044,7 +1044,7 @@ button.row:hover {
   gap: 16px;
   padding: 28px;
   border: 1px solid var(--home-line);
-  border-radius: 22px;
+  border-radius: 16px;
   background: var(--home-card);
 }
 
@@ -1107,7 +1107,7 @@ button.row:hover {
     align-items: stretch;
     gap: 18px;
     padding: 26px 18px 18px;
-    border-radius: 22px;
+    border-radius: 16px;
   }
 
   .dusk h1 {
@@ -1127,7 +1127,7 @@ button.row:hover {
 
   .working {
     padding: 22px 18px;
-    border-radius: 22px;
+    border-radius: 16px;
   }
 
   .sideTitle {

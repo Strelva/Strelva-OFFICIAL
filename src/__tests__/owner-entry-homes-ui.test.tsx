@@ -23,7 +23,7 @@ describe("every place has the same way home and the same failure states", () => 
     const permission = html(createElement(WorkspaceInquiries, { workspaceId: WS, state: { kind: "permission" } }));
     expect(permission).toContain(`href="/workspace?workspaceId=${WS}"`);
     expect(permission).toContain("Your account isn&#x27;t a member of this business. Ask its owner to invite you.");
-    expect(permission).toContain('href="/workspace">Open your workspace</a>');
+    expect(permission).toContain('href="/workspace">Go to Home</a>');
     expect(html(createElement(WorkspaceReviewsView, { workspaceId: WS, state: { kind: "error" } }))).toContain("Reviews couldn&#x27;t load");
     expect(html(createElement(WorkspaceInquiries, { workspaceId: WS, state: { kind: "ready", data: { sites: [], denied: [] } } }))).toContain("No site is connected to this business yet");
   });

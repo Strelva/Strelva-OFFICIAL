@@ -35,14 +35,14 @@ describe("read-only copy names the real reason", () => {
     expect(html).toContain("Alder Workshop shared this with your agency to review.");
     expect(html).not.toContain("owners can make changes");
     const before = render(false);
-    expect(before).toContain("Shared workspace");
+    expect(before).toContain("Shared business");
     expect(before).toContain("Alder Workshop shared this with your agency to review.");
     expect(before).not.toContain("owners can make changes");
   });
 
   it.each([
-    [{ exitUnavailable: true, stopped: false }, "Workspace status is temporarily unavailable, so new work is paused."],
-    [{ exitUnavailable: false, stopped: true }, "Work in this workspace has stopped."],
+    [{ exitUnavailable: true, stopped: false }, "Status is temporarily unavailable, so new work is paused."],
+    [{ exitUnavailable: false, stopped: true }, "Work in this business has stopped."],
     [{ exitUnavailable: false, stopped: false }, "Alder Workshop shared this with your agency to review. Switch to a workspace you’re a member of to create a document."],
   ])("explains why new work is blocked (%o)", (posture, message) => {
     const text = newWorkBlockedMessage({ ...posture, workspaceName: "Alder Workshop" }, "a document");

@@ -33,25 +33,20 @@ describe("fictional owner decision transport", () => {
     const transport = createOwnerDecisionTransport("ready");
     expect((await transport("/api/workspace/needs-you/undo", { method: "POST", body: JSON.stringify({ workspaceId: ownerDecisionWorkspace, receiptId: "fictional-reply" }) })).status).toBe(409);
   });
-  it("typed yes leaves the decision open, and a plain click on Hold does not accept", async () => {
+  it("typed yes leaves the decision open, and one press on the yes accepts", async () => {
     vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
     const node = document.createElement("div"); document.body.append(node); const root = createRoot(node);
     cleanup = async () => { await act(async () => root.unmount()); node.remove(); };
     await act(async () => root.render(<OwnerDecisionPreview state="ready" dark={false} />));
-    const input = node.querySelector<HTMLInputElement>('input[aria-label="Ask Strelva"]')!;
-    await act(async () => { Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(input, "yes"); input.dispatchEvent(new Event("input", { bubbles: true })); });
+    const input = node.querySelector<HTMLTextAreaElement>('textarea[aria-label="Ask Strelva"]')!;
+    await act(async () => { Object.getOwnPropertyDescriptor(Object.getPrototypeOf(input), "value")!.set!.call(input, "yes"); input.dispatchEvent(new Event("input", { bubbles: true })); });
     await act(async () => input.closest("form")!.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })));
     expect(node.textContent).toContain("A typed yes changes nothing.");
-    const hold = node.querySelector<HTMLButtonElement>('button[aria-label="Hold to make it live: Let attorneys request a session date"]')!;
-    await act(async () => hold.click());
-    expect(node.querySelector('button[aria-label="Confirm: Hold to make it live: Let attorneys request a session date"]')).not.toBeNull();
-    expect(node.textContent).not.toContain("Nothing needs you.");
-    const cancel = [...node.querySelectorAll("button")].find(button => button.textContent === "Cancel")!;
-    await act(async () => cancel.click());
-    const restored = node.querySelector<HTMLButtonElement>('button[aria-label="Hold to make it live: Let attorneys request a session date"]')!;
-    expect(document.activeElement).toBe(restored);
-    await act(async () => restored.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", metaKey: true, bubbles: true, cancelable: true })));
-    expect(node.querySelector('button[aria-label="Hold to make it live: Let attorneys request a session date"]')).toBeNull();
+    // One yes (October 16): a single press makes it live; there is no separate confirm or hold.
+    const yes = node.querySelector<HTMLButtonElement>('button[aria-label="Make it live: Let attorneys request a session date"]')!;
+    expect(yes).not.toBeNull();
+    await act(async () => yes.click());
+    expect(node.querySelector('button[aria-label="Make it live: Let attorneys request a session date"]')).toBeNull();
     expect(node.textContent).toContain("Nothing needs you.");
   });
 });

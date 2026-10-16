@@ -31,7 +31,8 @@ export function XaButton({ variant = "secondary", size = "md", block, busy, hint
   return <button {...rest} type={type} className={styles.button} data-variant={variant} data-size={size} data-block={block || undefined} data-xa-primary={variant === "primary" || undefined} disabled={disabled || busy} aria-busy={busy || undefined}>
     {busy ? <Loader2 size={16} className="motion-safe:animate-spin" aria-hidden="true" /> : null}
     {children}
-    {hint && !busy ? <span className={styles.buttonHint} aria-hidden="true">{hint}</span> : null}
+    {/* The hint is drawn by CSS so the button's name and text stay its words alone. */}
+    {hint && !busy ? <span className={styles.buttonHint} data-hint={hint} aria-hidden="true" /> : null}
   </button>;
 }
 

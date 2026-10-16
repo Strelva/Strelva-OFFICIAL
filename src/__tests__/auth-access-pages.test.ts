@@ -189,7 +189,7 @@ describe("auth access pages", () => {
 
     const agency = renderToStaticMarkup(await SignUpPage({ searchParams: Promise.resolve({ as: "agency", next: "/workspace?save=scan_public123" }) }));
     expect(agency).toContain("Make your Strelva account.");
-    expect(agency).toContain("Clients own their workspace; you work inside it.");
+    expect(agency).toContain("They own it; you work inside it.");
     expect(agency).toContain("&quot;next&quot;:&quot;/workspace/agency/start&quot;");
     expect(agency).toContain('href="/sign-up?next=%2Fworkspace%3Fsave%3Dscan_public123"');
   });

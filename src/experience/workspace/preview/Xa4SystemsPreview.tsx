@@ -15,6 +15,7 @@ import { WorkspaceInquiries } from "@/experience/places/WorkspaceInquiries";
 import { WorkspaceInquirySystem } from "@/experience/places/WorkspaceInquirySystem";
 import { WorkspaceRequestContext } from "../WorkspaceRequest";
 import { XA4_INBOX, XA4_SITE, XA4_WORKSPACE, type Xa4Screen, type Xa4State, harborBookingRequestDecision, harborForm, harborFormDetail, harborInbox, harborLeads, harborPossibility, harborWebsite, harborWebsiteDetail } from "./xa4-systems-fixture";
+import { xaSearchItems, XA_SYSTEMS } from "./xa-day";
 
 
 const BASE = "/preview/strelva/xa/xa4-systems";
@@ -72,7 +73,7 @@ export function Xa4SystemsPreview({ screen, state, mode, children }: { screen: X
   const formLive = screen === "form" && state === "done";
   const pinned: StrelvaPinnedItem[] = [
     { id: "website", kind: "website", title: "Website", href: href("website"), current: screen === "website" || screen === "possibility" || screen === "history", ...(screen === "possibility" ? { detail: "1 idea" } : state === "error" && screen === "website" ? { state: "waits" as const } : { detail: "Live" }) },
-    { id: "bookings", kind: "bookings", title: "Bookings", href: href("bookings"), current: screen === "bookings", detail: "6 this week" },
+    { id: "bookings", kind: "bookings", title: XA_SYSTEMS.bookings.name, href: href("bookings"), current: screen === "bookings", detail: XA_SYSTEMS.bookings.detail },
     { id: "inbox", kind: "inquiries", title: "Inquiries", href: href("inbox"), current: screen === "inbox", ...(screen === "inbox" && (state === "done" || state === "empty") ? { detail: "Nothing new" } : { state: "waits" as const }) },
     { id: "form", kind: "app", title: "New-patient form", href: href("form"), current: screen === "form", ...(formLive ? { detail: "Live" } : { state: "draft" as const }) },
   ];
@@ -82,7 +83,7 @@ export function Xa4SystemsPreview({ screen, state, mode, children }: { screen: X
     agency: { name: "North Studio", person: "Maya", color: "#2f5236" },
     notice: <p style={{ margin: 0, padding: "6px 16px", fontSize: 12, color: "var(--st-text-3)" }}>Fictional preview. Nothing here reaches a real business.</p>,
   } as const;
-  const frame = (title: string, children: ReactNode) => <StrelvaShell {...shell} title={title} active="system">
+  const frame = (title: string, children: ReactNode) => <StrelvaShell searchItems={xaSearchItems("owner")} {...shell} title={title} active="system">
     <WorkspaceRequestContext.Provider value={request}>{ready ? children : null}</WorkspaceRequestContext.Provider>
   </StrelvaShell>;
   const page = {

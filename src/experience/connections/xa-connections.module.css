@@ -73,7 +73,7 @@
 .focusedLead { display: flex; min-width: 0; flex-direction: column; padding: 24px 72px 48px; }
 .focusedTop { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: auto; padding-bottom: 48px; color: var(--st-text-2); font-size: 14px; }
 .focusedBody { display: flex; width: min(480px, 100%); flex-direction: column; gap: 24px; margin-bottom: auto; }
-.felt { box-sizing: border-box; display: flex; min-width: 0; flex-direction: column; align-items: center; justify-content: center; gap: 24px; padding: 48px 40px; border-radius: 24px; background: var(--st-felt-to); }
+.felt { box-sizing: border-box; display: flex; min-width: 0; flex-direction: column; align-items: center; justify-content: center; gap: 24px; padding: 48px 40px; border-radius: 16px; background: var(--st-felt-to); }
 .feltCaption { margin: -12px 0 0; color: var(--st-text-2); font-size: 13px; line-height: 18px; text-align: center; }
 .feltTitle { width: min(420px, 100%); margin: 0; color: var(--st-text); font-size: 17px; font-weight: 600; letter-spacing: -0.2px; line-height: 24px; }
 .felt > .group, .felt > .stack { width: min(420px, 100%); }
@@ -185,7 +185,7 @@ a.addressValue:focus-visible { border-radius: 4px; outline: 2px solid var(--st-a
   .focusedLead { padding: 20px 16px 32px; }
   .focusedTop { padding-bottom: 32px; }
   .focusedBody { width: 100%; }
-  .felt { margin: 0 16px 24px; padding: 28px 16px; border-radius: 20px; }
+  .felt { margin: 0 16px 24px; padding: 28px 16px; border-radius: 16px; }
 }
 @media (max-width: 767px) {
   .headTitle { font-size: 24px; line-height: 30px; }
@@ -197,6 +197,6 @@ a.addressValue:focus-visible { border-radius: 4px; outline: 2px solid var(--st-a
   .object { grid-template-columns: minmax(0, 1fr); padding: 20px 18px 22px; }
   .object > .clay { order: -1; justify-self: start; width: min(var(--clay), 168px); margin: -12px 0 -18px -8px; }
   .objectTitle { font-size: 21px; line-height: 27px; }
-  .key { border-radius: 20px; padding: 12px 14px; }
+  .key { border-radius: 16px; padding: 12px 14px; }
   .keyValue { font-size: 15px; line-height: 22px; }
 }

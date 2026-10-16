@@ -63,8 +63,8 @@ describe("workspace exit presentation", () => {
       notice: null,
     }));
 
-    expect(html).toContain("Work in this workspace has stopped.");
-    expect(html).toContain('aria-label="Workspace stopped"');
+    expect(html).toContain("Work in this business has stopped.");
+    expect(html).toContain('aria-label="Work stopped"');
     expect(html).toContain('disabled=""');
     expect(html).toContain("Export retained records");
     expect(html).toContain("Review retained work");
@@ -91,8 +91,8 @@ describe("workspace exit presentation", () => {
       notice: null,
     }));
 
-    expect(html).toContain("Work in this workspace has stopped.");
-    expect(html).toContain('aria-label="Workspace stopped"');
+    expect(html).toContain("Work in this business has stopped.");
+    expect(html).toContain('aria-label="Work stopped"');
     expect(html).toContain("Export retained records");
   });
 

@@ -84,18 +84,29 @@ interface XaYesProps {
   settled?: ReactNode;
   /** Blocks the yes, with the reason said beside it. */
   disabledReason?: ReactNode;
+  /** Holds the pill while something else on the screen is saving. Prefer disabledReason when the person can act on why. */
+  disabled?: boolean;
+  /**
+   * The confirm step for an act with no server Undo (cancel a booking, leave a
+   * business): one plain sentence said inside the yes, above the pill. Still one
+   * gesture: the pill is the confirmation, "Not yet" backs out.
+   */
+  question?: ReactNode;
+  /** Names the pill for assistive tech when several sit on one screen, e.g. "Make it live: Fees". */
+  yesAriaLabel?: string;
+  notYetAriaLabel?: string;
   block?: boolean;
   shortcut?: boolean;
 }
 
-export function XaYes({ state, onYes, onNotYet, onUndo, undoWindowMs = 5000, onUndoExpired, yesLabel = XA_YES_LABELS.yes, notYetLabel = XA_YES_LABELS.notYet, working, liveLabel, failure, settled, disabledReason, block = true, shortcut = true }: XaYesProps) {
+export function XaYes({ state, onYes, onNotYet, onUndo, undoWindowMs = 5000, onUndoExpired, yesLabel = XA_YES_LABELS.yes, notYetLabel = XA_YES_LABELS.notYet, working, liveLabel, failure, settled, disabledReason, disabled = false, question, yesAriaLabel, notYetAriaLabel, block = true, shortcut = true }: XaYesProps) {
   const id = useId();
   const reasonId = `${id}-reason`;
   const yes = useRef(onYes);
   const [pressed, setPressed] = useState(false);
   useEffect(() => { yes.current = onYes; }, [onYes]);
   if (pressed && state !== "waiting") setPressed(false);
-  const listening = shortcut && state === "waiting" && !disabledReason;
+  const listening = shortcut && state === "waiting" && !disabledReason && !disabled;
   useEffect(() => {
     if (!listening) return;
     shortcutOwners.push(id);
@@ -118,10 +129,12 @@ export function XaYes({ state, onYes, onNotYet, onUndo, undoWindowMs = 5000, onU
     <div className={styles.yesActions}><XaButton variant="primary" size="lg" block={block} onClick={onYes}>{XA_YES_LABELS.tryAgain}</XaButton>{onNotYet ? <XaButton variant="quiet" size="lg" onClick={onNotYet}>{notYetLabel}</XaButton> : null}</div>
   </div>;
   if (state === "undone" || state === "expired") return <div className={styles.yes}>{settled ? <p className={styles.yesSettled} role="status">{settled}</p> : null}</div>;
-  return <div className={styles.yes}>
+  const questionId = `${id}-question`;
+  return <div className={styles.yes} role={question ? "group" : undefined} aria-labelledby={question ? questionId : undefined}>
+    {question ? <p id={questionId} className={styles.yesQuestion}>{question}</p> : null}
     <div className={styles.yesActions}>
-      <XaButton variant="primary" size="lg" block={block} busy={pressed} disabled={Boolean(disabledReason)} aria-describedby={disabledReason ? reasonId : undefined} aria-keyshortcuts={listening ? "Meta+Enter Control+Enter" : undefined} hint={listening ? "⌘↵" : undefined} onClick={() => { setPressed(true); onYes(); }}>{yesLabel}</XaButton>
-      {onNotYet ? <XaButton variant="quiet" size="lg" onClick={onNotYet}>{notYetLabel}</XaButton> : null}
+      <XaButton variant="primary" size="lg" block={block} busy={pressed} disabled={Boolean(disabledReason) || disabled} aria-label={yesAriaLabel} aria-describedby={disabledReason ? reasonId : undefined} aria-keyshortcuts={listening ? "Meta+Enter Control+Enter" : undefined} hint={listening ? "⌘↵" : undefined} onClick={() => { if (pressed) return; setPressed(true); onYes(); }}>{yesLabel}</XaButton>
+      {onNotYet ? <XaButton variant="quiet" size="lg" disabled={pressed} aria-label={notYetAriaLabel} onClick={onNotYet}>{notYetLabel}</XaButton> : null}
     </div>
     {disabledReason ? <p id={reasonId} className={styles.yesSettled}>{disabledReason}</p> : null}
   </div>;

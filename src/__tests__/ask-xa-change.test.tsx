@@ -93,7 +93,7 @@ describe("The drafted change beside the conversation (XA · AS3, AS4)", () => {
   it("titles what the owner sees by the change, not the domain", () => {
     const page = html({ decider: { name: "Dr. Lin", you: false }, initialMessages: thread(), initialChangeView: "sees" });
     expect(page).toContain("Add your insurance to harbordental.com");
-    expect(page).toContain("Dr. Lin&#x27;s Today");
+    expect(page).toContain("Dr. Lin&#x27;s Home");
     expect(page).not.toContain("A change to harbordental.com");
   });
 

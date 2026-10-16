@@ -7,7 +7,7 @@
  * you". No key legend. Phone (390): a sheet from the top that fills the
  * width, the Open hint gone.
  */
-.dialog { width: min(640px, calc(100vw - 32px)); max-height: min(560px, calc(100dvh - 64px)); padding: 0; border: 0; border-radius: 20px; background: var(--st-surface); color: var(--st-text); box-shadow: var(--st-shadow-lg); margin: clamp(24px, 14vh, 140px) auto auto; overflow: hidden; font-family: var(--font-workspace), system-ui, sans-serif; }
+.dialog { width: min(640px, calc(100vw - 32px)); max-height: min(560px, calc(100dvh - 64px)); padding: 0; border: 0; border-radius: 16px; background: var(--st-surface); color: var(--st-text); box-shadow: var(--st-shadow-lg); margin: clamp(24px, 14vh, 140px) auto auto; overflow: hidden; font-family: var(--font-workspace), system-ui, sans-serif; }
 .dialog[open] { animation: var(--kf-xa-palette) var(--motion-fast) var(--ease-settle) both; }
 .dialog::backdrop { background: color-mix(in srgb, #161715 18%, transparent); }
 .content { display: flex; flex-direction: column; max-height: min(560px, calc(100dvh - 64px)); }

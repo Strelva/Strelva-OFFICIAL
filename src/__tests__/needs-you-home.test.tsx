@@ -44,8 +44,8 @@ describe("Needs you on Home", () => {
   it("shows each owner decision with Approve and Not yet and what each does", () => {
     const html = needs(ready({ items: [item(), item({ id: "d0000000-0000-4000-8000-000000000002", title: "Put the booking page live", openHref: "/workspace?view=apps" })] }));
     expect(html).toContain("Reply to Jordan quoting the consult fee");
-    expect(html).toContain("Approve: The reply sends. Not yet: Nothing sends.");
-    expect(html).toContain('aria-label="Approve: Reply to Jordan quoting the consult fee"');
+    expect(html).toContain("Make it live: The reply sends. Not yet: Nothing sends.");
+    expect(html).toContain('aria-label="Make it live: Reply to Jordan quoting the consult fee"');
     expect(html).toContain('aria-label="Not yet: Put the booking page live"');
     expect(html).toContain('href="/workspace?view=apps"');
     expect(html).toContain(">2</span>");
@@ -73,9 +73,9 @@ describe("Needs you on Home", () => {
       expect(html).toContain(long);
       expect(html).toContain("Service &quot;Cleaning&quot; Price: $99 → $999");
       expect(html).not.toContain("too long to show here");
-      expect(html).toContain('aria-label="Approve: Confirm changes to your business details"');
+      expect(html).toContain('aria-label="Make it live: Confirm changes to your business details"');
       const gone = renderToStaticMarkup(createElement(NeedsYouSection, { state: ready({ items: [{ ...facts, review: null }] }), pending: null, notices: {}, onDecide: noop, onRetry: noop, variant }));
-      expect(gone).not.toContain('aria-label="Approve: Confirm changes to your business details"');
+      expect(gone).not.toContain('aria-label="Make it live: Confirm changes to your business details"');
       expect(gone).not.toContain('aria-label="Not yet: Confirm changes to your business details"');
       expect(gone).toContain("Refresh to see the latest before deciding.");
     }
@@ -89,7 +89,7 @@ describe("Needs you on Home", () => {
   it("lets a member see but not decide", () => {
     const html = needs(ready({ role: "member" }));
     expect(html).toContain("Only the owner can decide these.");
-    expect(html).not.toContain("Approve: Reply");
+    expect(html).not.toContain("Make it live: Reply");
   });
 
   it("has honest loading and error states", () => {
@@ -102,7 +102,7 @@ describe("recorded actors on Home", () => {
   it("shows the agency with platform credit and support as a separate actor", () => {
     const html = needs(ready({ items: [item({ actor: { kind: "agency", displayName: "Acme Marketing" }, approveEffect: "Strelva sends the reply.", operatorNote: "Check the price.", noteActor: { kind: "operator", displayName: "Taylor" } })] }));
     expect(html).toContain("Acme Marketing · Runs on Strelva");
-    expect(html).toContain("Approve: Acme Marketing sends the reply.");
+    expect(html).toContain("Make it live: Acme Marketing sends the reply.");
     expect(html).toContain("Taylor (platform support): Check the price.");
     expect(html).not.toContain("Strelva&#x27;s note");
   });
@@ -130,7 +130,7 @@ describe("recorded actors on Home", () => {
   it("does not replace words inside the customer's quoted detail", () => {
     const html = needs(ready({ items: [item({ detail: '\"Strelva updated my hours\"', approveEffect: "Strelva sends the reply." })] }));
     expect(html).toContain("Strelva updated my hours");
-    expect(html).toContain("Approve: Sends the reply.");
+    expect(html).toContain("Make it live: Sends the reply.");
   });
 });
 
@@ -179,18 +179,18 @@ describe("BusinessHome with the Needs you release", () => {
 describe("Needs you, October 6 shapes", () => {
   it("names the one primary action for the decision while its effect stays visible", async () => {
     const { decisionPresentation, decisionCount } = await import("@/experience/workspace/needs-you-presentation");
-    expect(decisionPresentation(item()).verb).toBe("Approve");
+    expect(decisionPresentation(item()).verb).toBe("Make it live");
     expect(decisionPresentation(item()).amount).toBe("$150");
     expect(decisionPresentation(item()).shape).toBe("price");
-    expect(decisionPresentation(item({ kind: "system.go_live", detail: null, sourceLifecycle: "website_document" }))).toMatchObject({ verb: "Hold to make it live", shape: "live", source: "Website", amount: null });
-    expect(decisionPresentation(item({ kind: "google.post", detail: "\"Tip of the week\"" }))).toMatchObject({ verb: "Hold to make it live", shape: "message", source: "Google" });
-    expect(decisionPresentation(item({ sourceLifecycle: "booking_request", detail: "Thu 10:30" }))).toMatchObject({ verb: "Hold to confirm", source: "Bookings" });
+    expect(decisionPresentation(item({ kind: "system.go_live", detail: null, sourceLifecycle: "website_document" }))).toMatchObject({ verb: "Make it live", shape: "live", source: "Website", amount: null });
+    expect(decisionPresentation(item({ kind: "google.post", detail: "\"Tip of the week\"" }))).toMatchObject({ verb: "Make it live", shape: "message", source: "Google" });
+    expect(decisionPresentation(item({ sourceLifecycle: "booking_request", detail: "Thu 10:30" }))).toMatchObject({ verb: "Confirm", source: "Bookings" });
     expect(decisionPresentation(item({ kind: "fact.inferred", sourceLifecycle: "connected_site_schema" }))).toMatchObject({ verb: "Acknowledge", source: "Website" });
     for (const kind of ["system.change_live", "copy.routine", "copy.marketing", "structure", "google.photo"] as const) {
-      expect(decisionPresentation(item({ kind })).verb).toBe("Hold to make it live");
+      expect(decisionPresentation(item({ kind })).verb).toBe("Make it live");
     }
     expect(decisionPresentation(item({ kind: "system.go_live", sourceLifecycle: "website_document", sourceId: "website:approve" })).verb).toBe("Approve this preview");
-    expect(decisionPresentation(item({ kind: "system.change_live", sourceLifecycle: "website_document", sourceId: "website:launch" })).verb).toBe("Hold to make it live");
+    expect(decisionPresentation(item({ kind: "system.change_live", sourceLifecycle: "website_document", sourceId: "website:launch" })).verb).toBe("Make it live");
     expect(decisionPresentation(item({ kind: "customer.message" })).verb).toBe("Send");
     // A price only comes from the decision's own words.
     expect(decisionPresentation(item({ title: "Reply to Jordan", detail: "Happy to help." })).amount).toBeNull();
@@ -204,9 +204,9 @@ describe("Needs you, October 6 shapes", () => {
     expect(html).toContain("$150</p>");
     expect(html).toContain('data-shape="price"');
     expect(html).toContain('data-shape="live"');
-    expect(html).toContain('aria-label="Hold to make it live: Put the booking page live"');
+    expect(html).toContain('aria-label="Make it live: Put the booking page live"');
     expect(html).toContain('aria-label="Not yet: Put the booking page live"');
-    expect(html).toContain("Approve: The reply sends. Not yet: Nothing sends.");
+    expect(html).toContain("Make it live: The reply sends. Not yet: Nothing sends.");
   });
 
   it("says so honestly when nothing needs the owner and the caller asks for an empty state", () => {

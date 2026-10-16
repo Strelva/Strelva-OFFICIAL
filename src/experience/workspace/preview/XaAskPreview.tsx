@@ -12,6 +12,7 @@ import type { StrelvaClientLink, StrelvaPinnedItem } from "@/experience/app-fram
 import { XA_ASK_SYSTEM, XA_ASK_WORKSPACE, xaAskMessages, xaAskOutcomes, xaAskTransport, type XaAskScreen, type XaAskState } from "./xa-ask-fixture";
 import surface from "../workspace-surface.module.css";
 import styles from "./xa-ask-preview.module.css";
+import { xaSearchItems, xaOwnerPinned, XA_HARBOR, XA_NORTH } from "./xa-day";
 
 const BASE = "/preview/strelva/xa/xa5-ask";
 const COLORS = { harbor: "#2f5236", north: "#9c522c", lakeview: "#4f7590", fieldwork: "#6b6f68" } as const;
@@ -26,7 +27,7 @@ export function XaAskPreview({ screen, state, door, mode }: { screen: XaAskScree
   // The scope chip opens this picker; picking re-scopes the next conversation, as WorkspaceLayout does with openAsk.
   const [scoped, setScoped] = useState<string | null>(making ? null : XA_ASK_SYSTEM);
   const scopes: AskScopeOption[] = [
-    { id: null, label: "Harbor Dental", state: "live" },
+    { id: null, label: XA_HARBOR.name, state: "live" },
     { id: XA_ASK_SYSTEM, label: "Website", kind: "website", state: "live" },
     { id: "b7000000-0000-4000-8000-0000000005b2", label: "Bookings", kind: "bookings", state: "live" },
     { id: "b7000000-0000-4000-8000-0000000005b3", label: "Inbox", kind: "inbox", state: "live" },
@@ -35,11 +36,11 @@ export function XaAskPreview({ screen, state, door, mode }: { screen: XaAskScree
   // The same scroll container and detail frame WorkspaceLayout renders /workspace?view=ask in, so sticky and scroll match the real route.
   const ask = <div className={surface.scroll} data-workspace-scroll><div className={surface.detail} data-place="ask">
     {/* The agency door passes no decider: the owner's name comes from the route (GET owner), as in production. */}
-    <AskStrelva key={`${screen}:${state}:${door}:${scoped ?? "business"}`} workspaceId={XA_ASK_WORKSPACE} businessName="Harbor Dental" systemId={scoped} systemName={scopedName} systemKind={scopes.find(option => option.id === scoped)?.kind ?? "website"} systemState="live" address="harbordental.com"
+    <AskStrelva key={`${screen}:${state}:${door}:${scoped ?? "business"}`} workspaceId={XA_ASK_WORKSPACE} businessName={XA_HARBOR.name} systemId={scoped} systemName={scopedName} systemKind={scopes.find(option => option.id === scoped)?.kind ?? "website"} systemState="live" address={XA_HARBOR.domain}
       decider={owner ? { name: "you", you: true } : undefined} outcomes={outcomes} initialChangeView={screen === "as4" ? "sees" : "change"}
       scopes={scopes} onScope={setScoped}
       request={request} initialMessages={messages}
-      readOnly={state === "readonly"} readOnlyReason={owner ? "Work in this workspace has stopped. Earlier conversations stay readable." : "Harbor Dental shared this with North Studio to review. You can read, not ask."}
+      readOnly={state === "readonly"} readOnlyReason={owner ? "Work in this business has stopped. Earlier conversations stay readable." : "Harbor Dental shared this with North Studio to review. You can read, not ask."}
       refusalLinks={{ needsYou: href("as4"), help: href("as1") }} />
   </div></div>;
   const shell = { appBase: "/preview/strelva", signOut: null, systemsReleased: true, mode, active: "ask" as const, title: "Ask Strelva",
@@ -47,19 +48,17 @@ export function XaAskPreview({ screen, state, door, mode }: { screen: XaAskScree
 
   if (owner) {
     const pinned: StrelvaPinnedItem[] = [
-      { id: "website", kind: "website", title: "Website", href: href("as1"), detail: "Live" },
-      { id: "bookings", kind: "bookings", title: "Bookings", href: href("as1"), detail: "31 this week" },
-      { id: "inbox", kind: "inquiries", title: "Inbox", href: href("as1"), detail: "3 new" },
+      ...xaOwnerPinned(),
       ...(making ? [{ id: "texts", kind: "app" as const, title: "Text to reschedule", href: href("as6"), current: true, state: "draft" as const }] : []),
     ];
-    return <StrelvaShell {...shell} workspaceName="Harbor Dental" accountName="Dr. Amy Lin" pinned={pinned} agency={{ name: "North Studio", person: "Maya", color: COLORS.harbor }}>{ask}</StrelvaShell>;
+    return <StrelvaShell searchItems={xaSearchItems("owner")} {...shell} workspaceName={XA_HARBOR.name} accountName={XA_HARBOR.owner} pinned={pinned} agency={{ name: XA_NORTH.name, person: XA_NORTH.first, color: COLORS.harbor }}>{ask}</StrelvaShell>;
   }
   const clients: StrelvaClientLink[] = [
-    { id: "harbor", name: "Harbor Dental", href: href("as1"), detail: "Dr. Lin", color: COLORS.harbor, current: true },
+    { id: "harbor", name: XA_HARBOR.name, href: href("as1"), detail: XA_HARBOR.ownerShort, color: COLORS.harbor, current: true },
     { id: "north", name: "North Coast Realty", href: href("as1"), waits: true, color: COLORS.north },
     { id: "lakeview", name: "Lakeview Mediation", href: href("as1"), color: COLORS.lakeview },
     { id: "fieldwork", name: "Fieldwork Studio", href: href("as1"), color: COLORS.fieldwork },
   ];
-  return <StrelvaShell {...shell} workspaceName="North Studio" accountName="Maya Okafor"
+  return <StrelvaShell searchItems={xaSearchItems("agency")} {...shell} workspaceName={XA_NORTH.name} accountName={XA_NORTH.person}
     agencyNavigation={{ active: "home", queueCount: 3, clients, hrefs: { home: href("as1"), queue: href("as1"), library: href("as1"), minutes: href("as1") } }}>{ask}</StrelvaShell>;
 }

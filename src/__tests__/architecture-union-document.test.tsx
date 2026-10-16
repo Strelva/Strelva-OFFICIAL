@@ -38,7 +38,7 @@ async function settle() {
   await act(async () => { await new Promise(resolve => setTimeout(resolve, 30)); });
 }
 function titleInput(node: HTMLElement) {
-  const input = node.querySelector<HTMLInputElement>('section[aria-label="Workspace document"] input');
+  const input = node.querySelector<HTMLInputElement>('section[aria-label="Document"] input');
   if (!input) throw new Error("The real document title input did not open.");
   return input;
 }
@@ -103,14 +103,14 @@ it("a departed real document POST cannot navigate a replacement at the same crea
   root = createRoot(node);
   await act(async () => root!.render(<WorkspaceApp request={request} />));
   await settle();
-  const departedTool = node.querySelector('section[aria-label="Workspace document"]');
+  const departedTool = node.querySelector('section[aria-label="Document"]');
   expect(departedTool).not.toBeNull();
   await fillTitle(node, "Departed fictional document");
   await saveDocument(node);
   expect(commands).toHaveLength(1);
   expect(departedTool!.getAttribute("aria-busy")).toBe("true");
 
-  const home = [...node.querySelectorAll<HTMLAnchorElement>("a")].find(link => link.textContent?.trim() === "Today");
+  const home = [...node.querySelectorAll<HTMLAnchorElement>("a")].find(link => link.textContent?.trim() === "Home");
   expect(home).toBeDefined();
   await act(async () => home!.click());
   await settle();
@@ -118,7 +118,7 @@ it("a departed real document POST cannot navigate a replacement at the same crea
   await act(async () => window.history.back());
   await settle();
   expect(`/workspace${window.location.search}`).toBe(creationUrl);
-  const replacementTool = node.querySelector('section[aria-label="Workspace document"]');
+  const replacementTool = node.querySelector('section[aria-label="Document"]');
   expect(replacementTool).not.toBeNull();
   expect(replacementTool).not.toBe(departedTool);
   expect(titleInput(node).value).toBe("");
@@ -129,7 +129,7 @@ it("a departed real document POST cannot navigate a replacement at the same crea
   await settle();
   expect(`/workspace${window.location.search}`).toBe(creationUrl);
   expect(window.history.length).toBe(historyLength);
-  expect(node.querySelector('section[aria-label="Workspace document"]')).toBe(replacementTool);
+  expect(node.querySelector('section[aria-label="Document"]')).toBe(replacementTool);
   expect(titleInput(node).value).toBe("Replacement fictional document");
   expect(replacementTool!.getAttribute("aria-busy")).toBe("false");
   expect(replacementTool!.textContent).not.toContain("Document saved privately in your workspace.");
@@ -142,10 +142,10 @@ it("a departed real document POST cannot navigate a replacement at the same crea
   expect(new URLSearchParams(window.location.search).get("work")).toBe(REPLACEMENT_WORK);
   expect(new URLSearchParams(window.location.search).get("view")).toBe("document");
   expect(window.history.length).toBe(historyLength);
-  expect(node.querySelector('section[aria-label="Workspace document"] h1')?.textContent?.startsWith("Replacement fictional document.")).toBe(true);
+  expect(node.querySelector('section[aria-label="Document"] h1')?.textContent?.startsWith("Replacement fictional document.")).toBe(true);
   // Saved documents open in reading mode; the retained edit control must
   // reopen this document's saved input rather than the departed draft.
-  expect(node.querySelector('section[aria-label="Workspace document"] input')).toBeNull();
+  expect(node.querySelector('section[aria-label="Document"] input')).toBeNull();
   const edit = [...node.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "Edit");
   expect(edit).toBeDefined();
   await act(async () => edit!.click());

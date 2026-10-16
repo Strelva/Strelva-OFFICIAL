@@ -257,7 +257,7 @@ export function sameAppPath(value: string | null | undefined): string | undefine
 }
 
 const ROUTE_LINE: Record<string, string> = {
-  owner_decides: `Waiting on the owner in ${XA_PLACE_LABELS.today}. Nothing is live until they say yes.`,
+  owner_decides: `Waiting on the owner, on their ${XA_PLACE_LABELS.today}. Nothing is live until they say yes.`,
   strelva_reviews: "It is reviewed first. Nothing is live yet.",
   handle_after_notice: "The change will be made after a notice. Nothing is live yet.",
   handle: `The change will be made and reported under ${STRELVA_HANDLED_LABEL}.`,

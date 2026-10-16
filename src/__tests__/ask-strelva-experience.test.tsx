@@ -15,7 +15,7 @@ describe("Ask Strelva receipts", () => {
       { kind: "draft", toolId: "draft_website_change", status: "queued", ids: ["evt_1"], summary: "Homepage hero", needsYou: { route: "owner_decides", itemRef: "evt_1", decideAt: "/dashboard/review" } },
     ] } })!;
     expect(result).toMatchObject({ kind: "draft", saved: true, conversationId: "c1" });
-    expect(receiptLines(result)).toEqual([{ key: expect.any(String), tone: "waiting", text: "Drafted: Homepage hero. Waiting on the owner in Today. Nothing is live until they say yes.", decideHref: "/dashboard/review", ref: "evt_1" }]);
+    expect(receiptLines(result)).toEqual([{ key: expect.any(String), tone: "waiting", text: "Drafted: Homepage hero. Waiting on the owner, on their Home. Nothing is live until they say yes.", decideHref: "/dashboard/review", ref: "evt_1" }]);
   });
 
   it("names each of the four results honestly", () => {
@@ -82,14 +82,14 @@ describe("Ask Strelva in the workspace", () => {
     expect(html).toContain("Who asked for this?");
     expect(html).toContain("The owner, by email");
     expect(html).toContain("The owner, by phone");
-    expect(html).toContain("The owner still decides, in Today.");
+    expect(html).toContain("The owner still decides, on Home.");
     const owner = renderToStaticMarkup(createElement(AskStrelva, { workspaceId: WS, businessName: "The Mooney Firm" }));
     expect(owner).not.toContain("Who asked for this?");
   });
 
   it("disables asking with the reason when the person can't ask", () => {
-    const html = renderToStaticMarkup(createElement(AskStrelva, { workspaceId: WS, businessName: "The Mooney Firm", readOnly: true, readOnlyReason: "Work in this workspace has stopped.", request: (async () => new Response("{}")) as typeof fetch }));
-    expect(html).toContain('placeholder="Work in this workspace has stopped."');
+    const html = renderToStaticMarkup(createElement(AskStrelva, { workspaceId: WS, businessName: "The Mooney Firm", readOnly: true, readOnlyReason: "Work in this business has stopped.", request: (async () => new Response("{}")) as typeof fetch }));
+    expect(html).toContain('placeholder="Work in this business has stopped."');
     expect(html).toMatch(/<textarea[^>]*disabled/);
   });
 });

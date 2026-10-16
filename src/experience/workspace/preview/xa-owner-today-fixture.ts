@@ -15,6 +15,7 @@ import type { SystemView } from "@/experience/systems/model";
 import type { BusinessDeliveryItem } from "../business-delivery-summary";
 import type { BusinessRequestRow } from "../WorkspaceRequests";
 import type { ResponsibilityProofData } from "@/experience/operations/ResponsibilityProof";
+import { XA_DAY, XA_HARBOR, XA_NORTH, XA_SYSTEMS } from "./xa-day";
 
 export const XA3_SCREENS = ["o1", "o2", "o3", "o4", "o5", "o6"] as const;
 export type Xa3Screen = (typeof XA3_SCREENS)[number];
@@ -22,13 +23,13 @@ export const XA3_STATES = ["ready", "empty", "loading", "error", "member", "many
 export type Xa3State = (typeof XA3_STATES)[number];
 
 /** `accountName` is the account's recorded name; Today greets with greetingName(accountName), as the real route does. */
-export const HARBOR = { id: "a0000000-0000-4000-8000-0000000000aa", name: "Harbor Dental", accountName: "Dr. Amy Lin", address: "1180 Elmwood Ave" } as const;
-export const NORTH_STUDIO = { id: "a0000000-0000-4000-8000-0000000000bb", name: "North Studio", person: "Maya", personName: "Maya Okafor" } as const;
+export const HARBOR = { id: "a0000000-0000-4000-8000-0000000000aa", name: XA_HARBOR.name, accountName: XA_HARBOR.owner, address: XA_HARBOR.address } as const;
+export const NORTH_STUDIO = { id: "a0000000-0000-4000-8000-0000000000bb", name: XA_NORTH.name, person: XA_NORTH.first, personName: XA_NORTH.person } as const;
 const MAYA = { kind: "agency", displayName: NORTH_STUDIO.name, personName: NORTH_STUDIO.personName } as const;
 const OWNER = { kind: "person", displayName: HARBOR.accountName } as const;
 
 /** 8:14 am on Monday, November 23, 2026: the board's morning. */
-export const PREVIEW_NOW = Date.parse("2026-11-23T08:14:00-05:00");
+export const PREVIEW_NOW = XA_DAY.now;
 /** Dr. Lin's yes, and Strelva's read-back of the booking page. */
 export const YES_AT = Date.parse("2026-11-23T08:11:00-05:00");
 const at = (hoursAgo: number) => new Date(PREVIEW_NOW - hoursAgo * 3_600_000).toISOString();
@@ -41,14 +42,14 @@ function system(id: string, kind: SystemView["kind"], name: string, detail: stri
 export const SYSTEM_IDS = { website: "c0000000-0000-4000-8000-000000000001", bookings: "c0000000-0000-4000-8000-000000000002", inbox: "c0000000-0000-4000-8000-000000000003", listing: "c0000000-0000-4000-8000-000000000004", form: "c0000000-0000-4000-8000-000000000005" } as const;
 
 export function harborSystems(options: { bookingsDown?: boolean } = {}): SystemView[] {
-  const checked = new Date(Date.parse("2026-11-23T07:02:00-05:00")).toISOString();
+  const checked = new Date(Date.parse(XA_DAY.checkedAt)).toISOString();
   return [
-    system(SYSTEM_IDS.website, "website", "Website", "harbordental.com", "live", { state: "healthy", summary: "Every page loads.", lastVerifiedAt: checked }),
-    system(SYSTEM_IDS.bookings, "bookings", "Bookings", "31 this week", "live", options.bookingsDown
+    system(SYSTEM_IDS.website, "website", XA_SYSTEMS.website.name, XA_SYSTEMS.website.detail, "live", { state: "healthy", summary: "Every page loads.", lastVerifiedAt: checked }),
+    system(SYSTEM_IDS.bookings, "bookings", XA_SYSTEMS.bookings.name, XA_SYSTEMS.bookings.detail, "live", options.bookingsDown
       ? { state: "degraded", summary: "The booking page stopped loading at 6:40. Patients see an error instead of times.", lastVerifiedAt: new Date(Date.parse("2026-11-23T06:40:00-05:00")).toISOString() }
       : { state: "healthy", summary: "Taking bookings.", lastVerifiedAt: checked }),
-    system(SYSTEM_IDS.inbox, "inquiries", "Inbox", "3 new", "live", { state: "healthy", summary: "Inquiries arrive.", lastVerifiedAt: checked }),
-    system(SYSTEM_IDS.listing, "listing", "Google listing", "Hours and photos", "draft", { state: "unknown", summary: "Not live yet." }),
+    system(SYSTEM_IDS.inbox, "inquiries", XA_SYSTEMS.inquiries.name, XA_SYSTEMS.inquiries.detail, "live", { state: "healthy", summary: "Inquiries arrive.", lastVerifiedAt: checked }),
+    system(SYSTEM_IDS.form, "app", XA_SYSTEMS.form.name, "Forms patients fill in before a first visit", "draft", { state: "unknown", summary: "Not live yet." }),
   ];
 }
 

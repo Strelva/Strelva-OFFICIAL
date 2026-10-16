@@ -70,7 +70,7 @@ describe("fictional owner canon previews", () => {
       expect(container.textContent).toContain("could not be loaded");
       expect(container.textContent).not.toContain("Nothing is running yet");
     }
-    if (state === "loading") expect(container.querySelector('input')?.disabled).toBe(true);
+    if (state === "loading") expect(container.querySelector('textarea')?.disabled).toBe(true);
     expect(network).not.toHaveBeenCalled();
   });
 
@@ -80,7 +80,7 @@ describe("fictional owner canon previews", () => {
     expect(container.textContent).toContain("Every inquiry reaches the workshop");
     expect(container.textContent).toContain("Needs a calendar");
     expect(container.textContent).toContain("Needs you");
-    await type(container.querySelector('input[aria-label="Ask Strelva"]')!, "yes");
+    await type(container.querySelector('textarea[aria-label="Ask Strelva"]')!, "yes");
     await act(async () => container.querySelector("form")!.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })));
     expect(container.textContent).toContain("Nothing was sent, started or approved.");
     expect(network).not.toHaveBeenCalled();

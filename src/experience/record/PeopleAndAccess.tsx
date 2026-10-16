@@ -113,7 +113,7 @@ export function PeopleAndAccess({ snapshot, currentRole, request, postAction, on
         if (!response.ok) throw new Error("People couldn't be read.");
         const parsed = accessReviewSchema.parse(await response.json());
         // Fail closed: a review for any other scope names nobody here.
-        if (parsed.workspaceId !== workspaceId || parsed.organization || parsed.units.length !== 1 || parsed.units[0]?.workspaceId !== workspaceId) throw new Error("Access belongs to another workspace");
+        if (parsed.workspaceId !== workspaceId || parsed.organization || parsed.units.length !== 1 || parsed.units[0]?.workspaceId !== workspaceId) throw new Error("Access belongs to another business");
         if (!controller.signal.aborted) { setReview(parsed.units[0]!); setReviewState("ready"); }
       }).catch(() => { if (!controller.signal.aborted) { setReview(null); setReviewState("error"); } });
     if (owner) void request(`/api/workspace-invitations?${new URLSearchParams({ workspaceId })}`, { cache: "no-store", signal: controller.signal })

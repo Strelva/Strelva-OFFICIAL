@@ -50,7 +50,7 @@ export function XaNotFound({ mode, homeHref = "/", workspaceHref = "/workspace" 
     <XaEntryStack>
       <XaHeadline size="lg" quiet="The link may be old or mistyped.">This page isn’t here.</XaHeadline>
       <div className={styles.actions}><XaButtonLink variant="primary" size="lg" href={homeHref}>Go to Strelva</XaButtonLink></div>
-      <Links>{[<XaTextLink key="w" href={workspaceHref}>Open your workspace</XaTextLink>, <XaTextLink key="s" href="/sign-in">Sign in</XaTextLink>]}</Links>
+      <Links>{[<XaTextLink key="w" href={workspaceHref}>Go to Home</XaTextLink>, <XaTextLink key="s" href="/sign-in">Sign in</XaTextLink>]}</Links>
       <Ground pose="alone" object={<EmptyAddress />} />
     </XaEntryStack>
     </div>
@@ -75,10 +75,10 @@ export function XaPageBroke({ mode, onRetry, homeHref = "/", homeLabel = "Go to 
 
 /** The workspace release is off in this environment: one headline, one quiet line, one action. */
 export function XaNotOpenYet({ mode, place = "workspace" }: { mode?: Mode; place?: "workspace" | "getting-started" }) {
-  return <XaEntryFrame mode={mode} label={place === "getting-started" ? "Getting started opens soon" : "Workspaces open soon"} wide>
+  return <XaEntryFrame mode={mode} label={place === "getting-started" ? "Getting started opens soon" : "Strelva opens soon"} wide>
     <div className={styles.measure}>
     <XaEntryStack>
-      <XaHeadline size="lg" quiet="Your site and bookings keep running.">{place === "getting-started" ? "Getting started opens soon." : "Workspaces open soon."}</XaHeadline>
+      <XaHeadline size="lg" quiet="Your site and bookings keep running.">{place === "getting-started" ? "Getting started opens soon." : "Strelva opens soon."}</XaHeadline>
       <div className={styles.actions}><XaButtonLink variant="primary" size="lg" href="/account">Open your existing account</XaButtonLink></div>
       <Ground pose="resting" />
     </XaEntryStack>
@@ -87,7 +87,7 @@ export function XaNotOpenYet({ mode, place = "workspace" }: { mode?: Mode; place
 }
 
 /** Opening a workspace: Pebble beside the Working line, where the page's headline will be. Rendered inside the shell skeleton. */
-export function XaWorkspaceOpening({ label = "Opening your workspace" }: { label?: string }) {
+export function XaWorkspaceOpening({ label = "Opening Strelva" }: { label?: string }) {
   return <div className={styles.page}><div className={styles.opening}>
     <XaPebbleAvatar size={32} />
     <XaWorking title={label} steps={[]} />
@@ -107,8 +107,8 @@ export function XaWorkspaceUnopened({ reason, message, signInHref, accountHref, 
   const said = message && reason !== "failed" ? <p className={styles.body} role="alert">{message}</p> : null;
   const content: Record<UnopenedReason, { title: string; quiet: string; action: ReactNode; pebble: ReactNode }> = {
     "sign-in": { title: "Sign in to open your workspace.", quiet: "Your place is kept for after you sign in.", action: <XaButtonLink variant="primary" href={signInHref}>Sign in</XaButtonLink>, pebble: "I’ll bring you back to this page once you’re in." },
-    forbidden: { title: "This account can’t open this workspace.", quiet: "Nothing in it was shown or changed.", action: <XaButtonLink variant="primary" href={accountHref}>Choose another workspace</XaButtonLink>, pebble: "Ask its owner to invite the email you sign in with." },
-    gone: { title: "This workspace isn’t available anymore.", quiet: "Nothing in it was shown or changed.", action: <XaButtonLink variant="primary" href={accountHref}>Choose another workspace</XaButtonLink>, pebble: "The link may be out of date. Ask its owner for a current one." },
+    forbidden: { title: "This account can’t open this workspace.", quiet: "Nothing in it was shown or changed.", action: <XaButtonLink variant="primary" href={accountHref}>Choose another business</XaButtonLink>, pebble: "Ask its owner to invite the email you sign in with." },
+    gone: { title: "This business isn’t available anymore.", quiet: "Nothing in it was shown or changed.", action: <XaButtonLink variant="primary" href={accountHref}>Choose another business</XaButtonLink>, pebble: "The link may be out of date. Ask its owner for a current one." },
     failed: { title: "Strelva couldn’t reach your workspace.", quiet: "Nothing in it changed.", action: <XaButton variant="primary" onClick={onRetry}>Try again</XaButton>, pebble: <>Trying again reads it fresh. <XaTextLink href={accountHref}>Check your account</XaTextLink></> },
   };
   const state = content[reason];

@@ -24,14 +24,14 @@ async function choose() { await act(async () => button("Choose forms")!.click())
 it("adopts a validated acknowledgement in the actual Rebuild parent and invalidates old approval", async () => {
  const transport = vi.fn<typeof fetch>().mockImplementation(async (_url, init) => Response.json(init?.method === "POST" ? envelope(2, false) : options)); vi.stubGlobal("fetch", transport);
  await mount(); await choose(); await act(async () => button("Update website preview")!.click());
- expect(button("Hold to make it live")).toBeUndefined(); expect(node.textContent).not.toContain("This exact preview is approved.");
+ expect(button("Make it live")).toBeUndefined(); expect(node.textContent).not.toContain("This exact preview is approved.");
  expect(node.textContent).toContain("Visitor forms saved in a new preview");
 });
 it.each(["503", "malformed200"])("holds old approved UI behind current-state reload after %s", async kind => {
  const transport = vi.fn<typeof fetch>().mockImplementation(async (_url, init) => init?.method !== "POST" ? Response.json(options) : kind === "503" ? Response.json({ error: "Post-commit acknowledgement unavailable in fixture." }, { status: 503 }) : Response.json({ workId, workspaceId, rebuild: { committedRevision: 2 } })); vi.stubGlobal("fetch", transport);
  await mount(); await choose(); await act(async () => button("Update website preview")!.click());
  expect(node.querySelector("[role=alert]")).not.toBeNull();
- expect(button("Hold to make it live")?.disabled ?? true).toBe(true);
+ expect(button("Make it live")?.disabled ?? true).toBe(true);
  expect(button("Reload current state")).toBeDefined();
 });
 it("blocks available-form refresh as a substitute for current saved-state recovery after unknown save", async () => {
@@ -40,7 +40,7 @@ it("blocks available-form refresh as a substitute for current saved-state recove
  expect(transport.mock.calls.filter(([, init]) => init?.method !== "POST")).toHaveLength(1);
  expect(transport.mock.calls.every(([url]) => String(url).endsWith("/connections"))).toBe(true);
  expect(node.textContent).not.toContain("This exact preview is approved.");
- expect(button("Hold to make it live")!.disabled).toBe(true);
+ expect(button("Make it live")!.disabled).toBe(true);
  expect(button("Reload current state")).toBeDefined();
 });
 
@@ -91,7 +91,7 @@ it.each(['rebuild', 'legacy'] as const)('performs one actual %s saved-state read
  expect(node.textContent).toContain('could not be loaded'); expect(posts).toBe(1);
  readMode = 'current'; await act(async () => button('Reload current state')!.click());
  expect(currentReads).toBe(kind === 'legacy' ? 3 : 2); expect(posts).toBe(1); expect(button('Reload current state')).toBeUndefined();
- expect(button(kind === 'legacy' ? 'Prepare launch' : 'Hold to make it live')).toBeUndefined();
+ expect(button(kind === 'legacy' ? 'Prepare launch' : 'Make it live')).toBeUndefined();
  expect(document.activeElement).toBe(kind === 'legacy' ? node.querySelector('h1') : node.querySelector('#rebuild-decisions-heading'));
  expect(transport.mock.calls.some(([url]) => kind === 'legacy' ? /\/api\/websites\/[^/]+\?/.test(String(url)) : String(url).includes('/rebuild?'))).toBe(true);
 });
@@ -126,7 +126,7 @@ it.each(['rebuild', 'legacy'] as const)('holds %s unknown after permission loss 
  await act(async () => root.render(renderKind(kind, true)));
  await act(async () => root.render(renderKind(kind)));
  await act(async () => respond(Response.json(kind === 'legacy' ? legacyRecord(2,false) : envelope(2,false))));
- expect(button('Reload current state')).toBeDefined(); expect(button(kind === 'legacy' ? 'Prepare launch' : 'Hold to make it live')!.disabled).toBe(true);
+ expect(button('Reload current state')).toBeDefined(); expect(button(kind === 'legacy' ? 'Prepare launch' : 'Make it live')!.disabled).toBe(true);
  expect(node.textContent).not.toContain('is approved.'); expect(node.textContent).not.toContain('forms updated'); expect(node.textContent).not.toContain('forms saved');
 });
 it.each(['rebuild', 'legacy'] as const)('ignores %s current-state read after permission loss and regain, and permits read-only explicit recovery', async kind => {
@@ -142,7 +142,7 @@ it.each(['rebuild', 'legacy'] as const)('ignores %s current-state read after per
  pending = true; await act(async () => button('Reload current state')!.click());
  await act(async () => root.render(renderKind(kind, true))); await act(async () => root.render(renderKind(kind)));
  await act(async () => respond(Response.json(kind === 'legacy' ? legacyRecord(2,false) : envelope(2,false))));
- expect(button('Reload current state')).toBeDefined(); expect(button(kind === 'legacy' ? 'Prepare launch' : 'Hold to make it live')!.disabled).toBe(true);
+ expect(button('Reload current state')).toBeDefined(); expect(button(kind === 'legacy' ? 'Prepare launch' : 'Make it live')!.disabled).toBe(true);
  await act(async () => root.render(renderKind(kind, true)));
  await act(async () => button('Reload current state')!.click());
  await act(async () => respond(Response.json(kind === 'legacy' ? legacyRecord(2,false) : envelope(2,false))));
@@ -160,7 +160,7 @@ it.each(['rebuild', 'legacy'] as const)('rejects a %s current-state receipt for 
  await (kind === 'legacy' ? mountLegacy() : mount()); await choose(); await act(async () => button('Update website preview')!.click());
  foreign = true; await act(async () => button('Reload current state')!.click());
  expect(button('Reload current state')).toBeDefined(); expect(node.querySelectorAll('select')[1]!.value).toBe('catering');
- expect(button(kind === 'legacy' ? 'Prepare launch' : 'Hold to make it live')!.disabled).toBe(true);
+ expect(button(kind === 'legacy' ? 'Prepare launch' : 'Make it live')!.disabled).toBe(true);
 });
 it.each(['rebuild', 'legacy'] as const)('respects outside focus before %s uncertain forms completion', async kind => {
  let respond!: (value: Response) => void;
@@ -221,7 +221,7 @@ it('peer retains managed forms uncertainty across canPublish loss and regain', a
  await act(async () => root.render(render(true)));
  await act(async () => respond(Response.json({ error: 'Unknown' }, { status: 503 })));
  expect(button('Reload current state')).toBeDefined();
- expect(button('Hold to make it live')!.disabled).toBe(true);
+ expect(button('Make it live')!.disabled).toBe(true);
  expect(node.textContent).not.toContain('This exact preview is approved.');
 });
 
@@ -234,7 +234,7 @@ it.each(['rebuild', 'legacy'] as const)('peer refuses %s stale complete connecti
  await (kind === 'legacy' ? mountLegacy() : mount()); await choose();
  await act(async () => button('Update website preview')!.click());
  expect(button('Reload current state')).toBeDefined();
- expect(button(kind === 'legacy' ? 'Prepare launch' : 'Hold to make it live')!.disabled).toBe(true);
+ expect(button(kind === 'legacy' ? 'Prepare launch' : 'Make it live')!.disabled).toBe(true);
  expect(node.textContent).not.toContain('forms saved'); expect(node.textContent).not.toContain('forms updated');
 });
 

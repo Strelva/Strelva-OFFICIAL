@@ -13,7 +13,7 @@ describe("owner journey copy and links", () => {
     // Today · Ask Strelva · Website · Google Business · Analytics · Reviews (+ Settings gear).
     const surfaces = readRepoFile("src/lib/dashboard-surfaces.ts");
 
-    expect(surfaces).toContain('label: "Today"');
+    expect(surfaces).toContain('label: "Home"');
     expect(surfaces).toContain('label: "Ask Strelva"');
     expect(surfaces).toContain('label: "Website"');
     expect(surfaces).toContain('label: "Google Business"');

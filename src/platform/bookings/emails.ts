@@ -95,7 +95,7 @@ export function ownerRequestReminderEmail(input: {
       heading: "A booking request is still waiting",
       paragraphs: [
         `${who} asked for ${cleanSubjectText(input.booking.serviceName)} on ${day} at ${time}. Nobody has confirmed it yet.`,
-        "Confirm it or say not yet from the email we sent when it came in, or in Needs you on Today. If nobody answers within 3 days of the request, the customer receives a notice saying the time wasn't confirmed, with an option to choose other times. A booking is never confirmed by silence.",
+        "Confirm it or say not yet from the email we sent when it came in, or in Needs you on Home. If nobody answers within 3 days of the request, the customer receives a notice saying the time wasn't confirmed, with an option to choose other times. A booking is never confirmed by silence.",
       ],
       button: { label: "Confirm or say not yet", url: input.openUrl },
       footerNote: input.businessName ? `For ${cleanSubjectText(input.businessName)}` : undefined,
@@ -155,7 +155,7 @@ function ownerChaseMail(input: { who: string; day: string; time: string; service
       { kind: "waits", label: "Waits for you" },
       { kind: "headline", text: input.who === "A customer" ? `Confirm this request for ${input.day}?` : `Confirm ${input.who} for ${input.day}?`, lede: `${input.who} asked a day ago and nobody has answered. A booking is never confirmed by silence.` },
       { kind: "when", ...splitZone({ day: input.day, time: input.time, detail: `${input.service} · ${input.who}` }) },
-      { kind: "primary", action: { label: "Confirm or say not yet", url: input.openUrl }, note: "It waits for you in Needs you on Today." },
+      { kind: "primary", action: { label: "Confirm or say not yet", url: input.openUrl }, note: "It waits for you in Needs you on Home." },
       { kind: "rule" },
       { kind: "sentence", text: `If nobody answers within 3 days of the request, ${input.who} is told the time wasn't confirmed and can pick another.`, muted: true },
     ],

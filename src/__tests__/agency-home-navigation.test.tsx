@@ -37,8 +37,8 @@ it("opens agency Home, preserves separate Clients navigation, and returns Home f
   const mainNav = () => node.querySelector('aside nav[aria-label="Main"]')!;
   // October 15 (XA): Today in Main; the Clients page opens from "All clients" beside the clients list.
   const selected = () => node.querySelector('aside a[aria-current="page"]')?.textContent?.trim();
-  expect(selected()).toBe("Today");
-  const homeLink = [...mainNav().querySelectorAll<HTMLAnchorElement>("a")].find(link => link.textContent?.trim() === "Today")!;
+  expect(selected()).toBe("Home");
+  const homeLink = [...mainNav().querySelectorAll<HTMLAnchorElement>("a")].find(link => link.textContent?.trim() === "Home")!;
   expect(new URL(homeLink.href).searchParams.has("agencyView")).toBe(false);
   const clients = [...node.querySelectorAll<HTMLAnchorElement>("aside a")].find(link => link.textContent?.trim() === "All clients")!;
   await act(async () => clients.click()); await settle();
@@ -46,9 +46,9 @@ it("opens agency Home, preserves separate Clients navigation, and returns Home f
   expect(node.querySelector("h1")?.textContent).toBe("Clients");
   expect(new URLSearchParams(window.location.search).get("agencyView")).toBe("clients");
   // With the agency switcher in the header, Today is the way home.
-  const brandHome = [...mainNav().querySelectorAll<HTMLAnchorElement>("a")].find(link => link.textContent?.trim() === "Today")!;
+  const brandHome = [...mainNav().querySelectorAll<HTMLAnchorElement>("a")].find(link => link.textContent?.trim() === "Home")!;
   await act(async () => brandHome.click()); await settle();
-  expect(selected()).toBe("Today");
+  expect(selected()).toBe("Home");
   expect(new URLSearchParams(window.location.search).has("agencyView")).toBe(false);
   expect(node.querySelector("h1")?.textContent).not.toBe("Clients");
   // Both views reuse the mounted agency's client read.

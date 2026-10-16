@@ -79,7 +79,7 @@ export function XaComposer({ value, onChange, onSubmit, placeholder, inputLabel 
   const send = <button type="submit" className={styles.composerSend} disabled={disabled || busy} aria-disabled={!canSend || undefined} aria-label={busy ? "Sending" : value.trim() ? "Send" : "Send (type something first)"}>{busy ? <Loader2 size={18} className="motion-safe:animate-spin" aria-hidden="true" /> : <ArrowUp size={form === "bar" ? 20 : 18} aria-hidden="true" />}</button>;
   const input = <>
     <label htmlFor={id} className={styles.srOnly}>{inputLabel}</label>
-    <textarea id={id} ref={inputRef} rows={1} maxLength={maxLength} className={styles.composerInput} placeholder={placeholder} value={value} disabled={disabled}
+    <textarea id={id} ref={inputRef} rows={1} maxLength={maxLength} aria-label={inputLabel} className={styles.composerInput} placeholder={placeholder} value={value} disabled={disabled}
       onChange={event => onChange(event.target.value)}
       onKeyDown={event => { if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); if (canSend) event.currentTarget.form?.requestSubmit(); } }} />
   </>;

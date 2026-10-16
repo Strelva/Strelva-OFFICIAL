@@ -14,8 +14,9 @@ import type { PublicBlogPost } from "@/lib/cms/blog-public";
 import type { SiteLinkItem } from "@/components/public/SiteLinks";
 import type { StoreBooking } from "@/platform/bookings/store";
 import type { EmailOptions } from "@/platform/infra/email/layout";
+import { XA_HARBOR, XA_NORTH } from "./xa-day";
 
-export const HARBOR = { name: "Harbor Dental", doctor: "Dr. Amy Lin", street: "1180 Elmwood Ave", city: "Buffalo", region: "NY", phone: "(716) 555-0142", email: "hello@harbordental.example.test", zone: "America/New_York" } as const;
+export const HARBOR = { name: XA_HARBOR.name, doctor: XA_HARBOR.owner, street: XA_HARBOR.address, city: "Buffalo", region: "NY", phone: "(716) 555-0142", email: "hello@harbordental.example.test", zone: "America/New_York" } as const;
 export const PREVIEW_NOW = Date.parse("2026-11-20T14:05:00Z");
 
 /* ---------- The native website ---------- */
@@ -23,7 +24,7 @@ export const PREVIEW_NOW = Date.parse("2026-11-20T14:05:00Z");
 export const harborSite: SiteDocument = {
   version: 2, siteName: HARBOR.name, theme: { palette: "ocean", typeScale: "standard", accent: "#1f4e6b" },
   pages: [
-    { path: "/", title: "Harbor Dental", description: "Cleanings, exams and first visits at 1180 Elmwood Ave, Buffalo.", root: "home" },
+    { path: "/", title: XA_HARBOR.name, description: "Cleanings, exams and first visits at 1180 Elmwood Ave, Buffalo.", root: "home" },
     { path: "/about", title: "About Dr. Lin", description: "Dr. Amy Lin and the Harbor Dental team.", root: "about" },
   ],
   nodes: {
@@ -41,7 +42,7 @@ export const harborSite: SiteDocument = {
       { question: "Do you take my insurance?", answer: "Most PPO plans. Call and we will check before you come in." },
       { question: "Where do I park?", answer: "There is free parking behind the building, off Bryant Street." },
     ] }, children: [], factIds: [] },
-    story: { id: "story", type: "Story", variant: "long-form", props: { title: "Dr. Amy Lin", body: "Dr. Lin opened Harbor Dental on Elmwood in 2014. She trained at the University at Buffalo and still teaches there one afternoon a week." }, children: [], factIds: [] },
+    story: { id: "story", type: "Story", variant: "long-form", props: { title: XA_HARBOR.owner, body: "Dr. Lin opened Harbor Dental on Elmwood in 2014. She trained at the University at Buffalo and still teaches there one afternoon a week." }, children: [], factIds: [] },
     footer: { id: "footer", type: "Footer", variant: "simple", props: { text: "Harbor Dental · 1180 Elmwood Ave, Buffalo, NY 14222 · (716) 555-0142", links: [{ label: "About", href: "/about" }] }, children: [], factIds: [] },
   },
   facts: {}, assets: {}, redirects: [], provenance: { sourceUrl: "https://harbordental.example.test", composer: "rules" },
@@ -58,7 +59,7 @@ export const harborLinks: SiteLinkItem[] = [
 export const harborPosts: PublicBlogPost[] = [
   { id: "p3", slug: "thanksgiving-hours", title: "We're closed Thanksgiving, Nov 26 and 27", excerpt: "Back Saturday, Nov 28, 9 to 1. If something hurts before then, call and leave a message; Dr. Lin checks them.", content: "Back Saturday, Nov 28, from 9 to 1.\n\nIf something hurts before then, call (716) 555-0142 and leave a message. Dr. Lin checks them twice a day over the holiday.", author: HARBOR.doctor, tags: ["Hours"], publishedAt: "2026-11-10T14:00:00Z" },
   { id: "p2", slug: "first-visit", title: "What happens at your first visit", excerpt: "Sixty minutes, X-rays, and a plan you can take home. Here is the whole hour, step by step.", content: "## Before you come\n\nFill in the patient form online so you're not doing it on a clipboard.\n\n## The hour\n\n1. X-rays, about ten minutes\n2. The exam with Dr. Lin\n3. A plan, in writing, with what each step costs\n\nYou'll leave knowing what comes next, and nothing is booked without your say.", author: HARBOR.doctor, tags: ["New patients"], publishedAt: "2026-10-02T14:00:00Z" },
-  { id: "p1", slug: "parking", title: "Where to park on Elmwood", excerpt: "There is free parking behind the building, off Bryant Street.", content: "There is free parking behind the building, off Bryant Street.", author: "Harbor Dental", tags: [], publishedAt: "2026-09-12T14:00:00Z" },
+  { id: "p1", slug: "parking", title: "Where to park on Elmwood", excerpt: "There is free parking behind the building, off Bryant Street.", content: "There is free parking behind the building, off Bryant Street.", author: XA_HARBOR.name, tags: [], publishedAt: "2026-09-12T14:00:00Z" },
 ];
 
 /* ---------- The business page (/biz) ---------- */
@@ -85,7 +86,7 @@ export const harborFacts: PublicFacts = {
     domain: { verified: true, url: "harbordental.example.test", confirmedAt: "2026-10-03T12:00:00Z" },
     googleBusinessProfile: { linked: true, verified: true, url: null },
     ownerConfirmedFactCount: 9, lastConfirmedAt: "2026-10-12T12:00:00Z",
-    operatingAgencies: [{ name: "North Studio" }],
+    operatingAgencies: [{ name: XA_NORTH.name }],
   } as PublicFacts["verification"],
 };
 

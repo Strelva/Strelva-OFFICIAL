@@ -56,7 +56,7 @@ export function SchedulingCalendar({ availability, reservations, timeZone }: { a
                 if (high <= low) return null;
                 const hourStart = (low - date.getTime()) / 3_600_000, hourEnd = (high - date.getTime()) / 3_600_000;
                 return <div key={block.id} className={styles.block} data-status={block.status} style={{ top: `${(hourStart - from) / span * 100}%`, height: `${(hourEnd - hourStart) / span * 100}%` }} title={`${block.title} · ${new Date(block.start).toLocaleString("en-US", { timeZone })} to ${new Date(block.end).toLocaleString("en-US", { timeZone })}`}>
-                  <span>{block.title}</span><span className={styles.blockTime}>{clock(hourStart)} – {clock(hourEnd)}</span>{block.status !== "open" ? <span className="sr-only">{block.status === "reserved" ? "Reserved in workspace" : block.status === "accepted" ? "Calendar accepted" : "Calendar needs checking"}</span> : null}
+                  <span>{block.title}</span><span className={styles.blockTime}>{clock(hourStart)} – {clock(hourEnd)}</span>{block.status !== "open" ? <span className="sr-only">{block.status === "reserved" ? "Reserved in Strelva" : block.status === "accepted" ? "Calendar accepted" : "Calendar needs checking"}</span> : null}
                 </div>;
               })}</div>
             </div>;

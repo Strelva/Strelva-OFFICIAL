@@ -21,6 +21,7 @@ import type { FoundFact, WebsiteReading } from "@/products/getting-started/contr
 
 import type { Xa1Screen } from "./xa1-screens";
 import { XA_PLACE_LABELS } from "@/platform/presentation/place-labels";
+import { xaSearchItems, XA_SYSTEMS, XA_SYSTEM_HREFS } from "./xa-day";
 
 const BUSINESS = "b6a10000-0000-4000-8000-000000000001";
 const ACTOR = "b6a10000-0000-4000-8000-0000000000a0";
@@ -94,8 +95,8 @@ function Started({ screen, state, mode }: { screen: "b3" | "b4" | "b5"; state: s
 
 function Home({ state, mode }: { state: string; mode: Mode }) {
   // What B2 to B5 produce for a self-serve owner: the website kept where it is, nothing else, no agency.
-  const pinned: StrelvaPinnedItem[] = [{ id: "website", kind: "website", title: "Website", href: "#website" }];
-  return <StrelvaShell appBase="/preview/strelva" signOut={null} systemsReleased mode={mode} workspaceName="Harbor Dental" accountName="Dr. Amy Lin" title={XA_PLACE_LABELS.today} active="home"
+  const pinned: StrelvaPinnedItem[] = [{ id: "website", kind: "website", title: XA_SYSTEMS.website.name, href: XA_SYSTEM_HREFS.website }];
+  return <StrelvaShell searchItems={xaSearchItems("owner")} appBase="/preview/strelva" signOut={null} systemsReleased mode={mode} workspaceName="Harbor Dental" accountName="Dr. Amy Lin" title={XA_PLACE_LABELS.today} active="home"
     pinned={pinned} needsYou={{ count: state === "ready" ? 1 : 0 }}>
     <FirstDay ownerName="Dr. Lin" businessName="Harbor Dental" state={state === "loading" ? "loading" : state === "error" ? "error" : "ready"} retryHref="/preview/strelva/xa/xa1-business-door/b6"
       waiting={state === "ready" ? [{ ...FOUND[4]!, status: "later" }] : state === "unchecked" ? null : []} checkHref="/preview/strelva/xa/xa1-business-door/b4?state=waiting" onAsk={() => undefined} onRetry={() => undefined}

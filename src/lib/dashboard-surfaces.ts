@@ -156,7 +156,7 @@ export function getDashboardSurfaces({
   const reviewsReady = hasReviewsSource(tenantConfig, connections);
 
   const surfaces: DashboardSurface[] = [
-    { id: "today", label: "Today", href: "/dashboard", state: "shown", group: "manage" },
+    { id: "today", label: "Home", href: "/dashboard", state: "shown", group: "manage" },
     { id: "ask-ai", label: "Ask Strelva", href: "/dashboard/chat", state: "shown", group: "manage" },
     // Website is the spine — Site editor + Store/Blog/Photos as sub-tabs inside it.
     { id: "website", label: "Website", href: "/dashboard/site", state: "shown", group: "presence" },

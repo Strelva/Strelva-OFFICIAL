@@ -141,7 +141,7 @@ export function XaSidebar(props: XaSidebarProps) {
         <span className={styles.brandName}>{name}</span>
       </Link>;
 
-  const utilities = <div className={styles.group} aria-label="Workspace utilities">
+  const utilities = <div className={styles.group} aria-label="Account and tools">
     {onStart ? <button type="button" className={styles.item} disabled={startDisabled} onClick={() => { close(); onStart(); }}><SquarePen size={17} strokeWidth={1.7} aria-hidden="true" /><span className={styles.itemLabel}>{XA_PLACE_LABELS.newRequest}</span></button>
       : <Link className={styles.item} href={`${appBase}/workspace?view=start${workspaceId ? `&workspaceId=${encodeURIComponent(workspaceId)}` : ""}`} aria-disabled={startDisabled || undefined} tabIndex={startDisabled ? -1 : undefined} onClick={event => { if (startDisabled) event.preventDefault(); close(); }}><SquarePen size={17} strokeWidth={1.7} aria-hidden="true" /><span className={styles.itemLabel}>{XA_PLACE_LABELS.newRequest}</span></Link>}
     {onSearch ? <button type="button" className={styles.item} onClick={() => { close(); onSearch(); }} aria-keyshortcuts="Meta+K Control+K"><Search size={17} strokeWidth={1.7} aria-hidden="true" /><span className={styles.itemLabel}>{XA_PLACE_LABELS.search}</span></button>

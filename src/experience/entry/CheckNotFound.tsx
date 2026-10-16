@@ -13,6 +13,6 @@ export function CheckNotFound({ mode }: { mode?: "light" | "dark" }) {
     felt={<XaEntryFelt object={<XaEntryBrokenLink address="Your shared check" title="This check doesn’t open anymore.">Shared checks last about six months. A new one reads the site as it is today.</XaEntryBrokenLink>} />}>
     <XaHeadline quiet="The link may have expired or been copied only in part.">Business check not found.</XaHeadline>
     <XaButtonLink href="/audit" variant="primary" size="lg" block>Run the check again</XaButtonLink>
-    <XaEntryNote>Saved it to your workspace before? Your copy is still there. <XaTextLink href="/workspace">Open your workspace</XaTextLink></XaEntryNote>
+    <XaEntryNote>Saved it before? Your copy is still there. <XaTextLink href="/workspace">Go to Home</XaTextLink></XaEntryNote>
   </XaEntryFrame>;
 }

@@ -165,7 +165,7 @@ export function AskChangePanel({ item, site, decider, outcome, initialView = "ch
     <p className={styles.changeHead}>{routeStatus(item, decider)}{sender ? <span className={styles.changeMeta}>From {sender}</span> : null}</p>
     {waitsOnSomeoneElse ? <XaSegmented label="Show" value={view} onChange={setView} options={[{ value: "change", label: "The change" }, { value: "sees", label: `What ${decider.name} sees` }]} /> : null}
     {view === "sees" ? <div className={styles.sees}>
-      <p className={styles.seesKicker}>In {decider.name}&apos;s {XA_PLACE_LABELS.today}{sender ? `, from ${sender}` : ""}</p>
+      <p className={styles.seesKicker}>On {decider.name}&apos;s {XA_PLACE_LABELS.today}{sender ? `, from ${sender}` : ""}</p>
       <p className={styles.seesTitle}>{title}</p>
       <p className={styles.seesNote}>{decider.name} answers with {XA_YES_LABELS.yes} or {XA_YES_LABELS.notYet}.</p>
     </div> : null}

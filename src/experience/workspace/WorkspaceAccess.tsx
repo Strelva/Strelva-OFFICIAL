@@ -93,9 +93,9 @@ function CreateAgency({ postAction, isActive, onCreated }: { postAction: AccessA
     if (!name.trim()) { setError("Enter your agency name."); return; }
     setSubmitting(true); setError("");
     try {
-      const body = await postAction<{ workspaceId: string }>({ action: "create_agency", name: name.trim() }, "Your agency workspace couldn’t be created.");
+      const body = await postAction<{ workspaceId: string }>({ action: "create_agency", name: name.trim() }, "Your agency couldn’t be created.");
       if (isActive()) onCreated(body.workspaceId);
-    } catch (cause) { if (isActive()) setError(cause instanceof Error ? cause.message : "Your agency workspace couldn’t be created."); }
+    } catch (cause) { if (isActive()) setError(cause instanceof Error ? cause.message : "Your agency couldn’t be created."); }
     finally { if (isActive()) setSubmitting(false); }
   }
 
@@ -103,11 +103,11 @@ function CreateAgency({ postAction, isActive, onCreated }: { postAction: AccessA
     <div className="mx-auto max-w-2xl">
       <Building2 className="h-6 w-6 text-accent-text" strokeWidth={1.5} />
       <h1 className="mt-5 font-display text-[36px] font-medium leading-tight text-warm-black">Prepare useful work before the client arrives.</h1>
-      <p className="mt-4 max-w-xl text-[14px] leading-relaxed text-gray-muted">An agency workspace keeps your drafts separate. Hand off a finished assessment to its named client, who receives their own copy and decides whether you retain read-only access.</p>
+      <p className="mt-4 max-w-xl text-[14px] leading-relaxed text-gray-muted">An agency keeps your drafts separate. Hand off a finished assessment to its named client, who receives their own copy and decides whether you retain read-only access.</p>
       <form onSubmit={submit} className="mt-8 max-w-md">
         <TextInput label="Agency name" autoFocus required value={name} onChange={(event) => setName(event.target.value)} placeholder="Northstar Agency" className="min-h-12" />
         {error ? <p role="alert" className="mt-3 text-[13px] text-critical">{error}</p> : null}
-        <Button type="submit" size="lg" loading={submitting} className="mt-5">Create agency workspace</Button>
+        <Button type="submit" size="lg" loading={submitting} className="mt-5">Create your agency</Button>
       </form>
     </div>
   );
@@ -156,7 +156,7 @@ function AgencyHandoff({ snapshot, currentRole, selectedWork, postAction, isActi
       <p className="text-[13px] font-medium text-accent-text">Agency handoff</p>
       <h1 className="mt-4 font-display text-[36px] font-medium leading-tight text-warm-black">Put finished work in the client’s hands.</h1>
       <p className="mt-4 max-w-2xl text-[14px] leading-relaxed text-gray-muted">The link is bound to the recipient’s signed-in email. Acceptance creates an independent, client-owned copy. Agency access is never assumed.</p>
-      {currentRole === "owner" ? <div className="mt-5 flex flex-wrap gap-3"><a href={`/workspace/invitations?workspaceId=${encodeURIComponent(snapshot.workspaceId)}`} className="inline-flex min-h-10 items-center rounded-xl border border-gray-border px-4 text-[13px] font-medium text-warm-black hover:bg-gray-bg">Manage workspace invitations</a><a href={`/workspace/export?workspaceId=${encodeURIComponent(snapshot.workspaceId)}`} className="inline-flex min-h-10 items-center rounded-xl border border-gray-border px-4 text-[13px] font-medium text-warm-black hover:bg-gray-bg">Export workspace data</a></div> : null}
+      {currentRole === "owner" ? <div className="mt-5 flex flex-wrap gap-3"><a href={`/workspace/invitations?workspaceId=${encodeURIComponent(snapshot.workspaceId)}`} className="inline-flex min-h-10 items-center rounded-xl border border-gray-border px-4 text-[13px] font-medium text-warm-black hover:bg-gray-bg">Manage invitations</a><a href={`/workspace/export?workspaceId=${encodeURIComponent(snapshot.workspaceId)}`} className="inline-flex min-h-10 items-center rounded-xl border border-gray-border px-4 text-[13px] font-medium text-warm-black hover:bg-gray-bg">Download your records</a></div> : null}
       {selectedWork && !isDelegatedCustomerWork && !isUnsupportedWork ? (
         <form onSubmit={createHandoff} className="mt-8 border-y border-gray-border py-6">
           <p className="text-[12px] text-gray-muted">Handoff</p><p className="mt-1 text-[15px] font-medium text-warm-black">{selectedWork.title}</p>
@@ -164,7 +164,7 @@ function AgencyHandoff({ snapshot, currentRole, selectedWork, postAction, isActi
           {createdLink ? <div className="mt-4 flex flex-col gap-2 rounded-xl bg-gray-bg px-4 py-3 sm:flex-row sm:items-center"><code className="min-w-0 flex-1 truncate text-[11px] text-gray-muted">{createdLink}</code><Button type="button" size="sm" variant="secondary" icon={<Copy className="h-3.5 w-3.5" />} onClick={() => void copyLink()}>Copy link</Button>{copyState === "copied" ? <span role="status" className="text-[11px] text-positive">Copied</span> : copyState === "error" ? <span role="status" className="text-[11px] text-critical">Copy unavailable</span> : null}</div> : null}
         </form>
       ) : <p className="mt-8 border-y border-gray-border py-6 text-[14px] text-gray-muted">{isDelegatedCustomerWork ? "This is a client-owned copy shared with your agency as read-only. It cannot be handed to someone else." : isUnsupportedWork ? "This product cannot be handed off in this release. Its saved record remains available." : "Create or select an assessment before preparing a handoff."}</p>}
-      <section className="mt-8"><h2 className="text-[13px] font-medium text-gray-muted">Handoff history</h2>{snapshot.handoffs.length ? <ul className="mt-3 divide-y divide-gray-border border-y border-gray-border">{snapshot.handoffs.map((handoff) => <li key={handoff.id} className="flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between"><div><p className="text-[13px] font-medium text-warm-black">{handoff.recipientEmail}</p><p className="mt-1 text-[11px] capitalize text-gray-muted">{handoff.status} · created {formatDate(handoff.createdAt)}</p></div>{handoff.status === "pending" ? <Button type="button" size="sm" variant="danger" disabled={submitting} onClick={() => void revoke(handoff.id)}>Revoke</Button> : null}</li>)}</ul> : <p className="mt-3 text-[13px] text-gray-muted">No handoffs from this workspace yet.</p>}</section>
+      <section className="mt-8"><h2 className="text-[13px] font-medium text-gray-muted">Handoff history</h2>{snapshot.handoffs.length ? <ul className="mt-3 divide-y divide-gray-border border-y border-gray-border">{snapshot.handoffs.map((handoff) => <li key={handoff.id} className="flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between"><div><p className="text-[13px] font-medium text-warm-black">{handoff.recipientEmail}</p><p className="mt-1 text-[11px] capitalize text-gray-muted">{handoff.status} · created {formatDate(handoff.createdAt)}</p></div>{handoff.status === "pending" ? <Button type="button" size="sm" variant="danger" disabled={submitting} onClick={() => void revoke(handoff.id)}>Revoke</Button> : null}</li>)}</ul> : <p className="mt-3 text-[13px] text-gray-muted">No handoffs from here yet.</p>}</section>
     </div>
   );
 }
@@ -262,7 +262,7 @@ export function AccessHandoffOverlay({ loading, token, preview, postAction, onAc
       <div className="mx-auto min-h-full max-w-3xl rounded-2xl border border-gray-border bg-surface p-5 shadow-2xl sm:p-9">
         {loading || !preview ? <div role="status" className="flex min-h-[60vh] items-center justify-center gap-3 text-[14px] text-gray-muted"><Loader2 className="h-4 w-4 animate-spin" />Opening private handoff…</div> : (
           <>
-            <button type="button" autoFocus onClick={onClose} className="inline-flex items-center gap-1.5 text-[12px] text-gray-muted hover:text-warm-black"><ArrowLeft className="h-3.5 w-3.5" />Back to workspace</button>
+            <button type="button" autoFocus onClick={onClose} className="inline-flex items-center gap-1.5 text-[12px] text-gray-muted hover:text-warm-black"><ArrowLeft className="h-3.5 w-3.5" />Back to Home</button>
             <div className="mt-8"><div><p className="text-[13px] font-medium text-gray-muted">Prepared for {preview.recipientEmail}</p><h1 id="handoff-title" className="mt-2 font-display text-[32px] font-medium leading-tight text-warm-black">{preview.agencyName} prepared this for you.</h1></div></div>
             <div className="mt-8 border-y border-gray-border py-7">{isAiVisibilityPreview ? <AiVisibilityAssessmentResult work={preview.work} accessLabel="Prepared handoff preview" /> : isTrackerPreview ? <TrackerHandoffPreview preview={isTrackerPreview} /> : <p className="text-[14px] text-gray-muted">This handoff preview is unavailable. The saved work remains unchanged.</p>}</div>
             {preview.accepted ? <p className="mt-7 flex items-center gap-2 text-[14px] text-positive"><Check className="h-4 w-4" />This handoff has already been accepted.</p> : (
@@ -294,7 +294,7 @@ export function AccessHandoffOverlay({ loading, token, preview, postAction, onAc
                 </fieldset>
                 <label htmlFor={checkboxId} className="mt-5 flex cursor-pointer items-start gap-3 rounded-xl border border-gray-border bg-surface-inset p-4"><input id={checkboxId} type="checkbox" checked={allowAgencyAccess} onChange={(event) => setAllowAgencyAccess(event.target.checked)} className="mt-0.5 h-4 w-4 accent-[var(--accent)]" /><span><span className="block text-[13px] font-medium text-warm-black">Allow {preview.agencyName} read-only access</span><span className="mt-1 block text-[12px] leading-relaxed text-gray-muted">Optional and unchecked by default. You can revoke access later without losing your copy.</span></span></label>
                 {error ? <p role="alert" className="mt-4 text-[13px] text-critical">{error}</p> : null}
-                <Button size="lg" className="mt-5" loading={submitting} onClick={() => void accept()} icon={<ArrowRight className="h-4 w-4" />}>Accept into my workspace</Button>
+                <Button size="lg" className="mt-5" loading={submitting} onClick={() => void accept()} icon={<ArrowRight className="h-4 w-4" />}>Accept it</Button>
               </div>
             )}
           </>

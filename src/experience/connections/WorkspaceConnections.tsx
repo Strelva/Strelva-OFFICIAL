@@ -29,7 +29,7 @@ export function WorkspaceConnections({ workspaceId, workspaceKind, workspaceName
       if (response.status === 401 || response.status === 403) { if (!abort.signal.aborted) setRead({ scope: workspaceId, state: "permission" }); return; }
       if (!response.ok) throw new Error("Connections unavailable");
       const data = connectionsResponseSchema.parse(await response.json());
-      if (data.connections.some(row => row.workspaceId !== workspaceId)) throw new Error("Connections belong to another workspace");
+      if (data.connections.some(row => row.workspaceId !== workspaceId)) throw new Error("Connections belong to another business");
       if (!abort.signal.aborted) setRead({ scope: workspaceId, state: "ready", data });
     }).catch(() => { if (!abort.signal.aborted) setRead({ scope: workspaceId, state: "error" }); });
     return () => abort.abort();
@@ -37,7 +37,7 @@ export function WorkspaceConnections({ workspaceId, workspaceKind, workspaceName
   const current: Read = read.scope === workspaceId ? read : { scope: workspaceId, state: "loading" };
   const holderNames = new Map(names).set(workspaceId, workspaceName);
   return <StPage><StHead title="Connections" meta={`The outside accounts ${workspaceName} works with.`} />
-    {!canRead || current.state === "permission" ? <StNotice>You don’t have access to this workspace’s Connections. Ask its owner for access.</StNotice>
+    {!canRead || current.state === "permission" ? <StNotice>You don’t have access to this business’s Connections. Ask its owner for access.</StNotice>
       : current.state === "loading" ? <div role="status" aria-label="Loading Connections" className="space-y-4"><StSkeleton width="70%" /><StSkeleton width="45%" /></div>
       : current.state === "error" ? <StNotice tone="critical">Connections could not be loaded. <StTextButton onClick={() => setAttempt(value => value + 1)}>Try again</StTextButton></StNotice>
       : <div className="space-y-8">
@@ -67,7 +67,7 @@ function ConnectionRow({ connection, workspaceId, workspaceKind, names, systems,
       {connection.accessThrough.kind !== "platform" ? <p><span className="text-gray-muted">Access: </span>{agency ? `Through ${agency}’s ${connection.provider === "google_business_profile" ? "Google" : providerDefinition(connection.provider).label} access` : "Unknown"}</p> : null}
       <div><span className="text-gray-muted">Systems using it: </span>{connection.systemIds.length ? <ul className="space-y-1">{connection.systemIds.map(id => <li key={id}><StTextButton href={`/workspace?${new URLSearchParams({ workspaceId, view: "system", system: id })}`}>{systems.find(system => system.id === id)?.name || "Open System"}</StTextButton></li>)}</ul> : "None recorded"}</div>
       {next ? <p>{next}</p> : null}
-      {connection.provider === "resend" ? <p className="text-gray-muted">{connection.state === "connected" ? "Email sending is on for this business." : connection.state === "disconnected" ? "Email sending is off for this business." : "Email sending status is unknown for this business."} Strelva manages the sending account.</p> : !unavailable && canManage ? <StTextButton href={connectionSetupHref(connection, workspaceId)}>{action}</StTextButton> : !unavailable && !canManage && action !== "Manage" ? <p className="text-gray-muted">Ask a workspace owner or admin to {reconnect ? "reconnect" : "connect"} this account.</p> : null}
+      {connection.provider === "resend" ? <p className="text-gray-muted">{connection.state === "connected" ? "Email sending is on for this business." : connection.state === "disconnected" ? "Email sending is off for this business." : "Email sending status is unknown for this business."} Strelva manages the sending account.</p> : !unavailable && canManage ? <StTextButton href={connectionSetupHref(connection, workspaceId)}>{action}</StTextButton> : !unavailable && !canManage && action !== "Manage" ? <p className="text-gray-muted">Ask the owner or an admin to {reconnect ? "reconnect" : "connect"} this account.</p> : null}
     </div>
   </StRow>;
 }

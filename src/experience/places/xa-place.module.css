@@ -75,8 +75,8 @@
 .detailName { margin: 0; font-size: 17px; font-weight: 500; line-height: 24px; }
 .detailMeta { color: var(--st-text-2); font-size: 13px; line-height: 19px; overflow-wrap: anywhere; }
 .detailBody { display: flex; flex: 1; flex-direction: column; gap: 18px; }
-.bubble { box-sizing: border-box; max-width: 560px; margin: 0; padding: 13px 16px; border-radius: 18px; background: var(--st-chip); color: var(--st-text); font-size: 15px; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; }
-.said { box-sizing: border-box; max-width: 560px; margin: 0; padding: 13px 16px; border-radius: 18px; background: var(--st-tint); color: var(--st-text); font-size: 15px; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; }
+.bubble { box-sizing: border-box; max-width: 560px; margin: 0; padding: 13px 16px; border-radius: 16px; background: var(--st-chip); color: var(--st-text); font-size: 15px; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; }
+.said { box-sizing: border-box; max-width: 560px; margin: 0; padding: 13px 16px; border-radius: 16px; background: var(--st-tint); color: var(--st-text); font-size: 15px; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; }
 .detailFoot { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 16px; padding-top: 6px; }
 .detailFootNote { margin-left: auto; color: var(--st-text-3); font-size: 13px; line-height: 18px; }
 .backToList { display: none; }

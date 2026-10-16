@@ -2,12 +2,14 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { StHold, StPill } from "@/components/ui/strelva/Kit";
+import { StPill } from "@/components/ui/strelva/Kit";
+import { XaYes } from "@/components/ui/strelva/Xa";
 
 /**
  * Check in, undo, or cancel one booking. Plain POST to /api/workspace/bookings,
- * then a server refresh so the list shows what the store now holds. Cancelling
- * asks once before it acts.
+ * then a server refresh so the list shows what the store now holds. A cancel or
+ * a no-show has no server Undo, so the one yes (XaYes) asks its question in
+ * place first: one click to ask, the pill confirms, Not yet keeps it.
  */
 export function BookingActions({ workspaceId, tenantId, bookingId, status, clientName, view, canMarkNoShow }: {
   workspaceId: string;
@@ -65,19 +67,15 @@ export function BookingActions({ workspaceId, tenantId, bookingId, status, clien
         </StPill>
       ) : null}
       {status === "confirmed" && canMarkNoShow ? (
-        noShowConfirming ? <>
-          <span className="text-sm text-gray-muted">Mark {clientName} as a no-show?</span>
-          <StHold label={busy === "no_show" ? "Saving…" : "Hold to confirm no-show"} disabled={Boolean(busy)} onAccept={() => void change("no_show")} />
-          <StPill variant="soft" disabled={Boolean(busy)} onClick={() => setNoShowConfirming(false)}>Keep booked</StPill>
-        </> : <StPill variant="soft" disabled={Boolean(busy)} onClick={() => { setNoShowConfirming(true); setConfirming(false); }}>Mark no-show</StPill>
+        noShowConfirming ? <XaYes state={busy === "no_show" ? "going" : "waiting"} block={false} shortcut={false} question={`Mark ${clientName} as a no-show? This can't be undone here.`}
+          yesLabel="Mark no-show" notYetLabel="Keep booked" disabled={Boolean(busy)} working={{ title: "Saving the no-show", steps: [] }}
+          onYes={() => void change("no_show")} onNotYet={() => setNoShowConfirming(false)} /> : <StPill variant="soft" disabled={Boolean(busy)} onClick={() => { setNoShowConfirming(true); setConfirming(false); }}>Mark no-show</StPill>
       ) : null}
       {status === "confirmed" && !noShowConfirming ? (
         confirming ? (
-          <>
-            <span className="text-sm text-gray-muted">Cancel {clientName}&apos;s booking?</span>
-            <StHold label={busy === "cancelled" ? "Cancelling…" : "Hold to cancel booking"} disabled={Boolean(busy)} onAccept={() => void change("cancelled")} />
-            <StPill variant="soft" disabled={Boolean(busy)} onClick={() => setConfirming(false)}>Keep it</StPill>
-          </>
+          <XaYes state={busy === "cancelled" ? "going" : "waiting"} block={false} shortcut={false} question={`Cancel ${clientName}'s booking? This can't be undone here.`}
+            yesLabel="Cancel booking" notYetLabel="Keep it" disabled={Boolean(busy)} working={{ title: "Cancelling the booking", steps: [] }}
+            onYes={() => void change("cancelled")} onNotYet={() => setConfirming(false)} />
         ) : (
           <StPill variant="soft" disabled={Boolean(busy)} onClick={() => { setConfirming(true); setNoShowConfirming(false); }}>Cancel</StPill>
         )

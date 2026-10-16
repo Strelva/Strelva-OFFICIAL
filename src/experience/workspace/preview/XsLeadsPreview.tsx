@@ -25,6 +25,7 @@ import type { SiteResults } from "@/products/websites/client";
 import type { AgencyProspect } from "@/platform/agency-prospecting/server";
 import { resolveRange, type RangeKey } from "@/platform/infra/analytics/range";
 import { identityColor } from "@/platform/presentation/identity-color";
+import { XA_CLIENTS, xaOwnerPinned, XA_HARBOR, XA_NORTH } from "./xa-day";
 
 export type XsScreen = "leads" | "reviews" | "recaps" | "results" | "prospects" | "business-picker" | "business";
 
@@ -32,41 +33,36 @@ const BASE = "/preview/strelva/xa/xs-leads";
 const BUSINESS = "5e000000-0000-4000-8000-0000000000d1";
 const AGENCY = "5e000000-0000-4000-8000-0000000000a1";
 const MAYA = "5e000000-0000-4000-8000-0000000000e1";
-const CLIENT_COLORS = { harbor: "#2f5236", north: "#9c522c", juniper: "#4f7590", fieldwork: "#6b6f68" } as const;
+const CLIENT_COLORS = { harbor: "#2f5236", north: "#9c522c", lakeview: "#4f7590", fieldwork: "#6b6f68" } as const;
 /** Fixed "now" so day phrases ("yesterday") read the same in every capture. */
 const NOW = new Date("2026-10-16T15:00:00Z");
 const noop = () => undefined;
-const NORTH_STUDIO = { agencyId: AGENCY, name: "North Studio", logoUrl: null, accentColor: "#2f5236", replyTo: null, credit: "runs_on_strelva" as const };
+const NORTH_STUDIO = { agencyId: AGENCY, name: XA_NORTH.name, logoUrl: null, accentColor: "#2f5236", replyTo: null, credit: "runs_on_strelva" as const };
 type Chrome = Partial<Omit<ComponentProps<typeof StrelvaShell>, "children">>;
 
 function ownerChrome(mode: "light" | "dark", current: string): Chrome {
   const pinned: StrelvaPinnedItem[] = [
-    { id: "website", kind: "website", title: "Website", href: `${BASE}/results`, detail: "Live", current: current === "results" },
-    { id: "bookings", kind: "bookings", title: "Bookings", href: `${BASE}/recaps`, detail: "31 this week" },
-    { id: "inbox", kind: "inquiries", title: "Inbox", href: `${BASE}/business`, detail: "3 new" },
+    ...xaOwnerPinned({ current: current === "results" ? "website" : undefined }),
     { id: "listing", kind: "listing", title: "Google listing", href: `${BASE}/reviews`, current: current === "reviews", ...(current === "reviews" ? { state: "waits" as const } : { detail: "4.8" }) },
   ];
-  return { appBase: "/preview/strelva", signOut: null, systemsReleased: true, mode, workspaceName: "Harbor Dental", accountName: "Dr. Amy Lin", pinned, agency: { name: "North Studio", person: "Maya", color: CLIENT_COLORS.harbor }, ownerBrand: NORTH_STUDIO, onNavigate: noop };
+  return { appBase: "/preview/strelva", signOut: null, systemsReleased: true, mode, workspaceName: XA_HARBOR.name, accountName: XA_HARBOR.owner, pinned, agency: { name: XA_NORTH.name, person: XA_NORTH.first, color: CLIENT_COLORS.harbor }, ownerBrand: NORTH_STUDIO, onNavigate: noop };
 }
 function agencyChrome(mode: "light" | "dark", place: "leads" | "prospects"): Chrome {
   // North Studio's clients in this fiction. Harbor Dental and Lakeview Mediation are asking for work, so they are not clients yet.
   const clients: StrelvaClientLink[] = AGENCY_CLIENTS.map(client => ({ ...client, href: `${BASE}/leads` }));
-  return { appBase: "/preview/strelva", signOut: null, systemsReleased: true, mode, workspaceId: AGENCY, workspaceName: "North Studio", accountName: "Maya Okafor", ownerBrand: NORTH_STUDIO,
+  return { appBase: "/preview/strelva", signOut: null, systemsReleased: true, mode, workspaceId: AGENCY, workspaceName: XA_NORTH.name, accountName: XA_NORTH.person, ownerBrand: NORTH_STUDIO,
     agencyNavigation: { leadsAvailable: true, leadsCurrent: place === "leads", queueCount: 3, clients, hrefs: { home: `${BASE}/prospects`, queue: `${BASE}/prospects`, library: `${BASE}/prospects`, minutes: `${BASE}/prospects`, leads: `${BASE}/leads` } } };
 }
 
-const AGENCY_CLIENTS = [
-  { id: "north", name: "North Coast Realty", detail: "Dana", color: CLIENT_COLORS.north },
-  { id: "fieldwork", name: "Fieldwork Studio", detail: "Ana", color: CLIENT_COLORS.fieldwork },
-  { id: "juniper", name: "Juniper Bakery", detail: "Sam", color: CLIENT_COLORS.juniper },
-] as const;
+// North Studio's four clients, the same as every agency preview (xa-day.ts).
+const AGENCY_CLIENTS = XA_CLIENTS.map(client => ({ id: client.key, name: client.name, detail: client.owner.split(" ")[0]!, color: (CLIENT_COLORS as Record<string, string>)[client.key] }));
 const KNOWN_CLIENTS = AGENCY_CLIENTS.map(({ id, name }) => ({ id, name, href: `${BASE}/leads` }));
 
 /* ---------- Leads ---------- */
 const token = (n: number) => `${n}`.repeat(36).slice(0, 36).replace(/[^a-f0-9]/g, "a");
 type FixtureLead = { lead: Record<string, unknown> & { businessName: string; statusToken: string; deliveryStatus: string }; workflow: Record<string, unknown> & { token: string; status: string; note: string | null }; legacyOwnership: boolean };
 const LEADS: FixtureLead[] = [
-  { lead: { businessName: "Harbor Dental", email: "dr.lin@harbordental.com", phone: "(716) 555-0142", location: "1180 Elmwood Ave, Buffalo", description: "We need online booking for cleanings and a new-patient form. Our current site can't take either, and the front desk answers the same three questions all day.", currentWebsite: "harbordental.com", statusToken: token(1), deliveryStatus: "received", submittedAt: "2026-10-15T14:12:00Z", statusUpdatedAt: "2026-10-15T14:12:00Z" }, workflow: { token: token(1), status: "new", updatedAt: null, note: null }, legacyOwnership: false },
+  { lead: { businessName: XA_HARBOR.name, email: "dr.lin@harbordental.com", phone: "(716) 555-0142", location: "1180 Elmwood Ave, Buffalo", description: "We need online booking for cleanings and a new-patient form. Our current site can't take either, and the front desk answers the same three questions all day.", currentWebsite: XA_HARBOR.domain, statusToken: token(1), deliveryStatus: "received", submittedAt: "2026-10-15T14:12:00Z", statusUpdatedAt: "2026-10-15T14:12:00Z" }, workflow: { token: token(1), status: "new", updatedAt: null, note: null }, legacyOwnership: false },
   { lead: { businessName: "Hertel Avenue Florist", email: "ana@hertelflorist.com", phone: "(716) 555-0190", location: "Buffalo", description: "Wedding season orders keep getting lost in email. Could you set up an order form that sends us one list?", currentWebsite: null, statusToken: token(2), deliveryStatus: "received", submittedAt: "2026-10-14T09:30:00Z", statusUpdatedAt: "2026-10-14T09:30:00Z" }, workflow: { token: token(2), status: "new", updatedAt: null, note: null }, legacyOwnership: false },
   { lead: { businessName: "Lakeview Mediation", email: "ruth@lakeviewmediation.com", phone: null, location: "Amherst", description: "Spanish version of our intake form.", currentWebsite: "lakeviewmediation.com", statusToken: token(3), deliveryStatus: "reviewing", submittedAt: "2026-10-09T16:05:00Z", statusUpdatedAt: "2026-10-10T10:00:00Z" }, workflow: { token: token(3), status: "contacted", updatedAt: "2026-10-10T10:00:00Z", note: "Maya called Ruth on Oct 10. She wants a quote by Friday." }, legacyOwnership: false },
   { lead: { businessName: "Fieldwork Studio", email: "ana@fieldwork.studio", phone: null, location: "Buffalo", description: "A print price list customers can order from.", currentWebsite: "fieldwork.studio", statusToken: token(4), deliveryStatus: "launched", submittedAt: "2026-09-28T12:00:00Z", statusUpdatedAt: "2026-10-02T12:00:00Z" }, workflow: { token: token(4), status: "converted", updatedAt: "2026-10-02T12:00:00Z", note: "Added as a client on Oct 2." }, legacyOwnership: false },
@@ -74,7 +70,7 @@ const LEADS: FixtureLead[] = [
 
 function leadsRequest(state: string): typeof fetch {
   let leads: FixtureLead[] = state === "converting" ? LEADS.map((row, index) => index === 0 ? { ...row, lead: { ...row.lead, deliveryStatus: "drafting" }, workflow: { ...row.workflow, status: "converting" } } : row) : LEADS;
-  const snapshot = () => ({ agency: { id: AGENCY, name: "North Studio", role: "owner" }, currentActorId: MAYA, leads: state === "empty" ? [] : leads, conversionAvailable: state !== "unavailable" });
+  const snapshot = () => ({ agency: { id: AGENCY, name: XA_NORTH.name, role: "owner" }, currentActorId: MAYA, leads: state === "empty" ? [] : leads, conversionAvailable: state !== "unavailable" });
   return (async (_url: RequestInfo | URL, init?: RequestInit) => {
     if (state === "loading") return new Promise<Response>(() => undefined);
     if (state === "error") return Response.json({ error: "Leads could not be read just now." }, { status: 503 });
@@ -92,7 +88,7 @@ function leadsRequest(state: string): typeof fetch {
 
 /* ---------- Reviews ---------- */
 const review = (patch: Partial<ReviewView> & Pick<ReviewView, "id" | "author" | "rating" | "text" | "date">): ReviewView => ({ source: "google", externalId: `g-${patch.id}`, reply: null, repliedAt: null, draft: null, ...patch });
-const REVIEW_SITE: SiteReviews = { tenantId: "harbor", siteName: "Harbor Dental", googleConnected: true, googlePlaceId: "ChIJ-harbor-dental", replyMode: "approve", autoPostHeld: null, unavailable: false, reviews: [
+const REVIEW_SITE: SiteReviews = { tenantId: "harbor", siteName: XA_HARBOR.name, googleConnected: true, googlePlaceId: "ChIJ-harbor-dental", replyMode: "approve", autoPostHeld: null, unavailable: false, reviews: [
   review({ id: "r1", author: "Priya Shah", rating: 5, date: "2026-10-15", text: "Dr. Lin got my daughter in before school started back. Gentle, quick, and they took our Delta Dental PPO without any back and forth.", draft: { reply: "Thank you, Priya. We're glad we could fit your daughter in before school. See you both at the next cleaning.", autoPostAt: null } }),
   review({ id: "r2", author: "Tom Okafor", rating: 4, date: "2026-10-13", text: "Great cleaning. Parking on Elmwood is tough at 5pm, so give yourself a few minutes." }),
   review({ id: "r3", author: "Rachel Kim", rating: 5, date: "2026-10-08", text: "Kind with my 3-year-old. She asked to go back.", reply: "Thank you, Rachel. Tell her the dinosaur chair is waiting.", repliedAt: "2026-10-08" }),
@@ -123,7 +119,7 @@ const RECAPS: RecapView[] = [
   { id: "w40", period: "week", start: "2026-09-28", end: "2026-10-04", summary: "A steady week.", highlights: [], visits: 368, visitsDelta: -4, customerActions: 22, newReviews: 1, nextAction: null },
 ];
 function recapsState(state: string): WorkspaceRecapsState {
-  const site = { tenantId: "harbor", siteName: "harbordental.com", unavailable: false, recaps: RECAPS };
+  const site = { tenantId: "harbor", siteName: XA_HARBOR.domain, unavailable: false, recaps: RECAPS };
   if (state === "loading") return { kind: "loading" };
   if (state === "error") return { kind: "error" };
   if (state === "permission") return { kind: "permission" };
@@ -144,7 +140,7 @@ function resultsState(state: string, rangeKey: RangeKey): WorkspaceResultsState 
   const total = visits.reduce((sum, value) => sum + value, 0);
   const stats: NonNullable<SiteResults["stats"]> = { range: window, pageViews: total, pageViewsPrior: total - 41, pageViewsDelta: 41, actions: 31, actionsPrior: 26, actionsDelta: 5, bookingClicks: 24, bookingClicksPrior: 20, phoneClicks: 7, phoneClicksPrior: 6, hasData: true,
     series: visits.map((pageViews, index) => ({ date: new Date(window.to.getTime() - (days - index - 1) * 86400000).toISOString().slice(0, 10), pageViews, bookingClicks: 0, phoneClicks: 0 })) };
-  const site: SiteResults = { tenantId: "harbor", tenantStableId: "5e000000-0000-4000-8000-0000000000b9", siteName: "harbordental.com", stats, anomaly: null, visitorSeries: visits, milestone: null,
+  const site: SiteResults = { tenantId: "harbor", tenantStableId: "5e000000-0000-4000-8000-0000000000b9", siteName: XA_HARBOR.domain, stats, anomaly: null, visitorSeries: visits, milestone: null,
     searchPerf: { status: "ok", clicks: 86, impressions: 1420, ctr: 86 / 1420, position: 3.8, topQueries: [{ query: "dentist elmwood buffalo", clicks: 31, impressions: 400, position: 2.1 }, { query: "harbor dental", clicks: 28, impressions: 120, position: 1 }, { query: "delta dental ppo dentist buffalo", clicks: 12, impressions: 300, position: 6.4 }] },
     gaPerf: { status: "ok", users: 318, sessions: 402, pageviews: 911, topSources: [{ source: "google / organic", sessions: 240 }, { source: "(direct)", sessions: 102 }, { source: "google maps", sessions: 60 }], topPages: [{ path: "/", views: 380 }, { path: "/book", views: 214 }, { path: "/services/cleanings", views: 140 }] },
     aiVisibility: { service: "dentists in Buffalo", mentionedCount: 2, total: 5, mentionedQueries: ["Which dentist on Elmwood takes Delta Dental?", "Gentle dentist for kids in Buffalo"], newlyAppeared: ["Gentle dentist for kids in Buffalo"], hasData: true, checkedAt: "2026-10-14T12:00:00Z" },
@@ -159,7 +155,7 @@ function resultsState(state: string, rangeKey: RangeKey): WorkspaceResultsState 
 
 /* ---------- Prospects ---------- */
 const PROSPECTS: AgencyProspect[] = [
-  { id: "5e000000-0000-4000-8000-0000000001a1", name: "Dr. Amy Lin", email: "dr.lin@harbordental.com", business: "Harbor Dental", url: "https://harbordental.com", source: "audit", result_id: "r1", score: 62, grade: "C", created_at: "2026-10-15T13:40:00Z" },
+  { id: "5e000000-0000-4000-8000-0000000001a1", name: XA_HARBOR.owner, email: "dr.lin@harbordental.com", business: XA_HARBOR.name, url: "https://harbordental.com", source: "audit", result_id: "r1", score: 62, grade: "C", created_at: "2026-10-15T13:40:00Z" },
   { id: "5e000000-0000-4000-8000-0000000001a2", name: "Ana Ruiz", email: "ana@hertelflorist.com", business: "Hertel Avenue Florist", url: "https://hertelflorist.com", source: "monitor", result_id: "r2", score: 41, grade: "D", created_at: "2026-10-12T10:00:00Z" },
   { id: "5e000000-0000-4000-8000-0000000001a3", name: "Ruth Adler", email: "ruth@lakeviewmediation.com", business: "Lakeview Mediation", url: "https://lakeviewmediation.com", source: "audit", result_id: "r3", score: 78, grade: "B", created_at: "2026-10-03T15:00:00Z" },
   { id: "5e000000-0000-4000-8000-0000000001a5", name: "Ana Reyes", email: "ana@fieldwork.studio", business: "Fieldwork Studio", url: "https://fieldwork.studio", source: "audit", result_id: "r5", score: 70, grade: "B", created_at: "2026-09-25T09:00:00Z" },
@@ -182,8 +178,8 @@ export function XsLeadsPreview({ screen, state, mode, range, period, recap, open
   }
   if (screen === "business-picker") {
     const facts: Record<string, string> = { "Harbor Dental": "Run by Dr. Amy Lin · harbordental.com", "North Coast Realty": "Run by Dana Whitfield · northcoastrealty.com", "Lakeview Mediation": "Run by Ruth Adler · lakeviewmediation.com", "Fieldwork Studio": "Run by Ana Reyes · fieldwork.studio", "Hertel Avenue Florist": "Run by Ana Ruiz", "Elmwood Bikes": "Run by Sam Ortiz", "Juniper Bakery": "Run by Sam Lee · juniperbakery.com" };
-    const names = state === "many" ? Object.keys(facts) : ["Harbor Dental", "North Coast Realty", "Lakeview Mediation"];
-    return <BusinessPicker mode={mode} accountName="Maya Okafor" businesses={state === "empty" ? [] : names.map((name, index) => ({ id: `t${index}-${name}`, name, detail: facts[name], color: identityColor(`t${index}-${name}`) }))} />;
+    const names = state === "many" ? Object.keys(facts) : [XA_HARBOR.name, "North Coast Realty", "Lakeview Mediation"];
+    return <BusinessPicker mode={mode} accountName={XA_NORTH.person} businesses={state === "empty" ? [] : names.map((name, index) => ({ id: `t${index}-${name}`, name, detail: facts[name], color: identityColor(`t${index}-${name}`) }))} />;
   }
-  return <div data-workspace-theme="linen" data-workspace-mode={mode}><ServerStatus businessName="Harbor Dental" error={state === "error" ? "failed" : ""} /></div>;
+  return <div data-workspace-theme="linen" data-workspace-mode={mode}><ServerStatus businessName={XA_HARBOR.name} error={state === "error" ? "failed" : ""} /></div>;
 }

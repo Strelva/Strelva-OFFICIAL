@@ -20,7 +20,7 @@ describe("website canon fixture panels", () => {
   });
   it("blocks article publish for permission state while retaining the draft", () => {
     const node = page("articles", "permission");
-    expect([...node.querySelectorAll("button")].find(button => button.textContent?.includes("Hold to make it live"))?.disabled).toBe(true);
+    expect([...node.querySelectorAll("button")].find(button => button.textContent?.includes("Make it live"))?.disabled).toBe(true);
     expect(node.textContent).toContain("What happens in a mediation session");
   });
   it("gives the single visit series an accessible data summary", () => {

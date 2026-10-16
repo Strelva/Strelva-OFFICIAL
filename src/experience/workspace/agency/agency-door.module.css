@@ -117,7 +117,7 @@
   .addedSplit .addedHead { order: -2; }
   .addedSplit .objectColumn { order: -1; }
   .reading > span:first-child { --xa-size: 180px !important; margin: -28px 0 -36px -16px; }
-  .object { padding: 20px; border-radius: 20px; }
+  .object { padding: 20px; border-radius: 16px; }
   .linkRow { flex-direction: column; }
   .addedState { width: 100%; padding-left: 46px; text-align: left; }
   .inline { padding-left: 0; }

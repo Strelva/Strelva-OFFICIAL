@@ -326,7 +326,7 @@ export function AgencyHome({
     {snapshot.work.length ? <ul>{snapshot.work.slice(0, 6).map((work) => <li key={work.id} className="border-b border-gray-border">
       <button type="button" className="flex min-h-16 w-full items-center gap-4 px-2 py-4 text-left hover:bg-surface" onClick={() => onOpenWork(work.id)}>
         <FileText className="shrink-0 text-accent-text" size={18} aria-hidden="true" />
-        <span className="min-w-0 flex-1"><strong className="block truncate text-[14px] font-medium text-warm-black">{work.title}</strong><small className="mt-1 block text-[12px] text-gray-muted">{workLabel(work, released)} · Private to this agency workspace</small></span>
+        <span className="min-w-0 flex-1"><strong className="block truncate text-[14px] font-medium text-warm-black">{work.title}</strong><small className="mt-1 block text-[12px] text-gray-muted">{workLabel(work, released)} · Private to this agency</small></span>
         <ArrowRight className="shrink-0 text-gray-muted" size={16} aria-hidden="true" />
       </button>
     </li>)}</ul> : <div className="flex items-start gap-3 border-b border-gray-border py-5 text-[13px] leading-relaxed text-gray-muted"><BriefcaseBusiness className="mt-0.5 shrink-0" size={17} aria-hidden="true" /><p>No private agency work has been saved yet.</p></div>}

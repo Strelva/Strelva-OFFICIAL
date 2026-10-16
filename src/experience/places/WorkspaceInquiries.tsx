@@ -96,7 +96,7 @@ export function WorkspaceInquiries({ workspaceId, state, embedded = false, forwa
     {head ? <SystemHead kind="inquiries" title="Inquiries" back={embedded ? undefined : <a className={x.back} href={placeHomeHref(workspaceId)}>‹ Home</a>}
       status={waiting ? { kind: "waits", label: `${waiting} ${waiting === 1 ? "waits" : "wait"} for you` } : undefined} tone={waiting ? "waits" : undefined}
       line={recent !== null ? `${recent} in the last 30 days` : undefined} actions={segment} /> : null}
-    {state.kind === "permission" ? <XaEmpty size="sm" pose="alone" title="These inquiries belong to another business" job="Pebble kept them closed to your account" action={<XaButtonLink href="/workspace">Open your workspace</XaButtonLink>}>Your account isn&apos;t a member of this business. Ask its owner to invite you.</XaEmpty>
+    {state.kind === "permission" ? <XaEmpty size="sm" pose="alone" title="These inquiries belong to another business" job="Pebble kept them closed to your account" action={<XaButtonLink href="/workspace">Go to Home</XaButtonLink>}>Your account isn&apos;t a member of this business. Ask its owner to invite you.</XaEmpty>
       : state.kind === "error" ? <XaEmpty size="sm" bare pose="fixing" title="Inquiries couldn't load just now" job="Pebble kept every message. Nothing is lost." action={reload ?? <XaTextLink href={`/workspace/inquiries?workspaceId=${encodeURIComponent(workspaceId)}`}>Reload</XaTextLink>} /> : <>
         {head ? null : segment ? <div className={x.inboxHead}>{segment}</div> : null}
         {total ? null : <p className={x.note}>{meta}</p>}

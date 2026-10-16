@@ -18,7 +18,7 @@ export function DashboardErrorView({ onRetry }: { onRetry: () => void }) {
       title="This page didn't load."
       job="Your site is still up. Nothing on it changed."
       action={<XaButton variant="primary" onClick={onRetry}>Try again</XaButton>}
-      secondary={<XaTextLink href={dashboard?.dashboardHref("/dashboard") || "/dashboard"}>Go to Today</XaTextLink>}
+      secondary={<XaTextLink href={dashboard?.dashboardHref("/dashboard") || "/dashboard"}>Go to Home</XaTextLink>}
     >
       Strelva couldn&apos;t read what this page needs. Trying again usually fixes it.
     </DashEmpty>

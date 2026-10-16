@@ -199,7 +199,7 @@ describe("business home", () => {
   it("offers a truthful route to allowance and payer details without inventing a Home metric", () => {
     const html = renderHome([]);
 
-    expect(html).toContain("Current workspace");
+    expect(html).toContain("Current business");
     expect(html).toContain("Alder Workshop");
     expect(html).toContain("Work allowance");
     expect(html).toContain("Review allowance and payer details in Business details.");

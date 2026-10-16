@@ -62,7 +62,7 @@ export function WorkspaceGoogle({ workspaceId, state, result, action, reviewId, 
     <Head title="Google listing" meta={<span>Another business</span>} />
     <div className={styles.object}>
       <div className={styles.objectText}><h2 className={styles.objectTitle}>This belongs to another business.</h2><p className={styles.quiet}>Your account isn&apos;t a member of it, so Strelva showed nothing from it. Ask its owner to invite you.</p>
-        <div className={styles.objectActions}><XaButtonLink href="/workspace" variant="secondary">Open your workspace</XaButtonLink></div></div>
+        <div className={styles.objectActions}><XaButtonLink href="/workspace" variant="secondary">Go to Home</XaButtonLink></div></div>
       <Clay pose="alone" width={200} decorative />
     </div>
   </div></div>;

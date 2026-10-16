@@ -94,16 +94,16 @@ describe("actual Needs-you reads on Home and its decision place", () => {
       input: {}, createdAt: "2026-10-09T11:00:00Z", operation: { status: "needs_attention", reason: "Review the proposed change." } };
     await home([ready({ items: [ask] }), ready({ items: [ask], complete: true })], "needs-you", [work]);
     expect(text()).toContain("Some decisions could not be checked.");
-    expect(button(`Approve: ${ask.title}`)).toBeDefined(); expect(button("Open Review the opening checklist")).toBeDefined();
+    expect(button(`Make it live: ${ask.title}`)).toBeDefined(); expect(button("Open Review the opening checklist")).toBeDefined();
     expect(text()).toContain("Decisions only you can make for Fictional Workshop."); assertNoClear();
     await click("Check again"); expect(text()).toContain("Two decisions only you can make.");
-    expect(button(`Approve: ${ask.title}`)).toBeDefined();
+    expect(button(`Make it live: ${ask.title}`)).toBeDefined();
   });
   it("retains the member boundary on an actual incomplete read", async () => {
     await home([ready({ items: [ask], role: "member" })], "needs-you");
     expect(text()).toContain("Some decisions could not be checked.");
     expect(text()).toContain("Only the owner can decide these. You can see what is waiting.");
-    expect(button(`Approve: ${ask.title}`)).toBeUndefined(); expect(button(`Not yet: ${ask.title}`)).toBeUndefined();
+    expect(button(`Make it live: ${ask.title}`)).toBeUndefined(); expect(button(`Not yet: ${ask.title}`)).toBeUndefined();
     expect([...node.querySelectorAll("a")].some(a => a.textContent?.trim() === "Open")).toBe(true);
   });
 });
@@ -116,8 +116,9 @@ describe("partial discovery preserves independent decisions and receipts", () =>
   it("keeps pending and missing-review guards while showing known partial asks", async () => {
     await mount(<NeedsYouSection state={ready({ items: [ask, { ...ask, id: "d0000000-0000-4000-8000-000000000002", title: "Review unavailable change", review: null }] })}
       pending={ask.id} notices={{}} onDecide={noop} onRetry={noop} />);
-    expect(button(`Approve: ${ask.title}`)?.disabled).toBe(true); expect(button(`Not yet: ${ask.title}`)?.disabled).toBe(true);
-    expect(button("Approve: Review unavailable change")).toBeUndefined(); expect(text()).toContain("Refresh to see the latest before deciding.");
+    // The pending decision shows its Working state in place of the yes, so neither answer can be pressed twice.
+    expect(button(`Make it live: ${ask.title}`)).toBeUndefined(); expect(button(`Not yet: ${ask.title}`)).toBeUndefined(); expect(text()).toContain("Working…");
+    expect(button("Make it live: Review unavailable change")).toBeUndefined(); expect(text()).toContain("Refresh to see the latest before deciding.");
   });
   it.each([true, false])("does not conflate partial discovery with handledAvailable=%s", async handledAvailable => {
     await home([ready({ handledAvailable })]); expect(text()).toContain("Some decisions could not be checked.");
@@ -146,7 +147,7 @@ describe("initiated retry focus across actual partial and failed reads", () => {
   });
   it.each(["home", "needs-you"] as const)("preserves outside movement across partial→error→complete in %s", async view => {
     await home([ready(), { error: "Fictional discovery unavailable." }, ready({ complete: true })], view);
-    const outside = node.querySelector<HTMLSelectElement>('select[aria-label="Current workspace"]')!;
+    const outside = node.querySelector<HTMLSelectElement>('select[aria-label="Current business"]')!;
     outside.focus(); await click("Check again"); expect(document.activeElement).toBe(outside); assertNoClear();
     await click("Check again"); expect(document.activeElement).toBe(outside);
     expect(text()).toContain(view === "home" ? "Nothing needs you right now." : "Nothing needs you.");

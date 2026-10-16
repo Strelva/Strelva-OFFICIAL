@@ -108,7 +108,7 @@ describe("business entry preserves auth and acceptance boundaries", () => {
   it("makes a revoked invitation visible without an acceptance control", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => Response.json({ invitation: { workspaceId: "business", workspaceName: "Example business", recipientEmail: "owner@example.test", role: "member", status: "revoked", expiresAt: "2026-10-15T12:00:00Z" } })));
     const node = await render(createElement(WorkspaceInvitationAcceptance, { token: "b".repeat(43) }));
-    expect(node.textContent).toContain("owner revoked this invitation");
+    expect(node.textContent).toContain("owner took back this invitation");
     expect(node.querySelectorAll("button")).toHaveLength(0);
   });
 });

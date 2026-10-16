@@ -1,8 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
-import { StHold } from "@/components/ui/strelva/Kit";
-import { XaButtonLink, XaHeadline, XaLabel, XaPebbleScene, XaRow, XaRows, XaSays, XaSegmented, XaStatus, XaSystemTile, XaTextLink } from "@/components/ui/strelva/Xa";
+import { XaButtonLink, XaHeadline, XaLabel, XaPebbleScene, XaRow, XaRows, XaSays, XaSegmented, XaStatus, XaSystemTile, XaTextLink, XaYes } from "@/components/ui/strelva/Xa";
 import { RecordLoading, RecordTrouble } from "@/experience/record/RecordStates";
 import styles from "@/experience/record/record.module.css";
 import { SelectInput } from "@/components/ui/TextInput";
@@ -35,13 +34,13 @@ export function WorkspaceExit({ workspaceId, request = fetch, businessBillingRel
     setError("");
     try {
       const response = await request(`/api/workspace-exit?workspaceId=${encodeURIComponent(workspaceId)}`, { cache: "no-store" });
-      const next = await readBody<WorkspaceExitOptions>(response, "Workspace exit is unavailable.");
+      const next = await readBody<WorkspaceExitOptions>(response, "Leaving Strelva is unavailable right now.");
       if (sequence !== loadSequence.current) return;
       setOptions(next);
       setSuccessorUserId((current) => current || next.successors[0]?.userId || current);
     } catch (cause) {
       if (sequence !== loadSequence.current) return;
-      setError(cause instanceof Error ? cause.message : "Workspace exit is unavailable.");
+      setError(cause instanceof Error ? cause.message : "Leaving Strelva is unavailable right now.");
     } finally {
       if (sequence === loadSequence.current) setLoading(false);
     }
@@ -76,12 +75,12 @@ export function WorkspaceExit({ workspaceId, request = fetch, businessBillingRel
           idempotencyKey: crypto.randomUUID(),
         }),
       });
-      const result = await readBody<WorkspaceExitResponse>(response, "Workspace exit could not be confirmed.");
+      const result = await readBody<WorkspaceExitResponse>(response, "Leaving Strelva could not be confirmed.");
       if (sequence !== loadSequence.current) return;
       setOptions((current) => current ? { ...current, state: result.state } : current);
     } catch (cause) {
       if (sequence !== loadSequence.current) return;
-      setError(cause instanceof Error ? cause.message : "Workspace exit could not be confirmed.");
+      setError(cause instanceof Error ? cause.message : "Leaving Strelva could not be confirmed.");
     } finally {
       if (sequence === loadSequence.current) setBusy(false);
     }
@@ -130,8 +129,10 @@ export function WorkspaceExit({ workspaceId, request = fetch, businessBillingRel
       <div className={styles.choice}><span className={styles.choiceText}><span className={styles.canTitle}>Business record and history</span><span className={styles.canDetail}>They stay here to download until you ask for them to be deleted.</span></span></div>
       <div className={styles.choice}><span className={styles.choiceText}><span className={styles.canTitle}>Billing and outside services</span><span className={styles.canDetail}>{"This doesn't change billing or stop an outside service. "}{billing ?? "Billing controls are not open here. Contact your billing provider to end an existing agreement."}</span></span></div>
     </section>
-    <p className={styles.quietNote}>This is final for this workspace. Nothing is deleted. <XaTextLink href={exportHref}>Download everything first</XaTextLink></p>
-    <div><StHold label={busy ? "Recording your choice…" : "Hold to leave"} disabled={busy || (resourceKind === "successor" && !successorUserId)} onAccept={() => void complete()} /></div>
+    <p className={styles.quietNote}>This is final for this business. Nothing is deleted. <XaTextLink href={exportHref}>Download everything first</XaTextLink></p>
+    {/* Leaving has no Undo, so the one yes is the confirmation; the page above is its question. */}
+    <div><XaYes state={busy ? "going" : "waiting"} block={false} shortcut={false} yesLabel="Leave Strelva" working={{ title: "Recording your choice", steps: [] }}
+      disabledReason={resourceKind === "successor" && !successorUserId ? "Choose who looks after them first." : undefined} onYes={() => void complete()} /></div>
   </div>;
 }
 

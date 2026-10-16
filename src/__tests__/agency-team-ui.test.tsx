@@ -67,13 +67,12 @@ it("requires explicit removal confirmation and removes the person after success"
   const { node, request } = await render();
   await click(button(node, "Remove staff")); expect(writes(request)).toHaveLength(0);
   expect(node.textContent).toContain("All their client assignments will end");
-  await click(button(node, "Cancel removal")); expect(writes(request)).toHaveLength(0);
+  // One yes (October 16): the question is asked inside XaYes; "Keep them" backs out, "Remove them" confirms.
+  await click(button(node, "Keep them")); expect(writes(request)).toHaveLength(0);
   await click(button(node, "Remove staff"));
-  const confirmation = [...node.querySelectorAll("button")].find(item => item.textContent?.startsWith("Confirm removal"))!;
-  await click(confirmation); expect(writes(request)).toHaveLength(0);
-  const reviewed = node.querySelector<HTMLButtonElement>('button[aria-label="Confirm: Confirm removal"]')!;
-  expect(reviewed).not.toBeNull();
-  await click(reviewed);
+  const confirmation = node.querySelector<HTMLButtonElement>('button[aria-label^="Confirm removal of"]')!;
+  expect(confirmation.textContent).toBe("Remove them");
+  await click(confirmation);
   expect(writes(request)[0]).toEqual({ action: "remove", workspaceId: TEAM_AGENCY, userId: TEAM_STAFF });
   expect(node.textContent).not.toContain("sam@agency.example.test");
 });

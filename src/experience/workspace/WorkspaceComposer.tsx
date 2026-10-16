@@ -1,9 +1,8 @@
 "use client";
 
-import { ArrowUp, LayoutGrid } from "lucide-react";
 import { useEffect, useId, useRef, useState, type FormEvent } from "react";
-import { StComposerBar, StNotice, StTextButton } from "@/components/ui/strelva/Kit";
-import { Button } from "@/components/ui/Button";
+import { StNotice, StTextButton } from "@/components/ui/strelva/Kit";
+import { XaComposer } from "@/components/ui/strelva/xa/composer";
 import { readRequestDraft, writeRequestDraft } from "./request-draft";
 import styles from "./workspace-composer.module.css";
 
@@ -81,32 +80,14 @@ function ComposerSession({ initialRequest = "", draftKey, disabled = false, plac
     finally { submitting.current = false; setPending(false); }
   }
 
-  if (tone === "dock") return <div className={styles.dockWrap}>
-    <StComposerBar multiline textareaRef={textarea} scope={scope} placeholder={placeholder} value={ask} onChange={change} onSubmit={() => void submit()} disabled={disabled || pending} maxLength={3000} inputLabel="What do you want to accomplish?" />
+  // One composer product-wide (October 16): every tone draws XaComposer. The
+  // tone only decides whether the reassurance line shows under it.
+  return <div className={styles.dockWrap} data-tone={tone}>
+    <XaComposer inputRef={textarea} scope={scope ? { label: scope } : undefined} placeholder={placeholder} value={ask} onChange={change} onSubmit={() => void submit()} disabled={disabled} busy={pending} maxLength={3000} inputLabel="What do you want to accomplish?" />
     {onTemplates ? <StTextButton disabled={pending} onClick={onTemplates}>{"Browse Apps"}</StTextButton> : null}
     {pending ? <span role="status" className="sr-only">Opening your ask…</span> : null}
+    {tone === "default" && !storageUnavailable ? <p id={`${id}-hint`} className={styles.hint}>You’ll review what Strelva understood before anything consequential happens.</p> : null}
     {storageUnavailable ? <StNotice>Browser storage is unavailable. Keep this page open to retain your draft.</StNotice> : null}
     {error ? <div role="alert"><StNotice tone="critical">{error}</StNotice></div> : null}
-  </div>;
-
-  return <div className={styles.wrap} data-tone={tone === "glass" ? "glass" : undefined}>
-    <form className={styles.composer} onSubmit={event => void submit(event)} aria-label="Start new work" aria-busy={pending || undefined}>
-      <label className={styles.srOnly} htmlFor={id}>What do you want to accomplish?</label>
-      <textarea ref={textarea} id={id} value={ask} onChange={event => change(event.target.value)} disabled={disabled || pending} placeholder={placeholder} maxLength={3000} rows={tone === "glass" ? 1 : 3} aria-describedby={`${id}-hint${error ? ` ${id}-error` : ""}`} onKeyDown={event => {
-        if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
-          event.preventDefault();
-          event.currentTarget.form?.requestSubmit();
-        }
-      }} />
-      <div className={styles.tools}>
-        {onTemplates ? <Button type="button" variant="ghost" size="sm" onClick={onTemplates} disabled={pending} aria-label={tone === "glass" ? "Browse Apps" : undefined} title={tone === "glass" ? "Browse Apps" : undefined}><LayoutGrid size={16} aria-hidden="true" />{tone === "glass" ? null : "Browse Apps"}</Button> : <span />}
-        <div className={styles.send}>
-          {ask ? <button type="button" className={styles.clear} onClick={() => change("")} disabled={pending}>Clear draft</button> : null}
-          <Button type="submit" variant="contrast" size="sm" loading={pending} disabled={disabled || !ask.trim()} aria-label="Continue with this ask"><ArrowUp size={18} aria-hidden="true" /><span className={styles.srOnly}>Continue</span></Button>
-        </div>
-      </div>
-    </form>
-    <p id={`${id}-hint`} className={styles.hint}>{storageUnavailable ? "Browser storage is unavailable. Keep this page open to retain your draft." : "You’ll review what Strelva understood before anything consequential happens."}<span>Enter to continue. Shift + Enter for a new line.</span></p>
-    {error ? <p id={`${id}-error`} role="alert" className={styles.error}>{error}</p> : null}
   </div>;
 }

@@ -94,8 +94,8 @@ describe("chrome completion", () => {
     await click("Review Possibility");
     await click("Before"); expect(host.textContent).toContain("Call Harbor Dental");
     await click("After"); expect(host.textContent).toContain("Request an appointment with Harbor Dental");
-    const hold = [...host.querySelectorAll("button")].find(el => el.textContent?.includes("Hold to make it live"))!;
-    await act(async () => { hold.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true })); });
+    const hold = [...host.querySelectorAll("button")].find(el => el.textContent?.includes("Make it live"))!;
+    await act(async () => { hold.click(); });
     await act(async () => vi.advanceTimersByTime(2000));
     expect(host.textContent).toContain("Accepted in this demo");
     await click("Appointments"); expect(host.textContent).toContain("Release 2");

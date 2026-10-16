@@ -28,29 +28,27 @@ type Receipt = Awaited<ReturnType<typeof readWorkspaceGoogle>>[number]["receipts
 import xs from "@/experience/connections/xa-connections.module.css";
 
 import type { XsScreen } from "./xs-connections-screens";
+import { xaOwnerPinned, xaSearchItems, XA_HARBOR, XA_NORTH } from "./xa-day";
 
 const WS = "5e000000-0000-4000-8000-000000000010";
 const NOW = "2026-10-15T12:11:00Z";
-const HARBOR = "Harbor Dental";
+const HARBOR = XA_HARBOR.name;
 const CLIENT_COLOR = "#2f5236";
 
-function OwnerShell({ children, mode, active = "system", title, details, account = "Dr. Amy Lin", current }: { children: ReactNode; mode: "light" | "dark"; active?: "system" | "connections"; title: string; details?: boolean; account?: string; current?: string }) {
-  const pinned: StrelvaPinnedItem[] = [
-    { id: "website", kind: "website", title: "Website", href: "/preview/strelva/xa/xs-connections/domain", detail: "Live", current: current === "website" },
-    { id: "bookings", kind: "bookings", title: "Bookings", href: "/preview/strelva/xa", detail: "31 this week" },
-    { id: "inbox", kind: "inquiries", title: "Inbox", href: "/preview/strelva/xa/xs-connections/forwarding", detail: "3 new", current: current === "inbox" },
-    { id: "listing", kind: "listing", title: "Google listing", href: "/preview/strelva/xa/xs-connections/google", current: current === "listing", ...(current === "listing" ? {} : { detail: "4.9" }) },
-  ];
-  return <StrelvaShell appBase="/preview/strelva" signOut={null} systemsReleased mode={mode} workspaceName={HARBOR} accountName={account} title={title} active={active}
+function OwnerShell({ children, mode, active = "system", title, details, account = XA_HARBOR.owner, current }: { children: ReactNode; mode: "light" | "dark"; active?: "system" | "connections"; title: string; details?: boolean; account?: string; current?: string }) {
+  // The same four Systems as every preview; the website and inbox open this lane's own screens.
+  const pinned: StrelvaPinnedItem[] = xaOwnerPinned({ current: current === "website" ? "website" : current === "inbox" ? "inquiries" : undefined,
+    overrides: { website: { href: "/preview/strelva/xa/xs-connections/domain" }, inquiries: { href: "/preview/strelva/xa/xs-connections/forwarding" } } });
+  return <StrelvaShell searchItems={xaSearchItems("owner")} appBase="/preview/strelva" signOut={null} systemsReleased mode={mode} workspaceName={HARBOR} accountName={account} title={title} active={active}
     pinned={details ? undefined : pinned} connectionsAvailable={details} detailsPlace={details ? "connections" : undefined}
-    agency={{ name: "North Studio", person: "Maya", color: CLIENT_COLOR }}
+    agency={{ name: XA_NORTH.name, person: XA_NORTH.first, color: CLIENT_COLOR }}
     notice={<p className={xs.previewNotice}>Fictional preview. Nothing here reaches a real business.</p>}>{children}</StrelvaShell>;
 }
 
 export function XsConnectionsPreview({ screen, state, mode }: { screen: XsScreen; state: string; mode: "light" | "dark" }) {
   if (screen === "google") return <GooglePreview state={state} mode={mode} />;
   if (screen === "google-agency") return <AgencyGoogleFrame mode={mode}><AgencyGooglePicker workspaceId={WS} choices={state === "ready" ? { googleEmail: "maya@northstudio.co", more: false, listings: [
-    { accountId: "accounts/north", locationId: "harbor", title: HARBOR, address: "1180 Elmwood Ave, Buffalo, NY 14222" },
+    { accountId: "accounts/north", locationId: "harbor", title: HARBOR, address: `${XA_HARBOR.address}, ${XA_HARBOR.city}` },
     { accountId: "accounts/north", locationId: "fieldwork", title: "Fieldwork Studio", address: "77 Allen St, Buffalo, NY 14202" },
     { accountId: "accounts/north", locationId: "lakeview", title: "Lakeview Mediation", address: "500 Seneca St, Buffalo, NY 14204" },
   ] } : null} result={state === "ready" ? undefined : state as AgencyGoogleResult} request={async () => Response.json({ code: "discovery_expired" }, { status: 409 })} navigate={() => undefined} /></AgencyGoogleFrame>;
@@ -111,12 +109,12 @@ function GooglePreview({ state, mode }: { state: string; mode: "light" | "dark" 
       control: { workspaceId: WS, locationId: "harbor-elmwood", paused: state === "paused", accessPending: state === "pending", updatedAt: null }, canManage: true, connected: state !== "disconnected", drafts, receipts }] };
   const connect = <><GoogleConnect workspaceId={WS} viewer={viewer} enabled={state !== "soon"} hasListing={listingState.kind === "ready" && listingState.data.length > 0}
     params={state === "choose" ? { connect: "choose" } : state === "facts" ? { read: "found" } : {}} returnTo={null}
-    choices={state === "choose" ? { googleEmail: "amy.lin@harbordental.com", more: false, listings: [{ accountId: "accounts/1", locationId: "harbor", title: HARBOR, address: "1180 Elmwood Ave, Buffalo, NY 14222" }, { accountId: "accounts/1", locationId: "harbor-kids", title: "Harbor Dental Kids", address: "1182 Elmwood Ave, Buffalo, NY 14222" }] } : null}
+    choices={state === "choose" ? { googleEmail: "amy.lin@harbordental.com", more: false, listings: [{ accountId: "accounts/1", locationId: "harbor", title: HARBOR, address: `${XA_HARBOR.address}, ${XA_HARBOR.city}` }, { accountId: "accounts/1", locationId: "harbor-kids", title: "Harbor Dental Kids", address: "1182 Elmwood Ave, Buffalo, NY 14222" }] } : null}
     foundFacts={state === "facts" ? PREVIEW_FACTS : []} actions={{ start: noop, choose: noop, reread: noop, decide: noop }}
     agencyRequest={async () => Response.json({ kind: "agency_connect", link: `${window.location.origin}/api/oauth/google/agency?workspaceId=${WS}`, message: "North Studio holds Harbor Dental's Google area. Connect your agency's Google account to choose the listing." })} />
     {state === "connected" || state === "facts" ? <GoogleReadGrant workspaceId={WS} owner view={{ connected: true, googleEmail: "amy.lin@harbordental.com", gsc: { granted: true, property: "sc-domain:harbordental.com" }, ga4: { granted: true, property: "properties/42" } }}
       summary={{ gsc: { status: "ok", totals: { clicks: 318, impressions: 9420, position: 7.4 } }, ga4: { status: "ok", report: { users: 1204, sessions: 1530, pageviews: 4012 } } }} actions={{ start: noop, choose: noop, disconnect: noop }} /> : null}</>;
-  return <OwnerShell mode={mode} title="Google listing" current="listing" account={state === "agency" ? "Maya Okafor" : "Dr. Amy Lin"}>
+  return <OwnerShell mode={mode} title="Google listing" current="listing" account={state === "agency" ? "Maya Okafor" : XA_HARBOR.owner}>
     <WorkspaceGoogle workspaceId={WS} state={listingState} action={action} result={result} connect={connect} reviews={state === "connected" || state === "waiting" ? { kind: "ready", data: [REVIEWS] } : undefined}
       reviewRequest={async () => Response.json({ published: false })} />
   </OwnerShell>;
@@ -159,7 +157,7 @@ function AuthorizePreview({ state, mode }: { state: string; mode: "light" | "dar
 
 /* ---------- Website domain ---------- */
 
-const DOMAIN_PENDING: WebsiteDomainState = { hostname: "harbordental.com", status: "pending", checkedAt: "2026-10-15T12:09:00Z", records: [
+const DOMAIN_PENDING: WebsiteDomainState = { hostname: XA_HARBOR.domain, status: "pending", checkedAt: "2026-10-15T12:09:00Z", records: [
   { type: "A", name: "@", value: "76.76.21.21" },
   { type: "CNAME", name: "www", value: "cname.strelva-dns.com" },
   { type: "TXT", name: "_strelva", value: "strelva-verify=hd-8f2k3m9q" },
@@ -172,9 +170,9 @@ function DomainPreview({ state, mode }: { state: string; mode: "light" | "dark" 
   const requestFixture = useMemo<typeof fetch>(() => async (_input, init) => {
     await new Promise(resolve => setTimeout(resolve, 700));
     const body = JSON.parse(String(init?.body ?? "{}"));
-    return Response.json({ id: body.requestId, workspaceId: WS, workId: "5e000000-0000-4000-8000-0000000000aa", tenantId: "harbor", publishedRevision: 12, publishedHash: "a".repeat(64), hostname: "harbordental.com", records: DOMAIN_PENDING.records, revisionHash: "b".repeat(64), createdAt: NOW, expiresAt: "2026-10-29T12:11:00Z", current: true, decisionId: null, result: null, receiptEmail: null });
+    return Response.json({ id: body.requestId, workspaceId: WS, workId: "5e000000-0000-4000-8000-0000000000aa", tenantId: "harbor", publishedRevision: 12, publishedHash: "a".repeat(64), hostname: XA_HARBOR.domain, records: DOMAIN_PENDING.records, revisionHash: "b".repeat(64), createdAt: NOW, expiresAt: "2026-10-29T12:11:00Z", current: true, decisionId: null, result: null, receiptEmail: null });
   }, []);
-  return <OwnerShell mode={mode} title="Website" current="website" account={state === "request" ? "Maya Okafor" : "Dr. Amy Lin"}>
+  return <OwnerShell mode={mode} title="Website" current="website" account={state === "request" ? "Maya Okafor" : XA_HARBOR.owner}>
     <div className={xs.place} data-single>
       <div className={xs.main}>
         <header className={xs.head}><XaSystemTile kind="website" size={56} /><div className={xs.headText}><h1 className={xs.headTitle}>harbordental.com</h1><p className={xs.headMeta}>Your website · Release 12</p></div></header>

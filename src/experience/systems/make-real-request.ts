@@ -1,12 +1,13 @@
 import { z } from "zod";
+import { XA_YES_LABELS } from "@/platform/presentation/place-labels";
 import type { MakeRealOutcome } from "./model";
 
 /**
  * The live yes on Systems up close (S4, S5) and in the Possibilities list:
  * one word for one gesture. GLOSSARY.md names the live-approval button
- * "Make it live"; the XA foundation default ("Put it live") awaits Jacob's call.
+ * "Make it live" (settled October 16, XA_YES_LABELS).
  */
-export const LIVE_YES = "Make it live";
+export const LIVE_YES = XA_YES_LABELS.yes;
 
 /** Who may say yes, in one sentence. Names the owner when known. */
 export function ownerOnlyReason(ownerName?: string): string {

@@ -12,7 +12,7 @@ import type { DashboardSurface } from "@/lib/dashboard-surfaces";
 
 const base = "/preview/strelva/website";
 const surfaces: DashboardSurface[] = [
-  { id: "today", label: "Today", href: "/dashboard", state: "shown", group: "manage" },
+  { id: "today", label: "Home", href: "/dashboard", state: "shown", group: "manage" },
   { id: "ask-ai", label: "Ask Strelva", href: "/dashboard/chat", state: "shown", group: "manage" },
   { id: "website", label: "Website", href: "/dashboard/site", state: "shown", group: "presence" },
   { id: "google-business", label: "Google Business", href: "/dashboard/google", state: "connect", group: "presence" },
@@ -35,7 +35,7 @@ export function ManagedPreview() {
     <DashboardSurfacesProvider surfaces={surfaces}>
       <ConversationShell businessName="Elmwood Studio" accountName="Alex Morgan" accountEmail="alex@example.com" pendingCount={0} signOut={null} appBase="/preview/strelva">
         <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-          <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-gray-border px-6 py-3 text-[12px] text-gray-muted"><span>Local interface preview · fictional business · no live actions</span><Link href="/preview/strelva?scenario=managed" className="underline underline-offset-4">Back to workspace preview</Link></div>
+          <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-gray-border px-6 py-3 text-[12px] text-gray-muted"><span>Local interface preview · fictional business · no live actions</span><Link href="/preview/strelva?scenario=managed" className="underline underline-offset-4">Back to the preview</Link></div>
           {isChat ? <ChatPanel ownerName="Alex Morgan" threadId={threadId} /> : editorPreview ? <ManagedEditorPreview /> : <div className="min-h-0 flex-1 overflow-auto px-6 py-8 md:px-8 lg:px-12">
             <div className="mx-auto max-w-[960px]">
               <p className="text-[14px] text-gray-muted">Elmwood Studio</p>

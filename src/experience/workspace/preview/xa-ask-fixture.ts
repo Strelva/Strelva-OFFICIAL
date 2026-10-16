@@ -1,4 +1,5 @@
 import type { AskChangeOutcome, AskMessageView, AskTurnResult } from "@/experience/ask/ask-model";
+import { XA_HARBOR, XA_NORTH } from "./xa-day";
 
 /**
  * XA · AS1 to AS6 fixtures. Fictional people and businesses only (Harbor
@@ -48,7 +49,7 @@ function draftResult(): AskTurnResult {
   return { kind: "draft", systemId: XA_ASK_SYSTEM, conversationId: null, saved: true, items: [{
     kind: "draft", toolId: "draft_website_change", status: "queued", ids: [XA_ASK_DRAFT_REF], summary: INSURANCE,
     title: "Add your insurance to harbordental.com", shows: SHOWS,
-    actor: { kind: "agency", displayName: "North Studio" },
+    actor: { kind: "agency", displayName: XA_NORTH.name },
     needsYou: { route: "owner_decides", itemRef: XA_ASK_DRAFT_REF, decideAt: `${BASE}/as5?door=owner` },
   }] };
 }
@@ -59,7 +60,7 @@ const QUESTION: AskMessageView = { id: "as-2", role: "assistant", content: "One 
   addLabel: "Add a plan the form doesn't have",
 } }) };
 const ANSWERED: AskMessageView = { id: "as-3", role: "user", content: "Those three, plus Guardian. Out of network for Aetna, but we still file claims.", result: null };
-const DRAFTED: AskMessageView = { id: "as-4", role: "assistant", content: "Here it is on harbordental.com, right under Hours. Nothing else on the page moves.", result: draftResult(), at: "2026-10-15T10:14:00" };
+const DRAFTED: AskMessageView = { id: "as-4", role: "assistant", content: "Here it is on harbordental.com, right under Hours. Nothing else on the page moves.", result: draftResult(), at: "2026-11-23T10:14:00" };
 
 export function xaAskMessages(screen: XaAskScreen): AskMessageView[] {
   if (screen === "as1") return [];
@@ -91,10 +92,10 @@ export function xaAskMessages(screen: XaAskScreen): AskMessageView[] {
 /** AS5: what the decision record says, by the draft's ref (the shape GET /api/workspace/ask returns). */
 export function xaAskOutcomes(screen: XaAskScreen, state: XaAskState): Record<string, AskChangeOutcome> | undefined {
   if (screen !== "as5") return undefined;
-  const base = { sentBy: "North Studio", sentAt: "2026-10-15T10:14:00", decidedBy: "Dr. Lin", decidedAt: "2026-10-15T10:41:00", liveBy: null, liveAt: null, readBackAt: null, reason: null, undo: null };
+  const base = { sentBy: XA_NORTH.name, sentAt: "2026-11-23T10:14:00", decidedBy: XA_HARBOR.ownerShort, decidedAt: "2026-11-23T10:41:00", liveBy: null, liveAt: null, readBackAt: null, reason: null, undo: null };
   if (state === "declined") return { [XA_ASK_DRAFT_REF]: { ...base, state: "declined", outcome: null } };
   if (state === "failed") return { [XA_ASK_DRAFT_REF]: { ...base, state: "approved", outcome: "failed", reason: "the page changed after the draft was made" } };
-  return { [XA_ASK_DRAFT_REF]: { ...base, state: "approved", outcome: "done", liveBy: "Strelva", liveAt: "2026-10-15T10:43:00", readBackAt: "2026-10-15T10:43:00", undo: "available",
+  return { [XA_ASK_DRAFT_REF]: { ...base, state: "approved", outcome: "done", liveBy: "Strelva", liveAt: "2026-11-23T10:43:00", readBackAt: "2026-11-23T10:43:00", undo: "available",
     facts: [["What changed", "An Insurance section under Hours on the home page"]] } };
 }
 
@@ -105,9 +106,9 @@ export function xaAskTransport(screen: XaAskScreen, state: XaAskState): typeof f
     if (init?.method !== "POST") {
       if (state === "history-down") return json({ error: "Storage unavailable." }, 500);
       return json({ conversations: [
-        { id: "b7000000-0000-4000-8000-00000000c001", systemId: XA_ASK_SYSTEM, title: "Thanksgiving hours", messageCount: 4, mine: true, updatedAt: "2026-10-12T15:00:00Z" },
-        { id: "b7000000-0000-4000-8000-00000000c002", systemId: XA_ASK_SYSTEM, title: "New cleaning prices", messageCount: 6, mine: false, updatedAt: "2026-10-09T15:00:00Z" },
-      ], suggestions: XA_ASK_SUGGESTIONS, ideas: XA_ASK_IDEAS, owner: { name: "Dr. Lin" } });
+        { id: "b7000000-0000-4000-8000-00000000c001", systemId: XA_ASK_SYSTEM, title: "Thanksgiving hours", messageCount: 4, mine: true, updatedAt: "2026-11-20T16:00:00Z" },
+        { id: "b7000000-0000-4000-8000-00000000c002", systemId: XA_ASK_SYSTEM, title: "New cleaning prices", messageCount: 6, mine: false, updatedAt: "2026-11-17T16:00:00Z" },
+      ], suggestions: XA_ASK_SUGGESTIONS, ideas: XA_ASK_IDEAS, owner: { name: XA_HARBOR.ownerShort } });
     }
     if (state === "error") return json({ error: "Strelva can't answer right now. Nothing was changed." }, 503);
     const encoder = new TextEncoder();

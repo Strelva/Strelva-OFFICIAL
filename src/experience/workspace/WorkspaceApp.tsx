@@ -160,7 +160,7 @@ function WorkspaceContent({ appBase, signOut, inquiry: inquiryConfig, rebuildEna
       if (cause instanceof WorkspaceRequestError && cause.status === 401) setSignInRequired(true);
       if (cause instanceof WorkspaceRequestError && (cause.status === 403 || cause.status === 404)) setAccessFailure(cause.status);
       const message = cause instanceof Error ? cause.message : "We couldn’t load this workspace.";
-      setNotice({ kind: "error", message: supplementalFailure ? `Your workspace could not be refreshed. ${message}` : message, ...(supplementalFailure && selectedId ? { refreshWorkspaceId: selectedId } : {}) });
+      setNotice({ kind: "error", message: supplementalFailure ? `Your business could not be refreshed. ${message}` : message, ...(supplementalFailure && selectedId ? { refreshWorkspaceId: selectedId } : {}) });
     } finally {
       if (requestId === requestRef.current) setLoading(false);
     }
@@ -486,7 +486,7 @@ function WorkspaceContent({ appBase, signOut, inquiry: inquiryConfig, rebuildEna
     }
   }
 
-  if (loading && !snapshot) return <WorkspaceLoading label="Opening your workspace" />;
+  if (loading && !snapshot) return <WorkspaceLoading label="Opening Strelva" />;
 
   if (!snapshot) {
     return (
@@ -544,7 +544,7 @@ function WorkspaceContent({ appBase, signOut, inquiry: inquiryConfig, rebuildEna
         {notice ? (
         <div inert={Boolean(handoffLoading || (handoffToken && handoffPreview)) || undefined} role={notice.kind === "error" ? "alert" : "status"} className={`mx-4 mt-4 flex flex-col items-start justify-between gap-4 rounded-xl border px-4 py-3 text-[13px] sm:mx-7 sm:flex-row ${notice.kind === "error" ? "border-critical/30 bg-critical/10 text-critical" : "border-positive/30 bg-positive/10 text-positive"}`}>
           <span>{notice.message}</span>
-          {notice.refreshWorkspaceId ? <Button type="button" variant="secondary" size="sm" disabled={loading} onClick={() => void loadWorkspace(notice.refreshWorkspaceId, true)}>Retry workspace refresh</Button> : null}
+          {notice.refreshWorkspaceId ? <Button type="button" variant="secondary" size="sm" disabled={loading} onClick={() => void loadWorkspace(notice.refreshWorkspaceId, true)}>Try again</Button> : null}
           {!notice.refreshWorkspaceId ? <button type="button" onClick={() => setNotice(null)} className="shrink-0 underline underline-offset-2">Dismiss</button> : null}
         </div>
       ) : null}</>}>
@@ -569,7 +569,7 @@ function WorkspaceContent({ appBase, signOut, inquiry: inquiryConfig, rebuildEna
           ) : delegatedRead && !selectedWork ? (
             <DelegatedEmpty />
           ) : workspaceExitBlocks && (showAssessment || !selectedWork) && !isHorizontalView(view) ? (
-            <p role="status" className="mx-auto max-w-2xl text-[14px] text-gray-muted">{workspaceStopped ? "Work in this workspace has stopped. Existing records remain in My work for review and export." : "Workspace status is temporarily unavailable, so new work is paused. Existing records remain in My work for review and export."}</p>
+            <p role="status" className="mx-auto max-w-2xl text-[14px] text-gray-muted">{workspaceStopped ? "Work in this business has stopped. Existing records remain in My work for review and export." : "Status is temporarily unavailable, so new work is paused. Existing records remain in My work for review and export."}</p>
           ) : (showAssessment || !selectedWork) && !delegatedRead && !isHorizontalView(view) ? (
             <AiVisibilityAssessmentForm<WorkspaceWork>
               initialInput={retryAssessment ? { business: retryAssessment.business, url: retryAssessment.url, category: typeof retryWork?.input.category === "string" ? retryWork.input.category : undefined, location: typeof retryWork?.input.location === "string" ? retryWork.input.location : undefined } : undefined}
@@ -664,7 +664,7 @@ function WorkspaceContent({ appBase, signOut, inquiry: inquiryConfig, rebuildEna
         // The owner door: the check becomes the business, with saving here kept as the other choice.
         <StartBusinessFromCheck
           resultId={publicSaveResultId}
-          workspaceName={currentWorkspace?.name || "Current workspace"}
+          workspaceName={currentWorkspace?.name || "Current business"}
           savingHere={publicSaveSaving}
           saveHereError={publicSaveError}
           onSaveHere={() => void savePublicResult()}
@@ -677,7 +677,7 @@ function WorkspaceContent({ appBase, signOut, inquiry: inquiryConfig, rebuildEna
         />
       ) : !handoffLoading && !(handoffToken && handoffPreview) && publicSaveResultId ? (
         <PublicResultSaveOverlay
-          workspaceName={currentWorkspace?.name || "Current workspace"}
+          workspaceName={currentWorkspace?.name || "Current business"}
           saving={publicSaveSaving}
           error={publicSaveError}
           onSave={() => void savePublicResult()}

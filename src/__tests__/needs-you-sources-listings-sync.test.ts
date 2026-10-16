@@ -115,6 +115,6 @@ describe("listings sync Needs you source", () => {
 
   it("presents the source as Your listings with the hold-to-make-it-live verb", () => {
     expect(decisionPresentation({ ...item(), kind: "system.change_live", sourceLifecycle: "listings_sync", detail: null, title: "x" } as OwnerDecision))
-      .toMatchObject({ source: "Your listings", verb: "Hold to make it live" });
+      .toMatchObject({ source: "Your listings", verb: "Make it live" });
   });
 });

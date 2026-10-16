@@ -3,7 +3,8 @@
  * Strelva at work. Pen: LX · Working (rYq00); motion moment "Ask Strelva,
  * streamed" (design/motion/xa-motion, sguEC).
  *
- * The title shimmers while work runs; each step appears when it really
+ * The title stays still while work runs (no shimmer: the pulse dot and the
+ * real step text carry it); each step appears when it really
  * starts (Base, rising 8 px); done steps settle to gray with a check.
  * Steps are the caller's real progress events, never timers.
  */
@@ -16,7 +17,7 @@ export interface XaWorkingStep { id?: string; label: ReactNode; state: "done" | 
 export function XaWorking({ title, steps, state = "working" }: { title: ReactNode; steps: readonly XaWorkingStep[]; state?: "working" | "done" | "failed" }) {
   const shown = steps.filter(step => step.state !== "pending");
   return <div className={styles.working} data-state={state} role="status" aria-live="polite">
-    <p className={styles.workingHead}><span className={styles.pulse} aria-hidden="true" /><span className={state === "working" ? styles.shimmer : undefined}>{title}</span></p>
+    <p className={styles.workingHead}><span className={styles.pulse} aria-hidden="true" /><span>{title}</span></p>
     {shown.length ? <ol className={styles.trail}>
       {shown.map((step, index) => <li key={step.id ?? index} className={styles.trailStep} data-state={step.state}>
         <span className={styles.trailMark} aria-hidden="true">{step.state === "done" ? <Check size={15} strokeWidth={2.2} /> : step.state === "failed" ? <X size={15} strokeWidth={2.2} /> : <span className={styles.spinner} />}</span>

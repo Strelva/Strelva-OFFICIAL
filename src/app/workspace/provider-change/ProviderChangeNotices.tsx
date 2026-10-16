@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { TextArea } from "@/components/ui/TextInput";
-import { StEmpty, StHold, StMono, StNotice, StPill, StRow, StRows, StSection, StState, StSurface, StTextButton } from "@/components/ui/strelva/Kit";
+import { XaYes } from "@/components/ui/strelva/Xa";
+import { StEmpty, StMono, StNotice, StPill, StRow, StRows, StSection, StState, StSurface, StTextButton } from "@/components/ui/strelva/Kit";
 import { useWorkspaceRequest } from "@/experience/workspace/WorkspaceRequest";
 
 export interface ProviderChangeNotice {
@@ -72,14 +73,16 @@ export default function ProviderChangeNotices({ workspaceId, requests, canCancel
       {q.business_workspace_id !== workspaceId && ["awaiting_notice", "awaiting_policy"].includes(q.status) ? <StPill disabled={!!busy} busy={busy === q.id} onClick={() => void act(q.id, "acknowledge")}>Acknowledge notice</StPill> : null}
       {canCancel && q.business_workspace_id === workspaceId && q.status === "awaiting_policy" && !q.respond_by && !q.policy_version && !q.responses?.length ? <StSurface label="Cancel agency change">
         <p className="mb-4 text-sm text-gray-muted">This request is waiting for a notice policy. You can cancel the request and keep your current agency.</p>
-        <StHold label="Cancel agency change" disabled={!!busy} onAccept={() => void act(q.id, "cancel")} />
+        <XaYes state={busy === q.id ? "going" : "waiting"} block={false} shortcut={false} yesLabel="Cancel the agency change" disabled={!!busy} working={{ title: "Cancelling the agency change", steps: [] }} onYes={() => void act(q.id, "cancel")} />
       </StSurface> : null}
       {q.status === "cancelled" ? <StNotice>Cancelled{q.cancellation?.cancelled_at ? ` · ${new Date(q.cancellation.cancelled_at).toLocaleString()}` : ""}. Your current agency and billing were kept.</StNotice> : null}
       {q.business_workspace_id !== workspaceId && q.status === "notified" && q.respond_by && new Date(q.respond_by).getTime() >= Date.now() ? <StSurface label="Agency handoff response"><div className="grid gap-4">
         <TextArea label="Agency handoff response" value={notes[q.id] ?? ""} onChange={event => setNotes(values => ({ ...values, [q.id]: event.target.value }))} maxLength={5000} />
         <StPill disabled={!!busy || !notes[q.id]?.trim()} busy={busy === q.id} onClick={() => void act(q.id, "respond")}>Record handoff response</StPill>
       </div></StSurface> : null}
-      {canCancel && q.business_workspace_id === workspaceId && q.status === "notified" ? <StHold label="Complete agency change" disabled={!!busy || !q.respond_by || new Date(q.respond_by).getTime() > Date.now()} onAccept={() => void act(q.id, "complete")} /> : null}
+      {canCancel && q.business_workspace_id === workspaceId && q.status === "notified" ? <XaYes state={busy === q.id ? "going" : "waiting"} block={false} shortcut={false} yesLabel="Complete the agency change" disabled={!!busy} working={{ title: "Completing the agency change", steps: [] }}
+        question="This ends your current agency's access. It can't be undone here."
+        disabledReason={!q.respond_by ? "The response window has not been set yet." : new Date(q.respond_by).getTime() > Date.now() ? `You can complete it after ${new Date(q.respond_by).toLocaleString()}.` : undefined} onYes={() => void act(q.id, "complete")} /> : null}
     </StSection>) : <StEmpty>No agency changes are waiting.</StEmpty>}
     <StNotice>Strelva doesn’t pass messages between agencies. If you want to talk to the other agency, that’s up to you.</StNotice>
     {message ? <p role="status" className="text-sm text-positive">{message}</p> : null}

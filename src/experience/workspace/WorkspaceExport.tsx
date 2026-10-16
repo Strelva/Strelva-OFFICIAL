@@ -52,11 +52,11 @@ function groupForOwner(rows: ExportManifestRow[], group: boolean): ExportManifes
 const EXPORT_TILE: Record<string, string> = {
   "Website pages and photos": "website", "Inquiries and replies": "inbox", "Bookings and requests": "bookings", "Business record": "documents",
   "History of every change": "documents", "Documents and uploads": "documents", "Billing and payments": "payments",
-  "Workspace and saved results": "documents", "Uploads": "documents",
+  "Your business and saved results": "documents", "Uploads": "documents",
   "Your website": "website", "Inquiries and bookings": "inbox", "Business record and history": "documents", "Documents, billing and payments": "payments",
 };
 const LEGACY_SCOPE: ExportManifestRow[] = [
-  { title: "Workspace and saved results", detail: "Your business, its settings and the results Strelva saved.", included: true },
+  { title: "Your business and saved results", detail: "Your business, its settings and the results Strelva saved.", included: true },
   { title: "Uploads", detail: "Everything you uploaded, with a link to download each file.", included: true },
   { title: "Website, calendars and inquiries", detail: "Not in this smaller copy yet. Ask Strelva for them.", included: false },
   { title: "Passwords and Strelva's own notes", detail: "Passwords and sign-ins for connected accounts are never included.", included: false },
@@ -142,7 +142,7 @@ function WorkspaceExportScreen({ workspaceId, schema3 = false, request = fetch, 
     setLoading(true); setNotice(""); setError(false);
     try {
       const response = await request(schema3 ? "/api/workspace-export/v3" : "/api/workspace-export", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ workspaceId }) });
-      if (!response.ok) { const body = await response.json().catch(() => ({})) as { error?: string }; throw new Error(body.error || "The workspace export could not be created."); }
+      if (!response.ok) { const body = await response.json().catch(() => ({})) as { error?: string }; throw new Error(body.error || "The download could not be made."); }
       if (response.status === 202) {
         const body = await response.json() as { buildId?: string; message?: string };
         if (!body.buildId || !/^[0-9a-f-]{36}$/.test(body.buildId)) throw new Error("The export build could not be confirmed. Reload before trying again.");
@@ -153,7 +153,7 @@ function WorkspaceExportScreen({ workspaceId, schema3 = false, request = fetch, 
       const link = document.createElement("a"); link.href = URL.createObjectURL(blob); link.download = match?.[1] || "workspace-export.json"; link.click(); URL.revokeObjectURL(link.href);
       setNotice("Your file is downloading. Strelva recorded that you downloaded it, not what was in it.");
     } catch (cause) {
-      setError(true); setNotice(cause instanceof Error ? cause.message : "The workspace export could not be created.");
+      setError(true); setNotice(cause instanceof Error ? cause.message : "The download could not be made.");
       // A lost POST response may still have started a build. Recover before retrying.
       if (schema3) { setHistoryLoading(true); setRefresh(value => value + 1); }
     }

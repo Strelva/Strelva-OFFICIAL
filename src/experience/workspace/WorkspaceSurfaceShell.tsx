@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 import { StrelvaShell } from "@/experience/app-frame/StrelvaShell";
 
 /** Native workspace pages retain the common navigation and scoped paper tokens. */
-export function WorkspaceSurfaceShell({ children, workspaceId, businessName = "Business workspace", systemsReleased = false }: {
+export function WorkspaceSurfaceShell({ children, workspaceId, businessName = "Your business", systemsReleased = false }: {
   children: ReactNode;
   workspaceId: string;
   businessName?: string;

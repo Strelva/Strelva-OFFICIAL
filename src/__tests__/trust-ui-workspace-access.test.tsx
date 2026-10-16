@@ -16,7 +16,7 @@ afterEach(async () => { await act(async () => root.unmount()); node.remove(); vi
 it.each([403, 404])("%s has workspace/account destinations and access guidance instead of Retry", async status => {
   const request = vi.fn(async () => Response.json({ error: "Workspace unavailable" }, { status }));
   await act(async () => root.render(<WorkspaceApp request={request as typeof fetch} />));
-  expect(node.textContent).toContain("Choose another workspace");
+  expect(node.textContent).toContain("Choose another business");
   // XA: one way forward (the pill); the guidance sits in the sentence above it.
   expect(node.querySelector('a[href="/workspace/account"]')).not.toBeNull();
   expect(node.textContent).not.toContain("Try again");
@@ -33,5 +33,5 @@ it("401 preserves sign-in recovery, and a transient outage still offers Retry", 
   const offline = vi.fn(async () => { throw new Error("Network unavailable"); });
   await act(async () => root.render(<WorkspaceApp request={offline as typeof fetch} />));
   expect(node.textContent).toContain("Try again");
-  expect(node.textContent).not.toContain("Choose another workspace");
+  expect(node.textContent).not.toContain("Choose another business");
 });

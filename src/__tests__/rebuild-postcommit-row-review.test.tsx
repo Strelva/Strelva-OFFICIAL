@@ -54,13 +54,13 @@ it.each([{ stage: 'payload', status: 409 }, { stage: 'product', status: 403 }])(
   expect(rpc).toHaveBeenCalledTimes(1);
   // These assertions fail on 653: committed correction gets misclassified as safe refusal.
   expect(node.textContent).not.toContain('This exact preview is approved.');
-  expect(find('Hold to make it live')?.disabled).toBe(true);
+  expect(find('Make it live')?.disabled).toBe(true);
   expect(field.value).toBe(corrected);
   expect(find('Reload current state')).toBeDefined();
   corrupt = false;
   await act(async () => find('Reload current state')!.click());
   expect(node.textContent).toContain(corrected);
-  expect(find('Hold to make it live')).toBeUndefined();
+  expect(find('Make it live')).toBeUndefined();
   expect(mutationCount).toBe(1);
   expect(reads).toBe(2);
 });

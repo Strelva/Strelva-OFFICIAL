@@ -39,7 +39,7 @@ describe("XS · in-between pages", () => {
   it("release off: one headline, one quiet line, one action, and no builder words", () => {
     const workspace = text(html(<XaNotOpenYet />));
     const start = text(html(<XaNotOpenYet place="getting-started" />));
-    expect(workspace).toContain("Workspaces open soon. Your site and bookings keep running.");
+    expect(workspace).toContain("Strelva opens soon. Your site and bookings keep running.");
     expect(start).toContain("Getting started opens soon. Your site and bookings keep running.");
     for (const words of [workspace, start]) {
       expect(words.toLowerCase()).not.toMatch(/onboarding|release check|services are unchanged/);
@@ -59,7 +59,7 @@ describe("XS · in-between pages", () => {
   it("the workspace that could not open offers the right single next step for each reason", () => {
     const props = { signInHref: "/sign-in", accountHref: "/workspace/account", onRetry: () => undefined };
     expect(text(html(<XaWorkspaceUnopened reason="sign-in" {...props} />))).toContain("Sign in to open your workspace.");
-    expect(text(html(<XaWorkspaceUnopened reason="forbidden" {...props} />))).toContain("Choose another workspace");
+    expect(text(html(<XaWorkspaceUnopened reason="forbidden" {...props} />))).toContain("Choose another business");
     const failed = text(html(<XaWorkspaceUnopened reason="failed" message="The read timed out." {...props} />));
     // XS: Strelva names itself as the one that couldn't reach it; the system's own words stay out.
     expect(failed).toContain("Strelva couldn’t reach your workspace. Nothing in it changed.");
@@ -67,7 +67,7 @@ describe("XS · in-between pages", () => {
     expect(text(html(<XaWorkspaceUnopened reason="forbidden" message="This link was sent to frontdesk@harbordental.com." {...props} />))).toContain("frontdesk@harbordental.com");
     for (const reason of ["sign-in", "forbidden", "gone", "failed"] as const) expectNoSlop(html(<XaWorkspaceUnopened reason={reason} {...props} />));
     expectNoSlop(html(<XaSharedReadOnlyEmpty business="Harbor Dental" />));
-    expect(text(html(<XaWorkspaceOpening />))).toContain("Opening your workspace");
+    expect(text(html(<XaWorkspaceOpening />))).toContain("Opening Strelva");
   });
 
   it("the root crash fallback shows no error text and offers a full reload", () => {

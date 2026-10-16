@@ -242,7 +242,7 @@ function Editor({ value, workId, context, owner, crumbs, canEdit, until, notice,
     </div>
     {sentences.length ? <ul className={styles.sentences} aria-label="What changes">{sentences.map(sentence => <li key={sentence}>{sentence}</li>)}</ul>
       : <XaNote>Nothing changed yet. Edit a question on the left; this side shows it the way {context.businessName}&apos;s team will.</XaNote>}
-    <p className={styles.after}>{owner} sees this on Today with the tool beside it. Nothing changes until {owner} says yes.</p>
+    <p className={styles.after}>{owner} sees this on Home with the tool beside it. Nothing changes until {owner} says yes.</p>
   </XaDecision>;
 
   return <XaObjectPage label={`${title} draft for ${context.businessName}`} wide phone="object-first" head={<>{crumbs}{headline}</>} story={story} object={object} />;

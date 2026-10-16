@@ -37,7 +37,7 @@ describe("XA · S5 A Possibility", () => {
     const site = harborWebsite("waiting");
     const node = await mount(createElement(SystemPage, { ...base, system: site, systems: [site], initialPossibilityId: site.possibilities[0]!.id }), request);
     expect(node.textContent).toContain("Put booking at the top of your home page.");
-    expect(node.textContent).toContain("A Possibility from Maya at North Studio · Oct 13");
+    expect(node.textContent).toContain("A Possibility from Maya at North Studio · Nov 21");
     expect(node.textContent).toContain("Your site stays as it is until you say yes.");
     expect(node.textContent).not.toContain("Put it live");
     expect(node.querySelectorAll("iframe")).toHaveLength(2);
@@ -74,12 +74,12 @@ describe("XA · S6 History", () => {
     const request = detailFetch(url => url === "/api/workspace/systems/website/restore" ? Response.json({ status: "requested", message: "Prepared for review. Your live site is unchanged." }) : undefined);
     const site = harborWebsite("ready");
     const node = await mount(createElement(SystemPage, { ...base, system: site, systems: [site], initialView: "history" }), request);
-    expect(node.textContent).toContain("7 changes since Sep 28.");
+    expect(node.textContent).toContain("7 releases since Nov 6.");
     expect(node.textContent).toContain("Maya at North Studio");
     expect(node.textContent).not.toContain("Actor not recorded");
     // The live change is marked, its read-back is said, and nothing reads as builder talk.
     expect(node.querySelector('ol[aria-label="History of harbordental.com"] li')?.textContent).toContain("Live");
-    expect(node.textContent).toContain("Change 7 is live.");
+    expect(node.textContent).toContain("Release 7 is live.");
     expect(node.textContent).toContain("Pebble read the live page back. It matches.");
     expect(node.textContent).not.toMatch(/redeploy|site's code|authorized publisher/);
     const rows = [...node.querySelectorAll<HTMLButtonElement>('ol[aria-label="History of harbordental.com"] button')];

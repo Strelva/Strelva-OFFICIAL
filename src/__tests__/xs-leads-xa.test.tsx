@@ -57,7 +57,7 @@ describe("XA lane xs-leads words", () => {
 
   it("keeps Service requests inside the agency shell, not Agency details", () => {
     const html = render("leads");
-    for (const label of ["Today", "Queue", "Library", "Minutes", "Juniper Bakery", "Service requests"]) expect(html).toContain(label);
+    for (const label of ["Home", "Queue", "Library", "Time this month", "Fieldwork Studio", "Service requests"]) expect(html).toContain(label);
     expect(html).toMatch(/aria-current="page" href="\/preview\/strelva\/xa\/xs-leads\/leads"/);
     expect(html).not.toContain(">Verification<"); expect(html).not.toContain(">Team<");
   });

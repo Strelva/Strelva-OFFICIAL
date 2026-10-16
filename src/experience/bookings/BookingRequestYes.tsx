@@ -28,7 +28,7 @@ export function BookingRequestYes({ workspaceId, bookingId, clientName, homeHref
   const noticeText = notice?.tone === "done" && decided ? decided.decision === "approve" ? `Confirmed. ${clientName} is booked.` : "Not yet. The time is open again." : raw;
   if (!item) {
     if (decided && notice) return <p className={x.sentence} role={notice.tone === "error" ? "alert" : "status"}>{noticeText}</p>;
-    return <p className={x.note}>This request couldn&apos;t be read here. <XaTextLink href={homeHref}>Decide it from Today</XaTextLink></p>;
+    return <p className={x.note}>This request couldn&apos;t be read here. <XaTextLink href={homeHref}>Decide it from Home</XaTextLink></p>;
   }
   const canDecide = state.status === "ready" && (state.role === "owner" || state.canDecide === true || (state.role === "admin" && item.adminMayDecide));
   async function decide(decision: "approve" | "not_yet") {

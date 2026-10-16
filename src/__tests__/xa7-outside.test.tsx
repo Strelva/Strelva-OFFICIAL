@@ -86,9 +86,10 @@ describe("XA · E2 the yes on the phone (/api/approve pages)", () => {
     expect(brandXaPage(waiting, { agencyId: null, name: "Strelva", logoUrl: null, accentColor: "#447a4f", replyTo: null, credit: "runs_on_strelva" })).toBe(waiting);
   });
   it("names the consequence on the pill", () => {
-    expect(xaYesLabel("system.change_live", "approve")).toBe("Put it live");
-    expect(xaYesLabel("customer.message", "approve")).toBe("Send it");
-    expect(xaYesLabel("money", "approve")).toBe("Approve");
+    expect(xaYesLabel("system.change_live", "approve")).toBe("Make it live");
+    expect(xaYesLabel("customer.message", "approve")).toBe("Send");
+    expect(xaYesLabel("money", "approve")).toBe("Make it live");
+    expect(xaYesLabel(undefined, "approve")).toBe("Make it live");
     expect(xaYesLabel("system.go_live", "not_yet")).toBe("Not yet");
     expect(xaKeepWith(undefined)).toBe("Not now");
   });
@@ -210,7 +211,7 @@ describe("XA · E6 Today on the phone", () => {
     expect(html).toContain("Waits for you · from Maya at North Studio");
     expect(html).toContain("2 booked today");
     expect(html).not.toContain(">Live<");
-    expect(html).toContain("Ask Strelva anything");
+    expect(html).toContain("Ask Strelva for anything");
     expect(html).not.toMatch(/data-kind="(waits|live)"/);
     expect(clean(html)).toEqual([]);
   });
@@ -227,7 +228,7 @@ describe("XA · E6 Today on the phone", () => {
     expect(html).toContain("Harbor Dental didn’t load, but your Systems are still running.");
     expect(html).not.toContain("could not be checked");
     expect(html).toContain("Try again");
-    expect(html).toContain("Ask Strelva anything");
+    expect(html).toContain("Ask Strelva for anything");
   });
 });
 

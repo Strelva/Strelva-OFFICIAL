@@ -27,8 +27,8 @@ export function SignUpDoor({ next, asAgency, doors, requestedNext, identityName,
   const shown = typeof brand === "string" ? { name: brand } : brand;
   return <XaEntry mode={mode} brand={shown} account={<Link href={signInHref}>Sign in</Link>} foot={identityName || shown ? "Runs on Strelva. Same account as strelva.com." : undefined}
     stage={asAgency
-      ? { pose: "lineup", label: "Pebble beside a row of client Systems", title: "Every client, in its own workspace.", body: "Clients own their workspace; you work inside it. Nothing goes live without their yes.", phone: "Clients own their workspace. Nothing goes live without their yes." }
-      : { pose: "alone", label: "Pebble, ready to start", title: identityName ? `${identityName}, on Strelva.` : "Your business, on Strelva.", body: "You own it and everything in it. An agency can work inside it, and nothing goes live without your yes.", phone: "You own it and everything in it. Nothing goes live without your yes." }}>
+      ? { pose: "lineup", label: "Pebble beside a row of client Systems", title: "Every client, kept apart.", body: "Pebble keeps each client's Systems in their own business. They own it; you work inside it. Nothing goes live without their yes.", phone: "Clients own their business. Nothing goes live without their yes." }
+      : { pose: "website", label: "Pebble ready to read your website", title: identityName ? `${identityName}, on Strelva.` : "Your business, on Strelva.", body: "Next, Pebble reads your website and shows you what it found. You own it and everything in it, and nothing goes live without your yes.", phone: "You own it and everything in it. Nothing goes live without your yes." }}>
     <SupabaseSignIn emailReady={emailReady} key={next} next={next} emailLabel="Work email" initial={initial} prefillEmail={prefillEmail} heading={<>
       <XaHeadline quiet={asAgency ? "Use the account your agency works from." : "Use the account you run the business with."}>{identityName ? `Create access for ${identityName}.` : "Make your Strelva account."}</XaHeadline>
       {doors ? <AccountKindChoice selected={asAgency ? "agency" : "business"} next={requestedNext} /> : null}

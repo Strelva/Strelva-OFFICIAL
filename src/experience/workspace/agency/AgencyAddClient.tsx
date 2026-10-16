@@ -225,7 +225,7 @@ export function AgencyAddClient({ agencyWorkspaceId, agencyName = "your agency",
   if (conversionHeld) return frame("Add a client", <section className={styles.addPage} aria-labelledby={`${id}-held-title`}><div className={styles.addLead}>
     <XaHeadline id={`${id}-held-title`} quiet={<span role="status">{convertedBusinessWorkspaceId ? "The client business was created. Open it to continue." : "The person who started this conversion must confirm its outcome before another client can be added."}</span>}>{convertedBusinessWorkspaceId ? "This lead is already a client." : "This lead’s conversion is held."}</XaHeadline>
     <div className={styles.addActions}>
-      {convertedBusinessWorkspaceId ? <XaButtonLink variant="primary" size="lg" href={`/workspace?workspaceId=${encodeURIComponent(convertedBusinessWorkspaceId)}`}>Open client workspace</XaButtonLink> : null}
+      {convertedBusinessWorkspaceId ? <XaButtonLink variant="primary" size="lg" href={`/workspace?workspaceId=${encodeURIComponent(convertedBusinessWorkspaceId)}`}>Open client</XaButtonLink> : null}
       <XaTextLink href={`/workspace/leads?workspaceId=${encodeURIComponent(agencyWorkspaceId)}`}>Back to leads</XaTextLink>
     </div>
   </div>{list}</section>);

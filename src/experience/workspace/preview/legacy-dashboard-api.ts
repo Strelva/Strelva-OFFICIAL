@@ -71,6 +71,19 @@ export async function legacyApiFixture(method: string, path: string, query: URLS
     case path === "custom-repo/dependencies": return ok({ deliveryModel: "managed", dependencies: [], hasBlockingDependency: false });
     case path === "publish": return ok({ contentDrafts: state === "waiting" ? { hero: true } : {}, pageConfigDraft: false });
     case path === "site-snapshots": return ok({ snapshots: [] });
+    // October 16: the last legacy reads the preview answered with a 404, so those pages never settled.
+    case path === "dashboard/site-audit": return state === "empty" ? { status: 404, body: { error: "No site check yet." } } : ok({
+      url: "https://harbordental.com", scannedAt: ago(26), overallScore: 86, grade: "B",
+      categories: [
+        { slug: "speed", name: "Loads on a phone", score: 92, weight: 0.3 },
+        { slug: "local", name: "Found on Google", score: 81, weight: 0.4 },
+        { slug: "trust", name: "Answers patients' questions", score: 84, weight: 0.3 },
+      ],
+      topFixes: [{ name: "Holiday hours", message: "Add Thanksgiving hours so Google and the site agree.", category: "local", impact: "high", quantified: null }],
+    });
+    case path === "dashboard/site-audit/history": return ok({ history: state === "empty" ? [] : [{ at: ago(24 * 14), score: 82 }, { at: ago(24 * 7), score: 84 }, { at: ago(26), score: 86 }] });
+    case path === "admin/domains": return ok({ domains: state === "empty" ? [] : [{ domain: "harbordental.com", status: "active", dnsStatus: "verified", sslStatus: "active", primary: true }] });
+    case path === "offboarding/status": return ok({ tenant: LEGACY_TENANT, requestedAt: null, checkpoints: [], connectedProviders: state === "empty" ? [] : ["google"], domains: state === "empty" ? [] : [{ domain: "harbordental.com", status: "active", dnsStatus: "verified", sslStatus: "active" }] });
     default: return { status: 404, body: { error: "This preview has no data for that." } };
   }
 }

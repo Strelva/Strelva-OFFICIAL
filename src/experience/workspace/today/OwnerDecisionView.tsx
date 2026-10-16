@@ -93,7 +93,7 @@ export function OwnerDecisionView({ businessName, needs, pending, notices, selec
     <div className={styles.briefHead}>
       <XaEmpty pose="resting" job={selectedId ? "Pebble keeps the record in What changed" : "Pebble is keeping everything else running"}
         title={selectedId ? "This no longer waits for you." : "Nothing waits for you."}
-        action={<XaButton onClick={selectedId ? onWhatChanged : onToday}>{selectedId ? "What changed" : "Back to Today"}</XaButton>}>
+        action={<XaButton onClick={selectedId ? onWhatChanged : onToday}>{selectedId ? "What changed" : "Back to Home"}</XaButton>}>
         {selectedId ? "It was decided, withdrawn or lapsed. What changed has its record." : "When Strelva or your agency needs your yes, it shows here first, with what happens either way."}
       </XaEmpty>
     </div>
@@ -185,8 +185,8 @@ export function OwnerDecisionView({ businessName, needs, pending, notices, selec
       {phase === "waiting" && others.length ? <XaSays links={others.slice(0, 2).map(other => <XaTextLink key={other.id} onClick={() => onOpenDecision(other.id)}>{other.title}</XaTextLink>)}>
         {others.length === 1 ? "One more waits after this:" : `${others.length} more wait after this:`}
       </XaSays> : null}
-      {after || phase === "undone" ? <XaSays links={[<XaTextLink key="today" onClick={onToday}>Back to Today</XaTextLink>, <XaTextLink key="changed" onClick={onWhatChanged}>What changed</XaTextLink>]}>
-        {phase === "undone" ? "It is back the way it was before your yes." : others.length ? `${others.length === 1 ? "One more waits" : `${others.length} more wait`} for you on Today.` : "Nothing else waits for you."}
+      {after || phase === "undone" ? <XaSays links={[<XaTextLink key="today" onClick={onToday}>Back to Home</XaTextLink>, <XaTextLink key="changed" onClick={onWhatChanged}>What changed</XaTextLink>]}>
+        {phase === "undone" ? "It is back the way it was before your yes." : others.length ? `${others.length === 1 ? "One more waits" : `${others.length} more wait`} for you on Home.` : "Nothing else waits for you."}
       </XaSays> : null}
     </div>
     {onAsk && phase === "waiting" && canDecide ? <div className={styles.briefDock}>

@@ -11,9 +11,10 @@ import { parseStoreBooking } from "@/platform/bookings/store";
 import { publicIntakeForm, type PublicIntakeForm } from "@/products/vertical-intake/contracts";
 import { DENTAL_INTAKE } from "@/products/vertical-intake/definitions/dental";
 import { mondayEmail, waitsForYouEmail, type XaMail } from "@/platform/infra/email/xa-mail";
+import { XA_HARBOR, XA_SYSTEMS } from "./xa-day";
 
 export const XA7_BASE = "/preview/strelva/xa/xa7-outside";
-export const HARBOR = { business: "Harbor Dental", owner: "Dr. Lin", ownerFull: "Dr. Amy Lin", site: "harbordental.com", address: "1180 Elmwood Ave", phone: "(716) 555-0142", timeZone: "America/New_York" } as const;
+export const HARBOR = { business: XA_HARBOR.name, owner: XA_HARBOR.ownerShort, ownerFull: XA_HARBOR.owner, site: XA_HARBOR.domain, address: XA_HARBOR.address, phone: "(716) 555-0142", timeZone: "America/New_York" } as const;
 export const MAYA: RecordedActor = { kind: "agency", displayName: "Maya at North Studio" };
 
 /* ---------- E1 · waits for you (template only) ---------- */
@@ -25,7 +26,7 @@ export function e1Mail(state: string): XaMail {
     page: { address: `${HARBOR.site}/hours`, title: "Thanksgiving hours", change: "Closed Thursday and Friday, Nov 26–27. Back Saturday, Nov 28, 9–1.", note: "Replaces your usual hours for that week" },
     review: `${XA7_BASE}/phone-yes?state=confirm`,
     signInRequired: state === "sign-in",
-    undoNote: state === "no-undo" ? undefined : "You can undo it any time from Today.",
+    undoNote: state === "no-undo" ? undefined : "You can undo it any time from Home.",
     settingsUrl: `${XA7_BASE}/waits-email?state=settings`,
   });
 }
@@ -86,16 +87,18 @@ export function e6Decision(): OwnerDecision {
     title: "Close for Thanksgiving, Nov 26–27?", detail: null, approveEffect: "Thanksgiving hours go live on harbordental.com.", notYetEffect: "Nothing changes.",
     sourceLifecycle: "website_document", sourceId: "fixture", revisionHash: "a".repeat(64), urgent: false, signInRequired: false, adminMayDecide: false,
     openHref: null, state: "open", outcome: null, outcomeReason: null, receiptRef: null, decidedByKind: null, decidedAt: null, deliveryState: "sent",
-    operatorNote: null, actor: MAYA, openedAt: "2026-11-10T14:14:00Z", expiresAt: "2026-11-24T14:14:00Z", reminded1At: null, reminded2At: null, deliveries: [],
+    operatorNote: null, actor: MAYA, openedAt: "2026-11-22T21:12:00Z", expiresAt: "2026-11-25T21:12:00Z", reminded1At: null, reminded2At: null, deliveries: [],
   };
 }
 
 export function e6Systems(): SystemView[] {
   const base = { lifecycle: "live", health: { state: "healthy", summary: "Checks passed" }, surface: "managed", connections: [], possibilities: [], versions: [] } as unknown as Omit<SystemView, "id" | "kind" | "name" | "detail">;
   return [
-    { ...base, id: "web", kind: "website", name: "Website", detail: HARBOR.site },
-    { ...base, id: "book", kind: "bookings", name: "Bookings", detail: "New-patient exam, cleanings" },
-    { ...base, id: "form", kind: "onboarding", name: "New-patient form", detail: "Dental intake" },
+    // The same Systems as every preview (xa-day.ts).
+    { ...base, id: "web", kind: "website", name: XA_SYSTEMS.website.name, detail: XA_SYSTEMS.website.detail },
+    { ...base, id: "book", kind: "bookings", name: XA_SYSTEMS.bookings.name, detail: XA_SYSTEMS.bookings.detail },
+    { ...base, id: "inquiries", kind: "inquiries", name: XA_SYSTEMS.inquiries.name, detail: XA_SYSTEMS.inquiries.detail },
+    { ...base, id: "form", kind: "app", name: XA_SYSTEMS.form.name, detail: "Forms patients fill in before a first visit", lifecycle: "draft" },
   ] as SystemView[];
 }
-export const E6_FACTS = { web: "Checks passed at 7:02", book: "2 booked today", form: "1 filled in today" } as const;
+export const E6_FACTS = { web: "Checks passed at 7:02", book: "3 booked today", inquiries: XA_SYSTEMS.inquiries.detail, form: "Draft" } as const;

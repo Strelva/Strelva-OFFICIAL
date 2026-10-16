@@ -2,7 +2,7 @@
 import { act, createElement, createRef } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { StComposerBar, StHold, StRow } from "@/components/ui/strelva/Kit";
+import { StComposerBar, StRow } from "@/components/ui/strelva/Kit";
 import { WorkspaceComposer } from "@/experience/workspace/WorkspaceComposer";
 import { WorkspaceBusinessSwitcher } from "@/experience/workspace/WorkspaceBusinessSwitcher";
 import { writeRequestDraft } from "@/experience/workspace/request-draft";
@@ -34,7 +34,7 @@ describe("owner paper controls", () => {
     const retry = [...node.querySelectorAll("button")].find(button => button.textContent === "Check again")!;
     await act(async () => retry.click());
     expect(request.mock.calls.filter(([input]) => String(input).includes("/api/workspace/needs-you")).length).toBeGreaterThanOrEqual(2);
-    const home = [...node.querySelectorAll('nav[aria-label="Phone workspace navigation"] button')].find(button => button.textContent === "Home") as HTMLButtonElement;
+    const home = [...node.querySelectorAll('nav[aria-label="Phone navigation"] button')].find(button => button.textContent === "Home") as HTMLButtonElement;
     await act(async () => home.click());
     expect(navigate).toHaveBeenCalledWith("home");
   });
@@ -73,26 +73,6 @@ describe("owner paper controls", () => {
     expect(ref.current!.maxLength).toBe(20000);
   });
 
-  it("does not approve on a click or after focus leaves a hold", async () => {
-    const accept = vi.fn(); const frames = new Map<number, FrameRequestCallback>();
-    vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) => { frames.set(1, callback); return 1; });
-    vi.stubGlobal("cancelAnimationFrame", (id: number) => frames.delete(id));
-    const node = await render(createElement(StHold, { label: "Hold to accept", "aria-label": "Accept the exact scope", onAccept: accept }));
-    let button = node.querySelector("button")!;
-    await act(async () => button.click()); expect(accept).not.toHaveBeenCalled();
-    expect(node.querySelector('button[aria-label="Confirm: Accept the exact scope"]')).not.toBeNull();
-    await act(async () => [...node.querySelectorAll("button")].find(item => item.textContent === "Cancel")!.click());
-    button = node.querySelector("button")!;
-    expect(document.activeElement).toBe(button);
-    await act(async () => button.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true })));
-    expect(frames.size).toBe(1);
-    await act(async () => button.dispatchEvent(new FocusEvent("focusout", { bubbles: true })));
-    expect(frames.size).toBe(0); expect(accept).not.toHaveBeenCalled();
-    await act(async () => button.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", metaKey: true, bubbles: true })));
-    expect(accept).toHaveBeenCalledTimes(1);
-    await act(async () => button.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", metaKey: true, repeat: true, bubbles: true })));
-    expect(accept).toHaveBeenCalledTimes(1);
-  });
 
   it("offers only supplied memberships and restores switcher focus on Escape", async () => {
     const onWorkspace = vi.fn();

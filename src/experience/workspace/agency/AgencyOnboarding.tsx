@@ -5,7 +5,7 @@ import { useCallback, useEffect, useState, type FormEvent, type ReactNode } from
 import { AgencyQualification } from "./AgencyQualification";
 import type { QualificationState } from "./qualification-model";
 import { StHead, StNotice, StSkeleton } from "@/components/ui/strelva/Kit";
-import { XaButton, XaButtonLink, XaComposer, XaEntry, XaEntryCaption, XaEntryStack, XaField, XaHeadline, XaInitial, XaLabel, XaLede, XaPebbleScene, XaRow, XaRows, XaTextLink } from "@/components/ui/strelva/Xa";
+import { XaButton, XaButtonLink, XaWaiting, XaEntry, XaEntryCaption, XaEntryStack, XaField, XaHeadline, XaInitial, XaLabel, XaLede, XaPebbleScene, XaRow, XaRows, XaTextLink } from "@/components/ui/strelva/Xa";
 import { AgencyDayOne } from "./AgencyDayOne";
 import { AgencyFrame } from "./AgencyFrame";
 import styles from "./agency-door.module.css";
@@ -116,7 +116,7 @@ export function AgencyOnboardingView({ state, addClient, workspaceId, onOpen, on
   preview?: { appBase: string; hrefs?: Partial<Record<"home" | "clients" | "queue" | "library" | "team" | "verification" | "minutes", string>>; addClientHref?: string; mode?: "light" | "dark"; notice?: ReactNode; accountName?: string };
 }) {
   const workspaceHref = workspaceId ? `/workspace?workspaceId=${encodeURIComponent(workspaceId)}` : "/workspace";
-  const corner = <a href={preview ? "#" : workspaceHref}>Your workspace</a>;
+  const corner = <a href={preview ? "#" : workspaceHref}>Your agency</a>;
   const mode = preview?.mode;
   if (state.kind === "ready") return <Checklist onboarding={state.onboarding} workspaceHref={workspaceHref} addClient={addClient} preview={preview} />;
   if (state.kind === "create") return <CreateAgency onCreated={onOpen} onSignedOut={onSignedOut} create={create} corner={corner} mode={mode} />;
@@ -169,8 +169,7 @@ function CreateAgency({ onCreated, onSignedOut, create, corner, mode }: { onCrea
   return <XaEntry corner={corner} mode={mode} aside={<div className={styles.seen}>
     <XaLabel>How a client sees you, for example Dr. Lin at Harbor Dental</XaLabel>
     <div className={styles.seenComposer} inert aria-hidden="true">
-      <XaComposer value="" onChange={() => undefined} onSubmit={() => undefined} onAdd={() => undefined} onVoice={() => undefined} placeholder="Ask Strelva for anything" scope={{ label: "Harbor Dental", state: "live" }}
-        waiting={{ kicker: <>Waits for you · from {shown}</>, title: "New wording for your Fees page", from: { name: shown, color: "#2f5236" }, action: <span className={styles.fakeAction}>Review</span> }} />
+      <XaWaiting item={{ kicker: <>Waits for you · from {shown}</>, title: "New wording for your Fees page", from: { name: shown, color: "#2f5236" }, action: null }} />
     </div>
     <p className={styles.seenNote}>Prepared by {shown} · Runs on Strelva</p>
   </div>}>
@@ -206,7 +205,7 @@ function Checklist({ onboarding, workspaceHref, addClient, preview }: { onboardi
   const [verifying, setVerifying] = useState(false);
   const canAdd = addClient && agency.role !== "member";
   const addHref = preview?.addClientHref ?? `/workspace/agency/clients/new?workspaceId=${encodeURIComponent(agency.id)}`;
-  return <AgencyFrame agencyWorkspaceId={preview ? undefined : agency.id} agencyName={agency.name} title="Today" accountName={preview?.accountName} appBase={preview?.appBase} hrefs={preview?.hrefs} mode={preview?.mode} notice={preview?.notice} signOut={preview ? null : undefined} active={verifying ? "verification" : "home"}>
+  return <AgencyFrame agencyWorkspaceId={preview ? undefined : agency.id} agencyName={agency.name} title="Home" accountName={preview?.accountName} appBase={preview?.appBase} hrefs={preview?.hrefs} mode={preview?.mode} notice={preview?.notice} signOut={preview ? null : undefined} active={verifying ? "verification" : "home"}>
     <AgencyDayOne agencyName={agency.name} viewerFirstName={onboarding.viewer?.firstName} clients={onboarding.clients} openAgencyHref={preview?.hrefs?.home ?? workspaceHref}
       addClientHref={canAdd ? addHref : null} addClientBlocked={addClient ? `An owner or admin of ${agency.name} adds clients.` : "Adding clients opens here next."}
       verification={{ verified: onboarding.verifiedEffects, total: onboarding.effects.length || AGENCY_EFFECT_TOTAL, onOpen: () => setVerifying(value => !value), open: verifying }}

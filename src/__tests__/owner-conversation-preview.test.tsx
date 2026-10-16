@@ -93,11 +93,11 @@ describe("fictional owner conversation canon", () => {
     });
     await act(async () => { textarea.closest("form")!.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })); });
     expect(node.textContent).toContain("Saying yes here doesn't publish or approve anything");
-    const recovery = [...node.querySelectorAll<HTMLAnchorElement>("a")].filter(link => ["Go to Today", "Ask for help"].includes(link.textContent ?? ""));
+    const recovery = [...node.querySelectorAll<HTMLAnchorElement>("a")].filter(link => ["Go to Home", "Ask for help"].includes(link.textContent ?? ""));
     expect(recovery.map(link => link.getAttribute("href"))).toEqual(["/preview/strelva/owner-decision", "/preview/strelva/owner-conversation?frame=YsBMM"]);
     expect(node.textContent).not.toContain("Accepted in this preview. No live website changed.");
-    const decision = [...node.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent?.includes("Hold to make it live"))!;
-    await act(async () => { decision.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", metaKey: true, bubbles: true })); });
+    const decision = [...node.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent?.includes("Make it live"))!;
+    await act(async () => { decision.click(); });
     expect(node.textContent).toContain("Accepted in this preview. No live website changed.");
     expect(outsideFetch).not.toHaveBeenCalled();
   });
@@ -111,12 +111,12 @@ describe("fictional owner conversation canon", () => {
       input.dispatchEvent(new Event("input", { bubbles: true }));
     });
     expect(input.value).toBe("Preview visitor");
-    const make = [...node.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent?.includes("Hold to make it live"))!;
-    await act(async () => { make.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", ctrlKey: true, bubbles: true })); });
+    const make = [...node.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent?.includes("Make it live"))!;
+    await act(async () => { make.click(); });
     expect(node.textContent).toContain("No System or record was saved.");
     await act(async () => root!.render(createElement(OwnerConversationPreview, { frame: "ABt1D", state: "ready" })));
     const confirm = [...node.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent?.startsWith("Confirm"))!;
-    await act(async () => { confirm.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", ctrlKey: true, bubbles: true })); });
+    await act(async () => { confirm.click(); });
     expect(node.textContent).toContain("Confirmed in this preview. Nothing published.");
   });
 

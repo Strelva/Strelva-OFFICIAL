@@ -54,7 +54,7 @@ function siteChangesFixture(mode: "ready" | "empty" | "error", byCodeAgent = fal
 /** Local preview of the workspace website: fictional site, real frame and panels, no live actions. */
 export function WorkspaceSitePreview({ kind, tab, role, state, mode = "light", codeAgent = false }: { kind: "native" | "request"; tab: SiteTab | null; role: "owner" | "admin" | "member" | "operator"; state: "ready" | "empty" | "error" | "permission" | "not_found"; mode?: "light" | "dark"; codeAgent?: boolean }) {
   const request = useMemo(() => withAskPreview(siteChangesFixture(state === "error" ? "error" : state === "empty" ? "empty" : "ready", codeAgent), "on", role === "operator"), [state, role, codeAgent]);
-  if (state === "permission") return <WorkspaceSiteMessage title="This business is unavailable to your account." body="It may belong to another account, or your access may have changed. Nothing about the site was changed." href="/preview/strelva" action="Open your workspace" />;
+  if (state === "permission") return <WorkspaceSiteMessage title="This business is unavailable to your account." body="It may belong to another account, or your access may have changed. Nothing about the site was changed." href="/preview/strelva" action="Go to Home" />;
   if (state === "not_found") return <WorkspaceSiteMessage title="This website isn't connected to this business." body="It may belong to another business, or its link was removed. Nothing about the site was changed." href="/preview/strelva" action="Back to Home" />;
   const { tab: current, tabs } = managedSiteNavigation(kind, role === "operator", tab);
   const readOnly = role === "member";

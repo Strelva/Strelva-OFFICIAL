@@ -55,8 +55,10 @@ moves that screen to the `Xa*` parts.
 | `--st-need` / `--st-need-dot` / `--st-need-tint` | `#9c522c` / `#c9773f` / `#f6ebe1` | What waits |
 | `--st-shadow-sm` / `--st-shadow-lg` | LX shadows | Small for things on paper, large only for the one object a page is about |
 
-Radii are 8 for chips, 10 for nav and rows, 12 for fields, 16 for doors,
-24 for a Page or decision, and 999 for pills.
+Radii are 8 for chips, 10 for nav and rows, 12 for fields, and 16 for doors,
+a Page, a decision, the felt stage and every panel (October 16 kit tune:
+`--st-r-xl` is 16). Pills and the composer stay round (999 and 28). Shadows
+never exceed `0 1px 2px` plus `0 4px 12px` soft, the Undo toast included.
 
 Dark mode comes from `data-workspace-mode="dark"`, either on the linen element
 or on any ancestor. `--st-font-mono` and `--font-mono` resolve to DM Sans. The
@@ -77,13 +79,13 @@ tabular figures. Geist Mono is no longer loaded.
 | `XaAddTile` | `Xa` | O1 "Tile add" | |
 | `XaPebbleAvatar` | `Xa` | gxqij | Appears wherever Strelva speaks |
 | `XaPebbleScene pose size bare` | `Xa` | O1 "Felt" | Poses are `resting`, `fixing`, `waving`, `adds`, `lineup`, `alone` and `website`. Changes crossfade on Base. |
-| `XaComposer value onChange onSubmit placeholder waiting scope system onAdd onVoice busy disabled shape` | `Xa` | T4ln9, LHF4o, cLOpj, JIgmC | Resting it is a bar. With a waiting item, scope or System it becomes a card. Plus and mic appear only when they do something. `scope` takes `short` (the phone label, usually the System name), a `state` dot, and `onPick` to make the chip open a scope picker (`picking`, `pickerId` for aria). Keyboard focus in the field draws a solid 2px ring on the card. |
+| `XaComposer value onChange onSubmit placeholder waiting scope system onAdd onVoice busy disabled shape` | `Xa` | T4ln9, LHF4o, cLOpj, JIgmC | **The one composer** (October 16): `StComposerBar` and `WorkspaceComposer` both render it, and no screen shows two. Resting it is a bar. With a waiting item, scope or System it becomes a card. Plus and mic appear only when they do something. `scope` takes `short` (the phone label, usually the System name), a `state` dot, and `onPick` to make the chip open a scope picker (`picking`, `pickerId` for aria). Keyboard focus in the field draws a solid 2px ring on the card. |
 | `XaWaiting` | `Xa` | LHF4o "Waiting" | Holds one item, with whoever acted |
 | `XaComposerDock` | `Xa` | | Puts the composer in the frame's composer row |
 | `XaWorking title steps state="working\|done\|failed"` | `Xa` | rYq00 | Steps are the caller's real progress events |
 | `XaStream text` | `Xa` | motion "Ask, streamed" | Streams 28 ms per word. Screen readers get the whole text once. |
 | `XaPage address title replaces flat bleed` + `XaPageChange` | `Xa` | viaGc | The page as its visitors see it. `bleed` (added by XA-4) drops the body padding so a live frame sits edge to edge (S1, S5). |
-| `XaYes state onYes onNotYet onUndo working liveLabel failure settled disabledReason` | `Xa` | O3 decision + N2cSZg | **The one yes gesture.** See below. |
+| `XaYes state onYes onNotYet onUndo working liveLabel failure settled disabledReason disabled question yesAriaLabel notYetAriaLabel` | `Xa` | O3 decision + N2cSZg | **The one yes gesture.** See below. |
 | `XaDecision status meta yes label` | `Xa` | O3 panel | The one object that gets the large shadow |
 | `XaUndo onUndo windowMs onExpire shortcut` + `XaUndoDock` | `Xa` | N2cSZg | Has a draining 2 px bar, and ⌘Z works when `shortcut` is set |
 | `XaHeadline quiet size="sm\|md\|lg"`, `XaLede`, `XaAnswers`, `XaLabel`, `XaLines` | `Xa` | O1, O3 | The headline is two-tone and must never repeat itself. Labels use sentence case at 13/500. |
@@ -119,9 +121,20 @@ tabular figures. Geist Mono is no longer loaded.
 4. **undone** or **expired.** One settled sentence.
 5. **failed.** Pebble says what happened in one sentence, followed by "Try again".
 
-The caller owns authority and the server call. `StHold` still exists for the
-old callers and is now an ink pill. Lanes move it to `XaYes` once their Undo is
-a real reversal.
+The caller owns authority and the server call. October 16: there is no other
+yes gesture. Press-and-hold is gone; every non-preview caller of `StHold` now
+renders `XaYes`, and `StHold` itself is a deprecated wrapper around `XaYes` for
+the older preview harnesses. Where the server has a real reversal (Needs you
+decisions through `POST /api/workspace/needs-you/undo`), Undo follows the yes.
+Where it has none (cancel a booking, mark a no-show, leave Strelva, remove a
+team member, complete an agency change), `XaYes question` asks its one plain
+sentence inside the yes and the pill is the confirmation: still one gesture.
+One label set lives in `XA_YES_LABELS`: **Make it live** / **Not yet**, with
+GLOSSARY's own verbs **Confirm** (a booking) and **Send** (a reply). There is
+no "Approve", "Put it live" or "Save and make it live".
+
+The Working title no longer shimmers (`st-xa-sweep` is gone): the pulse dot and
+the caller's real step text carry the work.
 
 ## Shell
 
@@ -135,9 +148,9 @@ a real reversal.
 | Phone (XA · E6) | No tab bar. The header shows the mark and business name, which open the same navigation, with the account on the right. The composer floats at the bottom. |
 
 Places map to the existing routes:
-- Today → `home`
+- Home → `home`
 - Requests → `requests`
-- Minutes → `ongoing`
+- Running → `ongoing`
 - The full list → `apps`
 
 Added by lane xs-legacy-dashboard (October 16): `StrelvaShell navigationOnly accountHref`
@@ -220,11 +233,29 @@ Each of these is a must-fix. Jacob has rejected all of them by name.
 **The test.** If a screenshot could be any AI startup's dashboard, it is slop.
 Each screen needs one dominant element and a reason to remember it.
 
-## Pending calls (Jacob)
+## Word calls (October 16, main session, reversible)
 
-1. **GLOSSARY vs the board.** These words are kept in `XA_PLACE_LABELS` and
-   `XA_YES_LABELS`, so each decision is a one-line edit. Until then the board
-   wins on this branch.
+GLOSSARY.md wins over the Pen board. Each call is one edit in
+`XA_PLACE_LABELS` / `XA_YES_LABELS` (`src/platform/presentation/place-labels.ts`):
+**Home** (not Today), **Running** (not Minutes), **Time this month** for the
+agency's own time place, **Business details** for the business menu's record,
+**Make it live** / **Not yet** for the yes, **Release N** for numbered
+history, and never "workspace" on owner or agency screens.
+
+## One fixture day (October 16)
+
+Every `/preview/strelva/xa` harness reads `src/experience/workspace/preview/xa-day.ts`:
+Monday, November 23, 2026, 8:14 am. Harbor Dental (Dr. Amy Lin, 1180 Elmwood
+Ave) runs Website, Bookings, Inquiries and a Draft New-patient form; one thing
+waits on her. North Studio (Maya Okafor) runs Harbor Dental, North Coast
+Realty, Lakeview Mediation and Fieldwork Studio at 96 / 74 / 39 / 22 minutes.
+`xaOwnerPinned`, `xaAgencyClientHref` and `xaSearchItems` give every preview
+the same sidebar, links that open their own preview screens, and a working ⌘K.
+`/preview/strelva/api/*` answers the shell's owner-brand and agency-leads reads.
+
+## Earlier pending calls (Jacob)
+
+1. **GLOSSARY vs the board.** Settled October 16 by the word calls above.
    - The board says **Today**; GLOSSARY says Home.
    - The board says **Minutes**; GLOSSARY says Running and What changed.
      `app-frame-contract` used to list "Today" as retired. It now asserts the

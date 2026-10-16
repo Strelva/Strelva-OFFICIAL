@@ -22,8 +22,9 @@ import { createPortal } from "react-dom";
 import { ComposerDockTarget } from "./ComposerDockTarget";
 import { LogoMark } from "@/components/Logo";
 import { Check, ChevronLeft, Circle, Loader2, X } from "lucide-react";
-import { forwardRef, createContext, useContext, useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type ButtonHTMLAttributes, type CSSProperties, type HTMLAttributeAnchorTarget, type InputHTMLAttributes, type ReactNode, type Ref } from "react";
-import { strelvaDuration } from "@/platform/infra/motion";
+import { forwardRef, createContext, useContext, useId, useState, type ButtonHTMLAttributes, type CSSProperties, type HTMLAttributeAnchorTarget, type InputHTMLAttributes, type ReactNode, type Ref } from "react";
+import { XaComposer } from "./xa/composer";
+import { XaYes } from "./xa/yes";
 import styles from "./kit.module.css";
 
 type Tone = "need" | "critical" | "live" | "text";
@@ -248,101 +249,21 @@ export function StLedger({ path, count, lines, action }: { path: ReactNode; coun
   </div>;
 }
 
-/* ---------- Hold to accept ---------- */
-
-const HOLD_MS = strelvaDuration.hold * 1000;
+/* ---------- The yes (formerly hold to accept) ---------- */
 
 /**
- * For consequential yeses (publish, confirm a booking, leave). Press and hold
- * with pointer, Space or Enter; Command/Ctrl + Enter while focused accepts at
- * once. A click opens a separate confirmation using the same callback and
- * disabled gate. Reduced motion keeps the duration with a static indicator.
+ * October 16: there is one yes gesture product-wide, `XaYes` (a click or ⌘↵,
+ * then Undo where the caller has a real reversal). Press-and-hold is gone.
+ * `StHold` stays only so older preview harnesses keep compiling; it renders
+ * XaYes with the "Hold to" prefix dropped. New code uses XaYes directly.
+ * @deprecated Use XaYes from "@/components/ui/strelva/Xa".
  */
-export function StHold({ label, onAccept, disabled, block, hint = "⌘ Enter", "aria-label": ariaLabel }: { "aria-label"?: string; label: string; onAccept: () => void; disabled?: boolean; block?: boolean; hint?: string }) {
-  const [progress, setProgress] = useState(0);
-  const [holding, setHolding] = useState(false);
-  const [confirming, setConfirming] = useState(false);
-  const frame = useRef<number | null>(null);
-  const start = useRef<number | null>(null);
-  const done = useRef(false);
-  const accept = useRef(onAccept);
-  const blocked = useRef(disabled);
-  const hintId = useId();
-  const button = useRef<HTMLButtonElement>(null);
-  const cancelled = useRef(false);
-  useLayoutEffect(() => {
-    if (!confirming && cancelled.current) { cancelled.current = false; button.current?.focus(); }
-  }, [confirming]);
-
-  const stop = useCallback(() => {
-    if (frame.current) cancelAnimationFrame(frame.current);
-    frame.current = null;
-    start.current = null;
-    setHolding(false);
-    if (!done.current) setProgress(0);
-  }, []);
-
-  const begin = useCallback(() => {
-    if (disabled || confirming || frame.current) return;
-    done.current = false;
-    start.current = performance.now();
-    setHolding(true);
-    const tick = (now: number) => {
-      if (blocked.current) { stop(); return; }
-      const value = Math.min(1, (now - (start.current ?? now)) / HOLD_MS);
-      setProgress(value);
-      if (value >= 1) { done.current = true; frame.current = null; setHolding(false); accept.current(); return; }
-      frame.current = requestAnimationFrame(tick);
-    };
-    frame.current = requestAnimationFrame(tick);
-  }, [disabled, confirming, stop]);
-
-  useEffect(() => () => { if (frame.current) cancelAnimationFrame(frame.current); }, []);
-  useLayoutEffect(() => { accept.current = onAccept; blocked.current = disabled; }, [onAccept, disabled]);
-  useEffect(() => {
-    if (disabled) {
-      if (frame.current) cancelAnimationFrame(frame.current);
-      frame.current = null;
-      start.current = null;
-    }
-  }, [disabled]);
-  if (disabled && (confirming || holding || progress !== 0)) {
-    setConfirming(false); setHolding(false); setProgress(0);
-  }
-  const action = label.replace(/^Hold to /i, "");
-
-  if (confirming && !disabled) return <span className={styles.holdConfirmation} role="group" aria-label={`Confirm: ${ariaLabel ?? action}`}>
-    <span role="status">Confirm {action.charAt(0).toLowerCase() + action.slice(1)}?</span>
-    <StPill autoFocus aria-label={`Confirm: ${ariaLabel ?? action}`} onClick={() => {
-      if (blocked.current || done.current) return;
-      done.current = true;
-      setConfirming(false);
-      accept.current();
-    }}>{action}</StPill>
-    <StTextButton onClick={() => { done.current = false; cancelled.current = true; setConfirming(false); }}>Cancel</StTextButton>
-  </span>;
-
-  return <button ref={button} type="button" className={styles.hold} data-block={block || undefined} data-holding={holding || undefined} disabled={disabled} aria-label={ariaLabel ?? label} aria-describedby={hintId}
-    style={{ "--hold-progress": disabled ? 0 : progress } as CSSProperties}
-    onPointerDown={event => { if (event.button !== 0) return; event.currentTarget.setPointerCapture(event.pointerId); begin(); }}
-    onPointerUp={stop} onPointerCancel={stop} onPointerLeave={stop}
-    onBlur={stop}
-    onKeyDown={event => {
-      if ((event.metaKey || event.ctrlKey) && event.key === "Enter") { event.preventDefault(); if (!event.repeat && !blocked.current) { stop(); done.current = true; accept.current(); } return; }
-      if ((event.key === " " || event.key === "Enter") && !event.repeat) { event.preventDefault(); begin(); }
-    }}
-    onKeyUp={event => { if (event.key === " " || event.key === "Enter") stop(); }}
-    onClick={event => {
-      event.preventDefault();
-      if (blocked.current) return;
-      if (done.current) { done.current = false; return; }
-      stop();
-      setConfirming(true);
-    }}>
-    <span className={styles.holdFill} aria-hidden="true" />
-    <span className={styles.holdLabel}>{label}</span>
-    <span id={hintId} className={styles.holdHint}><span className="sr-only">Press and hold, or click to review a confirmation. With a keyboard, press </span><span className={styles.holdKeys}>{hint}</span></span>
-  </button>;
+export function StHold({ label, onAccept, disabled, block, "aria-label": ariaLabel }: { "aria-label"?: string; label: string; onAccept: () => void; disabled?: boolean; block?: boolean; hint?: string }) {
+  // Remounts after each yes so the pill never stays pressed when the caller keeps it on screen.
+  const [round, setRound] = useState(0);
+  const plain = (text: string) => { const words = text.replace(/^Hold to /i, ""); return words.charAt(0).toUpperCase() + words.slice(1); };
+  return <XaYes key={round} state="waiting" yesLabel={plain(label)} yesAriaLabel={ariaLabel ? plain(ariaLabel) : undefined} disabled={disabled} block={Boolean(block)} shortcut={false}
+    onYes={() => { onAccept(); setRound(value => value + 1); }} />;
 }
 
 /* ---------- Toast, surface, notice, empty ---------- */
@@ -372,14 +293,14 @@ export function StSkeleton({ width = "100%", label = "Loading" }: { width?: stri
 /* ---------- Composer ---------- */
 
 /** The floating Ask Strelva bar. Visual only: the caller owns submission and authority. */
-export function StComposerBar({ scope, placeholder, value, onChange, onSubmit, disabled, inputLabel = "Ask Strelva", inputRef, maxLength, multiline, textareaRef }: { scope?: string; placeholder: string; value: string; onChange: (value: string) => void; onSubmit: () => void; disabled?: boolean; inputLabel?: string; inputRef?: Ref<HTMLInputElement>; maxLength?: number; multiline?: boolean; textareaRef?: Ref<HTMLTextAreaElement> }) {
-  return <form className={styles.composer} onSubmit={event => { event.preventDefault(); if (!disabled && value.trim()) onSubmit(); }}>
-    {scope ? <span className={styles.composerScope}>{scope}</span> : null}
-    {multiline ? <textarea ref={textareaRef} rows={1} maxLength={maxLength} className={styles.composerInput} aria-label={inputLabel} placeholder={placeholder} value={value} onChange={event => onChange(event.target.value)} disabled={disabled} onKeyDown={event => {
-      if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); event.currentTarget.form?.requestSubmit(); }
-    }} /> : <input ref={inputRef} maxLength={maxLength} className={styles.composerInput} aria-label={inputLabel} placeholder={placeholder} value={value} onChange={event => onChange(event.target.value)} disabled={disabled} />}
-    <button className={styles.composerSend} type="submit" aria-label="Send" disabled={disabled || !value.trim()}><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 13V3M3.5 7.5 8 3l4.5 4.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg></button>
-  </form>;
+/**
+ * October 16: one composer product-wide. StComposerBar is now XaComposer with
+ * the old props mapped (a string scope becomes the composer's scope chip), so
+ * every older caller draws the same composer. New code uses XaComposer.
+ * @deprecated Use XaComposer from "@/components/ui/strelva/Xa".
+ */
+export function StComposerBar({ scope, placeholder, value, onChange, onSubmit, disabled, inputLabel = "Ask Strelva", inputRef, maxLength, textareaRef }: { scope?: string; placeholder: string; value: string; onChange: (value: string) => void; onSubmit: () => void; disabled?: boolean; inputLabel?: string; inputRef?: Ref<HTMLTextAreaElement>; maxLength?: number; /** Kept for older callers; the composer always grows with its text. */ multiline?: boolean; textareaRef?: Ref<HTMLTextAreaElement> }) {
+  return <XaComposer value={value} onChange={onChange} onSubmit={onSubmit} placeholder={placeholder} inputLabel={inputLabel} scope={scope ? { label: scope } : undefined} disabled={disabled} maxLength={maxLength} inputRef={textareaRef ?? inputRef} />;
 }
 
 /** The shell gives the composer its own row, outside the scrolling work.

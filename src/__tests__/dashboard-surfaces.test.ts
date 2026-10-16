@@ -88,7 +88,7 @@ describe("getDashboardSurfaces — the 6-item conditional nav", () => {
 
   it("uses owner-language labels (Today / Ask Strelva / Analytics)", () => {
     const s = getDashboardSurfaces({ tenantConfig: { template: "wellness" }, connections: [] });
-    expect(at(s, "today").label).toBe("Today");
+    expect(at(s, "today").label).toBe("Home");
     expect(at(s, "ask-ai").label).toBe("Ask Strelva");
     expect(at(s, "website").label).toBe("Website");
     expect(at(s, "google-business").label).toBe("Google Business");

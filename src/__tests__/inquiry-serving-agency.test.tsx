@@ -45,7 +45,7 @@ describe("inquiry shared workspace navigation", () => {
     const sidebar = html.slice(html.indexOf("<aside"), html.indexOf("</aside>") + 8);
     const main = html.slice(html.indexOf("<main"));
     // October 15 (XA): People & access and Help live in the details sidebar behind "Business details".
-    for (const label of ["New request", "Search", "Today", "Requests", "Running", 'href="/preview/strelva/workspace?view=apps', 'aria-label="Business details"', "Maria", "maria@example.test"]) {
+    for (const label of ["New request", "Search", "Home", "Requests", "Running", 'href="/preview/strelva/workspace?view=apps', 'aria-label="Business details"', "Maria", "maria@example.test"]) {
       expect(sidebar).toContain(label);
     }
     expect(sidebar).toContain('href="/preview/strelva/workspace/account"');

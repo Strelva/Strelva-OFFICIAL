@@ -37,7 +37,7 @@ describe("agency Library coherence", () => {
     mocks.version.mockRejectedValue(new Error("Access refused"));
     const html = renderToStaticMarkup(await VersionReviewPage({ searchParams: Promise.resolve({ workspaceId, systemId, decisionId }) }));
     expect(mocks.decision).not.toHaveBeenCalled(); expect(html).toContain("could not be verified");
-    expect(html).toContain('data-workspace-theme="linen"'); expect(html).toContain("Back to workspace");
+    expect(html).toContain('data-workspace-theme="linen"'); expect(html).toContain("Back to Home");
   });
   it.each(["systemId", "workspaceId", "sourceId", "sourceLifecycle"])("refuses a decision from a different %s", async key => {
     mocks.decision.mockResolvedValue({ ...(await mocks.decision()), [key]: "different" });

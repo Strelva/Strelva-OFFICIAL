@@ -191,7 +191,7 @@ export function AgencyManagedWebsiteDraftExperience({ bindingId, section = "hero
   const object = status === "ready" && grant && active && state ? <XaDecision label="The draft, as visitors would see it"
     status={receipt ? <XaStatus kind="live">Draft saved</XaStatus> : <XaStatus kind="draft">Draft</XaStatus>} meta={websiteAddress ?? "Nothing changes until the client says yes"}
     yes={<div className={styles.yes}>
-      {receipt ? <><XaNote role="status" tone="done">Saved. {client === "The client" ? "The client" : client} sees it on Today.</XaNote>{customerWebsiteHref ? <XaTextLink href={customerWebsiteHref}>Open it in {client === "The client" ? "the client" : client}&apos;s editor</XaTextLink> : null}</> : null}
+      {receipt ? <><XaNote role="status" tone="done">Saved. {client === "The client" ? "The client" : client} sees it on Home.</XaNote>{customerWebsiteHref ? <XaTextLink href={customerWebsiteHref}>Open it in {client === "The client" ? "the client" : client}&apos;s editor</XaTextLink> : null}</> : null}
       {message ? <XaNote role="alert" tone="down">{message}</XaNote> : null}
       <XaButton variant="primary" size="lg" block busy={saving} disabled={!parsed} onClick={() => void prepareAndRun()}>{saving ? "Saving the draft" : `Send to ${client === "The client" ? "the client" : client}`}</XaButton>
       <XaNote>Nothing on the live site changes until {client === "The client" ? "the client" : client} says yes.</XaNote>

@@ -115,7 +115,7 @@ describe("managed website agency draft authority", () => {
     });
     expect(requests[2]?.body).toEqual({ action: "run", assignmentId });
     expect(requests[2]?.body).not.toHaveProperty("input");
-    expect(container.textContent).toContain("Saved. The client sees it on Today.");
+    expect(container.textContent).toContain("Saved. The client sees it on Home.");
     expect(container.textContent).toContain("Nothing on the live site changes until the client says yes.");
     expect(container.querySelector<HTMLAnchorElement>('a[href="/client/website-draft-a/dashboard/site"]')).toBeTruthy();
     act(() => root.unmount());

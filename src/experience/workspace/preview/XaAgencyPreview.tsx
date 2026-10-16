@@ -16,15 +16,17 @@ import { clientColor } from "../agency/xa/client-color";
 import { splitQueue } from "../agency/xa/agency-xa-model";
 import { AgencyWebsiteDocumentDraftExperience, type AgencyDocumentTransport } from "@/experience/agency-website/AgencyWebsiteDocumentDraftExperience";
 import { agencyDocumentFixture } from "@/experience/agency-website/agency-document-fixture";
-import { XA_AGENCY, XA_CLIENT, XA_MINUTES, xaAgencyClients, xaAgencyLibrary, xaAgencySnapshot, xaHarborSystems, type XaAgencyScreen, type XaAgencyState } from "./xa-agency-fixture";
+import { XA_AGENCY, XA_CLIENT, XA_MINUTES, xaAgencyClients, xaAgencyLibrary, xaAgencySnapshot, xaClientSystems, xaHarborSystems, type XaAgencyScreen, type XaAgencyState } from "./xa-agency-fixture";
 import styles from "./xa-foundation-preview.module.css";
+import { XA_CLIENTS, XA_NORTH, xaClient, type XaClientKey, xaSearchItems } from "./xa-day";
 
 
 const BASE = "/preview/strelva/xa/xa6-agency";
 const never = () => new Promise<Response>(() => undefined);
 
-function previewHref(screen: XaAgencyScreen, mode: "light" | "dark", state?: XaAgencyState) {
+function previewHref(screen: XaAgencyScreen, mode: "light" | "dark", state?: XaAgencyState, client?: XaClientKey) {
   const query = new URLSearchParams();
+  if (client && client !== "harbor") query.set("client", client);
   if (state && state !== "ready") query.set("state", state);
   if (mode === "dark") query.set("mode", "dark");
   const search = query.toString();
@@ -32,7 +34,7 @@ function previewHref(screen: XaAgencyScreen, mode: "light" | "dark", state?: XaA
 }
 
 /** Answers the agency's reads the way the server would, for one fixture state. */
-function fixtureRouter(screen: XaAgencyScreen, state: XaAgencyState): typeof fetch {
+function fixtureRouter(screen: XaAgencyScreen, state: XaAgencyState, client: XaClientKey = "harbor"): typeof fetch {
   // Versions resolved inline in this preview session read back as offered.
   const resolved = new Set<string>();
   return (async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -80,14 +82,15 @@ function fixtureRouter(screen: XaAgencyScreen, state: XaAgencyState): typeof fet
       if (state === "loading") return never();
       if (state === "error") return Response.json({ error: "Unavailable" }, { status: 500 });
       const open = state !== "done";
+      if (client !== "harbor") return Response.json({ workspaceId: XA_CLIENT[client], decisions: [], changes: [], deliveryChecks: [], deliveries: [] });
       return Response.json({
         workspaceId: XA_CLIENT.harbor,
         decisions: [
-          { id: "f0000000-0000-4000-8000-000000000001", title: "New cleaning prices on harbordental.com/services", systemId: "b0000000-0000-4000-8000-000000000001", since: "2026-10-13T14:42:00.000Z", state: open ? "open" : "approved" },
-          { id: "f0000000-0000-4000-8000-000000000002", title: "Thanksgiving week hours", systemId: "b0000000-0000-4000-8000-000000000002", since: "2026-10-14T16:12:00.000Z", state: state === "waiting" ? "open" : "approved" },
+          { id: "f0000000-0000-4000-8000-000000000001", title: "New cleaning prices on harbordental.com/services", systemId: "b0000000-0000-4000-8000-000000000001", since: "2026-11-21T15:42:00.000Z", state: open ? "open" : "approved" },
+          { id: "f0000000-0000-4000-8000-000000000002", title: "Thanksgiving week hours", systemId: "b0000000-0000-4000-8000-000000000002", since: "2026-11-22T17:12:00.000Z", state: state === "waiting" ? "open" : "approved" },
         ],
         changes: [
-          { id: "f1000000-0000-4000-8000-000000000001", systemId: "b0000000-0000-4000-8000-000000000003", title: "After-hours reply turned on for the Inbox", at: "2026-10-12T15:00:00.000Z", actor: { kind: "agency", displayName: "Maya at North Studio" } },
+          { id: "f1000000-0000-4000-8000-000000000001", systemId: "b0000000-0000-4000-8000-000000000003", title: "After-hours reply turned on for Inquiries", at: "2026-11-20T16:00:00.000Z", actor: { kind: "agency", displayName: "Maya at North Studio" } },
         ],
         deliveryChecks: [], deliveries: [],
       });
@@ -102,35 +105,33 @@ function fixtureRouter(screen: XaAgencyScreen, state: XaAgencyState): typeof fet
   }) as typeof fetch;
 }
 
-export function XaAgencyPreview({ screen, state, mode }: { screen: XaAgencyScreen; state: XaAgencyState; mode: "light" | "dark" }) {
-  const request = useMemo(() => fixtureRouter(screen, state), [screen, state]);
+export function XaAgencyPreview({ screen, state, mode, client = "harbor" }: { screen: XaAgencyScreen; state: XaAgencyState; mode: "light" | "dark"; client?: XaClientKey }) {
+  const request = useMemo(() => fixtureRouter(screen, state, client), [screen, state, client]);
   const snapshot = useMemo(() => xaAgencySnapshot(), []);
   // The sidebar reads the same batched read the screens do: the Queue count, and a dot on each client that waits on the agency.
   const page = useMemo(() => xaAgencyClients(state), [state]);
   const you = splitQueue(page.queue).you;
   const waiting = new Set(you.filter(item => item.kind !== "improvement").map(item => item.workspaceId));
   const clients: StrelvaClientLink[] = state === "empty" && screen !== "client" ? [] : [
-    { id: XA_CLIENT.harbor, name: "Harbor Dental", href: previewHref("client", mode), current: screen === "client" || screen === "prepare" },
-    { id: XA_CLIENT.north, name: "North Coast Realty", href: previewHref("today", mode) },
-    { id: XA_CLIENT.lakeview, name: "Lakeview Mediation", href: previewHref("today", mode) },
-    { id: XA_CLIENT.fieldwork, name: "Fieldwork Studio", href: previewHref("today", mode) },
-  ].map(client => ({ ...client, color: clientColor(client.id), waits: waiting.has(client.id) || undefined }));
+  // Every client in the rail opens its own client screen, in the shared fixture's order.
+  ...XA_CLIENTS.map(entry => ({ id: XA_CLIENT[entry.key], name: entry.name, href: previewHref("client", mode, undefined, entry.key), current: (screen === "client" && client === entry.key) || (screen === "prepare" && entry.key === "harbor") })),
+  ].map(link => ({ ...link, color: clientColor(link.id), waits: waiting.has(link.id) || undefined }));
   const agencyView = screen === "today" ? "home" : screen === "queue" ? "queue" : screen === "library" ? "library" : screen === "minutes" ? "minutes" : "clients";
   const insideClient = screen === "client" || screen === "prepare";
   const shell = {
     appBase: "/preview/strelva", signOut: null, systemsReleased: true, mode,
     notice: <p className={styles.notice}>Fictional preview. Nothing here reaches a real business.</p>,
-    workspaceName: "North Studio", accountName: "Maya Okafor",
+    workspaceName: XA_NORTH.name, accountName: XA_NORTH.person,
     agencyNavigation: {
       active: agencyView, queueCount: state === "loading" || state === "error" ? null : you.length, clients, agencyWorkspaceId: insideClient ? XA_AGENCY : undefined,
       hrefs: { home: previewHref("today", mode), queue: previewHref("queue", mode), library: previewHref("library", mode), minutes: previewHref("minutes", mode), clients: previewHref("client", mode) },
     },
   } as const;
-  const title = screen === "today" ? "Today" : screen === "queue" ? "Queue" : screen === "library" ? "Library" : screen === "minutes" ? "Minutes" : "Harbor Dental";
+  const title = screen === "today" ? "Home" : screen === "queue" ? "Queue" : screen === "library" ? "Library" : screen === "minutes" ? "Time this month" : xaClient(client).name;
 
   return <WorkspaceRequestContext.Provider value={request}>
-    <StrelvaShell {...shell} title={title} active="home">
-      {screen === "client" ? <ClientScreen state={state} />
+    <StrelvaShell searchItems={xaSearchItems("agency")} {...shell} title={title} active="home">
+      {screen === "client" ? <ClientScreen state={state} client={client} />
         : screen === "prepare" ? <PrepareScreen state={state} />
           : <AgencyHome key={`${screen}:${state}`} view={agencyView} onViewChange={() => undefined} snapshot={snapshot} busy={false}
             onWorkspace={() => window.location.assign(previewHref("client", mode))} onOpenClientWork={() => window.location.assign(previewHref("prepare", mode))} onOpenWork={() => undefined} onStart={() => undefined} />}
@@ -138,13 +139,16 @@ export function XaAgencyPreview({ screen, state, mode }: { screen: XaAgencyScree
   </WorkspaceRequestContext.Provider>;
 }
 
-function ClientScreen({ state }: { state: XaAgencyState }) {
-  const shared = useAgencyClientHome(XA_CLIENT.harbor);
-  const request = useMemo(() => fixtureRouter("client", state), [state]);
-  const grants = useAgencyGrants(request, XA_CLIENT.harbor, XA_AGENCY);
+function ClientScreen({ state, client }: { state: XaAgencyState; client: XaClientKey }) {
+  const workspaceId = XA_CLIENT[client];
+  const shared = useAgencyClientHome(workspaceId);
+  const request = useMemo(() => fixtureRouter("client", state, client), [state, client]);
+  const grants = useAgencyGrants(request, workspaceId, XA_AGENCY);
+  // Harbor Dental has its full set of Systems; the other clients show the Systems the client list already reads.
+  const systems = client === "harbor" ? xaHarborSystems() : xaClientSystems(workspaceId);
   // No agency-readable owner name exists yet, so the preview names the business the way the app does.
-  return <AgencyClientXa clientName="Harbor Dental" workspaceId={XA_CLIENT.harbor} agencyName="North Studio" agencyHref={previewHref("today", "light")}
-    systems={state === "empty" ? [] : xaHarborSystems()} systemsLoading={state === "loading"} grants={grants} shared={shared.state}
+  return <AgencyClientXa clientName={xaClient(client).name} workspaceId={workspaceId} agencyName={XA_NORTH.name} agencyHref={previewHref("today", "light")}
+    systems={state === "empty" ? [] : systems} systemsLoading={state === "loading"} grants={grants} shared={shared.state}
     systemHref={() => previewHref("prepare", "light")} onRetryShared={shared.refresh} onAsk={() => undefined} />;
 }
 

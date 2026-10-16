@@ -36,8 +36,8 @@ it("push fixture requires the hold control and retains local intake differences"
   const request = vi.fn(); vi.stubGlobal("fetch", request);
   const node = await render(createElement(EnterprisePreview, { view: "push", state: "ready" }));
   expect(node.textContent).toContain("Has a local question 7");
-  const hold = [...node.querySelectorAll("button")].find(button => button.textContent?.includes("Hold to send to 5"))!;
-  await act(async () => hold.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", metaKey: true, bubbles: true })));
+  const hold = [...node.querySelectorAll("button")].find(button => button.textContent?.includes("Send to 5"))!;
+  await act(async () => hold.click());
   expect(node.querySelector('[role="status"]')?.textContent).toContain("No manager was contacted and no clinic changed");
   expect(request).not.toHaveBeenCalled();
 });

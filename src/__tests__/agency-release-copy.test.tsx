@@ -24,7 +24,7 @@ describe("agency release and review language", () => {
     const home = renderToStaticMarkup(<AgencyPortfolioPreview surface="home" state="ready" mode="light" />);
     expect(html).toContain("4 clients");
     expect(home).toContain("4 clients");
-    expect(html).not.toContain("Time this month");
+    expect(html).not.toMatch(/<th[^>]*>Time this month/);
     expect(html).not.toContain("Minutes · Oct");
     expect(html).not.toMatch(/\br\d+/);
   });

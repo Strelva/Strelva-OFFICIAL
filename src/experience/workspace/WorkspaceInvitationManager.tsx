@@ -88,7 +88,7 @@ export function WorkspaceInvitationManager({ workspaceId, businessName, systemsR
     <StSurface label="Invitation form">
       <form onSubmit={create} className="grid gap-5 md:grid-cols-[minmax(0,1fr)_180px_auto] md:items-end">
         <StField label="Recipient email"><input type="email" autoComplete="email" required value={recipientEmail} onChange={event => setRecipientEmail(event.target.value)} placeholder="person@business.com" /></StField>
-        <StField label="Workspace role"><select value={role} onChange={event => setRole(event.target.value as Role)}><option value="member">Member</option><option value="admin">Admin</option><option value="owner">Owner</option></select></StField>
+        <StField label="Role"><select value={role} onChange={event => setRole(event.target.value as Role)}><option value="member">Member</option><option value="admin">Admin</option><option value="owner">Owner</option></select></StField>
         <StPill type="submit" busy={submitting}>Create link</StPill>
       </form>
       <p className="mt-4 text-sm text-gray-muted">The link alone grants no access. Strelva checks the recipient’s confirmed identity when they accept.</p>
@@ -96,7 +96,7 @@ export function WorkspaceInvitationManager({ workspaceId, businessName, systemsR
     </StSurface>
     {notice ? <StNotice tone={notice.kind === "error" ? "critical" : undefined}><span role={notice.kind === "success" ? "status" : undefined}>{notice.message}</span></StNotice> : null}
     <StSection title="Invitation history">
-      {loading ? <StSkeleton label="Loading invitations" /> : historyError ? <StNotice tone="critical" action={<StTextButton onClick={() => void load()}>Reload invitations</StTextButton>}>Invitation history could not be read.{invitations.length ? " The last read is kept until you reload." : ""}</StNotice> : !invitations.length ? <StEmpty>No workspace invitations yet.</StEmpty> : <StRows>{invitations.map(invitation => <StRow key={invitation.id} title={invitation.recipientEmail} detail={`${invitation.role} · expires ${new Date(invitation.expiresAt).toLocaleDateString()}`} end={<><StState kind={invitation.status === "pending" ? "need" : invitation.status === "accepted" ? "live" : "draft"}>{invitation.status}</StState>{invitation.status === "pending" ? <StTextButton tone="danger" disabled={submitting} onClick={() => void revoke(invitation.id)}>Revoke</StTextButton> : null}</>} />)}</StRows>}
+      {loading ? <StSkeleton label="Loading invitations" /> : historyError ? <StNotice tone="critical" action={<StTextButton onClick={() => void load()}>Reload invitations</StTextButton>}>Invitation history could not be read.{invitations.length ? " The last read is kept until you reload." : ""}</StNotice> : !invitations.length ? <StEmpty>No invitations yet.</StEmpty> : <StRows>{invitations.map(invitation => <StRow key={invitation.id} title={invitation.recipientEmail} detail={`${invitation.role} · expires ${new Date(invitation.expiresAt).toLocaleDateString()}`} end={<><StState kind={invitation.status === "pending" ? "need" : invitation.status === "accepted" ? "live" : "draft"}>{invitation.status}</StState>{invitation.status === "pending" ? <StTextButton tone="danger" disabled={submitting} onClick={() => void revoke(invitation.id)}>Revoke</StTextButton> : null}</>} />)}</StRows>}
     </StSection>
   </StPage></WorkspaceSurfaceShell>;
 }

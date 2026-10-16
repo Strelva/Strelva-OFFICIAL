@@ -30,7 +30,7 @@ export function ago(hours: number): string {
 }
 
 export const LEGACY_SURFACES: DashboardSurface[] = [
-  { id: "today", label: "Today", href: "/dashboard", state: "shown", group: "manage" },
+  { id: "today", label: "Home", href: "/dashboard", state: "shown", group: "manage" },
   { id: "ask-ai", label: "Ask Strelva", href: "/dashboard/chat", state: "shown", group: "manage" },
   { id: "website", label: "Website", href: "/dashboard/site", state: "shown", group: "presence" },
   { id: "google-business", label: "Google Business", href: "/dashboard/google", state: "shown", group: "presence" },

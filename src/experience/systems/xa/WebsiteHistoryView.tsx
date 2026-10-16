@@ -114,7 +114,7 @@ export function WebsiteHistoryView({ workspaceId, systemId, siteName, state, sys
   return <div className={styles.history}>
     <div className={styles.historyList}>
       {back}
-      <XaHeadline size="md" quiet={`${liveNow ? `Change ${history.length} is live. ` : ""}${canRestore ? "Go back to any of them." : "Only the owner or an admin can go back."}`}>{history.length} {history.length === 1 ? "change" : "changes"} since {day(oldest.at)}.</XaHeadline>
+      <XaHeadline size="md" quiet={`${liveNow ? `Release ${history.length} is live. ` : ""}${canRestore ? "Go back to any of them." : "Only the owner or an admin can go back."}`}>{history.length} {history.length === 1 ? "release" : "releases"} since {day(oldest.at)}.</XaHeadline>
       <ol className={styles.changes} aria-label={`History of ${siteName}`}>
         {history.map((item, position) => <li key={item.id}>
           <button type="button" className={styles.change} aria-current={item.id === selected.id || undefined} onClick={() => { setChosen(item.id); if (typeof window.matchMedia === "function" && window.matchMedia("(max-width: 1100px)").matches) sheet.current?.scrollIntoView({ block: "start", behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" }); }}>
@@ -127,8 +127,8 @@ export function WebsiteHistoryView({ workspaceId, systemId, siteName, state, sys
       </ol>
       {missing.length ? <p className={styles.quiet} role="status">Couldn&apos;t read {missing.join(", ").toLowerCase()} just now. Nothing about them is shown.</p> : null}
     </div>
-    <section ref={sheet} className={styles.sheet} aria-label={`Change ${number(index)}: ${titleOf(selected)}`}>
-      <div className={styles.sheetHead}><h2 className={styles.sheetTitle}>Change {number(index)}</h2><span className={styles.quiet}>{byLine(selected)}</span></div>
+    <section ref={sheet} className={styles.sheet} aria-label={`Release ${number(index)}: ${titleOf(selected)}`}>
+      <div className={styles.sheetHead}><h2 className={styles.sheetTitle}>Release {number(index)}</h2><span className={styles.quiet}>{byLine(selected)}</span></div>
       {showLive ? <XaPage bleed flat address={address || siteName} label={`${siteName} as visitors see it now`}>
         <iframe className={styles.sheetFrame} title={`${siteName} as visitors see it now`} src={livePreviewSrc} sandbox={sandbox(livePreviewSrc)} loading="lazy" referrerPolicy="no-referrer" tabIndex={-1} />
       </XaPage> : <XaPage flat address={address || siteName} label={`${titleOf(selected)}, on ${siteName}`}>

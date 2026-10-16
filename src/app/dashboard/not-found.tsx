@@ -7,8 +7,8 @@ export default function DashboardNotFound() {
     <DashEmpty
       pose="alone"
       title="There's no page here."
-      job="Everything that needs you is on Today."
-      action={<XaButtonLink variant="primary" href="/dashboard">Back to Today</XaButtonLink>}
+      job="Everything that needs you is on Home."
+      action={<XaButtonLink variant="primary" href="/dashboard">Back to Home</XaButtonLink>}
     >
       It may have moved, or it isn&apos;t part of this website&apos;s dashboard.
     </DashEmpty>

@@ -6,6 +6,7 @@
 import type { ServiceRequest } from "@/platform/service-requests";
 import type { WorkspaceSnapshot } from "../contracts";
 import type { WorkspaceSearchItem } from "../workspace-search";
+import { XA_CLIENTS } from "./xa-day";
 
 export const XS_BASE = "/preview/strelva/xa/xs-shell-states";
 export const XS_SCREENS = ["account", "search", "switcher", "dialog", "help", "not-found", "error", "marketing-error", "not-open", "getting-started-off", "loading", "unopened", "shared-empty"] as const;
@@ -15,12 +16,7 @@ export type XsState = typeof XS_STATES[number];
 
 export const HARBOR = { id: "d2960000-0000-4000-8000-000000000001", name: "Harbor Dental", owner: "Dr. Amy Lin", email: "amy@harbordental.com", address: "1180 Elmwood Ave, Buffalo, NY 14222" } as const;
 export const NORTH = { id: "d2960000-0000-4000-8000-0000000000a1", name: "North Studio", person: "Maya Okafor", email: "maya@northstudio.co" } as const;
-export const CLIENTS = [
-  { id: "d2960000-0000-4000-8000-000000000001", name: "Harbor Dental", minutes: 96 },
-  { id: "d2960000-0000-4000-8000-000000000002", name: "North Coast Realty", minutes: 74 },
-  { id: "d2960000-0000-4000-8000-000000000003", name: "Lakeview Mediation", minutes: 39 },
-  { id: "d2960000-0000-4000-8000-000000000004", name: "Fieldwork Studio", minutes: 22 },
-] as const;
+export const CLIENTS = XA_CLIENTS.map((client, index) => ({ id: `d2960000-0000-4000-8000-00000000000${index + 1}`, name: client.name, minutes: client.minutes }));
 
 export function ownerSnapshot(): WorkspaceSnapshot {
   return { actor: { email: HARBOR.email, localPreview: true }, workspaceId: HARBOR.id, workspaces: [
@@ -31,7 +27,7 @@ export function ownerSnapshot(): WorkspaceSnapshot {
 }
 
 export function agencySnapshot(): WorkspaceSnapshot {
-  return { actor: { email: NORTH.email, localPreview: true }, workspaceId: CLIENTS[0].id, workspaces: [
+  return { actor: { email: NORTH.email, localPreview: true }, workspaceId: CLIENTS[0]!.id, workspaces: [
     { id: NORTH.id, name: NORTH.name, kind: "agency", role: "owner" },
     ...CLIENTS.map((client, index) => ({ id: client.id, name: client.name, kind: "customer" as const, access: index === 2 ? "delegated_read" as const : "provider_seat" as const, role: "admin" as const })),
   ], work: [], handoffs: [], delegations: [], products: [] };
