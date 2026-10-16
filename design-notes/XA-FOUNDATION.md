@@ -82,7 +82,7 @@ tabular figures. Geist Mono is no longer loaded.
 | `XaComposerDock` | `Xa` | | Puts the composer in the frame's composer row |
 | `XaWorking title steps state="working\|done\|failed"` | `Xa` | rYq00 | Steps are the caller's real progress events |
 | `XaStream text` | `Xa` | motion "Ask, streamed" | Streams 28 ms per word. Screen readers get the whole text once. |
-| `XaPage address title replaces flat` + `XaPageChange` | `Xa` | viaGc | The page as its visitors see it |
+| `XaPage address title replaces flat bleed` + `XaPageChange` | `Xa` | viaGc | The page as its visitors see it. `bleed` (added by XA-4) drops the body padding so a live frame sits edge to edge (S1, S5). |
 | `XaYes state onYes onNotYet onUndo working liveLabel failure settled disabledReason` | `Xa` | O3 decision + N2cSZg | **The one yes gesture.** See below. |
 | `XaDecision status meta yes label` | `Xa` | O3 panel | The one object that gets the large shadow |
 | `XaUndo onUndo windowMs onExpire shortcut` + `XaUndoDock` | `Xa` | N2cSZg | Has a draining 2 px bar, and ⌘Z works when `shortcut` is set |

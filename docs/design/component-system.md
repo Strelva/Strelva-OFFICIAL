@@ -57,6 +57,28 @@ Today count when a System row already carries it. The composer mic uses the
 browser's own speech recognition (`useDictation`) and is drawn only where it
 works; the plus stays undrawn until attachments exist.
 
+XA-4 Systems up close (October 16, branch xa/lane-xa4-systems):
+
+- `XaPage bleed` holds a live frame edge to edge (S1 site, S5 compare, S6
+  sheet); `XaPage flat` drops the shadow inside another surface.
+- `XaEmpty bare` puts the clay on the page itself, with no felt disc, for
+  errors and quiet states inside a System.
+- `StComposerDock inset={{ start, end }}` (exported as `XaComposerDock`) keeps
+  the composer under one column (S1 site column, S4 brief); it returns to full
+  width below 1100px.
+- `XaButton hint` (⌘↵) shows only on hover or keyboard focus.
+- `PossibilityView` (S5): Live now beside Proposed, the proposer named from
+  `SystemPossibility.actor` when recorded, one yes (`LIVE_YES`, "Make it live",
+  from `make-real-request.ts`), a sticky yes bar on phone.
+- `WebsiteHistoryView` (S6): every change with whoever made it, a Live dot on
+  the change that is live, a sheet built around the change's reason (the live
+  page for the newest change), Checked when a deploy was read back, and going
+  back in owner words. No picture of an older page is stored yet.
+- `SystemHealth.failing` names the failed signals; S1 marks them with a waits
+  dot in place. Signals written "Label: value" read as a label and its value.
+- `BookingRequestYes` puts the yes beside a booking request through the one
+  Needs you decision (POST `/api/workspace/needs-you`), never a second write.
+
 ## October 11 coherence amendment
 
 [GLOSSARY.md](../../GLOSSARY.md) and

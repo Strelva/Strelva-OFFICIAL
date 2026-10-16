@@ -9,7 +9,6 @@ import { inquiryForwardingReleaseEnabled, inquiryForwardingReleasedFor } from "@
 import { WorkspaceSurfaceShell } from "@/experience/workspace/WorkspaceSurfaceShell";
 import { listWorkspaces } from "@/platform/workspaces";
 import { systemsReleasedFor } from "@/platform/systems-release";
-import { StPage } from "@/components/ui/strelva/Kit";
 import { IntakeAppPanel } from "@/experience/vertical-intake/IntakeAppPanel";
 import { readIntakeApp, verticalIntakeReleaseMayBeOn, verticalIntakeReleasedFor } from "@/products/vertical-intake/server";
 
@@ -33,9 +32,9 @@ export default async function InquiriesPage({ searchParams }: { searchParams: Pr
     ? await readIntakeApp(actor, workspaceId, "dental_intake").catch(() => null)
     : null;
   return <WorkspaceSurfaceShell workspaceId={workspaceId} businessName={workspaces.find(workspace => workspace.id === workspaceId)?.name} systemsReleased={systemsReleased}>
-    <StPage>
-      {intake ? <IntakeAppPanel workspaceId={workspaceId} initial={intake} /> : null}
+    <>
       <WorkspaceInquiries workspaceId={workspaceId} state={state} forwarding={forwarding} embedded />
-    </StPage>
+      {intake ? <div className="px-4 pb-32 md:pl-14 md:pr-10"><IntakeAppPanel workspaceId={workspaceId} initial={intake} /></div> : null}
+    </>
   </WorkspaceSurfaceShell>;
 }

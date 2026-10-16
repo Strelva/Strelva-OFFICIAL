@@ -130,13 +130,14 @@ describe("the bookings page", () => {
     const html = render({ workspaceId: WS, view: "day", state: { kind: "ready", bookings: { view: "day", from: "2026-11-06", to: "2026-11-06", sites: [site] } } });
     expect(html).toContain(`href="/workspace?workspaceId=${WS}"`);
     expect(html).toContain("Friday, November 6");
-    expect(html).toContain("10:00 AM – 11:00 AM");
+    expect(html).toContain("10:00–11:00");
     expect(html).toContain("Dana Reed");
     expect(html).toContain("3 appointments · 1 checked in");
     expect(html).toContain(">Check in<");
     expect(html).toContain("Checked in");
     expect(html).toContain("Undo check-in");
-    expect(html).toContain("Waiting for the owner");
+    expect(html).toContain("Waits for you");
+    expect(html).toContain("Ana Ruiz asked for this time");
     expect(html).toContain(`href="/workspace/bookings?workspaceId=${WS}&amp;view=week&amp;date=2026-11-06"`);
     expect(html).toContain(`href="/workspace/bookings?workspaceId=${WS}&amp;view=day&amp;date=2026-11-05"`);
   });

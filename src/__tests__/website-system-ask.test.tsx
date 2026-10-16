@@ -47,7 +47,7 @@ describe("Ask for a change on a managed website files a Request", () => {
   it("opens a form, files the words as a Request to Strelva, and reads the Requests again", async () => {
     const request = server(() => new Response(JSON.stringify({ requestId: "76000000-0000-4000-8000-0000000000f1", requests: [] }), { status: 201 }));
     const { node, onAsk } = await mount(request as unknown as typeof fetch, managed);
-    await act(async () => buttons(node, "Ask for a change")[0]!.click());
+    await act(async () => buttons(node, "Send a Request to Strelva")[0]!.click());
     expect(node.textContent).toContain("Tell Strelva what should change on attymooney.com");
     await type(node, "New office hours in the footer");
     await act(async () => buttons(node, "File the request")[0]!.click());
@@ -64,18 +64,18 @@ describe("Ask for a change on a managed website files a Request", () => {
 
   it("an empty Requests panel is hidden and the header opens the same form", async () => {
     const { node, onAsk } = await mount(server(() => new Response("{}", { status: 500 })) as unknown as typeof fetch, managed);
-    const links = buttons(node, "Ask for a change");
+    const links = buttons(node, "Send a Request to Strelva");
     expect(links.length).toBe(1);
     expect(node.querySelector("ul[aria-label='Requests']")).toBeNull();
     await act(async () => links[0]!.click());
-    expect(node.querySelector("textarea")).not.toBeNull();
+    expect(node.querySelector("aside textarea")).not.toBeNull();
     expect(onAsk).not.toHaveBeenCalled();
   });
 
   it("an unconfirmed permission-looking response preserves the words and request uncertainty", async () => {
     const request = server(() => new Response(JSON.stringify({ error: "Only an owner or admin of this business can ask for a change here." }), { status: 403 }));
     const { node } = await mount(request as unknown as typeof fetch, managed);
-    await act(async () => buttons(node, "Ask for a change")[0]!.click());
+    await act(async () => buttons(node, "Send a Request to Strelva")[0]!.click());
     await type(node, "Change the hero photo");
     await act(async () => buttons(node, "File the request")[0]!.click());
     await settle();
@@ -87,25 +87,26 @@ describe("Ask for a change on a managed website files a Request", () => {
     expect(node.querySelector("textarea")!.value).toBe("Change the hero photo");
   });
 
-  it("a website Strelva doesn't manage still opens the composer; read-only can't ask", async () => {
+  it("a website Strelva doesn't manage asks through the composer alone; read-only can't ask", async () => {
     const { node, onAsk } = await mount(server(() => new Response("{}", { status: 500 })) as unknown as typeof fetch, site);
-    await act(async () => buttons(node, "Ask for a change")[0]!.click());
-    expect(onAsk).toHaveBeenCalledWith("About attymooney.com: ");
-    expect(node.querySelector("textarea")).toBeNull();
+    expect(buttons(node, "Send a Request to Strelva")).toHaveLength(0);
+    expect(node.querySelector<HTMLTextAreaElement>("[data-st-composer-dock] textarea")?.placeholder).toBe("Ask for a change to attymooney.com");
+    expect(onAsk).not.toHaveBeenCalled();
+    expect(node.querySelector("aside textarea")).toBeNull();
     const readOnly = await mount(server(() => new Response("{}", { status: 500 })) as unknown as typeof fetch, managed, true);
-    expect(buttons(readOnly.node, "Ask for a change").every(item => item.disabled)).toBe(true);
+    expect(buttons(readOnly.node, "Send a Request to Strelva").every(item => item.disabled)).toBe(true);
   });
   it("opens Ask Strelva with the website scope and preserves the words without filing or approving a change", async () => {
     const request = server(() => new Response("{}", { status: 500 }));
     const { node, onAsk } = await mount(request as unknown as typeof fetch, managed);
-    const field = node.querySelector<HTMLInputElement>('input[aria-label="Ask Strelva"]')!;
-    expect(field.placeholder).toBe("Ask about attymooney.com");
-    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!;
+    const field = node.querySelector<HTMLTextAreaElement>("[data-st-composer-dock] textarea")!;
+    expect(field.placeholder).toBe("Ask for a change to attymooney.com");
+    const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")!.set!;
     await act(async () => { setter.call(field, "yes"); field.dispatchEvent(new Event("input", { bubbles: true })); });
     await act(async () => field.form!.requestSubmit());
     expect(onAsk).toHaveBeenCalledExactlyOnceWith("About attymooney.com: yes");
     expect(field.value).toBe("yes");
     expect(request.mock.calls.some(([url]) => url === "/api/workspace/site-changes")).toBe(false);
-    expect(node.querySelector("textarea")).toBeNull();
+    expect(node.querySelector("aside textarea")).toBeNull();
   });
 });

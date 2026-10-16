@@ -1,0 +1,254 @@
+/*
+ * XA-4 · Systems up close (S1 Website, S2 Bookings, S3 Inbox, S4 form in
+ * Draft, S5 Possibility, S6 History). Geometry from the Pen frames
+ * nSHFG, H7QXXE, ADrYF, ZMIW5, fdAL4, ocLK4: main padding 36/40/28/56,
+ * header tile 56 with a 28/600 title, body gap 32, side column 300.
+ * Colors are workspace tokens only; motion is the ladder.
+ */
+
+.screen {
+  box-sizing: border-box;
+  display: flex;
+  width: 100%;
+  min-height: 100%;
+  flex-direction: column;
+  gap: 24px;
+  padding: 36px 40px 132px 56px;
+  color: var(--st-text);
+  font-family: var(--font-workspace), system-ui, sans-serif;
+}
+
+/* ---------- Header: the System's clay, its name, one state line ---------- */
+.head { display: flex; align-items: center; gap: 16px; min-width: 0; }
+.headText { display: flex; min-width: 0; flex: 1; flex-direction: column; gap: 4px; }
+.title { margin: 0; overflow-wrap: anywhere; color: var(--st-text); font-size: 28px; font-weight: 600; letter-spacing: -0.6px; line-height: 34px; }
+.stateLine { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; margin: 0; color: var(--st-text-2); font-size: 15px; line-height: 20px; }
+.stateLine[data-tone="waits"] { color: var(--st-need); }
+.headActions { display: flex; flex-shrink: 0; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 10px; }
+.back { align-self: flex-start; padding: 0; border: 0; background: none; color: var(--st-text-2); font: inherit; font-size: 14px; cursor: pointer; text-decoration: none; }
+.back:hover { color: var(--st-text); }
+.back:focus-visible { outline: 2px solid var(--st-accent); outline-offset: 2px; border-radius: 4px; }
+
+/* ---------- Two columns: the thing itself, and what it reads and checks ---------- */
+.body { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 32px; align-items: start; }
+.body[data-side="wide"] { grid-template-columns: minmax(0, 1fr) 360px; gap: 40px; }
+.body[data-side="none"] { grid-template-columns: minmax(0, 1fr); }
+.main { display: flex; min-width: 0; flex-direction: column; gap: 16px; }
+.side { display: flex; min-width: 0; flex-direction: column; gap: 14px; }
+.side > section + section, .side > div + section { margin-top: 18px; }
+
+/* A page as visitors see it, holding the live site in a frame. */
+.frame { display: block; width: 100%; min-height: 560px; height: calc(100vh - 300px); max-height: 900px; border: 0; background: var(--st-surface); }
+.frameEmpty { padding: 28px; color: var(--st-text-2); font-size: 15px; line-height: 1.45; }
+
+/* ---------- Key and value lines inside one white sheet (S1 Checks) ---------- */
+.facts { margin: 0; padding: 4px 0; border-radius: 18px; background: var(--st-surface); list-style: none; }
+.facts > li { position: relative; display: flex; align-items: baseline; gap: 16px; padding: 13px 16px; color: var(--st-text-body); font-size: 15px; line-height: 21px; }
+.facts > li + li::before { position: absolute; top: 0; left: 16px; right: 0; height: 1px; background: var(--st-line); content: ""; }
+.facts > li > span:first-child { min-width: 0; flex: 1; overflow-wrap: anywhere; }
+.facts > li > strong { flex-shrink: 0; color: var(--st-text); font-weight: 500; }
+
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.chip { display: inline-flex; height: 28px; align-items: center; padding: 0 10px; border-radius: 14px; background: var(--st-inset); color: var(--st-text-body); font-size: 13px; line-height: 18px; }
+.chip[data-tone="waits"] { background: var(--st-need-tint); color: var(--st-need); }
+
+.note { margin: 0; color: var(--st-text-2); font-size: 14px; line-height: 1.45; }
+.quiet { margin: 0; color: var(--st-text-3); font-size: 13px; line-height: 18px; }
+.sentence { margin: 0; color: var(--st-text); font-size: 15px; line-height: 1.45; }
+.sentence[data-tone="waits"] { color: var(--st-need); }
+.sentence[data-tone="down"] { color: var(--st-critical, var(--st-need)); }
+
+/* One labeled block in the side column: a sentence-case label, an optional line, then the rows. */
+.panel { display: flex; min-width: 0; flex-direction: column; gap: 8px; }
+.panelHead { display: flex; align-items: baseline; gap: 8px; margin: 0; color: var(--st-text-3); font-size: 13px; font-weight: 500; line-height: 18px; }
+.panelHead span { font-weight: 400; font-variant-numeric: tabular-nums; }
+
+/* ---------- S4: the brief beside the thing that waits ---------- */
+.draft { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 540px); grid-template-areas: "brief panel" "aside panel"; gap: 32px 40px; align-items: start; padding-top: 8px; }
+.draft > .brief { grid-area: brief; }
+.draft > section { grid-area: panel; }
+.draftAside { grid-area: aside; display: flex; min-width: 0; flex-direction: column; gap: 18px; padding-left: 16px; }
+.brief { display: flex; min-width: 0; flex-direction: column; gap: 26px; padding-left: 16px; }
+.draftPanel { display: flex; min-width: 0; flex-direction: column; gap: 22px; }
+.surfaceBox { min-width: 0; overflow: hidden; border: 1px solid var(--st-line); border-radius: 16px; background: var(--st-surface); }
+
+/* ---------- S5: Live now beside Proposed ---------- */
+.compareHead { display: flex; flex-direction: column; gap: 10px; }
+.kicker { display: flex; align-items: center; gap: 10px; margin: 0; color: var(--st-text-2); font-size: 14px; line-height: 20px; }
+.compare { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
+.compareCol { display: flex; min-width: 0; flex-direction: column; gap: 10px; }
+.compareCol .frame { min-height: 420px; height: calc(100vh - 430px); }
+.compareFoot { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding-right: 4px; }
+.compareFoot > :first-child { min-width: 0; flex: 1 1 320px; }
+.compareActions { display: flex; flex-shrink: 0; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 12px; }
+.compareActions > div { width: auto; }
+.phoneOnly { display: none; }
+
+/* ---------- S6: History list beside the chosen change ---------- */
+.history { box-sizing: border-box; display: grid; grid-template-columns: minmax(0, 1fr) 480px; gap: 24px; align-items: start; padding: 24px 24px 132px 40px; }
+.history > .sheet { position: sticky; top: 24px; }
+.historyList { display: flex; min-width: 0; flex-direction: column; gap: 24px; padding: 36px 16px 0 16px; }
+.changes { margin: 0; padding: 0; list-style: none; }
+.change { box-sizing: border-box; display: grid; width: 100%; grid-template-columns: 28px 32px minmax(0, 1fr) auto; align-items: center; gap: 14px; min-height: 64px; padding: 12px 14px 12px 4px; border: 0; border-radius: 14px; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; transition: background-color var(--motion-fast) var(--ease-settle); }
+.change:hover { background: var(--st-hover); }
+.change[aria-current="true"] { background: var(--st-surface); }
+.change:focus-visible { outline: 2px solid var(--st-accent); outline-offset: 2px; }
+.changeIndex { color: var(--st-faint); font-size: 13px; font-variant-numeric: tabular-nums; text-align: right; }
+.changeText { display: flex; min-width: 0; flex-direction: column; gap: 2px; }
+.changeTitle { color: var(--st-text); font-size: 15px; font-weight: 500; line-height: 21px; overflow-wrap: anywhere; }
+.changeBy { color: var(--st-text-2); font-size: 13px; line-height: 19px; }
+.changeMeta { color: var(--st-text-3); font-size: 13px; white-space: nowrap; }
+.sheet { box-sizing: border-box; display: flex; min-width: 0; flex-direction: column; gap: 20px; padding: 22px 24px 24px; border-radius: 20px; background: var(--st-surface); box-shadow: var(--st-shadow-sm); }
+.sheetFrame { display: block; width: 100%; height: 340px; border: 0; background: var(--st-surface); }
+.pageNote { margin: 0; color: var(--st-text-3); font-size: 13px; line-height: 18px; }
+.sheetHead { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px 12px; }
+.sheetTitle { margin: 0; font-size: 15px; font-weight: 600; line-height: 21px; }
+
+/* ---------- S2: Bookings ---------- */
+.week { display: flex; min-width: 0; flex-direction: column; gap: 20px; }
+.dayHead { display: flex; align-items: baseline; gap: 8px; margin: 0; color: var(--st-text-3); font-size: 13px; font-weight: 500; line-height: 18px; }
+.dayHead span { font-weight: 400; }
+.bookingTime { min-width: 72px; color: var(--st-text); font-size: 15px; font-variant-numeric: tabular-nums; }
+.bookingMore { margin-top: 6px; color: var(--st-text-2); font-size: 13px; line-height: 1.45; }
+.bookingMore summary { display: inline-flex; min-height: 32px; align-items: center; color: var(--st-accent); font-weight: 500; cursor: pointer; }
+.bookingMore summary:focus-visible { outline: 2px solid var(--st-accent); outline-offset: 2px; border-radius: 4px; }
+.bookingMore ol, .bookingMore dl { display: flex; flex-direction: column; gap: 6px; margin: 6px 0 0; padding: 0; list-style: none; }
+.bookingMore dd { margin: 0; white-space: pre-wrap; }
+.views { display: inline-flex; gap: 4px; padding: 4px; border-radius: 999px; background: var(--st-inset); }
+.views a { display: inline-flex; height: 36px; align-items: center; padding: 0 16px; border-radius: 999px; color: var(--st-text-2); font-size: 14px; font-weight: 500; text-decoration: none; transition: background-color var(--motion-fast) var(--ease-settle); }
+.views a[aria-current="page"] { background: var(--st-surface); color: var(--st-text); box-shadow: var(--st-shadow-sm); }
+.views a:focus-visible { outline: 2px solid var(--st-accent); outline-offset: 2px; }
+.weekNav { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; }
+.textLinks { display: inline-flex; flex-wrap: wrap; gap: 4px 14px; font-size: 14px; }
+.textLinks a { color: var(--st-accent); font-weight: 500; text-decoration: none; }
+.textLinks a:hover { text-decoration: underline; text-underline-offset: 3px; }
+
+/* What people see when they book, drawn from the bookable hours (no invented times). */
+.phone { box-sizing: border-box; display: flex; min-width: 0; flex-direction: column; gap: 14px; padding: 22px 20px 20px; border-radius: 20px; background: var(--st-surface); box-shadow: var(--st-shadow-sm); }
+.phoneBrand { margin: 0; color: var(--st-text); font-size: 15px; font-weight: 600; }
+.phoneTitle { margin: 0; font-size: 22px; font-weight: 600; letter-spacing: -0.4px; line-height: 28px; }
+.days { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; margin: 0; padding: 0; list-style: none; }
+.day { display: flex; min-width: 0; flex-direction: column; align-items: center; gap: 6px; text-align: center; }
+.dayName { color: var(--st-text-2); font-size: 12px; line-height: 16px; }
+.slot { box-sizing: border-box; display: flex; width: 100%; min-height: 44px; flex-direction: column; align-items: center; justify-content: center; padding: 4px 2px; border-radius: 8px; background: var(--st-tint); color: var(--st-text); font-size: 11px; font-variant-numeric: tabular-nums; line-height: 14px; }
+.slot[data-closed="true"] { min-height: 0; padding-top: 12px; background: none; color: var(--st-text-3); font-size: 12px; }
+
+/* ---------- S3: Inquiries ---------- */
+.inboxHead { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; }
+.inbox { display: grid; grid-template-columns: 330px minmax(0, 1fr); gap: 24px; align-items: start; }
+.people { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 2px; }
+.person { box-sizing: border-box; display: grid; width: 100%; grid-template-columns: minmax(0, 1fr) 10px; align-items: start; gap: 12px; padding: 12px 14px; border: 0; border-radius: 16px; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; transition: background-color var(--motion-fast) var(--ease-settle); }
+.person:hover { background: var(--st-hover); }
+.person[aria-current="true"] { background: var(--st-selected); }
+.person:focus-visible { outline: 2px solid var(--st-accent); outline-offset: 2px; }
+.personText { display: flex; min-width: 0; flex-direction: column; gap: 2px; }
+.personTop { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.personName { overflow: hidden; color: var(--st-text); font-size: 15px; font-weight: 500; line-height: 21px; text-overflow: ellipsis; white-space: nowrap; }
+.personWhen { flex-shrink: 0; color: var(--st-text-3); font-size: 12px; }
+.personSummary { display: -webkit-box; overflow: hidden; color: var(--st-text-body); font-size: 14px; line-height: 20px; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+.personSummary[data-quiet="true"] { color: var(--st-text-3); }
+.personDot { margin-top: 8px; }
+.thread { box-sizing: border-box; display: flex; min-width: 0; min-height: 560px; flex-direction: column; gap: 20px; padding: 24px 32px 28px; border-radius: 20px; background: var(--st-surface); box-shadow: var(--st-shadow-sm); }
+.threadHead { display: flex; align-items: center; gap: 14px; padding-bottom: 18px; border-bottom: 1px solid var(--st-line); }
+.threadWho { display: flex; min-width: 0; flex: 1; flex-direction: column; gap: 2px; }
+.threadName { margin: 0; color: var(--st-text); font-size: 17px; font-weight: 500; line-height: 22px; }
+.threadMeta { margin: 0; overflow-wrap: anywhere; color: var(--st-text-2); font-size: 14px; line-height: 20px; }
+.bubble { max-width: 560px; margin: 0; padding: 14px 16px; border-radius: 18px; background: var(--st-chip); color: var(--st-text); font-size: 15px; line-height: 1.5; white-space: pre-line; overflow-wrap: anywhere; }
+.replyRow { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 16px; margin-top: auto; }
+.replyRow > .quiet { margin-left: auto; }
+.replyForm { display: flex; min-width: 0; flex-direction: column; gap: 14px; margin-top: auto; }
+.phoneBack { display: none; }
+
+/* ---------- Phone (XA · E6): one column, the thing first ---------- */
+@media (max-width: 1100px) {
+  .body, .body[data-side="wide"] { grid-template-columns: minmax(0, 1fr); }
+  .history { grid-template-columns: minmax(0, 1fr); }
+  .draft { grid-template-columns: minmax(0, 1fr); grid-template-areas: "brief" "panel" "aside"; padding-top: 12px; }
+}
+@media (max-width: 767px) {
+  .screen { gap: 20px; padding: 20px 16px 132px; }
+  .head { flex-wrap: wrap; align-items: flex-start; gap: 12px; }
+  .head > :first-child { --xa-size: 44px; }
+  .headText { flex-basis: calc(100% - 60px); }
+  .title { font-size: 24px; line-height: 30px; }
+  .headActions { width: 100%; justify-content: flex-start; }
+  .frame { min-height: 520px; height: 70vh; }
+  .compare { grid-template-columns: minmax(0, 1fr); }
+  .compare[data-show="live"] > :nth-child(2), .compare[data-show="proposed"] > :nth-child(1) { display: none; }
+  .phoneOnly { display: flex; }
+  .deskOnly { display: none; }
+  .colLabel { display: none; }
+  /* The yes stays in reach on a phone: a bar pinned above the bottom edge. */
+  .compareFoot { position: sticky; bottom: 0; z-index: 2; margin: 0 -16px; padding: 12px 16px calc(12px + var(--st-phone-navigation-height, 0px)); background: var(--st-canvas); box-shadow: 0 -1px 0 var(--st-line); }
+  .compareFoot > :first-child { flex-basis: 100%; }
+  .compareActions { width: 100%; justify-content: stretch; }
+  .compareActions > * { flex: 1; }
+  .history { padding: 20px 16px 132px; }
+  .history > .sheet { position: static; }
+  .historyList { padding: 8px 0 0; }
+  .change { grid-template-columns: 32px minmax(0, 1fr) auto; padding-left: 10px; }
+  .changeIndex { display: none; }
+  .sheet { padding: 18px 18px 22px; border-radius: 18px; }
+  .brief, .draftAside { padding-left: 0; gap: 20px; }
+  .inbox { grid-template-columns: minmax(0, 1fr); }
+  .inbox[data-detail="true"] .peopleCol { display: none; }
+  .inbox:not([data-detail="true"]) .threadCol { display: none; }
+  .phoneBack { display: inline-flex; }
+  .thread { min-height: 0; padding: 18px 18px 22px; border-radius: 18px; }
+  .days { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+
+/* Bookings of one day: open rows, a hairline between, details folded under each. */
+.bookingList { display: flex; flex-direction: column; margin: 0; padding: 0; list-style: none; }
+.bookingList > li + li { border-top: 1px solid var(--st-line); }
+.bookingList > li { padding-bottom: 6px; }
+
+/* Held as spam: one message per open row, the decision under it. */
+.heldItem { display: flex; flex-direction: column; gap: 6px; padding: 14px 0; }
+.note[data-pre="true"] { white-space: pre-line; overflow-wrap: anywhere; }
+.screen[data-bare="true"] { padding: 0; }
+
+/* ---------- Shared: text-link buttons, phone and desktop only, one disclosure for the rest ---------- */
+.linkButton { display: inline-flex; min-height: 24px; align-items: center; padding: 0; border: 0; background: none; color: var(--st-accent); font: inherit; font-size: 14px; font-weight: 500; cursor: pointer; }
+.linkButton:hover:not(:disabled) { text-decoration: underline; text-underline-offset: 3px; }
+.linkButton:disabled { color: var(--st-text-3); cursor: not-allowed; }
+.linkButton:focus-visible { outline: 2px solid var(--st-accent); outline-offset: 2px; border-radius: 4px; }
+.phoneOnlyInline { display: none; }
+@media (max-width: 767px) { .phoneOnlyInline { display: inline-flex; } }
+.more { min-width: 0; margin-top: 8px; border-top: 1px solid var(--st-line); }
+.more > summary { display: flex; min-height: 44px; align-items: center; color: var(--st-text-2); font-size: 14px; font-weight: 500; cursor: pointer; list-style: none; }
+.more > summary::-webkit-details-marker { display: none; }
+.more > summary::after { margin-left: 6px; color: var(--st-text-3); content: "+"; }
+.more[open] > summary::after { content: "–"; }
+.more > summary:hover { color: var(--st-text); }
+.more > summary:focus-visible { outline: 2px solid var(--st-accent); outline-offset: 2px; border-radius: 4px; }
+.moreBody { display: flex; min-width: 0; flex-direction: column; gap: 18px; padding: 4px 0 8px; }
+
+/* ---------- S2: one row per visit, a fixed time column, status only for exceptions ---------- */
+.visit { display: grid; grid-template-columns: 92px minmax(0, 1fr) auto; align-items: center; gap: 4px 16px; min-height: 56px; padding: 10px 0; }
+.visitTime { color: var(--st-text); font-size: 15px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.visitText { display: flex; min-width: 0; flex-direction: column; gap: 2px; }
+.visitName { color: var(--st-text); font-size: 15px; font-weight: 500; line-height: 21px; overflow-wrap: anywhere; }
+.visitName s { color: var(--st-text-3); }
+.visitDetail { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; color: var(--st-text-2); font-size: 13px; line-height: 19px; }
+.visitEnd { display: flex; justify-content: flex-end; }
+.visit + .bookingMore { margin: -6px 0 8px 108px; }
+.waitsFor { display: flex; flex-direction: column; gap: 10px; padding: 16px 18px 18px; border-radius: 16px; background: var(--st-surface); box-shadow: var(--st-shadow-sm); }
+.waitsFor .visit { min-height: 0; padding: 0; grid-template-columns: 124px minmax(0, 1fr) auto; }
+.waitsYes { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+.waitsYes > div { width: auto; }
+
+/* ---------- S3: the person who waits, Pebble's one ask, the reply ---------- */
+.ask { display: flex; min-width: 0; flex-direction: column; gap: 14px; margin-top: 4px; }
+.askRow { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 20px; }
+.askRow > .quiet { margin-left: auto; }
+.quietList { margin: 0; padding: 0; list-style: none; }
+.quietList > li + li { border-top: 1px solid var(--st-line); }
+
+@media (max-width: 767px) {
+  .visit { grid-template-columns: 76px minmax(0, 1fr); }
+  .visitEnd { grid-column: 2; justify-content: flex-start; }
+  .visit + .bookingMore { margin-left: 92px; }
+  .waitsFor .visit { grid-template-columns: 100px minmax(0, 1fr); }
+  .askRow > .quiet { margin-left: 0; flex-basis: 100%; }
+}

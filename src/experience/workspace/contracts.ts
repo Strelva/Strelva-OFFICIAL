@@ -373,6 +373,10 @@ export interface WorkspaceSystemPossibility {
   stored?: boolean;
   /** Why it went back to Exploring ("attymooney.com changed since this was built."). Additive. */
   staleReason?: string | null;
+  /** Whoever proposed it, when recorded. Additive; never inferred from branding. */
+  actor?: RecordedActor | null;
+  /** When it was proposed (ISO). Additive. */
+  proposedAt?: string | null;
 }
 
 /** Result of Make real on an isolated copy (src/platform/make-real/sandbox.ts). */

@@ -16,8 +16,8 @@ import styles from "./xa.module.css";
 /* ---------- Page ---------- */
 
 /** A page the way its visitors see it: the address, then the content. */
-export function XaPage({ address, title, children, replaces, flat = false, label }: { address: string; title?: ReactNode; children?: ReactNode; replaces?: ReactNode; flat?: boolean; label?: string }) {
-  return <figure className={styles.page} data-flat={flat || undefined} aria-label={label ?? `${address}, as visitors see it`} style={{ margin: 0 }}>
+export function XaPage({ address, title, children, replaces, flat = false, bleed = false, label }: { address: string; title?: ReactNode; children?: ReactNode; replaces?: ReactNode; flat?: boolean; /** The body holds a live frame edge to edge (XA · S1, S5). */ bleed?: boolean; label?: string }) {
+  return <figure className={styles.page} data-flat={flat || undefined} data-bleed={bleed || undefined} aria-label={label ?? `${address}, as visitors see it`} style={{ margin: 0 }}>
     <div className={styles.pageAddress}><Lock size={12} aria-hidden="true" /><span>{address}</span></div>
     <div className={styles.pageBody}>
       {title ? <p className={styles.pageTitle}>{title}</p> : null}
@@ -105,9 +105,9 @@ export function XaRow({ lead, title, detail, tone, meta, action, href, onClick, 
  * An empty or quiet state with Pebble doing a job. `job` says what Pebble is
  * doing right now; it is required because Pebble is never idle decoration.
  */
-export function XaEmpty({ pose, job, title, children, action, secondary, size = "md", align = "start" }: { pose: XaPose; job: ReactNode; title: ReactNode; children?: ReactNode; action?: ReactNode; secondary?: ReactNode; size?: "sm" | "md"; align?: "start" | "center" }) {
-  return <section className={styles.empty} data-size={size} data-align={align} aria-label={typeof title === "string" ? title : undefined}>
-    <XaPebbleScene pose={pose} size={size === "sm" ? 140 : 200} />
+export function XaEmpty({ pose, job, title, children, action, secondary, size = "md", align = "start", bare = false }: { pose: XaPose; job: ReactNode; title: ReactNode; children?: ReactNode; action?: ReactNode; secondary?: ReactNode; size?: "sm" | "md"; align?: "start" | "center"; /** The clay on the page itself, without the felt disc (errors and quiet states inside a System). */ bare?: boolean }) {
+  return <section className={styles.empty} data-size={size} data-align={align} data-bare={bare || undefined} aria-label={typeof title === "string" ? title : undefined}>
+    <XaPebbleScene pose={pose} size={size === "sm" ? 140 : 200} bare={bare} />
     <h2 className={styles.emptyTitle}>{title}</h2>
     {children ? <p className={styles.emptyBody}>{children}</p> : null}
     <p className={styles.emptyJob}><span className={styles.pulse} aria-hidden="true" />{job}</p>

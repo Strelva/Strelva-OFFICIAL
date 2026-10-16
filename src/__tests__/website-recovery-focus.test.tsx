@@ -18,16 +18,13 @@ async function mount(element: ReturnType<typeof createElement>) {
 afterEach(async () => { await act(async () => root?.unmount()); document.body.innerHTML = ""; vi.unstubAllGlobals(); });
 function outsideButton() { const outside = document.createElement("button"); outside.textContent = "Other System"; document.body.append(outside); return outside; }
 
-it("opens an inquiry reply at Subject and returns to Reply when the draft closes, retaining words", async () => {
+it("keeps the reply open under the message and sends focus to it when words are missing, retaining words", async () => {
   const fetcher = vi.fn(); vi.stubGlobal("fetch", fetcher);
   await mount(createElement(WorkspaceInquiryReply, { workspaceId: "fictional", rowId: "row", name: "Pat", email: "pat@example.test" }));
-  const opener = button("Reply to Pat"); opener.focus();
-  await act(async () => opener.click()); expect(document.activeElement).toBe(container.querySelector("input"));
+  const send = button("Send to Pat"); send.focus();
+  await act(async () => send.click()); expect(document.activeElement).toBe(container.querySelector("textarea"));
   const draft = container.querySelector("textarea")!;
   await act(async () => { Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")!.set!.call(draft, "Retained private draft"); draft.dispatchEvent(new Event("input", { bubbles: true })); });
-  button("Close draft").focus(); await act(async () => button("Close draft").click());
-  expect(document.activeElement).toBe(button("Reply to Pat"));
-  await act(async () => button("Reply to Pat").click());
   expect(container.querySelector("textarea")!.value).toBe("Retained private draft"); expect(fetcher).not.toHaveBeenCalled();
 });
 

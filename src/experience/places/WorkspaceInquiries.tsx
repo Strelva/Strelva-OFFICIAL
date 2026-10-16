@@ -1,5 +1,9 @@
+"use client";
+import { useState, type ReactNode } from "react";
 import { ProposeBookingTimes } from "@/experience/bookings/ProposeBookingTimes";
-import { StPage, StHead, StSection, StRows, StRow, StSurface, StNotice, StEmpty, StMono, StTextButton, StPillLink } from "@/components/ui/strelva/Kit";
+import { XaAnswers, XaButtonLink, XaEmpty, XaInitial, XaSegmented, XaStatus, XaTextLink } from "@/components/ui/strelva/Xa";
+import { SidePanel, SystemHead } from "@/experience/systems/xa/SystemHead";
+import x from "@/experience/systems/xa/system-xa.module.css";
 import type { HeldInquiries, HeldView, LeadView, WorkspaceLeads } from "@/products/inquiries/client";
 import { REPLY_OUTCOME, WorkspaceInquiryReply } from "./WorkspaceInquiryReply";
 import { InquiryInbox } from "./InquiryInbox";
@@ -10,6 +14,8 @@ import { placeHomeHref, whenLabel, type PlaceState } from "./WorkspacePlace";
 /**
  * Inquiries, in the workspace: everyone who reached out through the site,
  * newest first, with a one-tap email reply. The home of /dashboard/leads.
+ * XA · S3: the people who wait on the left, the open person on the right,
+ * Open / Done in the header; status only where someone still waits.
  */
 
 function sourceLabel(source: string): string {
@@ -17,39 +23,37 @@ function sourceLabel(source: string): string {
   return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
-function LeadCard({ lead, workspaceId, tenantId, bookingProposals, replies, bookingOffers }: { lead: LeadView; workspaceId: string; tenantId: string | null; bookingProposals?: boolean; replies?: boolean; bookingOffers?: boolean }) {
+function LeadCard({ lead, workspaceId, tenantId, bookingProposals, replies, bookingOffers, siteName }: { lead: LeadView; workspaceId: string; tenantId: string | null; bookingProposals?: boolean; replies?: boolean; bookingOffers?: boolean; siteName: string }) {
+  const waiting = !!lead.email && replies === true && !lead.reply;
   return (
-    <div className="min-w-0">
-      <article aria-labelledby={`lead-${lead.id}`}>
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div className="min-w-0">
-            <h3 id={`lead-${lead.id}`} className="break-words text-base font-medium">{lead.name}</h3>
-            <p className="mt-1 text-xs text-gray-muted"><time dateTime={lead.createdAt}>{whenLabel(lead.createdAt, true)}</time></p>
-          </div>
-          {lead.source ? <span className="min-w-0 max-w-full break-words text-xs text-gray-muted">{sourceLabel(lead.source)}</span> : null}
+    <article className={x.thread} aria-labelledby={`lead-${lead.id}`}>
+      <header className={x.threadHead}>
+        <XaInitial name={lead.name} size={40} shape="round" color="var(--st-text)" />
+        <div className={x.threadWho}>
+          <h3 id={`lead-${lead.id}`} className={x.threadName}>{lead.name}</h3>
+          <p className={x.threadMeta}>{[lead.email, lead.source ? sourceLabel(lead.source) : null].filter(Boolean).join(" · ")}{lead.email || lead.source ? " · " : ""}<time dateTime={lead.createdAt}>{whenLabel(lead.createdAt, true)}</time></p>
         </div>
-        {lead.message ? <div className="my-4"><StSurface label={`Message from ${lead.name}`}><p className="whitespace-pre-line break-words text-sm leading-6">{lead.message}</p></StSurface></div> : null}
-        {lead.fields.length ? (
-          <dl className="mt-3 grid gap-1 text-sm">
-            {lead.fields.map(([key, value]) => <div key={key} className="flex flex-wrap gap-2"><dt className="min-w-0 max-w-full break-words text-gray-muted">{sourceLabel(key)}:</dt><dd className="min-w-0 break-words">{value}</dd></div>)}
-          </dl>
-        ) : null}
-        {replies && lead.reply && Object.hasOwn(REPLY_OUTCOME, lead.reply.status) ? <p role="status" className="mt-4 text-sm">{REPLY_OUTCOME[lead.reply.status]}{lead.reply.providerMessageId ? <span className="mt-1 block break-all text-xs text-gray-muted">Provider receipt: {lead.reply.providerMessageId}</span> : null}</p> : lead.email && replies && lead.rowId && lead.replyPermission === "none" ? <p className="mt-4 text-sm text-gray-muted">The owner or the assigned team member can reply to this inquiry.</p> : lead.email && replies && lead.rowId ? <WorkspaceInquiryReply workspaceId={workspaceId} rowId={lead.rowId} name={lead.name} email={lead.email} bookingOffers={bookingOffers && lead.replyPermission !== "member"} member={lead.replyPermission === "member"} /> : lead.email ? (
-          <p className="mt-4 flex flex-wrap items-center gap-3 text-sm">
-            <StPillLink variant="soft" href={`mailto:${encodeURIComponent(lead.email).replace(/%40/g, "@")}`}>Reply by email</StPillLink>
-            <span className="break-all text-gray-muted">{lead.email}</span>
-          </p>
-        ) : null}
-        {bookingProposals && tenantId && lead.email ? <ProposeBookingTimes workspaceId={workspaceId} tenantId={tenantId} inquiryId={lead.id} customerName={lead.name} /> : null}
-        {lead.releasedRowId ? (
-          <>
-            <p className="mt-3 text-xs text-gray-muted">Released from held messages.</p>
-            <HeldInquiryActions workspaceId={workspaceId} rowId={lead.releasedRowId} name={lead.name} mode="released" />
-          </>
-        ) : null}
-      </article>
-    </div>
+        {waiting ? <XaStatus kind="waits" size="sm">Waits for you</XaStatus> : null}
+      </header>
+      {lead.message ? <p className={x.bubble} aria-label={`Message from ${lead.name}`}>{lead.message}</p> : null}
+      {lead.fields.length ? <XaAnswers labelWidth={150} rows={lead.fields.map(([key, value]) => [sourceLabel(key), value] as const)} /> : null}
+      {bookingProposals && tenantId && lead.email ? <ProposeBookingTimes workspaceId={workspaceId} tenantId={tenantId} inquiryId={lead.id} customerName={lead.name} /> : null}
+      {lead.releasedRowId ? <div>
+        <p className={x.quiet}>Released from held messages.</p>
+        <HeldInquiryActions workspaceId={workspaceId} rowId={lead.releasedRowId} name={lead.name} mode="released" />
+      </div> : null}
+      {replies && lead.reply && Object.hasOwn(REPLY_OUTCOME, lead.reply.status) ? <p role="status" className={x.sentence}>{REPLY_OUTCOME[lead.reply.status]}</p>
+        : lead.email && replies && lead.rowId && lead.replyPermission === "none" ? <p className={x.note}>The owner or the assigned team member can reply to this inquiry.</p>
+          : lead.email && replies && lead.rowId ? <div className={x.replyForm}><WorkspaceInquiryReply workspaceId={workspaceId} rowId={lead.rowId} name={lead.name} email={lead.email} siteName={siteName} bookingOffers={bookingOffers && lead.replyPermission !== "member"} member={lead.replyPermission === "member"} /></div>
+            : lead.email ? <div className={x.replyRow}><XaButtonLink href={`mailto:${encodeURIComponent(lead.email).replace(/%40/g, "@")}`}>Reply by email</XaButtonLink><span className={x.quiet}>Opens your own email</span></div> : null}
+    </article>
   );
+}
+
+/** "Oct 15" in the list; the record keeps the full date and time. */
+function shortDay(value: string): string {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? value : date.toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
 }
 
 function reasonLabel(reason: string | null): string {
@@ -63,35 +67,51 @@ function reasonLabel(reason: string | null): string {
 }
 
 function HeldCard({ item, workspaceId }: { item: HeldView; workspaceId: string }) {
-  return <StRow title={item.name} detail={<><StMono as="time" dateTime={item.createdAt}>{whenLabel(item.createdAt, true)}</StMono> · {reasonLabel(item.reason)}</>} align="start" end={<HeldInquiryActions workspaceId={workspaceId} rowId={item.rowId} name={item.name} mode="held" />}>
-    {item.message ? <span className="mt-3 block whitespace-pre-line break-words text-sm leading-6">{item.message}</span> : null}
-    {item.email ? <span className="mt-2 block break-all text-sm text-gray-muted">{item.email}</span> : null}
-  </StRow>;
+  return <li className={x.heldItem}>
+    <p className={x.threadName}>{item.name}</p>
+    <p className={x.threadMeta}><time dateTime={item.createdAt}>{whenLabel(item.createdAt, true)}</time> · {reasonLabel(item.reason)}</p>
+    {item.message ? <p className={x.note} data-pre="true">{item.message}</p> : null}
+    {item.email ? <p className={x.quiet}>{item.email}</p> : null}
+    <HeldInquiryActions workspaceId={workspaceId} rowId={item.rowId} name={item.name} mode="held" />
+  </li>;
 }
 
 /** Messages Strelva held as spam. Shown only when there is something to decide or the list failed. */
 function HeldSection({ held, workspaceId }: { held: HeldInquiries; workspaceId: string }) {
   if (!held.unavailable && held.items.length === 0) return null;
-  return <StSection title="Held as spam">
-    <p className="text-sm leading-6 text-gray-muted">Strelva kept these out of your inbox. If one is a real person, release it. Nobody is emailed either way.</p>
-    {held.unavailable ? <StNotice tone="critical">Held messages couldn&apos;t be read right now. Nothing is lost; reload to try again.</StNotice> : <StRows label="Held messages">{held.items.map(item => <HeldCard key={item.rowId} item={item} workspaceId={workspaceId} />)}</StRows>}
-  </StSection>;
+  return <SidePanel title="Held as spam" count={held.items.length} intro="Strelva kept these out of your inbox. If one is a real person, release it. Nobody is emailed either way.">
+    {held.unavailable ? <p className={x.sentence} data-tone="waits" role="status">Held messages couldn&apos;t be read right now. Nothing is lost; reload to try again.</p> : <ul className={x.bookingList} aria-label="Held messages">{held.items.map(item => <HeldCard key={item.rowId} item={item} workspaceId={workspaceId} />)}</ul>}
+  </SidePanel>;
 }
 
-export function WorkspaceInquiries({ workspaceId, state, embedded = false, forwarding = false }: { workspaceId: string; state: PlaceState<WorkspaceLeads>; embedded?: boolean; forwarding?: boolean }) {
+export function WorkspaceInquiries({ workspaceId, state, embedded = false, forwarding = false, head = true, reload }: { workspaceId: string; state: PlaceState<WorkspaceLeads>; embedded?: boolean; forwarding?: boolean; /** False inside a System page, which already says what this is. */ head?: boolean; /** The one way forward when the records couldn't load; defaults to reloading this page. */ reload?: ReactNode }) {
   const data = state.kind === "ready" ? state.data : null;
+  const waiting = data ? data.sites.reduce((n, site) => n + site.leads.filter(lead => !!lead.email && data.workspaceReplies === true && !lead.reply).length, 0) : 0;
+  const total = data ? data.sites.reduce((n, site) => n + site.leads.length, 0) : 0;
+  const [tab, setTab] = useState<"open" | "done">(waiting ? "open" : "done");
+  const segment = data && total ? <XaSegmented label="Which inquiries" value={tab} onChange={setTab} options={[{ value: "open", label: `Open ${waiting}` }, { value: "done", label: `Done ${total - waiting}` }]} /> : undefined;
+  const recent = data && !data.paged ? data.sites.reduce((n, site) => n + (site.unavailable ? 0 : site.lastThirtyDays), 0) : null;
+  const meta = data?.durable ? "People who contacted you through your site. Your inquiries stay on record." : "People who contacted you through your site. Strelva keeps the last 90 days here.";
   const content = <>
-    <StHead crumb={embedded ? undefined : { label: "Home", href: placeHomeHref(workspaceId) }} title="Inquiries" meta={data?.durable ? "People who contacted you through your site. Your inquiries stay on record." : "People who contacted you through your site. Strelva keeps the last 90 days here."} />
-    {state.kind === "permission" ? <StEmpty action={<StPillLink variant="soft" href="/workspace">Open your workspace</StPillLink>}>Your account isn&apos;t a member of this business. Ask its owner to invite you.</StEmpty> : state.kind === "error" ? <StNotice tone="critical">Inquiries couldn&apos;t load. Nothing is lost. Reload to check the current records.</StNotice> : <>
-      {data?.denied.length ? <StNotice>Your account can&apos;t open {data.denied.map(site => site.siteName).join(", ")} yet. Ask the owner to finish adding you.</StNotice> : null}
-      {data && data.sites.length === 0 && data.denied.length === 0 && !forwarding ? <StEmpty>No site is connected to this business yet. Inquiries start once a connected site sends its contact form here.</StEmpty> : null}
-      {data?.sites.map(site => <StSection key={site.key} id={`site-${site.key.replace(/[^a-z0-9-]/gi, "-")}`} title={site.connected ? `${site.siteName} (your site)` : site.siteName} meta={site.unavailable ? undefined : <StMono>{data.paged ? "" : `${site.lastThirtyDays} in the last 30 days · `}{site.leads.length} shown</StMono>}>
-        {site.unavailable ? <StNotice tone="critical">Messages for {site.siteName} couldn&apos;t be read right now. Reload to check the current records.</StNotice> : site.leads.length === 0 ? <StEmpty>{site.forwarded ? "No forwarded email yet. Each inquiry you forward shows up here with the sender and what they asked." : <>No one has reached out yet. When someone contacts you through {site.siteName}, they show up here with their name and what they asked.</>}</StEmpty> : <InquiryInbox key={`${workspaceId}:${site.key}`} entries={site.leads.map(lead => ({ id: lead.id, name: lead.name, summary: lead.message, at: whenLabel(lead.createdAt), waiting: !!lead.email && data.workspaceReplies === true && !lead.reply, record: <LeadCard lead={lead} workspaceId={workspaceId} tenantId={site.tenantId} bookingProposals={site.bookingProposals} replies={data.workspaceReplies} bookingOffers={data.bookingOffers} /> }))} />}
-      </StSection>)}
-      {data?.nextPage ? <StTextButton href={`/workspace/inquiries?workspaceId=${encodeURIComponent(workspaceId)}&before=${encodeURIComponent(data.nextPage.before)}&beforeId=${encodeURIComponent(data.nextPage.beforeId)}`}>Earlier inquiries</StTextButton> : null}
-      {data?.held ? <HeldSection held={data.held} workspaceId={workspaceId} /> : null}
-      {forwarding ? <ForwardInquiries workspaceId={workspaceId} /> : null}
-    </>}
+    {head ? <SystemHead kind="inquiries" title="Inquiries" back={embedded ? undefined : <a className={x.back} href={placeHomeHref(workspaceId)}>‹ Home</a>}
+      status={waiting ? { kind: "waits", label: `${waiting} ${waiting === 1 ? "waits" : "wait"} for you` } : undefined} tone={waiting ? "waits" : undefined}
+      line={recent !== null ? `${recent} in the last 30 days` : undefined} actions={segment} /> : null}
+    {state.kind === "permission" ? <XaEmpty size="sm" pose="alone" title="These inquiries belong to another business" job="Pebble kept them closed to your account" action={<XaButtonLink href="/workspace">Open your workspace</XaButtonLink>}>Your account isn&apos;t a member of this business. Ask its owner to invite you.</XaEmpty>
+      : state.kind === "error" ? <XaEmpty size="sm" bare pose="fixing" title="Inquiries couldn't load just now" job="Pebble kept every message. Nothing is lost." action={reload ?? <XaTextLink href={`/workspace/inquiries?workspaceId=${encodeURIComponent(workspaceId)}`}>Reload</XaTextLink>} /> : <>
+        {head ? null : segment ? <div className={x.inboxHead}>{segment}</div> : null}
+        {total ? null : <p className={x.note}>{meta}</p>}
+        {data?.denied.length ? <p className={x.sentence} data-tone="waits">Your account can&apos;t open {data.denied.map(site => site.siteName).join(", ")} yet. Ask the owner to finish adding you.</p> : null}
+        {data && data.sites.length === 0 && data.denied.length === 0 && !forwarding ? <XaEmpty size="sm" bare pose="resting" title="No inquiries yet" job="Pebble is waiting for a site to send its contact form here">No site is connected to this business yet. Inquiries start once a connected site sends its contact form here.</XaEmpty> : null}
+        {data?.sites.map(site => <section key={site.key} className={x.main} id={`site-${site.key.replace(/[^a-z0-9-]/gi, "-")}`} aria-label={site.connected ? `${site.siteName} (your site)` : site.siteName}>
+          {data.sites.length > 1 ? <h2 className={x.panelHead}>{site.connected ? `${site.siteName} (your site)` : site.siteName}{site.unavailable ? null : <span>{data.paged ? "" : `${site.lastThirtyDays} in the last 30 days · `}{site.leads.length} shown</span>}</h2> : null}
+          {site.unavailable ? <p className={x.sentence} data-tone="waits" role="status">Messages for {site.siteName} couldn&apos;t be read right now. Reload to check the current records.</p>
+            : site.leads.length === 0 ? <XaEmpty size="sm" bare pose="resting" title="No one has reached out yet" job={`Pebble is watching ${site.siteName} for the next message`}>{site.forwarded ? "No forwarded email yet. Each inquiry you forward shows up here with the sender and what they asked." : <>No one has reached out yet. When someone contacts you through {site.siteName}, they show up here with their name and what they asked.</>}</XaEmpty>
+              : <InquiryInbox key={`${workspaceId}:${site.key}`} show={tab} onShowDone={() => setTab("done")} entries={site.leads.map(lead => ({ id: lead.id, name: lead.name, summary: lead.message, at: shortDay(lead.createdAt), waiting: !!lead.email && data.workspaceReplies === true && !lead.reply, record: <LeadCard lead={lead} workspaceId={workspaceId} tenantId={site.tenantId} bookingProposals={site.bookingProposals} replies={data.workspaceReplies} bookingOffers={data.bookingOffers} siteName={site.siteName} /> }))} />}
+        </section>)}
+        {data?.nextPage ? <p className={x.textLinks}><a href={`/workspace/inquiries?workspaceId=${encodeURIComponent(workspaceId)}&before=${encodeURIComponent(data.nextPage.before)}&beforeId=${encodeURIComponent(data.nextPage.beforeId)}`}>Earlier inquiries</a></p> : null}
+        {data?.held ? <HeldSection held={data.held} workspaceId={workspaceId} /> : null}
+        {forwarding ? <ForwardInquiries workspaceId={workspaceId} /> : null}
+      </>}
   </>;
-  return embedded ? <section className="grid gap-6">{content}</section> : <main data-dashboard data-workspace-theme="linen" data-workspace-mode="light"><StPage>{content}</StPage></main>;
+  return embedded ? <section className={x.screen} data-bare={head ? undefined : true}>{content}</section> : <main data-dashboard data-workspace-theme="linen" data-workspace-mode="light"><div className={x.screen}>{content}</div></main>;
 }
