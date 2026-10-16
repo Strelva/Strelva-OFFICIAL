@@ -12,7 +12,7 @@ export function providerQueueItemHref(item: ProviderQueueItem) {
   if (kind === "review") return `/workspace?${new URLSearchParams({ workspaceId: item.workspaceId, view: "needs-you", decision: id! })}`;
   return `/workspace?${new URLSearchParams({ workspaceId: item.workspaceId, view: kind === "decision" ? "needs-you" : "home", ...(kind === "decision" ? { decision: id! } : { deliveryCheck: item.key }) })}`;
 }
-export function ProviderClientQueue({ workspaceId }: { workspaceId: string; onWorkspace: (workspaceId: string) => void }) {
+export function ProviderClientQueue({ workspaceId, onCount }: { workspaceId: string; onWorkspace: (workspaceId: string) => void; /** How many items were read; null while unknown or unreadable. */ onCount?: (count: number | null) => void }) {
   const request = useWorkspaceRequest();
   const [attempt, setAttempt] = useState(0);
   const key = `${workspaceId}:${attempt}`;
@@ -38,6 +38,8 @@ export function ProviderClientQueue({ workspaceId }: { workspaceId: string; onWo
     // Keyed reads discard old agency results; request is the owned preview/real boundary.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [request, workspaceId, key]);
+  const readCount = state.status === "ready" ? state.page.items.length : null;
+  useEffect(() => { onCount?.(readCount); }, [onCount, readCount]);
   const more = () => {
     if (state.status !== "ready" || state.moreBusy || !state.page.nextCursor) return;
     setStored({ key, state: { ...state, moreBusy: true, moreError: false } });

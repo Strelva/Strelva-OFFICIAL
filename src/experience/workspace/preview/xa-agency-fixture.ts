@@ -97,7 +97,7 @@ export const XA_MINUTES: Record<string, AgencyTimeList> = {
 const source = (n: number) => `d0000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
 const version = (n: number) => `e0000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
 
-export function xaAgencyLibrary(state: XaAgencyState): AgencyLibrary {
+export function xaAgencyLibrary(state: XaAgencyState, resolved: ReadonlySet<string> = new Set()): AgencyLibrary {
   if (state === "empty") return { agencyWorkspaceId: XA_AGENCY, reviewEnabled: true, sources: [] };
   const v = (id: number, workspaceId: string, clientName: string, systemName: string, stateName: AgencyLibrary["sources"][number]["versions"][number]["state"], extra: Partial<AgencyLibrary["sources"][number]["versions"][number]> = {}) => ({
     versionId: `v-${id}`, workspaceId, clientName, systemId: version(id), systemName, context: { kind: "agency_client" as const, label: clientName },
@@ -114,7 +114,7 @@ export function xaAgencyLibrary(state: XaAgencyState): AgencyLibrary {
         versions: [
           v(1, XA_CLIENT.harbor, "Harbor Dental", "Inbox", "up_to_date"),
           v(2, XA_CLIENT.lakeview, "Lakeview Mediation", "Inquiry form", done ? "up_to_date" : "ready"),
-          v(3, XA_CLIENT.north, "North Coast Realty", "Contact form", "conflicts", { conflicts: [{ path: "reply.message", local: "Thanks! An agent will text you shortly.", upstream: "Thanks. We're closed now and answer by 9 tomorrow." }] }),
+          resolved.has("v-3") ? v(3, XA_CLIENT.north, "North Coast Realty", "Contact form", "up_to_date") : v(3, XA_CLIENT.north, "North Coast Realty", "Contact form", "conflicts", { conflicts: [{ path: "reply.message", local: "Thanks! An agent will text you shortly.", upstream: "Thanks. We're closed now and answer by 9 tomorrow." }] }),
           v(4, XA_CLIENT.fieldwork, "Fieldwork Studio", "Intake form", done ? "up_to_date" : "ready"),
         ] },
       { systemId: source(2), workspaceId: XA_AGENCY, name: "Holiday hours, every page at once", hidden: false,

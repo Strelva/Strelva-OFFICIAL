@@ -10,11 +10,11 @@
  * so instead of guessing a level.
  */
 import { useEffect, useState } from "react";
-import { Lock } from "lucide-react";
+import { Lock, MessageCircle } from "lucide-react";
 import { z } from "zod";
 import { StSkeleton } from "@/components/ui/strelva/Kit";
 import { XaButton, XaInitial, XaLabel, XaRow, XaRows, XaSystemTile, XaTextLink } from "@/components/ui/strelva/Xa";
-import { AGENCY_LEVEL_LABELS, AGENCY_SCOPES, AGENCY_SCOPE_LABELS, type AgencyLevel, type AgencyScope } from "@/platform/agency-directory/contract";
+import { AGENCY_SCOPES, AGENCY_SCOPE_LABELS, type AgencyLevel, type AgencyScope } from "@/platform/agency-directory/contract";
 import { actorPresentation } from "@/platform/presentation/actor";
 import { clientDecisionHref } from "@/platform/workspaces/location";
 import type { SystemView } from "@/experience/systems/model";
@@ -95,26 +95,44 @@ export function AgencyClientXa({ clientName, workspaceId, agencyName, agencyHref
     <header className={styles.clientHead}>
       <XaInitial name={clientName} color={clientColor(workspaceId)} size={56} />
       <div className={styles.clientTitle}><h1 id="business-start-title">{clientName}</h1><p>{meta}</p></div>
-      {onAsk ? <XaButton onClick={onAsk}>Ask about {clientName}</XaButton> : null}
+      {onAsk ? <XaButton onClick={onAsk}><MessageCircle size={15} strokeWidth={1.8} aria-hidden="true" />Ask about {clientName}</XaButton> : null}
     </header>
 
     <div className={styles.clientBody}>
-      <section className={styles.areas} aria-labelledby="client-areas">
-        <XaLabel id="client-areas" as="h2">What {agencyName} can do here, set by {owner}</XaLabel>
-        {systemsLoading ? <div className={styles.areaList}><div className={styles.skeletonRows} role="status" aria-label="Loading shared Systems">{[80, 64, 72].map(width => <StSkeleton key={width} width={`${width}%`} />)}</div></div>
-          : areas.length ? <div className={styles.areaList}><XaRows label={`What ${agencyName} can do in ${clientName}`}>
-            {areas.map(({ scope, systems: inArea, grant }) => <XaRow key={scope}
-              lead={<XaSystemTile kind={inArea[0]?.kind ?? scope} size={36} />}
-              title={inArea.length === 1 ? inArea[0]!.name : AGENCY_SCOPE_LABELS[scope]}
-              detail={grants.status === "ready" ? areaSentence(grant?.level, Owner, grant?.proposed) : inArea.map(system => system.detail || system.name).join(" · ")}
-              href={inArea.length === 1 ? systemHref(inArea[0]!.id) : undefined}
-              onClick={inArea.length === 1 && onOpenSystem ? () => onOpenSystem(inArea[0]!.id) : undefined}
-              meta={grants.status === "ready" ? <span className={styles.level} data-level={grant?.level ?? "none"}>{grant ? AGENCY_LEVEL_LABELS[grant.level] : "Not given"}</span> : undefined} />)}
-          </XaRows></div>
-          : <p className={styles.note}>{clientName} hasn&apos;t shared a System with {agencyName} yet. Shared Systems appear here as soon as {owner} adds them.</p>}
-        {grants.status === "loading" ? <p role="status" className={styles.note}>Reading what {owner} set for {agencyName}…</p> : null}
-        {grants.status === "unreadable" ? <p className={styles.note}>What {owner} set for each area isn&apos;t shared with agencies on this page yet. Strelva still enforces it on every change you make here.</p> : null}
-      </section>
+      <div className={styles.clientMain}>
+        <section className={styles.areas} aria-labelledby="client-areas">
+          <XaLabel id="client-areas" as="h2">What {agencyName} can do here, set by {owner}</XaLabel>
+          {systemsLoading ? <div className={styles.areaList}><div className={styles.skeletonRows} role="status" aria-label="Loading shared Systems">{[80, 64, 72].map(width => <StSkeleton key={width} width={`${width}%`} />)}</div></div>
+            : areas.length ? <div className={styles.areaList}><XaRows label={`What ${agencyName} can do in ${clientName}`}>
+              {areas.map(({ scope, systems: inArea, grant }) => <XaRow key={scope}
+                lead={<XaSystemTile kind={inArea[0]?.kind ?? scope} size={36} />}
+                title={inArea.length === 1 ? inArea[0]!.name : AGENCY_SCOPE_LABELS[scope]}
+                detail={grants.status === "ready" ? areaSentence(grant?.level, Owner, grant?.proposed) : inArea.map(system => system.detail || system.name).join(" · ")}
+                href={inArea.length === 1 ? systemHref(inArea[0]!.id) : undefined}
+                onClick={inArea.length === 1 && onOpenSystem ? () => onOpenSystem(inArea[0]!.id) : undefined}
+                // The sentence already says the level; only an area the owner kept gets a mark.
+                meta={grants.status === "ready" && !grant ? <span className={styles.level} data-level="none">Not given</span> : undefined} />)}
+            </XaRows></div>
+            : <p className={styles.note}>{clientName} hasn&apos;t shared a System with {agencyName} yet. Shared Systems appear here as soon as {owner} adds them.</p>}
+          {grants.status === "loading" ? <p role="status" className={styles.note}>Reading what {owner} set for {agencyName}…</p> : null}
+          {grants.status === "unreadable" ? <p className={styles.note}>What {owner} set for each area isn&apos;t shared with agencies on this page yet. Strelva still enforces it on every change you make here.</p> : null}
+        </section>
+
+        <section className={styles.group} aria-labelledby="client-decision-status">
+          <XaLabel id="client-decision-status" as="h2">Waiting on {clientName}</XaLabel>
+          {shared.status === "loading" || shared.status === "disabled" ? <p role="status" className={styles.note}>Checking shared decision status…</p>
+            : shared.status === "error" ? <p role="alert" className={styles.inlineAlert}>Shared decisions could not be checked. Nothing changed. <XaTextLink onClick={onRetryShared}>Check again</XaTextLink></p>
+              : open.length ? <XaRows label={`Waiting on ${clientName}`}>{open.map(item => <XaRow key={item.id} title={item.title}
+                detail={`Sent ${new Date(item.since).toLocaleDateString("en-US", { month: "short", day: "numeric" })}. Only ${owner} can say yes.`}
+                action={<XaTextLink href={clientDecisionHref(workspaceId, item.id)} aria-label={`See it: ${item.title}`}>See it</XaTextLink>} />)}</XaRows>
+                : <p className={styles.note}>Nothing waits on {owner}. What you send for a yes shows here until it&apos;s decided.</p>}
+        </section>
+
+        {changes.length ? <section className={styles.group} aria-labelledby="client-changes">
+          <XaLabel id="client-changes" as="h2">Changed in the last 7 days</XaLabel>
+          <XaRows label="Changed in the last 7 days">{changes.map(change => <XaRow key={change.id} title={change.title} detail={byLine(change.actor)} meta={new Date(change.at).toLocaleDateString("en-US", { month: "short", day: "numeric" })} href={systemHref(change.systemId)} />)}</XaRows>
+        </section> : null}
+      </div>
 
       <aside className={styles.onlyOwner} aria-labelledby="client-only-owner">
         <XaLabel id="client-only-owner" as="h2">Only {owner} can</XaLabel>
@@ -124,19 +142,6 @@ export function AgencyClientXa({ clientName, workspaceId, agencyName, agencyHref
         <p className={styles.note}>Prepare means nothing goes live without {owner}. Full control means you can put it live and {owner} sees it in Minutes.</p>
       </aside>
     </div>
-
-    <section className={styles.group} aria-labelledby="client-decision-status">
-      <XaLabel id="client-decision-status" as="h2">Waiting on {clientName}</XaLabel>
-      {shared.status === "loading" || shared.status === "disabled" ? <p role="status" className={styles.note}>Checking shared decision status…</p>
-        : shared.status === "error" ? <p role="alert" className={styles.inlineAlert}>Shared decisions could not be checked. Nothing changed. <XaTextLink onClick={onRetryShared}>Check again</XaTextLink></p>
-          : open.length ? <XaRows label={`Waiting on ${clientName}`}>{open.map(item => <XaRow key={item.id} title={item.title} detail={`Sent ${new Date(item.since).toLocaleDateString("en-US", { month: "short", day: "numeric" })}. Only ${owner} can say yes.`} href={clientDecisionHref(workspaceId, item.id)} />)}</XaRows>
-            : <p className={styles.note}>Nothing waits on {owner}. What you send for a yes shows here until it&apos;s decided.</p>}
-    </section>
-
-    {changes.length ? <section className={styles.group} aria-labelledby="client-changes">
-      <XaLabel id="client-changes" as="h2">Changed in the last 7 days</XaLabel>
-      <XaRows label="Changed in the last 7 days">{changes.map(change => <XaRow key={change.id} title={change.title} detail={byLine(change.actor)} meta={new Date(change.at).toLocaleDateString("en-US", { month: "short", day: "numeric" })} href={systemHref(change.systemId)} />)}</XaRows>
-    </section> : null}
   </div>;
 }
 

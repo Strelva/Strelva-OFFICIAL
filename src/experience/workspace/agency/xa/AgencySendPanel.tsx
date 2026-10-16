@@ -32,7 +32,7 @@ export interface AgencySendPanelProps {
   onKeepEditing: () => void;
 }
 
-const clip = (text: string) => text.length > 120 ? `${text.slice(0, 117).trimEnd()}…` : text || "Empty";
+const clip = (text: string, empty: string) => text.length > 120 ? `${text.slice(0, 117).trimEnd()}…` : text || empty;
 
 export function AgencySendPanel({ clientName, address, changes, blocked, sending, sent, onSend, onKeepEditing }: AgencySendPanelProps) {
   const count = changes.length;
@@ -44,7 +44,12 @@ export function AgencySendPanel({ clientName, address, changes, blocked, sending
     {count ? <table className={styles.changes}>
       <caption className="sr-only">What changes for {clientName}</caption>
       <thead><tr><th scope="col">Part</th><th scope="col">Now</th><th scope="col">After</th></tr></thead>
-      <tbody>{changes.map(change => <tr key={change.id} data-changed><td>{change.label}</td><td data-before>{clip(change.before)}</td><td data-after>{clip(change.after)}</td></tr>)}</tbody>
+      <tbody>{changes.map((change, index) => <tr key={change.id} data-changed>
+        {/* A part's name shows once; the lines under it line up now beside after. */}
+        <td>{index && changes[index - 1]!.label === change.label ? <span className="sr-only">{change.label}</span> : change.label}</td>
+        <td data-before data-empty={change.before ? undefined : ""}>{clip(change.before, "New line")}</td>
+        <td data-after data-empty={change.after ? undefined : ""}>{clip(change.after, "Removed")}</td>
+      </tr>)}</tbody>
     </table> : sent ? null : <p className={styles.note}>Edit a section on the left. Each change shows here as now and after before you send it.</p>}
     {sent ? <XaSays links={[<XaTextLink key="edit" onClick={onKeepEditing}>Keep editing</XaTextLink>]}>{sent}</XaSays>
       : <>

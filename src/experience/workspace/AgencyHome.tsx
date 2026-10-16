@@ -35,7 +35,8 @@ import { AgencyToday } from "./agency/xa/AgencyToday";
 import { AgencyQueueXa } from "./agency/xa/AgencyQueueXa";
 import { AgencyMinutes } from "./agency/xa/AgencyMinutes";
 import { useAgencyMinutes } from "./agency/xa/useAgencyMinutes";
-import { firstNameFromEmail } from "./agency/xa/agency-xa-model";
+import { firstNameFromEmail, splitQueue } from "./agency/xa/agency-xa-model";
+import { AgencyFold } from "./agency/xa/AgencyFold";
 import type { AgencyQueueItem } from "./agency-clients";
 import xaStyles from "./agency/xa/agency-xa.module.css";
 
@@ -87,6 +88,7 @@ export function AgencyHome({
   onStart,
   view: controlledView,
   onViewChange,
+  onQueueSummary,
 }: {
   snapshot: WorkspaceSnapshot;
   busy: boolean;
@@ -96,6 +98,8 @@ export function AgencyHome({
   onStart: (request?: string) => void;
   view?: AgencyView;
   onViewChange?: (view: AgencyView) => void;
+  /** The sidebar's Queue count and the clients that wait on the agency, from this same batched read. */
+  onQueueSummary?: (summary: { count: number; waiting: ReadonlySet<string> } | null) => void;
 }) {
   const request = useWorkspaceRequest();
   const id = useId().replace(/:/g, "");
@@ -157,6 +161,16 @@ export function AgencyHome({
   const xaView = released && canUseTools && (controlledView ? view === "home" || view === "queue" || view === "library" || view === "minutes" : view === "minutes");
   const minutes = useAgencyMinutes(request, snapshot.workspaceId, combined?.clients ?? null, xaView && (view === "home" || view === "minutes"));
   const minutesByClient = minutes.state.status === "ready" ? new Map(minutes.state.rows.map(row => [row.workspaceId, row.minutes])) : null;
+  const [providerCount, setProviderCount] = useState<number | null>(null);
+  const [requestCount, setRequestCount] = useState<number | null>(null);
+  // The sidebar shows what the Queue shows: the agency's own items, and a clay dot on each client that has one.
+  const queueSummary = useMemo(() => {
+    if (!combined) return null;
+    const { you } = splitQueue(combined.queue);
+    // A Library offer counts in the Queue but never marks a client as waiting on the agency.
+    return { count: you.length, waiting: new Set(you.filter(item => item.kind !== "improvement").map(item => item.workspaceId)) as ReadonlySet<string> };
+  }, [combined]);
+  useEffect(() => { onQueueSummary?.(queueSummary); }, [onQueueSummary, queueSummary]);
 
   const loadMore = () => {
     if (clients.status !== "ready" || clients.loadingMore) return;
@@ -275,7 +289,7 @@ export function AgencyHome({
   const serviceRequests = <section aria-labelledby={`${id}-service-requests`}>
     <h2 id={`${id}-service-requests`} className={sectionTitle}>Service requests</h2>
     <p className={sectionNote}>Review requests addressed to {agencyName}. A response records review and does not start work.</p>
-    <div className="mt-5"><ServiceRequestInbox providerWorkspaceId={snapshot.workspaceId} surface="workspace" /></div>
+    <div className="mt-5"><ServiceRequestInbox providerWorkspaceId={snapshot.workspaceId} surface="workspace" onCount={setRequestCount} /></div>
   </section>;
 
   const applicationDraftSection = <section aria-labelledby={`${id}-application-drafts`}>
@@ -334,16 +348,25 @@ export function AgencyHome({
       minutes={minutesByClient} totalClients={combined?.total} addClientHref={addClientHref} hour={new Date(now).getHours()} onAsk={onStart} onOpenClient={onWorkspace} onOpenItem={openItem} onAllClients={() => go("clients")} onRetry={retry} />
   </section>{creditSection}</div>;
 
+  const moreCount = providerCount === null || requestCount === null || applicationDrafts === null || websiteDrafts === null ? null
+    : providerCount + requestCount + readyApplicationDrafts.length + readyWebsiteDrafts.length;
+  const queueChecks = combined ? combined.clients.reduce((sum, client) => {
+    const checked = client.systems.filter(system => system.health?.lastVerifiedAt);
+    const latest = checked.map(system => system.health!.lastVerifiedAt!).sort().at(-1) ?? null;
+    return { systems: sum.systems + checked.length, at: latest && (!sum.at || latest > sum.at) ? latest : sum.at };
+  }, { systems: 0, at: null as string | null }) : undefined;
+
   if (xaView && view === "queue") return <div aria-busy={busy || clients.status === "loading" || undefined}><section aria-label="Queue">
     <AgencyQueueXa now={now} status={clientsStatus} items={combined?.queue ?? []} complete={combined?.queueComplete ?? true} gaps={combined?.queueGaps} loaded={combined ? { clients: combined.clients.length, total: combined.total } : undefined}
       onOpen={openItem} onLoadMore={combined?.nextCursor ? loadMore : undefined} loadingMore={clients.status === "ready" && clients.loadingMore} onRetry={retry}
       proposals={<AgencyProposals key={snapshot.workspaceId} quietWhenEmpty onAccepted={retry} agencyWorkspaceId={snapshot.workspaceId} agencyName={agencyName} canManage={current?.role === "owner" || current?.role === "admin"} transport={request} showListing={false} />}
-      more={<details className={xaStyles.more}><summary>Requests addressed to {agencyName} and assigned drafts</summary><ProviderClientQueue workspaceId={snapshot.workspaceId} onWorkspace={onWorkspace} />{serviceRequests}{applicationDraftSection}{websiteDraftSection}</details>} />
-  </section><XaComposerDock><div style={{ width: "min(680px, 100%)" }}><XaComposer value={ask} onChange={setAsk} onSubmit={() => { onStart(ask); setAsk(""); }} placeholder="Ask Strelva about any client" inputLabel={`Ask Strelva about ${agencyName}'s clients`} /></div></XaComposerDock></div>;
+      checks={queueChecks}
+      more={{ count: moreCount, content: <><ProviderClientQueue workspaceId={snapshot.workspaceId} onWorkspace={onWorkspace} onCount={setProviderCount} />{serviceRequests}{applicationDraftSection}{websiteDraftSection}</> }} />
+  </section><XaComposerDock><div className={xaStyles.columnDock}><XaComposer value={ask} onChange={setAsk} onSubmit={() => { onStart(ask); setAsk(""); }} placeholder="Ask Strelva about any client" inputLabel={`Ask Strelva about ${agencyName}'s clients`} /></div></XaComposerDock></div>;
 
   if (xaView && view === "library") return <div aria-busy={busy || undefined}><section aria-label="Library">
     <AgencyLibraryView request={request} agencyWorkspaceId={snapshot.workspaceId} onWorkspace={onWorkspace} />
-    {current?.role === "owner" || current?.role === "admin" ? <div className={xaStyles.column} style={{ paddingTop: 0 }}><details className={xaStyles.more}><summary>Adapt a source for another client</summary><AgencyVersionCreate request={request} agencyWorkspaceId={snapshot.workspaceId} clients={combined?.clients ?? []} /></details></div> : null}
+    {current?.role === "owner" || current?.role === "admin" ? <div className={xaStyles.column} style={{ paddingTop: 0 }}><AgencyFold label="Adapt a source for another client"><AgencyVersionCreate request={request} agencyWorkspaceId={snapshot.workspaceId} clients={combined?.clients ?? []} /></AgencyFold></div> : null}
   </section></div>;
 
   if (xaView && view === "minutes") return <div aria-busy={busy || minutes.state.status === "loading" || undefined}><section aria-label="Minutes">

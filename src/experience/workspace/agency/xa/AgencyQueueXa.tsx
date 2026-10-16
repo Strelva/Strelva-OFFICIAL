@@ -9,10 +9,11 @@
  */
 import type { ReactNode } from "react";
 import { StSkeleton } from "@/components/ui/strelva/Kit";
-import { XaButton, XaEmpty, XaHeadline, XaInitial, XaLabel, XaRow, XaRows, XaTextLink } from "@/components/ui/strelva/Xa";
+import { XaButton, XaEmpty, XaHeadline, XaInitial, XaLabel, XaRow, XaRows, XaSays, XaTextLink } from "@/components/ui/strelva/Xa";
+import { AgencyFold } from "./AgencyFold";
 import { lapseLabel } from "@/platform/owner-reach/model";
 import type { AgencyQueueItem } from "../../agency-clients";
-import { queueActionLabel, queueDetail, queueHeadline, splitQueue } from "./agency-xa-model";
+import { clockLabel, queueActionLabel, queueDetail, queueHeadline, splitQueue } from "./agency-xa-model";
 import { clientColor } from "./client-color";
 import styles from "./agency-xa.module.css";
 
@@ -30,11 +31,17 @@ export interface AgencyQueueXaProps {
   onRetry: () => void;
   /** Incoming proposals from businesses, shown above the rows when present. */
   proposals?: ReactNode;
-  /** Requests addressed to the agency and assigned drafts, folded below. */
-  more?: ReactNode;
+  /**
+   * Requests addressed to the agency and assigned drafts, folded below.
+   * `count` is null while any part is still being read; at 0 the fold hides
+   * but stays mounted so its parts can keep reporting.
+   */
+  more?: { content: ReactNode; count: number | null };
+  /** Pebble's latest pass over shared Systems, for the empty Queue. */
+  checks?: { systems: number; at: string | null };
 }
 
-export function AgencyQueueXa({ status, items, complete, gaps = [], loaded, now, onOpen, onLoadMore, loadingMore, onRetry, proposals, more }: AgencyQueueXaProps) {
+export function AgencyQueueXa({ status, items, complete, gaps = [], loaded, now, onOpen, onLoadMore, loadingMore, onRetry, proposals, more, checks }: AgencyQueueXaProps) {
   if (status === "loading") return <div className={styles.column} role="status" aria-label="Checking work across clients">
     <XaHeadline>Checking every client…</XaHeadline>
     <div className={styles.skeletonRows}>{[88, 70, 80].map(width => <StSkeleton key={width} width={`${width}%`} />)}</div>
@@ -56,7 +63,9 @@ export function AgencyQueueXa({ status, items, complete, gaps = [], loaded, now,
       {onLoadMore && loaded && loaded.clients < loaded.total ? <p className={styles.note}><XaTextLink onClick={loadingMore ? undefined : onLoadMore}>{loadingMore ? "Reading more clients…" : "Read the rest of your clients"}</XaTextLink></p> : null}
     </div> : null}
 
-    {!you.length && !owners.length ? <XaEmpty pose="resting" size="sm" job="Pebble checks every client's Systems and tells you here when something needs you." title="Nothing waits across your clients." /> : null}
+    {!you.length && !owners.length && !incomplete ? <XaSays>{checks?.systems
+      ? `Pebble checked ${checks.systems} ${checks.systems === 1 ? "System" : "Systems"}${checks.at ? ` at ${clockLabel(new Date(checks.at))}` : ""}. Anything that breaks shows here first.`
+      : "Pebble checks every client's Systems and shows anything that breaks here first."}</XaSays> : null}
 
     {you.length ? <section className={styles.group} aria-labelledby="queue-you">
       <XaLabel id="queue-you" as="h2">Waiting on you</XaLabel>
@@ -80,6 +89,6 @@ export function AgencyQueueXa({ status, items, complete, gaps = [], loaded, now,
       <p className={styles.note}>Only each owner can say yes. Their decision shows here the moment they make it.</p>
     </section> : null}
 
-    {more}
+    {more ? <AgencyFold hidden={more.count === 0} label={more.count ? `${more.count} more ${more.count === 1 ? "request or draft" : "requests and drafts"}` : "More requests and drafts"}>{more.content}</AgencyFold> : null}
   </div>;
 }

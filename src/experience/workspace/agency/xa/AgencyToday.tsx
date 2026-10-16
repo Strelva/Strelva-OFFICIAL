@@ -10,7 +10,7 @@
 import { useState } from "react";
 import { Check, CircleAlert } from "lucide-react";
 import { StSkeleton } from "@/components/ui/strelva/Kit";
-import { XaButton, XaButtonLink, XaComposer, XaEmpty, XaHeadline, XaInitial, XaLabel, XaLede, XaMark, XaPebbleScene, XaRow, XaRows, XaTextLink } from "@/components/ui/strelva/Xa";
+import { XaButton, XaButtonLink, XaComposer, XaEmpty, XaHeadline, XaInitial, XaLabel, XaLede, XaMark, XaPebbleAvatar, XaPebbleScene, XaRow, XaRows, XaTextLink } from "@/components/ui/strelva/Xa";
 import type { AgencyClientRow, AgencyQueueItem } from "../../agency-clients";
 import { clientStanding, greeting, problemSystems, queueActionLabel, splitQueue, todaySentence } from "./agency-xa-model";
 import { clientColor } from "./client-color";
@@ -84,21 +84,25 @@ export function AgencyToday({ agencyName, personName, status, clients, queue, mi
           from: { name: first.clientName, color: clientColor(first.workspaceId) },
           action: <XaButton size="sm" onClick={() => onOpenItem(first)}>{queueActionLabel(first)}</XaButton>,
         } : undefined} />
+      {problems.length ? <div className={styles.phoneBadNews} role="status">
+        <XaPebbleAvatar size={32} label="Pebble" />
+        <p><b>Pebble is on it:</b> {problems.slice(0, 2).map(({ client, system }) => `${system.name} at ${client.name}`).join(" and ")}.<small>{problems[0]!.system.health?.summary || "Not working"}{checked ? ` Everything else passed its last check.` : ""}</small></p>
+      </div> : null}
       <section aria-labelledby="agency-today-clients">
-        <XaLabel id="agency-today-clients" as="h2">Clients{minutes ? " · time this month" : ""}</XaLabel>
+        <XaLabel id="agency-today-clients" as="h2">Clients</XaLabel>
         <XaRows label="Clients">
-          {shown.map(client => {
+          {shown.map((client, index) => {
             const { standing, line } = clientStanding(client, queue);
             const time = minutes?.get(client.workspaceId);
             return <XaRow key={client.workspaceId} lead={<XaInitial name={client.name} color={clientColor(client.workspaceId)} />} title={client.name}
               detail={line} tone={standing === "needs-you" || standing === "broken" || standing === "unread" ? "waits" : undefined}
-              meta={time !== undefined ? `${time} min` : undefined} onClick={() => onOpenClient(client.workspaceId)} />;
+              meta={time !== undefined ? `${time} min${index === 0 ? " this month" : ""}` : undefined} onClick={() => onOpenClient(client.workspaceId)} />;
           })}
         </XaRows>
         {more > 0 && onAllClients ? <p className={styles.note}><XaTextLink onClick={onAllClients}>All {totalClients ?? clients.length} clients</XaTextLink></p> : null}
       </section>
     </div>
-    <aside className={styles.todaySide} aria-label="What Strelva checked">
+    <aside className={styles.todaySide} aria-label="What Strelva checked" data-problems={problems.length ? "" : undefined}>
       <XaPebbleScene pose={problems.length ? "fixing" : "resting"} size={300} label={problems.length ? "Pebble working on what broke" : "Pebble resting beside the calendar"} />
       <div className={styles.checks}>
         <XaLabel as="h2">{problems.length ? `Pebble is watching ${problems.length === 1 ? "one System" : `${problems.length} Systems`} that broke` : "Latest checks"}</XaLabel>

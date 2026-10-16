@@ -3,13 +3,14 @@
  * XA · AG6 · Minutes this month (Pen XAg65).
  *
  * The figure is the screen: minutes the agency's people logged per client
- * this month, with what the time went to in their own notes. Strelva's own
- * work is not counted here and the page says so. Time is logged inside each
+ * this month, who logged them, and what the time went to in their own notes.
+ * Strelva's own work is not counted here; Pebble says so once, under the rows
+ * (one Pebble, on phone too). Time is logged inside each
  * client (the Care plan time entry); this page only reads it.
  */
 import { StSkeleton } from "@/components/ui/strelva/Kit";
-import { XaButton, XaEmpty, XaHeadline, XaInitial, XaLabel, XaPebbleScene, XaRow, XaRows, XaSays } from "@/components/ui/strelva/Xa";
-import { minutesHeadline } from "./agency-xa-model";
+import { XaButton, XaEmpty, XaHeadline, XaInitial, XaRow, XaRows, XaSays, XaTextLink } from "@/components/ui/strelva/Xa";
+import { minutesHeadline, notesLine, peopleMinutesLine } from "./agency-xa-model";
 import { clientColor } from "./client-color";
 import { MINUTES_CLIENT_LIMIT, type AgencyMinutesState } from "./useAgencyMinutes";
 import styles from "./agency-xa.module.css";
@@ -44,20 +45,17 @@ export function AgencyMinutes({ agencyName, state, now = new Date(), onOpenClien
   return <div className={styles.minutes}>
     <div className={styles.minutesLead}>
       <XaHeadline quiet={quiet}>{line}</XaHeadline>
-      <p className={styles.note}>Logged when someone at {agencyName} works on a client. Strelva&apos;s own work isn&apos;t counted here.</p>
       {counted.length ? <XaRows label="Minutes by client this month">
         {counted.map(row => <XaRow key={row.workspaceId} lead={<XaInitial name={row.name} color={clientColor(row.workspaceId)} size={32} />} title={row.name}
-          detail={row.notes.length ? row.notes.slice(0, 3).join(", ") : `Logged by ${row.people.join(" and ")}`}
+          detail={<><span className={styles.minutesWho}>{peopleMinutesLine(row)}</span>{row.notes.length ? <span className={styles.minutesNotes}>{notesLine(row.notes)}</span> : null}</>}
           meta={<span className={styles.figure}>{row.minutes}<small>min</small></span>} onClick={() => onOpenClient(row.workspaceId)} />)}
       </XaRows> : <XaEmpty pose="resting" size="sm" job="Pebble adds up time as soon as someone logs it inside a client." title="Nothing logged yet this month." />}
       {zero.length && counted.length ? <p className={styles.note}>No time logged for {zero.length === 1 ? zero[0]!.name : `${zero.length} other clients`} this month.</p> : null}
       {state.failed.length ? <p role="alert" className={styles.inlineAlert}>Time for {state.failed.join(", ")} could not be read, so it isn&apos;t in the total.</p> : null}
       {state.partial ? <p className={styles.note}>Counted for your first {MINUTES_CLIENT_LIMIT} clients.</p> : null}
+      {counted.length ? <XaSays links={[<XaTextLink key="see" onClick={() => onOpenClient(counted[0]!.workspaceId)}>See it on {counted[0]!.name}</XaTextLink>]}>
+        Pebble keeps its own work out of these minutes. It shows on each client&apos;s page, named as Strelva.
+      </XaSays> : null}
     </div>
-    <aside className={styles.minutesSide} aria-label="Who did the work">
-      <XaPebbleScene pose="lineup" size={260} label="Pebble with every System lined up" />
-      <XaLabel as="h2">Strelva&apos;s own work</XaLabel>
-      <XaSays>What Strelva does for your clients is named as Strelva wherever it appears, and never added to your time.</XaSays>
-    </aside>
   </div>;
 }

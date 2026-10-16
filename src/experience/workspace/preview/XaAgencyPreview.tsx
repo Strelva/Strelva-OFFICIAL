@@ -13,6 +13,7 @@ import { WorkspaceRequestContext } from "../WorkspaceRequest";
 import { useAgencyClientHome } from "../useAgencyClientHome";
 import { AgencyClientXa, useAgencyGrants } from "../agency/xa/AgencyClientXa";
 import { clientColor } from "../agency/xa/client-color";
+import { splitQueue } from "../agency/xa/agency-xa-model";
 import { AgencyWebsiteDocumentDraftExperience, type AgencyDocumentTransport } from "@/experience/agency-website/AgencyWebsiteDocumentDraftExperience";
 import { agencyDocumentFixture } from "@/experience/agency-website/agency-document-fixture";
 import { XA_AGENCY, XA_CLIENT, XA_MINUTES, xaAgencyClients, xaAgencyLibrary, xaAgencySnapshot, xaHarborSystems, type XaAgencyScreen, type XaAgencyState } from "./xa-agency-fixture";
@@ -32,7 +33,9 @@ function previewHref(screen: XaAgencyScreen, mode: "light" | "dark", state?: XaA
 
 /** Answers the agency's reads the way the server would, for one fixture state. */
 function fixtureRouter(screen: XaAgencyScreen, state: XaAgencyState): typeof fetch {
-  return (async (input: RequestInfo | URL) => {
+  // Versions resolved inline in this preview session read back as offered.
+  const resolved = new Set<string>();
+  return (async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = new URL(String(input), "http://preview.local");
     const path = url.pathname;
     const wait = (ms = 220) => new Promise(resolve => setTimeout(resolve, ms));
@@ -52,7 +55,19 @@ function fixtureRouter(screen: XaAgencyScreen, state: XaAgencyState): typeof fet
       if (state === "loading") return never();
       if (state === "error") return Response.json({ error: "Unavailable" }, { status: 500 });
       await wait();
-      return Response.json(xaAgencyLibrary(state));
+      return Response.json(xaAgencyLibrary(state, resolved));
+    }
+    if (path === "/api/workspace/versions" && init?.method === "POST") {
+      const body = JSON.parse(String(init.body)) as { versionId: string; rowRevision: number };
+      await wait(400);
+      resolved.add(body.versionId);
+      return Response.json({ outcome: "prepared", rowRevision: body.rowRevision + 1, receipt: null });
+    }
+    if (path === "/api/workspace/versions") {
+      const conflict = xaAgencyLibrary("ready").sources.flatMap(source => source.versions).find(version => version.systemId === url.searchParams.get("systemId") && version.state === "conflicts");
+      if (!conflict) return Response.json({ error: "Not in this preview" }, { status: 404 });
+      return Response.json({ workspaceId: conflict.workspaceId, systemId: conflict.systemId, versionId: conflict.versionId, rowRevision: 4, canManage: true, canMakeReal: false, pendingRelease: null,
+        possibilities: [{ sourceRevision: 3, conflicts: conflict.conflicts.map(item => ({ ...item })), missingAccounts: [] }] });
     }
     if (path === "/api/workspace/agencies") {
       if (state === "waiting") return Response.json({ error: "Not shared with agencies." }, { status: 403 });
@@ -77,6 +92,7 @@ function fixtureRouter(screen: XaAgencyScreen, state: XaAgencyState): typeof fet
         deliveryChecks: [], deliveries: [],
       });
     }
+    if (path === "/api/service-requests") return Response.json({ requests: [] });
     if (path === "/api/workspace/provider-client-queue") return Response.json({ agencyWorkspaceId: XA_AGENCY, items: [], nextCursor: null });
     if (path === "/api/workspace/agency-proposals") return Response.json({ proposals: [], listing: { listed: false, summary: null } });
     if (path === "/api/agency-website-draft-access") return Response.json({ websites: [] });
@@ -89,21 +105,24 @@ function fixtureRouter(screen: XaAgencyScreen, state: XaAgencyState): typeof fet
 export function XaAgencyPreview({ screen, state, mode }: { screen: XaAgencyScreen; state: XaAgencyState; mode: "light" | "dark" }) {
   const request = useMemo(() => fixtureRouter(screen, state), [screen, state]);
   const snapshot = useMemo(() => xaAgencySnapshot(), []);
-  const fixed = state === "done";
+  // The sidebar reads the same batched read the screens do: the Queue count, and a dot on each client that waits on the agency.
+  const page = useMemo(() => xaAgencyClients(state), [state]);
+  const you = splitQueue(page.queue).you;
+  const waiting = new Set(you.filter(item => item.kind !== "improvement").map(item => item.workspaceId));
   const clients: StrelvaClientLink[] = state === "empty" && screen !== "client" ? [] : [
-    { id: XA_CLIENT.harbor, name: "Harbor Dental", href: previewHref("client", mode), detail: "Dr. Lin", color: clientColor(XA_CLIENT.harbor), current: screen === "client" || screen === "prepare" },
-    { id: XA_CLIENT.north, name: "North Coast Realty", href: previewHref("today", mode), waits: !fixed, detail: fixed ? "Dana" : undefined, color: clientColor(XA_CLIENT.north) },
-    { id: XA_CLIENT.lakeview, name: "Lakeview Mediation", href: previewHref("today", mode), detail: "Ruth", color: clientColor(XA_CLIENT.lakeview) },
-    { id: XA_CLIENT.fieldwork, name: "Fieldwork Studio", href: previewHref("today", mode), detail: "Ana", color: clientColor(XA_CLIENT.fieldwork) },
-  ];
+    { id: XA_CLIENT.harbor, name: "Harbor Dental", href: previewHref("client", mode), current: screen === "client" || screen === "prepare" },
+    { id: XA_CLIENT.north, name: "North Coast Realty", href: previewHref("today", mode) },
+    { id: XA_CLIENT.lakeview, name: "Lakeview Mediation", href: previewHref("today", mode) },
+    { id: XA_CLIENT.fieldwork, name: "Fieldwork Studio", href: previewHref("today", mode) },
+  ].map(client => ({ ...client, color: clientColor(client.id), waits: waiting.has(client.id) || undefined }));
   const agencyView = screen === "today" ? "home" : screen === "queue" ? "queue" : screen === "library" ? "library" : screen === "minutes" ? "minutes" : "clients";
   const insideClient = screen === "client" || screen === "prepare";
   const shell = {
     appBase: "/preview/strelva", signOut: null, systemsReleased: true, mode,
     notice: <p className={styles.notice}>Fictional preview. Nothing here reaches a real business.</p>,
-    workspaceName: insideClient ? "North Studio / Harbor Dental" : "North Studio", accountName: "Maya Okafor",
+    workspaceName: "North Studio", accountName: "Maya Okafor",
     agencyNavigation: {
-      active: agencyView, queueCount: state === "empty" ? 0 : fixed ? 1 : 3, clients, agencyWorkspaceId: insideClient ? XA_AGENCY : undefined,
+      active: agencyView, queueCount: state === "loading" || state === "error" ? null : you.length, clients, agencyWorkspaceId: insideClient ? XA_AGENCY : undefined,
       hrefs: { home: previewHref("today", mode), queue: previewHref("queue", mode), library: previewHref("library", mode), minutes: previewHref("minutes", mode), clients: previewHref("client", mode) },
     },
   } as const;
@@ -123,9 +142,10 @@ function ClientScreen({ state }: { state: XaAgencyState }) {
   const shared = useAgencyClientHome(XA_CLIENT.harbor);
   const request = useMemo(() => fixtureRouter("client", state), [state]);
   const grants = useAgencyGrants(request, XA_CLIENT.harbor, XA_AGENCY);
-  return <AgencyClientXa clientName="Harbor Dental" workspaceId={XA_CLIENT.harbor} agencyName="North Studio" agencyHref={previewHref("today", "light")} ownerName="Dr. Lin"
+  // No agency-readable owner name exists yet, so the preview names the business the way the app does.
+  return <AgencyClientXa clientName="Harbor Dental" workspaceId={XA_CLIENT.harbor} agencyName="North Studio" agencyHref={previewHref("today", "light")}
     systems={state === "empty" ? [] : xaHarborSystems()} systemsLoading={state === "loading"} grants={grants} shared={shared.state}
-    systemHref={() => previewHref("prepare", "light")} onRetryShared={shared.refresh} />;
+    systemHref={() => previewHref("prepare", "light")} onRetryShared={shared.refresh} onAsk={() => undefined} />;
 }
 
 const HOURS_NODE = "service-one";

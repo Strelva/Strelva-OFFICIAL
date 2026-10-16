@@ -53,12 +53,21 @@ export function splitQueue(items: readonly AgencyQueueItem[]): { you: AgencyQueu
   return { you, owners };
 }
 
-/** The one action a Queue row offers, named for what it does. */
+/** Connections a broken System is most often waiting on, longest name first. */
+const CONNECTION_NAMES = ["Google Business Profile", "Google Calendar", "Microsoft Outlook", "Outlook Calendar", "QuickBooks", "Mailchimp", "Calendly", "Square", "Stripe", "Google", "Outlook"];
+
+/** The one action a Queue row offers, named for what clicking does. */
 export function queueActionLabel(item: AgencyQueueItem): string {
   switch (item.kind) {
-    case "health": return "Fix it";
-    case "owner_unreachable": return "Fix contact";
+    case "health": {
+      const text = `${item.title} ${item.label ?? ""}`;
+      const connection = CONNECTION_NAMES.find(name => text.includes(name));
+      return connection ? `Reconnect ${connection}` : "Open the System";
+    }
+    case "owner_unreachable": return "Update contact";
     case "improvement": return "Review";
+    case "request": return "Open request";
+    case "client_site": return "Open site work";
     default: return "Open";
   }
 }
@@ -84,12 +93,23 @@ const QUEUE_KIND: Partial<Record<AgencyQueueItem["kind"], string>> = {
   owner_unreachable: "owner not reachable",
 };
 
+/** "6:14 am": the one clock format every agency screen uses. */
+export function clockLabel(date: Date): string {
+  return date.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }).replace("AM", "am").replace("PM", "pm");
+}
+
+/** "Dec 31, 7:00 pm". */
+export function dayAndClockLabel(at: string | Date): string {
+  const date = new Date(at);
+  return `${date.toLocaleDateString("en-US", { month: "short", day: "numeric" })}, ${clockLabel(date)}`;
+}
+
 /** "6:14 am" today, "yesterday 4:05 pm", "Mon 10:42 am" this week, else "Oct 3". */
 export function sinceLabel(at: string, now = Date.now()): string {
   const date = new Date(at);
   if (Number.isNaN(date.getTime())) return "a while ago";
   const today = new Date(now);
-  const time = date.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }).replace("AM", "am").replace("PM", "pm");
+  const time = clockLabel(date);
   const days = Math.floor((startOfDay(today) - startOfDay(date)) / 86_400_000);
   if (days <= 0) return time;
   if (days === 1) return `yesterday ${time}`;
@@ -170,14 +190,30 @@ export interface ClientMinutes {
   /** Notes as written, newest first, without repeats. */
   notes: string[];
   people: string[];
+  /** Who logged the time, most minutes first. */
+  byPerson: { name: string; minutes: number }[];
+}
+
+/** "Logged by Maya 60 · Jonah 36 min". */
+export function peopleMinutesLine(row: Pick<ClientMinutes, "byPerson">): string {
+  return row.byPerson.length ? `Logged by ${row.byPerson.map(person => `${person.name} ${person.minutes}`).join(" · ")} min` : "";
+}
+
+/** Notes keep their own capitals, so they are joined with a middle dot, never mid-sentence. */
+export function notesLine(notes: readonly string[], limit = 3): string {
+  return notes.slice(0, limit).join(" · ");
 }
 
 /** One client's live entries this month, as AG6 reads them. Voided entries never count. */
 export function clientMinutes(workspaceId: string, name: string, entries: AgencyTimeList): ClientMinutes {
   const live = entries.filter(entry => !entry.voided).sort((a, b) => b.occurredOn.localeCompare(a.occurredOn));
   const notes = [...new Set(live.map(entry => entry.note?.trim()).filter((note): note is string => Boolean(note)))];
-  const people = [...new Set(live.map(entry => firstNameFromEmail(entry.recordedBy) ?? entry.recordedBy.split("@")[0] ?? "").filter(Boolean))];
-  return { workspaceId, name, minutes: live.reduce((sum, entry) => sum + entry.minutes, 0), notes, people };
+  const who = (email: string) => firstNameFromEmail(email) ?? email.split("@")[0] ?? "";
+  const people = [...new Set(live.map(entry => who(entry.recordedBy)).filter(Boolean))];
+  const totals = new Map<string, number>();
+  for (const entry of live) { const name = who(entry.recordedBy); if (name) totals.set(name, (totals.get(name) ?? 0) + entry.minutes); }
+  const byPerson = [...totals].map(([person, minutes]) => ({ name: person, minutes })).sort((a, b) => b.minutes - a.minutes);
+  return { workspaceId, name, minutes: live.reduce((sum, entry) => sum + entry.minutes, 0), notes, people, byPerson };
 }
 
 /** "231 minutes across 4 clients." + "October 1 to 14, by Maya and Jonah." */

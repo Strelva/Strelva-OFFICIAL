@@ -24,13 +24,14 @@ describe("agency v2 document drafts", () => {
     const save = vi.fn(async (_binding,record) => ({website:record}));
     await mount({read:async()=>initial,save});
     const options = [...container.querySelectorAll("option")].map(option=>option.textContent);
-    expect(options.join()).toContain("Service grid");
+    expect(options.join()).toContain("Practice areas");
+    expect(options.join()).not.toContain("Service grid");
     expect(options.join()).not.toContain("Header");
     expect(options.join()).not.toContain("Hero");
     expect(container.textContent).not.toContain("Approve this preview");
     expect(container.textContent).not.toContain("Connect domain");
     await change(container.querySelector("textarea")!,"[Agency's proposed services]");
-    await act(async()=>container.querySelector<HTMLButtonElement>('[aria-label="Move service-one down"]')!.click());
+    await act(async()=>container.querySelector<HTMLButtonElement>('[aria-label="Move [First service from source] down"]')!.click());
     await act(async()=>button("Send to the client").click());
     expect(save).toHaveBeenCalledWith(bindingId,initial.website,"services",[
       {op:"replace",path:"/nodes/services/props",value:{...initial.website!.rebuild.candidate!.document.nodes.services!.props,title:"[Agency's proposed services]"}},
