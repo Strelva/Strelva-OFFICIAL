@@ -101,7 +101,7 @@ describe("business deposit presentation", () => {
     vi.stubGlobal("fetch", vi.fn(async () => Response.json({ url })));
     await act(async () => root.render(createElement(BusinessPayment, { token, initialRequest: request })));
     await act(async () => payButton().click());
-    expect(container.querySelector('[role="alert"]')?.textContent).toContain("invalid link");
+    expect(container.querySelector('[role="alert"]')?.textContent).toContain("couldn't be opened. Nothing was charged.");
   });
 
   it("uses the current token reader and reports a failed read without a payment button", async () => {

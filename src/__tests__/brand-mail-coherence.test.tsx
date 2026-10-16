@@ -186,9 +186,9 @@ describe("entry branding", () => {
 describe("neutral owner navigation identity", () => {
   it("keeps the provided neutral identity instead of rendering the platform brand", () => {
     const html = renderToStaticMarkup(<StrelvaSidebar ownerBrand={unavailable} accountName="Owner" signedIn={false} />);
-    expect(html).toContain('aria-label="Workspace navigation"');
+    expect(html).toContain('aria-label="Your business navigation"');
     expect(html).toContain("Agency identity unavailable");
-    expect(html).toContain('aria-label="Workspace home"');
+    expect(html).toContain('aria-label="Your business home"');
     expect(html).not.toContain('aria-label="Strelva platform"');
     expect(html).not.toContain('aria-label="Strelva home"');
     expect(html).not.toContain('>Strelva</span>');
