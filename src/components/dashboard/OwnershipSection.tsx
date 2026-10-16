@@ -38,7 +38,7 @@ const MANAGED_ITEMS = [
 const HANDOFF_STEPS = [
   {
     title: "Export content",
-    body: "Download the structured JSON before any handoff. It includes page sections, settings, theme, navigation, footer, and page configuration: everything Strelva renders from.",
+    body: "Download one file with everything on your site before any handoff: its pages, settings, look, menu and footer. It is everything Strelva shows your site from.",
   },
   {
     title: "Export assets",

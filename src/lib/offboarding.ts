@@ -89,9 +89,9 @@ export async function getOffboardingSnapshot(tenantId: string): Promise<Offboard
       },
       {
         id: "workspace",
-        label: "Workspace records",
+        label: "Your records in Strelva",
         state: "manual",
-        detail: "If this work used Workspace, use its existing owner-only export before leaving.",
+        detail: "Requests, decisions and History you keep in Strelva have their own owner-only export. Download it before leaving.",
         href: "/workspace",
       },
     ],

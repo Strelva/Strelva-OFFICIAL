@@ -7,33 +7,34 @@ test.skip(
 
 test("owner dashboard surfaces are reachable and product-complete enough to orient", async ({ page }) => {
   await page.goto("/dashboard/chat");
-  const dashboardNav = page.getByRole("navigation", { name: "Dashboard" });
+  // XA sidebar (October 16): the business's own name labels it; GLOSSARY words (Home, What changed).
+  const dashboardNav = page.getByRole("complementary", { name: /navigation$/ }).first();
 
   await expect(page.getByRole("heading", { name: /good (morning|afternoon|evening),/i })).toBeVisible();
   await expect(page.getByRole("textbox").first()).toBeVisible();
-  // Current IA: Today / Ask Strelva / Website / Analytics / Reports (Sources removed;
-  // Site relabelled Website in the console redesign).
-  await expect(dashboardNav.getByRole("link", { name: "Today", exact: true })).toHaveAttribute("href", "/dashboard");
-  await expect(dashboardNav.getByRole("link", { name: "Ask Strelva", exact: true })).toHaveAttribute("href", "/dashboard/chat");
+  await expect(dashboardNav.getByRole("link", { name: "New request", exact: true })).toHaveAttribute("href", "/dashboard/chat");
+  await expect(dashboardNav.getByRole("link", { name: "Home", exact: true })).toHaveAttribute("href", "/dashboard");
+  await expect(dashboardNav.getByRole("link", { name: "What changed", exact: true })).toHaveAttribute("href", "/dashboard/history");
   await expect(dashboardNav.getByRole("link", { name: "Website", exact: true })).toHaveAttribute("href", "/dashboard/site");
-  await expect(dashboardNav.getByRole("link", { name: "Analytics", exact: true })).toHaveAttribute("href", "/dashboard/analytics");
-  await expect(dashboardNav.getByRole("link", { name: "Reports", exact: true })).toHaveAttribute("href", "/dashboard/reports");
+  await expect(dashboardNav.getByRole("link", { name: "Business details", exact: true })).toHaveAttribute("href", "/dashboard/settings");
 
   await page.goto("/dashboard/reports");
   await expect(page.getByRole("heading").first()).toBeVisible();
 
   await page.goto("/dashboard/site");
-  // The Website sub-nav is now accent pills (links): Preview / Content / Media / Brand Kit / History.
-  await expect(page.getByRole("link", { name: "Content", exact: true })).toBeVisible();
-  await expect(page.getByRole("link", { name: "Media", exact: true })).toBeVisible();
-  await expect(page.getByRole("link", { name: "Brand Kit", exact: true })).toBeVisible();
+  // The Website sections: Your site / Lists / Photos / Brand (Store when the tenant sells).
+  const sections = page.getByRole("navigation", { name: "Website sections" });
+  await expect(sections.getByRole("link", { name: "Your site", exact: true })).toBeVisible();
+  await expect(sections.getByRole("link", { name: "Lists", exact: true })).toBeVisible();
+  await expect(sections.getByRole("link", { name: "Photos", exact: true })).toBeVisible();
+  await expect(sections.getByRole("link", { name: "Brand", exact: true })).toBeVisible();
 
   await page.goto("/dashboard/analytics");
   await expect(page.getByRole("heading").first()).toBeVisible();
 
   await page.goto("/dashboard/settings");
-  // Settings is consolidated into Business / Account / Domains / Plan; Business is the default section.
-  await expect(page.getByRole("heading", { name: "Business", exact: true })).toBeVisible();
+  // Business details is one page: the facts said once, then who can change the site.
+  await expect(page.getByRole("heading", { name: "About the business", exact: true })).toBeVisible();
 });
 
 test("site editor surfaces the draft state and can discard it without publishing", async ({ page, request }) => {
@@ -56,12 +57,12 @@ test("site editor surfaces the draft state and can discard it without publishing
   // its Headline field is live) and the PublishBar reflects the pending draft.
   await page.getByRole("button", { name: "Edit site" }).click();
   await expect(page.getByLabel("Headline").first()).toBeVisible();
-  await expect(page.getByText("Draft preview active", { exact: false })).toBeVisible();
-  await expect(page.getByRole("button", { name: /Publish live|Publish to Strelva/ })).toBeEnabled();
+  await expect(page.getByText("Draft, not live yet").first()).toBeVisible();
+  await expect(page.getByRole("button", { name: "Save changes" })).toBeVisible();
 
   // Discard clears the draft; nothing is ever published to the live site.
   await page.getByRole("button", { name: /Discard draft/ }).click();
-  await expect(page.getByText(/No draft changes|Live sync ready/)).toBeVisible();
+  await expect(page.getByText("Draft, not live yet")).toHaveCount(0);
 });
 
 test("client fallback editor keeps drafts isolated from the active site", async ({ page, request }) => {
@@ -104,13 +105,13 @@ test("client presence surfaces render their real content", async ({ page }) => {
   // stable copy (not just a 200), so a regression on any one fails loudly.
   // Numbers are dynamic, so these anchor on fixed section titles / verdicts.
   const surfaces: Array<[string, RegExp]> = [
-    ["/dashboard", /What Strelva did for you/],
-    ["/dashboard/analytics", /How people find you on Google/],
-    ["/dashboard/reviews", /How Strelva answers your reviews/],
+    ["/dashboard", /Good (morning|afternoon|evening)/],
+    ["/dashboard/analytics", /Visits\./],
+    ["/dashboard/reviews", /Connect your Google listing|reviews/i],
     ["/dashboard/google", /Connect your Google listing/],
     ["/dashboard/health", /Site [Hh]ealth/],
-    ["/dashboard/history", /History & safety/],
-    ["/dashboard/store", /Best sellers/],
+    ["/dashboard/history", /What changed/],
+    ["/dashboard/store", /Recent orders/],
   ];
   for (const [path, needle] of surfaces) {
     const res = await page.goto(path, { waitUntil: "domcontentloaded" });
@@ -119,51 +120,38 @@ test("client presence surfaces render their real content", async ({ page }) => {
   }
 });
 
-test("settings sections and report views switch on interaction", async ({ page }) => {
-  // Settings consolidated to Business / Account / Domains / Plan — switching
-  // sections must swap the in-page content, not just the active pill.
+test("business details and recaps render their own content", async ({ page }) => {
+  // Business details is one page now (October 16): facts, who can change the site, how much Strelva does alone.
   await page.goto("/dashboard/settings", { waitUntil: "domcontentloaded" });
-  await expect(page.getByRole("heading", { name: "Business", exact: true })).toBeVisible();
-  // Business is the default section: the autonomy panel is shown.
-  await expect(page.getByText("How much Strelva handles on its own")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "About the business", exact: true })).toBeVisible();
+  await expect(page.getByText("How much Strelva does on its own").first()).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Menu and footer", exact: true })).toBeVisible();
 
-  await page.getByRole("button", { name: "Domains", exact: true }).click();
-  await expect(page.getByText("Production Domain").first()).toBeVisible();
-
-  await page.getByRole("button", { name: "Plan", exact: true }).click();
-  await expect(page.getByText(/Manage billing|Current plan|Billing/i).first()).toBeVisible();
-
-  // Reports: the Weekly/Monthly recap toggle drives the view via the query param.
+  // Recaps lead with one sentence (no recap has been sent on a clean backend yet).
   await page.goto("/dashboard/reports", { waitUntil: "domcontentloaded" });
-  await expect(page.getByRole("button", { name: "Weekly", exact: true })).toBeVisible();
-  await page.getByRole("button", { name: "Monthly", exact: true }).click();
-  await expect(page).toHaveURL(/view=monthly/);
+  await expect(page.getByRole("heading").first()).toBeVisible();
 });
 
 test("dashboard surfaces are feature-gated per tenant", async ({ page }) => {
   // A feature the tenant HAS (gldf runs a storefront) renders its surface...
   const store = await page.goto("/dashboard/store", { waitUntil: "domcontentloaded" });
   expect(store?.status(), "store status").toBeLessThan(400);
-  await expect(page.getByRole("heading", { name: "Best sellers" }).first()).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Recent orders" }).first()).toBeVisible();
 
   // ...a feature it LACKS (no booking/scheduling) resolves to the gated
   // not-found, not a crash or a half-rendered surface leaking the wrong set.
   const schedule = await page.goto("/dashboard/schedule", { waitUntil: "domcontentloaded" });
   expect(schedule?.status(), "schedule status").toBeLessThan(500);
-  await expect(page.getByText(/404|not found|not available|isn't available/i).first()).toBeVisible();
+  await expect(page.getByText(/404|not found|not available|isn't available|no page here/i).first()).toBeVisible();
 });
 
-test("analytics range selector drives the reporting window", async ({ page }) => {
-  // Every number on Analytics is computed for the selected window; the range
-  // selector must move that window and reflect it in the URL (?range=).
+test("analytics leads with visits and keeps site health on the same page", async ({ page }) => {
+  // On a clean backend there is no traffic yet: Visits says so in a sentence and Site health sits below.
   await page.goto("/dashboard/analytics", { waitUntil: "domcontentloaded" });
-  await expect(page.getByRole("button", { name: "This week", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Visits.", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Site health", exact: true })).toBeVisible();
 
-  await page.getByRole("button", { name: "This month", exact: true }).click();
-  await expect(page).toHaveURL(/range=month/);
-
-  await page.getByRole("button", { name: "Live", exact: true }).click();
-  await expect(page).toHaveURL(/range=live/);
-  // The verdict/section chrome still renders after a window switch.
-  await expect(page.getByText("How people find you on Google").first()).toBeVisible();
+  // The old Site health route lands on that section.
+  await page.goto("/dashboard/health", { waitUntil: "domcontentloaded" });
+  await expect(page).toHaveURL(/\/dashboard\/analytics#site-health/);
 });

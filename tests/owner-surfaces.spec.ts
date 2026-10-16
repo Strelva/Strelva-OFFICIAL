@@ -35,10 +35,10 @@ test("owner Today surface renders without crashing", async ({ page }) => {
 // config + content defaults (not the operational stores), so they hold in CI
 // where Redis/metrics are absent.
 const OWNER_SURFACES: Array<[string, RegExp]> = [
-  ["/dashboard/settings", /How much Strelva handles on its own/],
-  ["/dashboard/store", /Products/],
-  ["/dashboard/history", /History & safety/],
-  ["/dashboard/analytics", /Connect Google to unlock your analytics/],
+  ["/dashboard/settings", /How much Strelva does on its own/],
+  ["/dashboard/store", /Recent orders/],
+  ["/dashboard/history", /What changed/],
+  ["/dashboard/analytics", /Connect Google and Strelva can also show/],
   ["/dashboard/google", /Connect your Google listing/],
 ];
 
