@@ -4,6 +4,10 @@ export interface WorkspaceSearchItem {
   detail: string;
   href: string;
   onOpen?: () => void;
+  /** XS: the System or work kind, so the result wears its clay tile. Omit for actions. */
+  kind?: string;
+  /** XS: the one status a result shows: it waits for this person. */
+  waits?: boolean;
 }
 
 function normalize(value: string): string {

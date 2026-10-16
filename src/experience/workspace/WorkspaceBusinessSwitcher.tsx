@@ -8,6 +8,7 @@ import type { SystemView } from "@/experience/systems/model";
 import type { WorkspaceSnapshot } from "./contracts";
 import type { StrelvaSection } from "@/experience/app-frame/StrelvaShell";
 import type { StrelvaClientLink } from "@/experience/app-frame/workspace-places";
+import { clientTone } from "./client-tone";
 import styles from "./workspace-business-switcher.module.css";
 
 /** Navigation hints never grant access. Prefer the serving agency when it is reachable. */
@@ -25,12 +26,13 @@ export function clientAgencyWorkspace(snapshot: WorkspaceSnapshot) {
 export function agencyClientLinks(snapshot: WorkspaceSnapshot, appBase: string, onWorkspace?: (id: string) => void): StrelvaClientLink[] {
   return snapshot.workspaces
     .filter(item => item.kind === "customer" && ["provider_seat", "delegated_read"].includes(item.access || ""))
-    .map(item => ({ id: item.id, name: item.name, href: `${appBase}/workspace?workspaceId=${encodeURIComponent(item.id)}`, onOpen: onWorkspace ? () => onWorkspace(item.id) : undefined, current: item.id === snapshot.workspaceId, detail: item.access === "delegated_read" ? "Read-only" : undefined }));
+    .map(item => ({ id: item.id, name: item.name, href: `${appBase}/workspace?workspaceId=${encodeURIComponent(item.id)}`, onOpen: onWorkspace ? () => onWorkspace(item.id) : undefined, current: item.id === snapshot.workspaceId, detail: item.access === "delegated_read" ? "Read-only" : undefined, color: clientTone(item.name) }));
 }
 
 /**
  * XA scope switcher (October 16). The trigger is the sidebar's first line:
- * an initial, the scope, and the up-down chevrons (XA · AS1). The menu is a
+ * an initial, the scope, and the up-down chevrons (XA · AS1). Each business
+ * wears its own tone (client-tone.ts), never one repeated green tile. The menu is a
  * white popover of open rows grouped in sentence case, with a check on the
  * current one and a quiet word only where access differs ("Read-only",
  * "Agency access"). Arrow keys move between rows; Escape returns focus.
@@ -72,11 +74,11 @@ export function WorkspaceBusinessSwitcher({ snapshot, busy, onWorkspace, onNavig
   const accessWord = (item: WorkspaceSnapshot["workspaces"][number]) => item.access === "delegated_read" ? "Read-only" : null;
   return <div ref={root} className={styles.switcher}>
     <button ref={trigger} className={styles.trigger} type="button" disabled={busy} aria-label={`Current scope: ${scope}`} aria-expanded={open} aria-controls="owner-business-menu" onClick={() => setOpen(!open)}>
-      {current?.name ? <XaInitial name={current.name} size={24} /> : <XaMark size={22} />}<span className={styles.scope}>{scope}{current?.access === "delegated_read" ? <span className={styles.aside}> · Read-only</span> : ""}</span><ChevronsUpDown size={14} aria-hidden="true" className={styles.chevrons} />
+      {current?.name ? <XaInitial name={current.name} color={clientTone(current.name)} size={24} shape={current.kind === "personal" ? "round" : "square"} /> : <XaMark size={22} />}<span className={styles.scope}>{scope}{current?.access === "delegated_read" ? <span className={styles.aside}> · Read-only</span> : ""}</span><ChevronsUpDown size={14} aria-hidden="true" className={styles.chevrons} />
     </button>
     {open ? <div id="owner-business-menu" ref={menu} className={styles.menu} aria-label="Switch scope" onKeyDown={arrows}>
       {groups.filter(group => group.items.length).map(group => <div key={group.label} className={styles.group} role="group" aria-label={group.label}><p className={styles.groupLabel}>{group.label}</p>{group.items.map(item => <button className={styles.business} type="button" key={item.id} disabled={busy} aria-current={item.id === snapshot.workspaceId ? "true" : undefined} onClick={() => { setOpen(false); onWorkspace(item.id); }}>
-        <XaInitial name={item.name} size={24} /><span className={styles.name}>{item.name}</span>{accessWord(item) ? <span className={styles.aside}>{accessWord(item)}</span> : null}<Check size={15} aria-hidden="true" className={styles.check} />
+        <XaInitial name={item.name} color={clientTone(item.name)} size={24} shape={item.kind === "personal" ? "round" : "square"} /><span className={styles.name}>{item.name}</span>{accessWord(item) ? <span className={styles.aside}>{accessWord(item)}</span> : null}<Check size={15} aria-hidden="true" className={styles.check} />
       </button>)}</div>)}
       {systems.length && onSystem ? <div className={styles.group} role="group" aria-label={`Systems in ${current?.name || "your business"}`}><p className={styles.groupLabel}>Systems in {current?.name || "your business"}</p>{systems.map(system => <button type="button" className={styles.business} key={system.id} disabled={busy} aria-current={system.id === currentSystemId ? "true" : undefined} onClick={() => { setOpen(false); onSystem(system.id); }}>
         <XaSystemTile kind={system.kind} size={24} /><span className={styles.name}>{system.name}</span><Check size={15} aria-hidden="true" className={styles.check} />

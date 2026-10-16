@@ -23,5 +23,9 @@ export async function GET(request: Request) {
   if (!strelvaUiPreviewEnabled()) return new Response("Not found", { status: 404 });
   const name = new URL(request.url).searchParams.get("template") as keyof typeof TEMPLATES | null;
   const email = (TEMPLATES[name ?? "team"] ?? TEMPLATES.team)();
-  return new Response(renderPaperEmailHtml(email), { headers: { "Content-Type": "text/html; charset=utf-8", "X-Robots-Tag": "noindex", "Cache-Control": "no-store" } });
+  // The app's CSP keeps web fonts to 'self', so this preview can't load the DM Sans link the email carries.
+  // Say so on the page instead of passing the fallback stack off as DM Sans.
+  const note = `<p style="margin:0;padding:8px 16px;font:13px/18px -apple-system,'Segoe UI',Arial,sans-serif;color:#6b6f68;background:#efeee9;">Preview shows the fallback type (Helvetica, Segoe UI or Arial). Mail apps that load web fonts show DM Sans; Gmail shows this fallback too.</p>`;
+  const html = renderPaperEmailHtml(email).replace(/(<body[^>]*>)/, `$1${note}`);
+  return new Response(html, { headers: { "Content-Type": "text/html; charset=utf-8", "X-Robots-Tag": "noindex", "Cache-Control": "no-store" } });
 }

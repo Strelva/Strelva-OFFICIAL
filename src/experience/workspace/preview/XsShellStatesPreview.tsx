@@ -15,12 +15,21 @@ import { WorkspaceRequestContext } from "../WorkspaceRequest";
 import { PublicResultSaveOverlay } from "../WorkspaceApp";
 import { StartBusinessFromCheck } from "@/experience/getting-started/StartBusinessFromCheck";
 import { XaNotFound, XaNotOpenYet, XaPageBroke, XaSharedReadOnlyEmpty, XaWorkspaceOpening, XaWorkspaceUnopened } from "@/experience/states/XaStates";
-import { CLIENTS, HARBOR, NORTH, SEARCH_ITEMS, XS_BASE, accountWorkspaces, agencySnapshot, helpTransport, ownerSnapshot, type XsScreen, type XsState } from "./xs-shell-states-fixture";
+import { ACCOUNT_SITES, CLIENTS, HARBOR, NORTH, SEARCH_ITEMS, XS_BASE, accountWorkspaces, agencySnapshot, helpTransport, ownerSnapshot, type XsScreen, type XsState } from "./xs-shell-states-fixture";
 import styles from "./xa-foundation-preview.module.css";
 
 type Mode = "light" | "dark";
 
-function Behind() {
+/** The home behind a popover: whoever is signed in, and the business in focus. */
+function Behind({ who, empty = false }: { who: "owner" | "agency"; empty?: boolean }) {
+  if (who === "agency") return <div className={styles.center}><div className={styles.error}>
+    <XaHeadline size="md" quiet={`You’re in ${HARBOR.name} for North Studio.`}>Good morning, Maya.</XaHeadline>
+    <XaLede>{HARBOR.name}’s bookings, website and Google listing are running as they should.</XaLede>
+  </div></div>;
+  if (empty) return <div className={styles.center}><div className={styles.error}>
+    <XaHeadline size="md" quiet={`${HARBOR.name} has nothing in Strelva yet.`}>Good morning, Dr. Lin.</XaHeadline>
+    <XaLede>Start with your website or bookings, and it shows up here.</XaLede>
+  </div></div>;
   return <div className={styles.center}><div className={styles.error}>
     <XaHeadline size="md" quiet="31 visits booked this week.">Good morning, Dr. Lin.</XaHeadline>
     <XaLede>Bookings, the website and the Google listing are running as they should.</XaLede>
@@ -58,7 +67,8 @@ export function XsShellStatesPreview({ screen, state, mode }: { screen: XsScreen
   });
   const notice = <p className={styles.notice}>Fictional preview. Nothing here reaches a real business.</p>;
 
-  if (screen === "account") return <WorkspaceAccountView mode={mode} appBase="/preview/strelva" managedHref="/preview/strelva/website"
+  if (screen === "account") return <WorkspaceAccountView mode={mode} appBase="/preview/strelva" managedHref="/preview/strelva/website" signOut={null}
+    sites={state === "error" ? undefined : agency || state === "empty" ? [] : ACCOUNT_SITES}
     name={agency ? NORTH.person : HARBOR.owner} email={agency ? NORTH.email : HARBOR.email}
     emailConfirmed={state !== "unconfirmed"} releaseOpen={state !== "closed"} workspacesUnavailable={state === "error"}
     workspaces={state === "empty" ? [] : accountWorkspaces(agency ? "agency" : "owner")}
@@ -68,7 +78,7 @@ export function XsShellStatesPreview({ screen, state, mode }: { screen: XsScreen
   if (screen === "marketing-error") return <XaPageBroke mode={mode} onRetry={() => window.location.reload()} homeHref="/preview/strelva" />;
   if (screen === "not-open") return <XaNotOpenYet mode={mode} />;
   if (screen === "getting-started-off") return <XaNotOpenYet mode={mode} place="getting-started" />;
-  if (screen === "loading") return <div data-dashboard data-workspace-theme="linen" data-workspace-look="xa" data-workspace-mode={mode} style={{ minHeight: "100dvh", background: "var(--st-canvas)" }}><XaWorkspaceOpening /></div>;
+  if (screen === "loading") return <StrelvaShell unopened signOut={null} mode={mode} title="Your Strelva"><XaWorkspaceOpening /></StrelvaShell>;
 
   const switcher = <WorkspaceBusinessSwitcher snapshot={live} busy={state === "busy"} onWorkspace={setWorkspaceId} onNavigate={() => undefined} />;
   const current = live.workspaces.find(item => item.id === workspaceId);
@@ -76,23 +86,23 @@ export function XsShellStatesPreview({ screen, state, mode }: { screen: XsScreen
     appBase="/preview/strelva" signOut={null} systemsReleased mode={mode} workspaceId={HARBOR.id}
     accountName={agency ? NORTH.person : HARBOR.owner} accountDetail={agency ? NORTH.email : HARBOR.email}
     businessContext={switcher} searchItems={state === "empty" ? [] : SEARCH_ITEMS} searchScopeName={current?.name || HARBOR.name}
-    pinned={agency ? [] : [
-      { id: "web", kind: "website", title: "harbordental.com", href: XS_BASE + "/switcher", detail: "Live" },
+    pinned={agency || state === "empty" ? [] : [
+      { id: "web", kind: "website", title: "harbordental.com", href: XS_BASE + "/switcher", detail: "31 this week" },
       { id: "book", kind: "bookings", title: "Bookings", href: XS_BASE + "/switcher", state: "waits" },
       { id: "listing", kind: "listing", title: "Google listing", href: XS_BASE + "/switcher", detail: "4.9" },
     ]}
     agency={agency ? undefined : { name: NORTH.name, person: "Maya", color: "#2f5236" }}
     agencyNavigation={agency ? { active: "home", clients: agencyClientLinks(live, "/preview/strelva", setWorkspaceId).map((client, index) => ({ ...client, detail: `${CLIENTS[index]?.minutes ?? 0} min`, waits: index === 1 })), queueCount: 3, agencyWorkspaceId: NORTH.id } : undefined}
-    needsYou={{ count: agency ? null : 1 }} notice={notice} title={title} {...extra}>{children}</StrelvaShell>;
+    needsYou={{ count: agency || state === "empty" ? null : 1 }} notice={notice} title={title} {...extra}>{children}</StrelvaShell>;
 
-  if (screen === "unopened") return <StrelvaShell signedIn={state !== "sign-in"} signInHref="/sign-in" title="Your Strelva" mode={mode} accountName={HARBOR.owner} signOut={null} notice={notice}>
-    <XaWorkspaceUnopened reason={state === "sign-in" ? "sign-in" : state === "forbidden" ? "forbidden" : state === "gone" ? "gone" : "failed"} message={state === "error" || state === "ready" ? "The workspace service didn’t answer in time." : undefined} signInHref="/sign-in" accountHref={`${XS_BASE}/account`} onRetry={() => window.location.reload()} />
+  if (screen === "unopened") return <StrelvaShell unopened signedIn={state !== "sign-in"} signInHref="/sign-in" title="Your Strelva" mode={mode} accountName={HARBOR.owner} signOut={null} notice={notice}>
+    <XaWorkspaceUnopened reason={state === "sign-in" ? "sign-in" : state === "forbidden" ? "forbidden" : state === "gone" ? "gone" : "failed"} message={state === "forbidden" ? "This link was sent to frontdesk@harbordental.com." : undefined} signInHref="/sign-in" accountHref={`${XS_BASE}/account`} onRetry={() => window.location.reload()} />
   </StrelvaShell>;
   if (screen === "shared-empty") return shell(HARBOR.name, <XaSharedReadOnlyEmpty business={HARBOR.name} />);
-  if (screen === "search" || screen === "switcher") return shell("Today", <Behind />);
+  if (screen === "search" || screen === "switcher") return shell("Today", <Behind who={agency ? "agency" : "owner"} empty={state === "empty"} />);
 
   if (screen === "dialog") return <WorkspaceRequestContext.Provider value={async () => state === "loading" ? new Promise<Response>(() => undefined) : state === "error" ? Response.json({ error: "This check couldn’t be opened. It may have expired." }, { status: 404 }) : Response.json({ check: { name: null, suggestedName: HARBOR.name, website: "harbordental.com", kind: "website_audit" } })}>
-    {shell("Today", <><Behind />{state === "start" || state === "loading" || state === "error"
+    {shell("Today", <><Behind who="owner" />{state === "start" || state === "loading" || state === "error"
       ? <StartBusinessFromCheck resultId="fictional-check" workspaceName="Amy’s own work" savingHere={false} saveHereError="" onSaveHere={() => undefined} onClose={() => window.history.back()} />
       : <PublicResultSaveOverlay workspaceName={HARBOR.name} saving={state === "busy"} error={state === "waiting" ? "That result couldn’t be saved. Nothing was copied; try again." : ""} onSave={() => undefined} onClose={() => window.history.back()} />}</>)}
   </WorkspaceRequestContext.Provider>;

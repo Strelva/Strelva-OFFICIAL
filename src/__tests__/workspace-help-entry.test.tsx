@@ -40,7 +40,7 @@ describe("workspace help entry", () => {
       initialRequest: "Have Strelva build our website.",
     }));
     expect(html).toContain("Send request");
-    expect(html).toContain("Review saved requests and delivery deadlines");
+    expect(html).toContain("All requests");
     expect(html).not.toContain("Choose a business for this request.");
   });
 });

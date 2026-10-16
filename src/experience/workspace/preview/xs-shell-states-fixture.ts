@@ -39,19 +39,24 @@ export function agencySnapshot(): WorkspaceSnapshot {
 
 export function accountWorkspaces(kind: "owner" | "agency") {
   return kind === "agency"
-    ? [{ id: NORTH.id, kind: "agency" as const, name: NORTH.name, access: "member" as const }, ...CLIENTS.slice(0, 3).map((client, index) => ({ id: client.id, kind: "customer" as const, name: client.name, access: index === 2 ? "delegated_read" as const : "member" as const }))]
+    // Maya reaches her clients through North Studio's seat, never as a member of the business.
+    ? [{ id: NORTH.id, kind: "agency" as const, name: NORTH.name, access: "member" as const }, ...CLIENTS.slice(0, 3).map((client, index) => ({ id: client.id, kind: "customer" as const, name: client.name, access: index === 2 ? "delegated_read" as const : "provider_seat" as const }))]
     : ownerSnapshot().workspaces.map(item => ({ id: item.id, kind: item.kind, name: item.name, access: "member" as const }));
 }
 
+/** Each result says its kind in plain words and wears its clay; only the request that waits says so. */
 export const SEARCH_ITEMS: readonly WorkspaceSearchItem[] = [
-  { id: "s1", title: "harbordental.com", detail: "Website · Live · 31 visits booked this week", href: `${XS_BASE}/search` },
-  { id: "s2", title: "Bookings", detail: "Mon to Fri 8 to 5, Sat 9 to 1 · 3 tomorrow", href: `${XS_BASE}/search` },
-  { id: "s3", title: "New patient form", detail: "Form · Draft · Maya at North Studio is preparing it", href: `${XS_BASE}/search` },
-  { id: "s4", title: "Close for Thanksgiving, Nov 26 and 27", detail: "Request · Waits for you", href: `${XS_BASE}/search` },
+  { id: "s1", title: "harbordental.com", detail: "Website", kind: "website", href: `${XS_BASE}/search` },
+  { id: "s2", title: "Bookings", detail: "Bookings · Mon to Fri 8 to 5, Sat 9 to 1", kind: "bookings", href: `${XS_BASE}/search` },
+  { id: "s3", title: "New patient form", detail: "Form · Maya at North Studio is preparing it", kind: "form", href: `${XS_BASE}/search` },
+  { id: "s4", title: "Close for Thanksgiving, Nov 26 and 27", detail: "Request", kind: "documents", waits: true, href: `${XS_BASE}/search` },
   { id: "s5", title: "Insurance we take", detail: "Business record · Delta Dental, Cigna, MetLife", href: `${XS_BASE}/search` },
-  { id: "s6", title: "Google listing", detail: "Listing · 1180 Elmwood Ave · 4.9 from 212 reviews", href: `${XS_BASE}/search` },
-  { id: "s7", title: "October care plan report", detail: "Document · from North Studio · 96 minutes recorded", href: `${XS_BASE}/search` },
+  { id: "s6", title: "Google listing", detail: "Listing · 1180 Elmwood Ave", kind: "listing", href: `${XS_BASE}/search` },
+  { id: "s7", title: "October care plan report", detail: "Document from North Studio", kind: "documents", href: `${XS_BASE}/search` },
 ];
+
+/** The person's websites from before workspaces, named by domain. */
+export const ACCOUNT_SITES = [{ id: "harbor-legacy", domain: "harbordental.com", href: "/preview/strelva/website" }] as const;
 
 const request = (id: string, text: string, status: ServiceRequest["providerAcceptance"]["status"], day: string, extra: Partial<ServiceRequest> = {}): ServiceRequest => ({
   id, businessId: HARBOR.id, status: "requested", request: text, outcome: text, context: { source: "workspace_help" }, scope: ["help_request"],

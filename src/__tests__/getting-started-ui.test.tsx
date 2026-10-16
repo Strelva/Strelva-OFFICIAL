@@ -39,6 +39,11 @@ describe("Start with this fix (owner door)", () => {
     });
     await mount(createElement(StartBusinessFromCheck, { resultId: "scan_abc", workspaceName: "Personal", savingHere: false, saveHereError: "", onSaveHere: vi.fn(), onClose: vi.fn() }), transport);
     expect(container.querySelector("[role=dialog]")?.getAttribute("aria-labelledby")).toBe("start-business-title");
+    // XS: the sheet is only the yes; the name reads as a fact with Change beside it, and focus is on the yes.
+    expect(container.querySelector("input")).toBeNull();
+    expect(container.textContent).toContain("Northside Bakery");
+    expect(document.activeElement?.textContent).toBe("Start my business");
+    await act(async () => button("Change")!.click());
     const name = container.querySelector<HTMLInputElement>("input")!;
     expect(name.value).toBe("Northside Bakery");
     expect(document.activeElement).toBe(name);

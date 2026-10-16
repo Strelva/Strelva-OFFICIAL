@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { WorkspaceDialog, WorkspaceDialogActions, WorkspaceDialogTitle } from "@/experience/workspace/WorkspaceDialog";
-import { XaAnswers, XaButton, XaField, XaWorking } from "@/components/ui/strelva/Xa";
+import { XaButton, XaTextLink, XaWorking } from "@/components/ui/strelva/Xa";
 import dialogStyles from "@/experience/workspace/workspace-dialog.module.css";
 import { useWorkspaceRequest } from "@/experience/workspace/WorkspaceRequest";
 
@@ -14,8 +14,10 @@ function errorText(body: unknown, fallback: string): string {
 
 /**
  * "Start with this fix" on the owner door: the check becomes the business.
- * The name and website come from the check; the owner can change the name.
- * Saving the result into the current workspace stays available as before.
+ * The name and website come from the check. The sheet is only the yes: the
+ * name reads as a fact with "Change" beside it, which edits it in place
+ * (no form field unless the check had no name). Saving the result into the
+ * current workspace stays available as before.
  */
 export function StartBusinessFromCheck({ resultId, workspaceName, savingHere, saveHereError, onSaveHere, onClose }: {
   resultId: string; workspaceName: string; savingHere: boolean; saveHereError: string; onSaveHere: () => void; onClose: () => void;
@@ -27,10 +29,12 @@ export function StartBusinessFromCheck({ resultId, workspaceName, savingHere, sa
   const [name, setName] = useState("");
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState("");
+  const [editingName, setEditingName] = useState(false);
   const inFlight = useRef(false);
   const nameRef = useRef<HTMLInputElement>(null);
-  // The dialog opens on a loading line; once the check is read, focus the one field.
-  useEffect(() => { if (preview) nameRef.current?.focus(); }, [preview]);
+  const startRef = useRef<HTMLButtonElement>(null);
+  // The dialog opens on a loading line; once the check is read, focus the yes (or the name, when it is missing or being changed).
+  useEffect(() => { if (!preview) return; if (editingName || !preview.suggestedName) nameRef.current?.focus(); else startRef.current?.focus(); }, [preview, editingName]);
 
   useEffect(() => {
     const abort = new AbortController();
@@ -53,7 +57,7 @@ export function StartBusinessFromCheck({ resultId, workspaceName, savingHere, sa
   async function start(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (inFlight.current || savingHere) return;
-    if (!name.trim()) { setError("Enter your business name."); return; }
+    if (!name.trim()) { setError("Enter your business name."); setEditingName(true); return; }
     inFlight.current = true; setStarting(true); setError("");
     try {
       const response = await transport("/api/workspace/getting-started", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "start_from_check", resultId, name: name.trim() }) });
@@ -80,13 +84,18 @@ export function StartBusinessFromCheck({ resultId, workspaceName, savingHere, sa
       </>
       : <form className={dialogStyles.form} onSubmit={event => void start(event)} aria-describedby="start-business-note">
         <p id="start-business-note">Your business starts with this result saved in it{preview?.website ? ", and this site as its website" : ""}.</p>
-        <XaField ref={nameRef} label="Business name" value={name} maxLength={120} required disabled={busy} autoComplete="organization" onChange={event => { setName(event.target.value); setError(""); }} error={error && !name.trim() ? error : undefined} />
-        {preview?.website ? <XaAnswers rows={[["Website", <span key="w" className={dialogStyles.breakAll}>{preview.website}</span>]]} /> : <p>This check didn&rsquo;t include a website. You can add one next.</p>}
-        {error && name.trim() ? <p role="alert" className={dialogStyles.error}>{error}</p> : null}
+        <p className={dialogStyles.fact}>
+          {editingName || !preview?.suggestedName ? <label htmlFor="start-business-name" className={dialogStyles.factLabel}>Business name</label> : <span className={dialogStyles.factLabel}>Business name</span>}
+          {editingName || !preview?.suggestedName
+            ? <span className={dialogStyles.inlineName}><input ref={nameRef} id="start-business-name" value={name} maxLength={120} required disabled={busy} autoComplete="organization" aria-invalid={error && !name.trim() ? true : undefined} onChange={event => { setName(event.target.value); setError(""); }} />{preview?.suggestedName ? <XaTextLink onClick={() => { setEditingName(false); if (!name.trim()) setName(preview.suggestedName || ""); }}>Done</XaTextLink> : null}</span>
+            : <span className={dialogStyles.inlineName}><span className={dialogStyles.factValue}>{name}</span><XaTextLink onClick={() => setEditingName(true)} aria-label="Change the business name">Change</XaTextLink></span>}
+        </p>
+        {preview?.website ? <p className={dialogStyles.fact}><span className={dialogStyles.factLabel}>Website</span><span className={`${dialogStyles.factValue} ${dialogStyles.breakAll}`}>{preview.website}</span></p> : <p>This check didn&rsquo;t include a website. You can add one next.</p>}
+        {error ? <p role="alert" className={dialogStyles.error}>{error}</p> : null}
         {saveHereError ? <p role="alert" className={dialogStyles.error}>{saveHereError}</p> : null}
         <WorkspaceDialogActions>
           <XaButton variant="quiet" busy={savingHere} disabled={starting} onClick={onSaveHere}>Save to {workspaceName} instead</XaButton>
-          <XaButton variant="primary" type="submit" busy={starting} disabled={savingHere}>Start my business</XaButton>
+          <XaButton ref={startRef} variant="primary" type="submit" busy={starting} disabled={savingHere}>Start my business</XaButton>
         </WorkspaceDialogActions>
       </form>}
   </WorkspaceDialog>;

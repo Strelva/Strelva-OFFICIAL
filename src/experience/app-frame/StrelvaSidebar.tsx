@@ -85,6 +85,8 @@ interface Props {
   agency?: StrelvaAgencyLink;
   /** XA: which business details place is open (billing and export set it). */
   detailsPlace?: StrelvaDetailsPlace;
+  /** XS: no workspace has loaded; the sidebar shows the mark and the account only. */
+  unopened?: boolean;
 }
 
 function navigateInPlace(event: MouseEvent<HTMLAnchorElement>, action: (() => void) | undefined) {

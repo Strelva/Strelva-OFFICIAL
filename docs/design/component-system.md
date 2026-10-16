@@ -2606,27 +2606,49 @@ and `./global-error`.
   `XaPageBroke` (root and marketing error boundaries), `XaNotOpenYet`
   (release off for `/workspace` and getting started), `XaWorkspaceOpening`
   (loading), `XaWorkspaceUnopened` (sign-in, 403, 404, failed read) and
-  `XaSharedReadOnlyEmpty`. Built on the entry frame or `XaEmpty`; Pebble is in
-  frame for bad news. [GlobalErrorDocument](../../src/experience/states/GlobalErrorDocument.tsx)
+  `XaSharedReadOnlyEmpty`. Entry pages use the entry column with no felt slab:
+  Pebble stands on the page ground below the words doing the page's job
+  (not found: looking at the empty address; broke: fixing; not open: resting
+  with bookings). In-shell states are left-aligned with Pebble's one line at
+  the foot (R1), never a disc or a centered stack. [GlobalErrorDocument](../../src/experience/states/GlobalErrorDocument.tsx)
   is the literal-styled root crash page.
 - `src/components/ui/strelva/xa/entry.tsx` is byte-identical to the
   `xa/lane-xs-entry` copy (XaEntryFrame). Imported by path, not through
   `Xa.tsx`, so the two lanes merge without a conflict.
 - [WorkspaceAccountView](../../src/experience/workspace/WorkspaceAccountView.tsx):
-  the entry column with R1's label and fact rows; places are open rows; status
-  only for an unconfirmed email or read-only access; sign-out defaults in.
+  inside the R1 details shell (`StrelvaShell active="account"`: Back to the
+  business, its details, the account current in the foot). The person's name
+  is the dominant headline; places are open rows that each say "Open", the
+  home business first and larger; neutral outlined initials; roles in
+  GLOSSARY words (`workspaceRole`: Your business, Client, Client · Read-only
+  access, Your agency, Just you); older sites by domain under "Your other
+  websites"; Pebble's line at the foot.
+- `StrelvaShell unopened` / `XaSidebar unopened`: no workspace has loaded
+  (route loading, opening, could not open). The rail shows the mark and the
+  account only, never a business's places.
 - [WorkspaceSearchDialog](../../src/experience/workspace/WorkspaceSearchDialog.tsx):
-  XA motion 4; "Open ↵" on the selected row; Pebble says when nothing matches;
-  a top sheet on a phone.
+  XA motion 4; each result wears its clay (`WorkspaceSearchItem.kind`) and
+  says its kind in plain words; status only for "Waits for you"
+  (`waits`); "Open ↵" on the selected row and no key legend; no count when
+  nothing matches; a top sheet on a phone.
 - [WorkspaceBusinessSwitcher](../../src/experience/workspace/WorkspaceBusinessSwitcher.tsx):
   white popover, sentence-case groups, a check on the current scope, arrow keys,
-  "Read-only" as the only access word.
+  "Read-only" as the only access word; each business's initial in its own tone
+  (`client-tone.ts`, also on the agency sidebar's clients).
 - [WorkspaceDialog](../../src/experience/workspace/WorkspaceDialog.tsx): the
-  LX confirm sheet, with `WorkspaceDialogTitle` and `WorkspaceDialogActions`, a
-  close button, and a bottom sheet on a phone. One ink pill per sheet.
+  LX confirm sheet at the 16 confirm radius, with `WorkspaceDialogTitle` and
+  `WorkspaceDialogActions`, a close button, and a bottom sheet on a phone. One
+  ink pill per sheet; a sheet holds only the yes (start-from-check edits the
+  name in place with "Change").
 - [WorkspaceHelp](../../src/experience/workspace/WorkspaceHelpForm.tsx): the
-  request is a composer card with "Goes to" and one ink pill, "Send to
-  <agency>"; requests are open rows.
+  request is a flat composer (1px line, 14 radius) with "Goes to" (the only
+  agency is preselected) and one ink pill, "Send to <agency>", shown as a
+  quiet outline until there is text; one sentence under it; requests are open
+  rows showing who and when, with a clay dot only when the agency declined.
+  [BringInAgency](../../src/experience/workspace/BringInAgency.tsx) is in XA:
+  access as a sentence (`agencyAccessSentence`), one "Change access" per row,
+  End access inside that change.
 - Emails: `teamInvitationPaperEmail` (now used by invitation delivery, still
-  gated off), owner invitation and export ready. Paper emails use the ink pill
-  and no monospace.
+  gated off), owner invitation and export ready. Paper emails use the ink pill,
+  no monospace, and link DM Sans for clients that load web fonts (Gmail and
+  Outlook for Windows use the fallback stack).

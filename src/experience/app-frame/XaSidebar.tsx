@@ -76,9 +76,12 @@ export interface XaSidebarProps {
   agency?: StrelvaAgencyLink;
   /** XA: which details place is open; set by pages outside the workspace view (billing, export). */
   detailsPlace?: StrelvaDetailsPlace;
+  /** XS: no workspace has loaded (opening, or it could not open). Show the mark and the account only, never a business's places. */
+  unopened?: boolean;
 }
 
-const DETAILS_SECTIONS: ReadonlySet<StrelvaSection | undefined> = new Set(["settings", "access", "connections", "help"]);
+// "account" (XS): the personal account page sits in the details sidebar like R1, with Back to the workspace.
+const DETAILS_SECTIONS: ReadonlySet<StrelvaSection | undefined> = new Set(["settings", "access", "connections", "help", "account"]);
 
 function inPlace(event: MouseEvent<HTMLAnchorElement>, action: (() => void) | undefined) {
   if (!action || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) return;
@@ -94,7 +97,7 @@ function Item({ href, icon: Icon, label, current, count, onOpen, onClose }: { hr
 }
 
 export function XaSidebar(props: XaSidebarProps) {
-  const { agencyNavigation, connectionsAvailable = false, ownerBrand, workspaceName, active, appBase = "", workspaceId, accountName, accountDetail, businessContext, contextualNavigation, pinned = [], mobileOpen = false, onCloseMobile, onNavigate, onSearch, onStart, startDisabled = false, signedIn = true, signInHref, signOut, standalone = false, systemsReleased = false, needsYou, allClients, agency, detailsPlace } = props;
+  const { agencyNavigation, connectionsAvailable = false, ownerBrand, workspaceName, active, appBase = "", workspaceId, accountName, accountDetail, businessContext, contextualNavigation, pinned = [], mobileOpen = false, onCloseMobile, onNavigate, onSearch, onStart, startDisabled = false, signedIn = true, signInHref, signOut, standalone = false, systemsReleased = false, needsYou, allClients, agency, detailsPlace, unopened = false } = props;
   const contextName = plainWorkspaceName(businessContext);
   const name = workspaceName || contextName || (agencyNavigation && ownerBrand?.agencyId ? ownerBrand.name : "Workspace");
   const href = (section: StrelvaSection) => workspaceSectionHref(section, appBase, workspaceId);
@@ -119,7 +122,9 @@ export function XaSidebar(props: XaSidebarProps) {
   // In its own workspace (owner or agency) home swaps in place; inside a client it is a link to the agency.
   const homeInPlace = onNavigate && !agencyNavigation?.agencyWorkspaceId ? () => { close(); onNavigate("home"); } : undefined;
 
-  const header = details
+  const header = unopened
+    ? <span className={styles.brand}><XaMark size={22} /><span className={styles.brandName}>Strelva</span></span>
+    : details
     ? <Link className={styles.back} href={agencyNavigation ? agencyHref("home") : href("home")} onClick={event => { inPlace(event, homeInPlace); if (!homeInPlace) close(); }}><ArrowLeft size={16} aria-hidden="true" /><span>{name}</span></Link>
     : showSwitcher ? <div className={styles.switcher}>{businessContext}</div>
       : <Link href={agencyNavigation ? agencyHref("home") : href("home")} className={styles.brand} aria-label={`${name} home`} onClick={event => inPlace(event, homeInPlace)}>
@@ -214,7 +219,7 @@ export function XaSidebar(props: XaSidebarProps) {
     </div>
     {brandCredit}
     <div className={styles.body}>
-      {details ? detailsNav : <>
+      {unopened ? null : details ? detailsNav : <>
         {utilities}
         {agencyNavigation ? agencyMain : ownerMain}
         {agencyNavigation ? clients : businessList}
@@ -228,7 +233,7 @@ export function XaSidebar(props: XaSidebarProps) {
           <XaInitial name={accountName} shape="round" size={28} />
           <span className={styles.accountText}><strong>{accountName}</strong>{accountDetail ? <small>{accountDetail}</small> : null}</span>
         </Link>
-        {details ? null : <Link className={styles.footerIcon} href={detailsHref} aria-label={agencyNavigation ? XA_PLACE_LABELS.agencyDetails : XA_PLACE_LABELS.details} title={agencyNavigation ? XA_PLACE_LABELS.agencyDetails : XA_PLACE_LABELS.details} onClick={event => { inPlace(event, !agencyNavigation && onNavigate ? () => { close(); onNavigate("settings"); } : agencyGo("team") ? () => { close(); agencyNavigation?.onNavigate?.("team"); } : undefined); }}>{agencyNavigation ? <Users size={17} strokeWidth={1.7} aria-hidden="true" /> : <Building2 size={17} strokeWidth={1.7} aria-hidden="true" />}</Link>}
+        {details || unopened ? null : <Link className={styles.footerIcon} href={detailsHref} aria-label={agencyNavigation ? XA_PLACE_LABELS.agencyDetails : XA_PLACE_LABELS.details} title={agencyNavigation ? XA_PLACE_LABELS.agencyDetails : XA_PLACE_LABELS.details} onClick={event => { inPlace(event, !agencyNavigation && onNavigate ? () => { close(); onNavigate("settings"); } : agencyGo("team") ? () => { close(); agencyNavigation?.onNavigate?.("team"); } : undefined); }}>{agencyNavigation ? <Users size={17} strokeWidth={1.7} aria-hidden="true" /> : <Building2 size={17} strokeWidth={1.7} aria-hidden="true" />}</Link>}
         <span className={styles.signOut}>{signOut === undefined ? <WorkspaceSignOutButton className={styles.signOutButton} /> : signOut}</span>
       </> : <Link className={styles.account} href={signInHref || `${appBase}/sign-in?next=%2Fworkspace`}><UserRound size={18} aria-hidden="true" /><span className={styles.accountText}><strong>Sign in</strong></span></Link>}
     </div>

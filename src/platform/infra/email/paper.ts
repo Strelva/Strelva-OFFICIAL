@@ -81,8 +81,15 @@ export function renderPaperEmailBody(email: PaperEmail): string {
     </td></tr><tr><td valign="bottom" style="padding:32px 20px 24px;"><p style="margin:0;font-size:12px;line-height:18px;color:${t.faint};">${e(paperFooter(email))}</p></td></tr>`, `max-width:560px;width:100%;height:760px;background:${bg};font-family:${t.font};color:${t.text};`, "560")}</td></tr>`, `background:${bg};`);
 }
 
+/**
+ * DM Sans for clients that load web fonts (Apple Mail, iOS Mail, Outlook for
+ * Mac). Gmail and Outlook for Windows drop it and use the documented fallback
+ * stack in paper-tokens (-apple-system, Segoe UI, Arial). No monospace either way.
+ */
+const PAPER_FONT_LINK = '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600&display=swap">';
+
 export function renderPaperEmailHtml(email: PaperEmail): string {
-  return `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light"><title>${e(email.subject)}</title></head><body style="margin:0;padding:0;background:${email.white ? t.surface : t.canvas};">${email.preheader ? `<div style="display:none;max-height:0;overflow:hidden;">${e(email.preheader)}</div>` : ""}${renderPaperEmailBody(email)}</body></html>`;
+  return `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light">${PAPER_FONT_LINK}<title>${e(email.subject)}</title></head><body style="margin:0;padding:0;background:${email.white ? t.surface : t.canvas};">${email.preheader ? `<div style="display:none;max-height:0;overflow:hidden;">${e(email.preheader)}</div>` : ""}${renderPaperEmailBody(email)}</body></html>`;
 }
 
 export function renderPaperEmailText(email: PaperEmail): string {

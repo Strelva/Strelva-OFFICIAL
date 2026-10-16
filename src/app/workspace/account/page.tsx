@@ -10,6 +10,10 @@ import { openPublicContinuation, PUBLIC_CONTINUATION_COOKIE } from "@/lib/public
 import { readPublicContinuationImport } from "@/platform/public-continuations/repository";
 import { XaButtonLink, XaHeadline, XaLabel, XaSays } from "@/components/ui/strelva/Xa";
 import { AccountPayerInbox } from "@/experience/workspace/AccountPayerInbox";
+import type { AccountSite } from "@/experience/workspace/WorkspaceAccountView";
+import { getCurrentUserTenants } from "@/platform/infra/auth";
+import { getTenantConfig, isActiveTenant } from "@/lib/tenants";
+import { getTenantDashboardFallbackUrl, getTenantPrimaryDomain } from "@/lib/tenant-urls";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
@@ -37,6 +41,23 @@ function identityName(user: UserIdentity): string | null {
   return null;
 }
 
+
+/**
+ * The person's websites from before workspaces, named by domain. The same
+ * memberships /account?managed=1 reads; a failed read returns undefined so
+ * the page falls back to that chooser instead of claiming there are none.
+ */
+async function readAccountSites(): Promise<AccountSite[] | undefined> {
+  try {
+    const tenants = await getCurrentUserTenants();
+    const configs = await Promise.all(tenants.map(id => getTenantConfig(id)));
+    return configs.flatMap(config => config && isActiveTenant(config)
+      ? [{ id: config.id, domain: getTenantPrimaryDomain(config) || config.siteName || "Your website", href: getTenantDashboardFallbackUrl(config) }]
+      : []);
+  } catch {
+    return undefined;
+  }
+}
 
 export default async function WorkspaceAccountPage({
   searchParams,
@@ -95,7 +116,10 @@ export default async function WorkspaceAccountPage({
     : continuing ? <section aria-label={emailConfirmed ? "Public session unavailable" : "Confirm your email to continue"}><XaLabel as="h2">{emailConfirmed ? "Public session unavailable" : "Confirm your email to continue"}</XaLabel><XaSays>{emailConfirmed ? "This session is missing, no longer open to this account, or couldn’t be restored. Go back to it, or use the brief you downloaded. No workspace changed." : "The brief you started stays hidden until this email is confirmed. No workspace changed."}</XaSays></section>
     : undefined;
 
+  const sites = emailConfirmed ? await readAccountSites() : [];
+
   return <WorkspaceAccountView
+    sites={sites}
     name={name}
     email={normalizedEmail}
     emailConfirmed={emailConfirmed}

@@ -36,20 +36,35 @@ describe("XS · in-between pages", () => {
     expectNoSlop(markup);
   });
 
-  it("release off says what still works and uses Getting started, not onboarding", () => {
+  it("release off: one headline, one quiet line, one action, and no builder words", () => {
     const workspace = text(html(<XaNotOpenYet />));
     const start = text(html(<XaNotOpenYet place="getting-started" />));
-    expect(workspace).toContain("Existing client services are unchanged.");
-    expect(start).toContain("Getting started opens with them");
-    expect(start.toLowerCase()).not.toContain("onboarding");
+    expect(workspace).toContain("Workspaces open soon. Your site and bookings keep running.");
+    expect(start).toContain("Getting started opens soon. Your site and bookings keep running.");
+    for (const words of [workspace, start]) {
+      expect(words.toLowerCase()).not.toMatch(/onboarding|release check|services are unchanged/);
+    }
+    expect((html(<XaNotOpenYet />).match(/<h1/g) ?? []).length).toBe(1);
     expectNoSlop(html(<XaNotOpenYet />));
+  });
+
+  it("not found puts Pebble beside an empty address, with no felt slab or caption block", () => {
+    const markup = html(<XaNotFound />);
+    expect(markup).toContain("pose-alone");
+    expect(markup).not.toContain("pose-website");
+    expect(markup).not.toContain("What this means");
+    expect(text(markup)).not.toContain("Looking for a business");
   });
 
   it("the workspace that could not open offers the right single next step for each reason", () => {
     const props = { signInHref: "/sign-in", accountHref: "/workspace/account", onRetry: () => undefined };
     expect(text(html(<XaWorkspaceUnopened reason="sign-in" {...props} />))).toContain("Sign in to open your workspace.");
     expect(text(html(<XaWorkspaceUnopened reason="forbidden" {...props} />))).toContain("Choose another workspace");
-    expect(text(html(<XaWorkspaceUnopened reason="failed" message="The read timed out." {...props} />))).toContain("The read timed out.");
+    const failed = text(html(<XaWorkspaceUnopened reason="failed" message="The read timed out." {...props} />));
+    // XS: Strelva names itself as the one that couldn't reach it; the system's own words stay out.
+    expect(failed).toContain("Strelva couldn’t reach your workspace. Nothing in it changed.");
+    expect(failed).not.toContain("The read timed out.");
+    expect(text(html(<XaWorkspaceUnopened reason="forbidden" message="This link was sent to frontdesk@harbordental.com." {...props} />))).toContain("frontdesk@harbordental.com");
     for (const reason of ["sign-in", "forbidden", "gone", "failed"] as const) expectNoSlop(html(<XaWorkspaceUnopened reason={reason} {...props} />));
     expectNoSlop(html(<XaSharedReadOnlyEmpty business="Harbor Dental" />));
     expect(text(html(<XaWorkspaceOpening />))).toContain("Opening your workspace");
@@ -76,6 +91,28 @@ describe("XS · account", () => {
     expectNoSlop(markup);
   });
 
+  it("an agency person sees clients as Client, never Your business", () => {
+    const words = text(html(<WorkspaceAccountView signOut={null} sites={[]} name="Maya Okafor" email="maya@northstudio.co" emailConfirmed releaseOpen workspaces={[
+      { id: "a", kind: "agency", name: "North Studio", access: "member" },
+      { id: "b", kind: "customer", name: "Harbor Dental", access: "provider_seat" },
+      { id: "c", kind: "customer", name: "Lakeview Mediation", access: "delegated_read" },
+    ]} />));
+    expect(words).toContain("Harbor Dental Client Open");
+    expect(words).toContain("Client · Read-only access");
+    expect(words).not.toContain("Your business");
+  });
+
+  it("names older websites by domain and says what each row opens", () => {
+    const markup = html(<WorkspaceAccountView signOut={null} sites={[{ id: "t", domain: "harbordental.com", href: "https://admin.harbordental.com/dashboard" }]} name="Dr. Amy Lin" email="amy@harbordental.com" emailConfirmed releaseOpen workspaces={[{ id: "h", kind: "customer", name: "Harbor Dental", access: "member" }]} />);
+    const words = text(markup);
+    expect(words).toContain("Your other websites");
+    expect(words).toContain("harbordental.com");
+    expect(words).not.toMatch(/Managed websites|from before workspaces/);
+    expect(markup).toContain('href="https://admin.harbordental.com/dashboard"');
+    expect((words.match(/Open/g) ?? []).length).toBeGreaterThanOrEqual(2);
+    expect(words).toContain("Your account is yours.");
+  });
+
   it("an unconfirmed email waits in clay and hides places", () => {
     const words = text(html(<WorkspaceAccountView signOut={null} name={null} email="amy@harbordental.com" emailConfirmed={false} releaseOpen workspaces={[{ id: "x", kind: "customer", name: "Harbor Dental", access: "member" }]} />));
     expect(words).toContain("Confirmation needed");
@@ -100,5 +137,26 @@ describe("XS · emails (templates only)", () => {
     const exported = exportReadyPaperEmail({ ...identity, business: "Harbor Dental", filename: "harbor-dental.zip", fileDetail: "18 MB", included: "Website", omitted: "Card details", download: accept, linkNote: "Works for 7 days.", requestedBy: "Dr. Amy Lin asked for this." });
     for (const email of [owner, exported]) expectNoSlop(renderPaperEmailHtml(email));
     expect(owner.preheader).toBeTruthy();
+  });
+});
+
+describe("XS · search", () => {
+  it("shows a result's kind and clay, status only when it waits, and no key legend", async () => {
+    const { WorkspaceSearchDialog } = await import("@/experience/workspace/WorkspaceSearchDialog");
+    const markup = html(<WorkspaceSearchDialog open={false} scopeName="Harbor Dental" onClose={() => undefined} items={[
+      { id: "1", title: "harbordental.com", detail: "Website", kind: "website", href: "/a" },
+      { id: "2", title: "Close for Thanksgiving", detail: "Request", kind: "documents", waits: true, href: "/b" },
+    ]} />);
+    expect(markup).toContain("system-website");
+    expect((text(markup).match(/Waits for you/g) ?? []).length).toBe(1);
+    expect(text(markup)).not.toMatch(/Choose|Esc/);
+    expect(text(markup)).not.toMatch(/\bLive\b|\bDraft\b/);
+  });
+
+  it("drops the result count when nothing matches", async () => {
+    const { WorkspaceSearchDialog } = await import("@/experience/workspace/WorkspaceSearchDialog");
+    const markup = html(<WorkspaceSearchDialog open={false} scopeName="Harbor Dental" onClose={() => undefined} items={[]} />);
+    expect(text(markup)).not.toContain("0 results");
+    expect(text(markup)).toContain("Nothing saved yet.");
   });
 });

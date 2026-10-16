@@ -491,7 +491,7 @@ function WorkspaceContent({ appBase, signOut, inquiry: inquiryConfig, rebuildEna
   if (!snapshot) {
     return (
       <WorkspaceFrame>
-        <StrelvaShell signedIn={Boolean(accessFailure)} signInHref={signInHref} title="Your Strelva">
+        <StrelvaShell unopened signedIn={Boolean(accessFailure)} signInHref={signInHref} signOut={accessFailure ? undefined : null} title="Your Strelva">
           <XaWorkspaceUnopened reason={signInRequired ? "sign-in" : accessFailure === 403 ? "forbidden" : accessFailure === 404 ? "gone" : "failed"} message={notice?.message} signInHref={signInHref} accountHref={`${appBase}/workspace/account`} onRetry={() => void loadWorkspace()} />
         </StrelvaShell>
       </WorkspaceFrame>
@@ -701,7 +701,7 @@ function WorkspaceLoading({ label }: { label: string }) {
   return (
     <WorkspaceFrame>
       <div inert className="contents">
-        <StrelvaShell signedIn={false} title="Your Strelva">
+        <StrelvaShell unopened signOut={null} title="Your Strelva">
           <XaWorkspaceOpening label={label} />
         </StrelvaShell>
       </div>
