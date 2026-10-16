@@ -129,7 +129,7 @@ export default function BusinessPayment({
   // The business's own look: read on the server, or carried on the payment read.
   const carried = visitorBrandFromAccent(request?.brand?.accentColor ?? null);
   const carriedLogo = request?.brand?.logoUrl ?? null;
-  const worn = brand ?? (carried && carriedLogo ? { ...carried, logo: { url: carriedLogo, alt: businessName } } : carried);
+  const worn = brand ?? (carried && carriedLogo ? { ...carried, logo: { url: carriedLogo, alt: businessName ?? "" } } : carried);
   return (
     <VisitorBookingShell siteName={businessName} wide brand={worn}>
       <div className={styles.split}>

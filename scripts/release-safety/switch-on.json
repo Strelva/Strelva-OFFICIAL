@@ -1838,8 +1838,8 @@
     },
     {
       "name": "STRELVA_MONEY_RECONCILIATION",
-      "where": "src/app/workspace/money-reconciliation/page.tsx:28",
-      "controls": "Money reconciliation page",
+      "where": "src/app/admin/money/reconciliation/page.tsx:21",
+      "controls": "Money reconciliation (operator console)",
       "prod": "unknown (not recorded in vault)",
       "class": "STAYS_OFF",
       "heldMigrations": [],

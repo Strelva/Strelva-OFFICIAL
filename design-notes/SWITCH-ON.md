@@ -220,7 +220,7 @@ means nothing was recorded and step 0 must read it.
 | `STRELVA_INTERNAL_TOOL_NOTICES_RELEASE` | `src/platform/release-flags/resolve.ts:100` | Internal tool submit notices (email) | unknown (not recorded in vault) | none | none | Not claim or Needs you. |
 | `STRELVA_LISTINGS_SYNC_GOOGLE_FIX` | `src/platform/app-releases/catalog.ts:133` | Listings in sync applies fixes to Google | off | 20261028100200, 20261028100300 | none | GBP writes have no approval. |
 | `STRELVA_LISTINGS_SYNC_YELP` | `src/products/listings-sync/release.ts:22` | Listings in sync reads Yelp | off | none | none | Provider key / terms not in hand. |
-| `STRELVA_MONEY_RECONCILIATION` | `src/app/workspace/money-reconciliation/page.tsx:28` | Money reconciliation page | unknown (not recorded in vault) | none | none | Money. |
+| `STRELVA_MONEY_RECONCILIATION` | `src/app/admin/money/reconciliation/page.tsx:21` | Money reconciliation (operator console) | unknown (not recorded in vault) | none | none | Money. |
 | `STRELVA_NEWSLETTER_CONTACTS_RELEASE` | `src/platform/release-flags/resolve.ts:102` | Newsletter contacts in the business record | unknown (not recorded in vault) | none | none | Only useful with newsletter sending, which stays off. |
 | `STRELVA_NEWSLETTER_SENDER_RELEASE` | `src/products/publishing/newsletter-sender.ts:43` | Receipted newsletter batch sender | off | none | none | Marketing email stays off. |
 | `STRELVA_PLANNING_ENABLED` | `src/products/work-plans/generation.ts:52` | Work plan generation | off (capabilities doc) | none | none | Spends AI money on Strelva's account; money call. |
