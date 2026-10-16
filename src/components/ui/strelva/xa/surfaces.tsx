@@ -129,7 +129,8 @@ export function XaSheet({ open, onClose, title, children, actions, art }: { open
   useEffect(() => {
     const node = dialog.current;
     if (!node) return;
-    if (open && !node.open) { opener.current = document.activeElement; node.showModal(); }
+    // A sheet that confirms something destructive marks its safe choice with data-sheet-focus, so focus never lands on the destructive pill.
+    if (open && !node.open) { opener.current = document.activeElement; node.showModal(); node.querySelector<HTMLElement>("[data-sheet-focus]")?.focus(); }
     if (!open && node.open) { node.close(); if (opener.current instanceof HTMLElement) opener.current.focus(); }
   }, [open]);
   return <dialog ref={dialog} className={styles.sheet} aria-labelledby={titleId} onCancel={event => { event.preventDefault(); onClose(); }} onClick={event => { if (event.target === event.currentTarget) onClose(); }}>

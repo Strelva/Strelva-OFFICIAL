@@ -1,4 +1,4 @@
-import { StHead, StPage, StSkeleton } from "@/components/ui/strelva/Kit";
+import { RecordLoading } from "@/experience/record/RecordStates";
 export default function BusinessDetailsLoading() {
-  return <main data-workspace-theme="linen"><StPage><StHead title="The business record" /><StSkeleton label="Loading business facts" /><StSkeleton width="70%" /></StPage></main>;
+  return <main data-workspace-theme="linen"><RecordLoading title="Said once, here." label="Loading your business record" /></main>;
 }

@@ -109,16 +109,28 @@ describe("Business details", () => {
 
   it("is a form the owner can save, with a section for every old settings anchor", () => {
     const page = html(createElement(WorkspaceBusinessDetails, { workspaceId: WS, action, state: { kind: "ready", data: { record: record("owner"), operator: false, sites: [site], denied: [] } } }));
-    expect(page).toContain("Save details");
-    expect(page).toContain('value="2"');
+    expect(page).toContain('aria-label="Change business name: Lakeshore"');
+    expect(page).toContain("Said once, here.");
     for (const anchor of ["business", "notifications", "ownership", "plan", "domains", "branding", "site-config", "dependencies", "shortcuts", "account", "people"]) expect(page, anchor).toContain(`id="${anchor}"`);
     expect(page).toContain("view=access");
+  });
+
+  it("offers Undo only for a save that changed nothing on Google, and never claims readers it can't show", () => {
+    const ready = { kind: "ready" as const, data: { record: record("owner"), operator: false, sites: [], denied: [] } };
+    const undoable = html(createElement(WorkspaceBusinessDetails, { workspaceId: WS, action, undoAction: action, result: "saved", savedSequence: 7, state: ready }));
+    expect(undoable).toContain('form="record-undo"');
+    expect(undoable).toContain('name="sequence" value="7"');
+    expect(undoable).not.toContain("Read by");
+    expect(undoable).not.toContain("Every System reads it");
+    const google = html(createElement(WorkspaceBusinessDetails, { workspaceId: WS, action, undoAction: action, result: "saved", savedSequence: 7, googleResult: "confirmed", state: { kind: "ready", data: { ...ready.data, publishing: true } } }));
+    expect(google).not.toContain('form="record-undo"');
+    expect(google).toContain("Change it back here to undo");
   });
 
   it("is read-only for a member and says why, and shows the save outcome", () => {
     const page = html(createElement(WorkspaceBusinessDetails, { workspaceId: WS, action, result: "conflict", state: { kind: "ready", data: { record: record("member"), operator: false, sites: [], denied: [] } } }));
     expect(page).not.toContain("Save details");
-    expect(page).toContain("Only the owner can change these details.");
+    expect(page).toContain("Only the owner changes these details.");
     expect(page).toContain("Nothing was saved");
     const invalid = html(createElement(WorkspaceBusinessDetails, { workspaceId: WS, action, result: "invalid", field: "phone", state: { kind: "ready", data: { record: record("owner"), operator: false, sites: [], denied: [] } } }));
     expect(invalid).toContain("7 to 15 digits");

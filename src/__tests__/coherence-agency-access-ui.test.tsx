@@ -38,16 +38,20 @@ it("resolves an agency independently of owner memberships and targets the exact 
   const postAction: AccessActionPoster = async (action, fallback) => { posted(action, fallback); throw new Error("Fictional write refused"); };
   const node = await render(async () => Response.json(review), postAction);
   expect(node.textContent).toContain("North Studio");
-  expect(node.textContent).toContain(`Read-only access to shared work ${workId}`);
-  await act(async () => [...node.querySelectorAll("button")].find(button => button.textContent === "Revoke North Studio access")!.click());
+  expect(node.textContent).toContain("Sees one piece of work. Read only.");
+  await act(async () => [...node.querySelectorAll("button")].find(button => button.textContent === "Stop sharing with North Studio")!.click());
   expect(posted).toHaveBeenCalledWith({ action: "revoke_delegation", delegationId }, expect.any(String));
+  // The refusal is said in place, by Strelva, and nothing claims success.
+  expect(node.querySelector('[role="alert"]')?.textContent).toContain("Fictional write refused");
 });
 it("rejects identity from a foreign scope and keeps the targeted revocation identifiable", async () => {
   const node = await render(async () => Response.json({ ...review, units: [{ ...review.units[0], workspaceId: agencyId }] }), async () => { throw new Error("unused"); });
-  expect(node.textContent).toContain("Agency name unavailable");
+  expect(node.textContent).toContain("An agency");
   expect(node.textContent).not.toContain("North Studio");
-  expect(node.textContent).toContain(agencyId);
-  expect([...node.querySelectorAll("button")].find(button => button.textContent?.includes(workId))?.disabled).toBe(false);
+  // No ids are shown to an owner; the row stays identifiable by what was shared.
+  expect(node.textContent).not.toContain(agencyId);
+  expect(node.textContent).toContain("I couldn't confirm this agency's name.");
+  expect([...node.querySelectorAll("button")].find(button => button.textContent?.startsWith("Stop sharing"))?.disabled).toBe(false);
 });
 it("refuses an acknowledgment receipt for another handoff", async () => {
   const node = document.createElement("div"); document.body.append(node);

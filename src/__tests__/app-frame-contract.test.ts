@@ -80,7 +80,9 @@ describe("shared app frame accessibility contract", () => {
     // October 15 (XA, the default): Today, Requests and Running; details sit behind the business details control.
     const xa = renderToStaticMarkup(createElement(StrelvaShell, { ...shellProps, systemsReleased: true }));
     for (const label of ['aria-label="Workspace utilities"', 'aria-label="Main"', ">Today<", ">Requests<", ">Running<", 'aria-label="Business details"', ">New request<", ">Search<", "All systems and files", "Sign out"]) expect(xa).toContain(label);
-    for (const href of ['href="/workspace?view=requests"', 'href="/workspace?view=ongoing"', 'href="/workspace?view=apps"', 'href="/workspace?view=settings"', 'href="/workspace/account"']) expect(xa).toContain(href);
+    for (const href of ['href="/workspace?view=requests"', 'href="/workspace?view=ongoing"', 'href="/workspace?view=apps"', 'href="/workspace/business-details"', 'href="/workspace/account"']) expect(xa).toContain(href);
+    // The XA business details control opens the rebuilt Business record route, not the old settings view.
+    expect(xa).not.toContain('href="/workspace?view=settings"');
     expect(xa).not.toContain(">Customers<");
 
     expect(html).toContain('aria-label="Workspace navigation"');

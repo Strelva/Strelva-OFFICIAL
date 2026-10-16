@@ -356,7 +356,7 @@ textarea.fieldControl { min-height: 96px; resize: vertical; field-sizing: conten
 @media (pointer: coarse) { .segment { min-height: 44px; } }
 
 /* ---------- Sheet (In · Confirm sheet) ---------- */
-.sheet { box-sizing: border-box; width: min(440px, calc(100vw - 32px)); max-height: calc(100dvh - 48px); margin: auto; padding: 0; border: 1px solid #16171510; border-radius: 28px; background: var(--st-surface); color: var(--st-text); box-shadow: 0 30px 80px #16171529; overflow: auto; }
+.sheet { box-sizing: border-box; width: min(440px, calc(100vw - 32px)); max-height: calc(100dvh - 48px); margin: auto; padding: 0; border: 1px solid var(--st-line); border-radius: var(--st-r-lg, 20px); background: var(--st-surface); color: var(--st-text); box-shadow: var(--st-shadow-lg); overflow: auto; }
 .sheet[open] { animation: var(--kf-xa-palette) var(--motion-fast) var(--ease-settle) both; }
 .sheet::backdrop { background: color-mix(in srgb, #161715 28%, transparent); }
 .sheetBody { display: flex; flex-direction: column; gap: 22px; padding: 30px 28px 26px; }
@@ -364,7 +364,7 @@ textarea.fieldControl { min-height: 96px; resize: vertical; field-sizing: conten
 .sheetActions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .sheetActions > :first-child { flex: 1; }
 @media (max-width: 767px) {
-  .sheet { width: 100vw; max-width: 100vw; margin: auto 0 0; border-radius: 28px 28px 0 0; }
+  .sheet { width: 100vw; max-width: 100vw; margin: auto 0 0; border-radius: var(--st-r-lg, 20px) var(--st-r-lg, 20px) 0 0; }
   .sheetBody { padding: 26px 20px calc(20px + env(safe-area-inset-bottom, 0px)); }
 }
 

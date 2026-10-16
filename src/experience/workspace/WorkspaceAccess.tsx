@@ -12,9 +12,8 @@ import {
   UserRound,
 } from "lucide-react";
 import { useEffect, useId, useLayoutEffect, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
-import { StPage, StHead, StSection, StRows, StRow, StState, StTextButton, StPillLink, StEmpty } from "@/components/ui/strelva/Kit";
 import { useWorkspaceRequest } from "./WorkspaceRequest";
-import { accessReviewSchema } from "@/platform/access-review/contracts";
+import { PeopleAndAccess } from "@/experience/record/PeopleAndAccess";
 import { Button } from "@/components/ui/Button";
 import { TextInput } from "@/components/ui/TextInput";
 import { AiVisibilityAssessmentResult } from "@/products/ai-visibility";
@@ -171,41 +170,10 @@ function AgencyHandoff({ snapshot, currentRole, selectedWork, postAction, isActi
   );
 }
 
-function CustomerAccess({ snapshot, currentRole, postAction, isActive, onChanged, setNotice }: { snapshot: WorkspaceSnapshot; currentRole?: WorkspaceRole; postAction: AccessActionPoster; isActive: () => boolean; onChanged: () => void; setNotice: (notice: AccessNotice) => void }) {
-  const [submitting, setSubmitting] = useState(false);
+function CustomerAccess({ snapshot, currentRole, postAction, onChanged }: { snapshot: WorkspaceSnapshot; currentRole?: WorkspaceRole; postAction: AccessActionPoster; isActive: () => boolean; onChanged: () => void; setNotice: (notice: AccessNotice) => void }) {
+  // XA · R3–R5. Outcomes are said in place by Pebble, not as a banner notice.
   const request = useWorkspaceRequest();
-  const [agencyNames, setAgencyNames] = useState<Record<string, string>>({});
-  useEffect(() => {
-    const controller = new AbortController();
-    void request(`/api/workspace/access-review?${new URLSearchParams({ workspaceId: snapshot.workspaceId })}`, { credentials: "same-origin", signal: controller.signal })
-      .then(async response => {
-        if (!response.ok) throw new Error("Agency identity unavailable");
-        const review = accessReviewSchema.parse(await response.json());
-        if (review.workspaceId !== snapshot.workspaceId || review.organization || review.units.length !== 1 || review.units[0]?.workspaceId !== snapshot.workspaceId) throw new Error("Access belongs to another workspace");
-        if (!controller.signal.aborted) setAgencyNames(Object.fromEntries(review.units.filter(unit => unit.workspaceId === snapshot.workspaceId).flatMap(unit => unit.entries.filter(entry => entry.kind === "delegation").map(entry => [entry.id, entry.label]))));
-      }).catch(() => { if (!controller.signal.aborted) setAgencyNames({}); });
-    return () => controller.abort();
-  }, [request, snapshot.workspaceId, snapshot.actor.email]);
-
-
-  async function revoke(id: string) {
-    setSubmitting(true); setNotice(null);
-    try { await postAction<{ ok: true }>({ action: "revoke_delegation", delegationId: id }, "Agency access couldn’t be revoked."); if (!isActive()) return; setNotice({ kind: "success", message: "Agency access was revoked. Your work remains here." }); onChanged(); }
-    catch (cause) { if (isActive()) setNotice({ kind: "error", message: cause instanceof Error ? cause.message : "Agency access couldn’t be revoked." }); }
-    finally { if (isActive()) setSubmitting(false); }
-  }
-
-  const description = currentRole === "owner" ? `Who can see and change ${snapshot.workspaces.find(workspace => workspace.id === snapshot.workspaceId)?.name || "this business"}. You own this workspace.` : currentRole === "admin" ? "You manage access for this workspace." : "The workspace owner controls membership and may revoke access.";
-  return <StPage>
-    <StHead title="People & access" meta={description} actions={currentRole === "owner" ? <StPillLink href={`/workspace/invitations?workspaceId=${encodeURIComponent(snapshot.workspaceId)}`}>Invite someone</StPillLink> : undefined} />
-    <StSection title="Your access" action={<StTextButton tone="accent" href={`/workspace/access-review?workspaceId=${encodeURIComponent(snapshot.workspaceId)}`}>Review all People & access</StTextButton>}><StRows><StRow title={snapshot.actor.email} detail={currentRole ? `${currentRole} · you` : "Your confirmed account"} /></StRows></StSection>
-    <StSection title="Agency access" meta="Agencies can see the work but not change it.">
-      <p className="text-sm text-gray-muted">Removing one never deletes the work they handed to you.</p>
-      {snapshot.delegations.length ? <StRows>{snapshot.delegations.map(delegation => <StRow key={delegation.id} title={agencyNames[delegation.id] || "Agency name unavailable"} detail={<>Read-only access to {snapshot.work.find(work => work.id === delegation.workId)?.title || `shared work ${delegation.workId}`}.{!agencyNames[delegation.id] ? <><br />Agency reference: {delegation.agencyWorkspaceId}. <StTextButton href={`/workspace/access-review?workspaceId=${encodeURIComponent(snapshot.workspaceId)}`}>Verify this agency’s access</StTextButton></> : null}</>} end={<><StState kind={delegation.status === "active" ? "live" : "draft"}>{delegation.status === "active" ? "Read-only · active" : "Revoked"}</StState>{delegation.status === "active" && delegation.canRevoke ? <StTextButton tone="accent" disabled={submitting} onClick={() => void revoke(delegation.id)}>{agencyNames[delegation.id] ? `Revoke ${agencyNames[delegation.id]} access` : `Revoke access to ${snapshot.work.find(work => work.id === delegation.workId)?.title || delegation.workId}`}</StTextButton> : null}</>} />)}</StRows> : <StEmpty>No agency can access this workspace.</StEmpty>}
-    </StSection>
-    {currentRole === "owner" ? <StSection title="Your data"><div className="flex flex-wrap gap-6"><StTextButton tone="accent" href={`/workspace/invitations?workspaceId=${encodeURIComponent(snapshot.workspaceId)}`}>Manage invitations</StTextButton><StTextButton tone="accent" href={`/workspace/export?workspaceId=${encodeURIComponent(snapshot.workspaceId)}`}>Export all workspace data</StTextButton></div></StSection> : null}
-  </StPage>;
-
+  return <PeopleAndAccess snapshot={snapshot} currentRole={currentRole} request={request} postAction={postAction} onChanged={onChanged} />;
 }
 
 export interface AccessHandoffOverlayProps {

@@ -208,6 +208,8 @@ export interface WorkspaceReleases {
   agencyAddClient?: boolean;
   /** STRELVA_AGENCY_IMPORT_RELEASE on top of the add-client release: agency Home links to /workspace/agency/clients/import. */
   agencyImportClients?: boolean;
+  /** STRELVA_PROVIDER_CHANGE: the agency handoff page (/workspace/provider-change) is open. Absent: People & access says to ask Strelva instead. */
+  providerChange?: boolean;
   /** STRELVA_KEEP_YOUR_SITE_RELEASE may be on (env): agency Client websites view; per-client availability is rechecked server-side. */
   keepYourSite?: boolean;
 }
