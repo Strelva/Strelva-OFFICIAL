@@ -12,7 +12,7 @@ import type { WorkspaceActor, WorkspaceRole } from "@/platform/workspaces/types"
 import type { AskAuthoritySnapshot } from "./authority";
 import { authorizeAskTool } from "./authority";
 import { classifyAsk, containsAskCredentials, MANAGED_REQUEST_SUMMARY } from "./classify";
-import { ASK_REFUSALS, type AskedOnBehalf, type AskResultKind } from "./contracts";
+import { ASK_REFUSALS, type AskedOnBehalf, type AskQuestion, type AskResultKind } from "./contracts";
 import { AskAgencyRequiredError, type AskAgency, type AskPossibilityPort, type AskRequestPort, type NeedsYouPort } from "./ports";
 import { AskConversationNotFoundError, type AskHistoryPort } from "./history";
 import { WorkspaceAccessError, WorkspaceConflictError } from "@/platform/workspaces/types";
@@ -123,6 +123,8 @@ function systemPrompt(input: { businessName: string; target: AskResolution; agen
       : input.agency.kind === "several" ? "- This business has more than one agency. For work the tools can't do, the owner chooses which agency in Requests."
         : "- This business makes its own Systems. For work the tools can't do, say they can make it from Start or bring in an agency from Help. Never file a Request; there is no agency to receive it.",
     "- Say where an answer came from, using the tool's source line (for example \"From your site history\").",
+    "- When you need one fact before drafting and you found the likely answers (a form, the business record), call ask_question with those answers and ask in one sentence. Ask at most one question per turn.",
+    "- When you draft a website change, fill shows: a title that names the change, where it sits, the section as visitors read it, and facts (Adds, Lists, Notes, Assumed). Say every assumption.",
     "- When a tool refuses, say why in one sentence and the next step. Earlier results stand.",
     input.askedOnBehalf ? `- A Strelva operator is asking on the owner's behalf (by ${input.askedOnBehalf}). The owner still decides.` : "",
     "Older context below may name earlier tool names. Use these instead: read_section/read_site/show_content/show_photos/preview_site/list_entries/list_subscribers/get_suggestions → read_system; get_metrics/explain_traffic/show_report → read_performance; get_activity → read_history; show_connections → read_connections; get_reviews → read_reviews; update_section/patch_site/toggle_section_visibility/reorder_sections → draft_website_change; undo_last_change → undo_change; upload_image → add_image; save_entry → draft_entry; create_gbp_post → draft_gbp_post; upload_gbp_photo → add_gbp_photo; update_business_hours → draft_business_fact_change; reply_to_review → draft_review_reply; request_custom_change → create_request; create_suggestion → open_possibility.",
@@ -200,6 +202,7 @@ export async function startAskTurn(deps: AskTurnDeps, actor: WorkspaceActor, raw
       let resultKind: AskResultKind = "answer";
       let creationAction: { kind: "website" | "booking"; label: string; href: string } | null = null;
       let budgetRecovery: "plan" | "agency" | null = null;
+      let question: AskQuestion | null = null;
       const onReceipt = (item: AskReceiptItem) => {
         items.push(item);
         if (item.kind !== "refusal") resultKind = item.kind;
@@ -315,6 +318,7 @@ export async function startAskTurn(deps: AskTurnDeps, actor: WorkspaceActor, raw
           origin: deps.isOperator ? "operator" : "owner_interpreted", askedOnBehalf: request.askedOnBehalf ?? null,
           lastUserText, turnId: deps.newTurnId(), tenantTools: tenant?.tools ?? null, authority,
           workspaceDrafts: deps.workspaceDrafts, nativeSystems: deps.nativeSystems, needsYou: deps.needsYou, requests: deps.requests, possibilities: deps.possibilities, onReceipt,
+          onQuestion: (asked) => { question = asked; },
         });
         const system = systemPrompt({
           businessName: site?.name ?? "this business", target, agency,
@@ -347,16 +351,18 @@ export async function startAskTurn(deps: AskTurnDeps, actor: WorkspaceActor, raw
         }
       } finally {
         const contract = buildAgentResultContract(actions);
+        // A question stands only when the turn made nothing: a draft answers it.
+        const asked: AskQuestion | null = items.some(item => item.kind !== "refusal") ? null : question;
         if (deps.history && saved && conversationId) {
           try {
             await deps.history.append(actor, {
               workspaceId: request.workspaceId, conversationId, systemId: request.systemId ?? null, role: "assistant",
-              content: (replyText.trim() || NO_ANSWER).slice(0, 20_000), result: { kind: resultKind, items: items.slice(0, 20), systemId, ...(creationAction ? { creationAction } : {}), ...(budgetRecovery ? { budgetRecovery } : {}) },
+              content: (replyText.trim() || NO_ANSWER).slice(0, 20_000), result: { kind: resultKind, items: items.slice(0, 20), systemId, ...(creationAction ? { creationAction } : {}), ...(budgetRecovery ? { budgetRecovery } : {}), ...(asked ? { question: asked } : {}) },
             });
           } catch { saved = false; }
         }
         try {
-          emit(`\n__RESULT__${JSON.stringify({ ...contract, ask: { kind: resultKind, items, systemId, workspaceId: request.workspaceId, conversationId, saved, ...(creationAction ? { creationAction } : {}), ...(budgetRecovery ? { budgetRecovery } : {}) } })}\n`);
+          emit(`\n__RESULT__${JSON.stringify({ ...contract, ask: { kind: resultKind, items, systemId, workspaceId: request.workspaceId, conversationId, saved, ...(creationAction ? { creationAction } : {}), ...(budgetRecovery ? { budgetRecovery } : {}), ...(asked ? { question: asked } : {}) } })}\n`);
         } catch { /* client gone */ }
       }
     },

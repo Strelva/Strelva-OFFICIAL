@@ -140,8 +140,8 @@ describe("XA-1 kit additions", () => {
 });
 
 describe("XA-1 initials", () => {
-  it("skips honorifics", () => {
-    expect(xaInitialOf("Dr. Amy Lin")).toBe("A");
+  it("follows the one initials rule: a titled person goes by the surname", () => {
+    expect(xaInitialOf("Dr. Amy Lin")).toBe("L");
     expect(xaInitialOf("Dr Lin")).toBe("L");
     expect(xaInitialOf("Maya Okafor")).toBe("M");
     expect(xaInitialOf("  ")).toBe("·");

@@ -1,0 +1,2 @@
+/* XA-5 preview: the frame itself is WorkspaceLayout's (workspace-surface .scroll and .detail[data-place="ask"]). */
+.notice { margin: 0; padding: 8px 20px; color: var(--st-text-3); font-size: 13px; line-height: 18px; }

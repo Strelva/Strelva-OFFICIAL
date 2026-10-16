@@ -26,8 +26,16 @@ export interface XaWaitingItem {
 
 export interface XaComposerScope {
   label: string;
+  /** What the chip says on a phone, usually the System's name alone. */
+  short?: string;
   /** Dot beside the scope: the business or System it speaks to and its state. */
   state?: "live" | "waits" | "draft";
+  /** Opens the scope picker. Omit and the chip is a plain label: no dead controls. */
+  onPick?: () => void;
+  /** Whether the picker is open, for aria-expanded. */
+  picking?: boolean;
+  /** The id of the picker the chip controls. */
+  pickerId?: string;
 }
 
 export interface XaComposerSystem { kind: string; name: string; onRemove?: () => void }
@@ -81,7 +89,12 @@ export function XaComposer({ value, onChange, onSubmit, placeholder, inputLabel 
       {input}
       <div className={styles.composerBar}>
         {plus}
-        {scope ? <span className={styles.chip} title={`Asking about ${scope.label}`}>{scope.state ? <span className={styles.dot} data-kind={scope.state} aria-hidden="true" /> : null}<span>{scope.label}</span></span> : null}
+        {scope ? (() => {
+          const words = <>{scope.state ? <span className={styles.dot} data-kind={scope.state} aria-hidden="true" /> : null}<span data-chip-full={scope.short ? "true" : undefined}>{scope.label}</span>{scope.short ? <span data-chip-short="true">{scope.short}</span> : null}</>;
+          return scope.onPick
+            ? <button type="button" className={styles.chip} data-pick="true" onClick={scope.onPick} disabled={disabled} aria-haspopup="listbox" aria-expanded={scope.picking ?? false} aria-controls={scope.pickerId} aria-label={`Asking about ${scope.label}. Change what this asks about`}>{words}</button>
+            : <span className={styles.chip} title={`Asking about ${scope.label}`}>{words}</span>;
+        })() : null}
         {system ? <span className={styles.chip} data-system="true"><XaSystemTile kind={system.kind} size={24} /><span>{system.name}</span>{system.onRemove ? <button type="button" className={styles.chipRemove} onClick={system.onRemove} aria-label={`Stop asking about ${system.name}`}><X size={14} aria-hidden="true" /></button> : null}</span> : null}
         <span className={styles.grow} />
         {onVoice ? <button type="button" className={styles.composerMic} onClick={onVoice} disabled={disabled} aria-label="Say it instead"><Mic size={18} aria-hidden="true" /></button> : null}

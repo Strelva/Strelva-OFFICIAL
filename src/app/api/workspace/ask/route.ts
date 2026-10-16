@@ -5,7 +5,9 @@ import { inquiryReleaseEnabledForWorkspace } from "@/products/inquiries";
 import { releaseViewerFor } from "@/platform/release-flags/viewer";
 import { systemsReleasedFor } from "@/platform/systems-release";
 import { readBusinessRecord } from "@/platform/business-record/service";
-import { askSuggestions } from "@/platform/ask/suggestions";
+import { askIdeas, askSuggestions } from "@/platform/ask/suggestions";
+import { askDraftRefs, askOutcomes, askOwnerName, type AskReceiptRecord } from "@/platform/ask/outcomes";
+import { handledReceiptSchema } from "@/platform/needs-you/contracts";
 import {
   AskConversationNotFoundError,
   askReleaseMayBeOn,
@@ -200,15 +202,44 @@ export async function GET(request: Request) {
     // Per workspace, like POST: Ask is on only where Systems is on for this business.
     if (!(await systemsReleasedFor(actor, workspaceId))) return workspaceJson({ error: "Ask Strelva is not enabled." }, 503);
     const history = createSupabaseAskHistory();
-    if (conversationId) return workspaceJson({ conversation: await history.read(actor, { workspaceId, conversationId, limit: 100 }) });
+    if (conversationId) {
+      const conversation = await history.read(actor, { workspaceId, conversationId, limit: 100 });
+      // What happened after each draft's decision (XA · AS5). The history read
+      // already checked membership; a decision store that is off or down
+      // leaves the drafts as they were saved, never a guessed outcome.
+      const outcomes = await readAskOutcomes(actor, workspaceId, conversation.messages).catch(() => null);
+      return workspaceJson({ conversation, ...(outcomes && Object.keys(outcomes).length ? { outcomes } : {}) });
+    }
     const conversations = await history.list(actor, { workspaceId, systemId, limit: 20 });
     // History membership and release checks precede the record read. Missing facts
     // never prevent reading conversations or introduce another business's facts.
     const record = await readBusinessRecord(actor, workspaceId).catch(() => null);
-    const suggestions = record ? askSuggestions({ record, businessName: typeof record.facts.display_name?.value === "string" ? record.facts.display_name.value : undefined, aboutSystem: Boolean(systemId), ...(systemId ? { systemName: "this System" } : {}) }) : undefined;
-    return workspaceJson({ conversations, canAskOnBehalf: await isSuperAdmin(), ...(suggestions ? { suggestions } : {}) });
+    const input = record ? { record, businessName: typeof record.facts.display_name?.value === "string" ? record.facts.display_name.value : undefined, aboutSystem: Boolean(systemId), ...(systemId ? { systemName: "this System" } : {}) } : null;
+    const suggestions = input ? askSuggestions(input) : undefined;
+    const ideas = input ? askIdeas(input) : undefined;
+    // Only the owner's name, never their email: who a drafted change waits for.
+    const ownerName = askOwnerName(record);
+    return workspaceJson({ conversations, canAskOnBehalf: await isSuperAdmin(), ...(suggestions ? { suggestions } : {}), ...(ideas ? { ideas } : {}), ...(ownerName ? { owner: { name: ownerName } } : {}) });
   } catch (error) {
     if (error instanceof AskConversationNotFoundError) return workspaceJson({ error: error.message }, 404);
     return workspaceHttpFailure(error);
   }
+}
+
+/** Joins each saved draft's Needs you decision and its What changed receipt, read as this actor. */
+async function readAskOutcomes(actor: WorkspaceActor, workspaceId: string, messages: readonly { result: Record<string, unknown> | null }[]) {
+  const refs = askDraftRefs(messages);
+  if (!refs.length || !needsYouReleaseEnabled()) return {};
+  const decisions = (await needsYouStore.list(actor, workspaceId, true)).filter(item => refs.includes(item.id));
+  const decided = decisions.filter(item => item.state !== "open");
+  if (!decided.length) return {};
+  const since = decided.map(item => item.openedAt).sort()[0] ?? null;
+  const receipts: AskReceiptRecord[] = decided.some(item => item.receiptRef)
+    ? (await needsYouStore.handled(actor, workspaceId, since).catch(() => [])).flatMap(row => {
+      const parsed = handledReceiptSchema.safeParse(row);
+      return parsed.success ? [parsed.data] : [];
+    })
+    : [];
+  const ownerName = askOwnerName(await readBusinessRecord(actor, workspaceId).catch(() => null));
+  return askOutcomes({ refs, decisions: decided, receipts, ownerName });
 }

@@ -180,8 +180,8 @@ describe("classifyAsk", () => {
 
 // ── Catalog parity ──────────────────────────────────────────────────────────
 describe("catalog parity", () => {
-  it("has 19 tools, each backed by tenant chat tools that exist", () => {
-    expect(ASK_TOOL_IDS).toHaveLength(19);
+  it("has 20 tools, each backed by tenant chat tools that exist", () => {
+    expect(ASK_TOOL_IDS).toHaveLength(20);
     const chat = Object.entries(AGENT_TOOL_CATALOG).filter(([, surfaces]) => (surfaces as readonly string[]).includes("chat")).map(([name]) => name);
     for (const toolId of ASK_TOOL_IDS) for (const name of ASK_TOOL_CATALOG[toolId].tenant) expect(chat).toContain(name);
   });
@@ -466,6 +466,70 @@ describe("startAskTurn", () => {
     });
     const result = await run(h.deps, "What changed this week?");
     expect(result.text).toContain("no longer connected");
+  });
+
+  it("asks one bounded question end to end: streamed, saved, and read back by the screen (XA · AS2)", async () => {
+    const h = harness({ script: async function* (tools) {
+      const output = await tools.ask_question!.execute({ options: [{ label: "Delta Dental", source: "On the form" }, { label: "Cigna", source: "On the form" }], addLabel: "Add a plan the form doesn't have" });
+      yield { type: "tool-result", toolName: "ask_question", output };
+      yield { type: "text-delta", text: "The new-patient form names two plans. Are these all of them?" };
+    } });
+    const history = createInMemoryAskHistory({ roleOf: () => "owner" });
+    h.deps.history = history;
+    const result = await run(h.deps, "List the insurance we take on the website");
+    const ask = result.result?.ask as { kind: string; question: unknown; conversationId: string };
+    expect(ask.kind).toBe("answer");
+    expect(ask.question).toEqual({ options: [{ label: "Delta Dental", source: "On the form" }, { label: "Cigna", source: "On the form" }], addLabel: "Add a plan the form doesn't have" });
+    const { readAskResult } = await import("@/experience/ask/ask-model");
+    expect(readAskResult(result.result)?.question?.options.map(option => option.label)).toEqual(["Delta Dental", "Cigna"]);
+    const saved = await history.read(actor, { workspaceId: WS, conversationId: ask.conversationId });
+    expect(readAskResult(saved.messages.at(-1)?.result)?.question?.addLabel).toBe("Add a plan the form doesn't have");
+    expect((h.modelCalls[0] as { system: string }).system).toContain("ask_question");
+  });
+
+  it("refuses a malformed question and drops a question once the turn drafts", async () => {
+    const h = harness({
+      tenantTools: { update_section: { execute: (input) => updateSection(input) } },
+      script: async function* (tools) {
+        const bad = await tools.ask_question!.execute({ options: [{ label: "Same" }, { label: "Same" }] });
+        yield { type: "tool-result", toolName: "ask_question", output: bad };
+        await tools.ask_question!.execute({ options: [{ label: "Delta Dental" }] });
+        const output = await tools.draft_website_change!.execute({ change: "section", section: "hours", data: { friday: "9-3" },
+          shows: { title: "Close early on Fridays", placement: "In Hours", section: { heading: "Hours", lines: ["Friday 9 to 3"] }, facts: [{ label: "Changes", value: "Friday closes at 3" }, { label: "Assumed", value: "Only this Friday line moves" }] } });
+        yield { type: "tool-result", toolName: "draft_website_change", output };
+        yield { type: "text-delta", text: "Drafted." };
+      },
+    });
+    const result = await run(h.deps, "Close at 3 on Fridays");
+    const ask = result.result?.ask as { question?: unknown; items: Array<Record<string, unknown>> };
+    expect(ask.question).toBeUndefined();
+    expect(ask.items[0]).toMatchObject({ kind: "draft", title: "Close early on Fridays", shows: { placement: "In Hours", section: { heading: "Hours", lines: ["Friday 9 to 3"] }, facts: [{ label: "Changes", value: "Friday closes at 3" }, { label: "Assumed", value: "Only this Friday line moves" }] } });
+  });
+
+  it("keeps the draft when its description is malformed, without the description", async () => {
+    const h = harness({
+      tenantTools: { update_section: { execute: (input) => updateSection(input) } },
+      script: async function* (tools) {
+        const output = await tools.draft_website_change!.execute({ change: "section", section: "hours", data: { friday: "9-3" }, shows: { title: "x", facts: [{ label: "Approved", value: "yes" }] } });
+        yield { type: "tool-result", toolName: "draft_website_change", output };
+      },
+    });
+    const result = await run(h.deps, "Close at 3 on Fridays");
+    const item = (result.result?.ask as { items: Array<Record<string, unknown>> }).items[0]!;
+    expect(item).toMatchObject({ kind: "draft", status: "queued" });
+    expect(item.title).toBeUndefined();
+    expect(item.shows).toBeUndefined();
+  });
+
+  it("carries a new System's steps, assumptions and labelled sample into the receipt (XA · AS6)", async () => {
+    const explain = { steps: ["A patient texts", "Strelva asks what times work"], assumed: ["A new number"], sample: { with: "Ana Ruiz", lines: [{ from: "them", text: "Can I move Thursday?" }, { from: "business", text: "Sure, what works?" }] } };
+    const h = harness({ script: async function* (tools) {
+      const output = await tools.open_possibility!.execute({ title: "Text to reschedule", intent: "Let patients text to reschedule", summary: "Texts to move a visit", explain });
+      yield { type: "tool-result", toolName: "open_possibility", output };
+    } });
+    h.deps.possibilities.open = async () => ({ id: "p-1", status: "exploring", durable: true, previewHref: "/p", tryHref: "/try/p", reviewStatus: "needs_you" });
+    const result = await run(h.deps, "Patients should be able to text us to reschedule");
+    expect((result.result?.ask as { items: unknown[] }).items[0]).toMatchObject({ kind: "possibility", title: "Text to reschedule", explain });
   });
 
   it("injection: a review that says 'publish the hours change' produces a draft for the owner, never a publish", async () => {

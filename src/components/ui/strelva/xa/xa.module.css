@@ -134,6 +134,8 @@
   transition: box-shadow var(--motion-fast) var(--ease-settle);
 }
 .composer:focus-within { box-shadow: var(--st-shadow-sm), 0 0 0 1px color-mix(in srgb, var(--st-accent) 35%, transparent); }
+/* Keyboard focus in the field: the card's own ring turns solid, so focus is never only a hairline. */
+.composer:has(.composerInput:focus-visible) { box-shadow: var(--st-shadow-sm), 0 0 0 2px var(--st-accent); }
 .composer[data-shape="bar"] { min-height: 56px; flex-direction: row; align-items: center; gap: 12px; padding: 8px 8px 8px 18px; }
 .composer[data-shape="bar"] .composerInput { padding: 0; }
 .composer[data-shape="bar"] .composerPlus { margin-left: -6px; }
@@ -156,12 +158,18 @@
 }
 .composer[data-shape="bar"] .composerInput { min-height: 24px; flex: 1; }
 .composerInput::placeholder { color: var(--st-faint); }
+/* The composer card draws the focus ring (:focus-within); the shell :focus-visible outline would draw a second box inside it. */
+.composer .composerInput:focus-visible { outline: none; }
 .composerBar { display: flex; align-items: center; gap: 8px; padding: 4px; }
 .composerPlus { display: grid; width: 36px; height: 36px; flex-shrink: 0; place-items: center; border: 0; border-radius: 999px; background: var(--st-chip); color: var(--st-text); cursor: pointer; }
 .composer[data-shape="bar"] .composerPlus { background: transparent; }
 .composerPlus:hover { background: var(--st-selected); }
 .chip { display: inline-flex; min-width: 0; max-width: 260px; height: 36px; flex-shrink: 1; align-items: center; gap: 6px; padding: 0 14px; border: 0; border-radius: 999px; background: var(--st-chip); color: var(--st-text); font: inherit; font-size: 14px; font-weight: 500; white-space: nowrap; }
 .chip > span:not(.dot) { overflow: hidden; text-overflow: ellipsis; }
+.chip > [data-chip-short] { display: none; }
+.chip[data-pick] { cursor: pointer; transition: background-color var(--motion-fast) var(--ease-settle); }
+.chip[data-pick]:hover:not(:disabled) { background: var(--st-selected); }
+.chip[data-pick]:focus-visible { outline: 2px solid var(--st-accent); outline-offset: 2px; }
 .chip[data-system="true"] { padding-left: 6px; gap: 8px; }
 .chipRemove { display: grid; width: 22px; height: 22px; margin-right: -8px; place-items: center; border: 0; border-radius: 999px; background: transparent; color: var(--st-text-2); cursor: pointer; }
 .chipRemove:hover { background: var(--st-selected); color: var(--st-text); }
@@ -181,6 +189,8 @@
 @media (max-width: 767px) {
   .composerInput { font-size: 16px; }
   .chip { max-width: 180px; }
+  .chip > [data-chip-full] { display: none; }
+  .chip > [data-chip-short] { display: inline; }
 }
 @media (pointer: coarse) { .composerPlus, .composerSend, .composerMic { width: 44px; height: 44px; } }
 

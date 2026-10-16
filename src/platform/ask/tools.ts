@@ -4,7 +4,7 @@ import { z } from "zod";
 import type { RecordedActor } from "@/platform/presentation/actor";
 import type { WorkspaceActor, WorkspaceRole } from "@/platform/workspaces/types";
 import { authorizeAskTool, type AskAuthoritySnapshot } from "./authority";
-import { ASK_TOOL_CATALOG, type AskChangeKind, type AskChangeOrigin, type AskToolId, type AskedOnBehalf, type AskResultKind } from "./contracts";
+import { ASK_TOOL_CATALOG, askChangeShowsSchema, askPossibilityExplainSchema, askQuestionSchema, type AskChangeKind, type AskChangeShows, type AskPossibilityExplain, type AskQuestion, type AskChangeOrigin, type AskToolId, type AskedOnBehalf, type AskResultKind } from "./contracts";
 import type { AskAuthorityReader, AskNeedsYouRouting, AskPossibilityPort, AskRequestPort, NeedsYouPort } from "./ports";
 import { AskAgencyRequiredError, AskPossibilityUnsupportedError, AskPreparedPossibilityError } from "./ports";
 import { askNativeChangeSchema, askNativeIdentitySchema, AskNativePreparationIncompleteError, AskNativeUnsupportedError, type AskNativeSystemPort } from "./native-systems";
@@ -34,6 +34,12 @@ export interface AskReceiptItem {
   previewHref?: string;
   tryHref?: string;
   needsYou?: AskNeedsYouRouting;
+  /** The change or System by its own name ("Add your insurance to harbordental.com", "Text to reschedule"). */
+  title?: string;
+  /** A drafted website change as the decider reads it (XA · AS3). Strelva's description; the saved draft is the record. */
+  shows?: Omit<AskChangeShows, "title">;
+  /** A new System opened as a Possibility, in the owner's words (XA · AS6). */
+  explain?: AskPossibilityExplain;
 }
 
 export interface AskToolsContext {
@@ -58,6 +64,8 @@ export interface AskToolsContext {
   workspaceDrafts?: AskWorkspaceDraftPort;
   nativeSystems?: AskNativeSystemPort;
   onReceipt: (item: AskReceiptItem) => void;
+  /** The one bounded question this turn asks, if any (XA · AS2). */
+  onQuestion?: (question: AskQuestion) => void;
 }
 
 type Output = Record<string, unknown>;
@@ -107,7 +115,8 @@ export function buildAskTools(ctx: AskToolsContext): Record<AskToolId, Tool> {
   }
 
   /** Hand a tenant draft to Needs you and report the route. */
-  async function draft(toolId: AskToolId, kind: AskChangeKind, summary: string, output: Output): Promise<Output> {
+  async function draft(toolId: AskToolId, kind: AskChangeKind, summary: string, output: Output, shows?: AskChangeShows): Promise<Output> {
+    const view = shows ? { title: shows.title, shows: { ...(shows.placement ? { placement: shows.placement } : {}), ...(shows.section ? { section: shows.section } : {}), ...(shows.facts?.length ? { facts: shows.facts } : {}) } } : {};
     const status = output.agentResultStatus;
     const ids = eventIdsOf(output);
     if (status === "failed" || status === "blocked" || status === "no-op" || output.success === false && ids.length === 0) {
@@ -115,7 +124,7 @@ export function buildAskTools(ctx: AskToolsContext): Record<AskToolId, Tool> {
       return output;
     }
     if (ids.length === 0) {
-      ctx.onReceipt({ kind: "draft", toolId, status: "drafted", ids: [], summary: String(output.message ?? summary) });
+      ctx.onReceipt({ kind: "draft", toolId, status: "drafted", ids: [], summary: String(output.message ?? summary), ...view });
       return output;
     }
     let routing: AskNeedsYouRouting;
@@ -125,11 +134,11 @@ export function buildAskTools(ctx: AskToolsContext): Record<AskToolId, Tool> {
         origin: ctx.origin, askedOnBehalf: ctx.askedOnBehalf, summary, eventIds: ids,
       });
     } catch {
-      ctx.onReceipt({ kind: "draft", toolId, status: "queued", ids, summary: `${summary}: saved, Needs you could not sync.` });
+      ctx.onReceipt({ kind: "draft", toolId, status: "queued", ids, summary: `${summary}: saved, Needs you could not sync.`, ...view });
       return { ...output, eventIds: ids, agentResultStatus: "queued", needsYouSyncPending: true,
         nextStep: "The draft is saved in the review queue, but Needs you couldn't sync. Nothing was approved or sent. Reload Needs you before retrying." };
     }
-    ctx.onReceipt({ kind: "draft", toolId, status: "queued", ids, summary, needsYou: routing });
+    ctx.onReceipt({ kind: "draft", toolId, status: "queued", ids, summary, needsYou: routing, ...view });
     return {
       ...output,
       needsYou: routing,
@@ -140,6 +149,16 @@ export function buildAskTools(ctx: AskToolsContext): Record<AskToolId, Tool> {
   }
 
   const tools: Record<AskToolId, Tool> = {
+    ask_question: tool({
+      description: "Ask the person ONE question before drafting, when you found the likely answers somewhere (a form, the business record, the site). Give 1 to 8 short answers, each with where you found it (source, e.g. \"On the form\"), and an addLabel such as \"Add a plan the form doesn't have\" when they may need to add one. The answers show as a checkable list; ask the question in one sentence and stop. Never use it to ask for approval.",
+      inputSchema: askQuestionSchema,
+      execute: (input) => guarded("ask_question", async () => {
+        const parsed = askQuestionSchema.safeParse(input);
+        if (!parsed.success) return { success: false, error: "Give 1 to 8 short, different answers.", agentResultStatus: "failed" };
+        ctx.onQuestion?.(parsed.data);
+        return { success: true, shown: true, message: "The answers are shown as a checkable list. Ask the question in one sentence and wait for the answer." };
+      }),
+    }),
     read_system: tool({
       description: "Read the selected native internal app/Version definition and release history (native_application), the business record, recent/unanswered inquiries and confirmed bookings starting in the next 30 days, with pending/unknown evidence separate, or the website System: its pages and nodes (view site), a legacy section (section), the content outline (content), photos (photos), a preview link (preview), blog/video/product entries (entries), newsletter subscribers (subscribers), or open Possibilities and suggestions (possibilities).",
       inputSchema: z.object({
@@ -264,19 +283,22 @@ export function buildAskTools(ctx: AskToolsContext): Record<AskToolId, Tool> {
         candidateRevision: z.number().int().positive().optional(),
         candidateContentHash: z.string().max(64).optional(),
         ops: z.array(z.record(z.string(), z.unknown())).max(100).optional(),
+        shows: askChangeShowsSchema.optional().describe("How the change reads to the person deciding: a title naming the change (\"Add your insurance to harbordental.com\"), where it sits (\"Right under Hours\"), the new or changed section as visitors read it (heading, lines, note), and facts labelled Adds/Changes/Removes/Lists/Notes/Assumed. Describe only what the draft does; say every assumption."),
       }),
       execute: (input) => guarded("draft_website_change", async () => {
+        // A malformed description is dropped, never the draft: the saved draft is the record.
+        const shows = askChangeShowsSchema.safeParse(input.shows).data;
         if (input.change === "section") {
-          return draft("draft_website_change", "copy.routine", `Edit ${input.section ?? "a section"}`, await callTenant(ctx, "update_section", { section: input.section, data: input.data }));
+          return draft("draft_website_change", "copy.routine", `Edit ${input.section ?? "a section"}`, await callTenant(ctx, "update_section", { section: input.section, data: input.data }), shows);
         }
         if (input.change === "patch") {
           const { expectedRevision, candidateRevision, candidateContentHash, ops } = input;
-          return draft("draft_website_change", "copy.marketing", "Edit website pages", await callTenant(ctx, "patch_site", { expectedRevision, candidateRevision, candidateContentHash, ops }));
+          return draft("draft_website_change", "copy.marketing", "Edit website pages", await callTenant(ctx, "patch_site", { expectedRevision, candidateRevision, candidateContentHash, ops }), shows);
         }
         if (input.change === "visibility") {
-          return draft("draft_website_change", "structure", `${input.visible ? "Show" : "Hide"} ${input.section ?? "a section"}`, await callTenant(ctx, "toggle_section_visibility", { section: input.section, visible: input.visible, ...(input.page ? { page: input.page } : {}) }));
+          return draft("draft_website_change", "structure", `${input.visible ? "Show" : "Hide"} ${input.section ?? "a section"}`, await callTenant(ctx, "toggle_section_visibility", { section: input.section, visible: input.visible, ...(input.page ? { page: input.page } : {}) }), shows);
         }
-        return draft("draft_website_change", "structure", "Reorder sections", await callTenant(ctx, "reorder_sections", { order: input.order, ...(input.page ? { page: input.page } : {}) }));
+        return draft("draft_website_change", "structure", "Reorder sections", await callTenant(ctx, "reorder_sections", { order: input.order, ...(input.page ? { page: input.page } : {}) }), shows);
       }),
     }),
     undo_change: tool({
@@ -399,6 +421,7 @@ export function buildAskTools(ctx: AskToolsContext): Record<AskToolId, Tool> {
           kind: z.literal("existing-booking-page"), path: z.string().min(1).max(80),
           title: z.string().min(1).max(70), description: z.string().max(160), bookingGrantId: z.string().uuid().optional(),
         }).strict()]).optional(),
+        explain: askPossibilityExplainSchema.optional().describe("For the owner: 2 to 6 numbered steps of how it works, what it assumed, and an optional sample conversation (labelled as a sample, never a real customer's words)."),
       }).superRefine((input, ctx) => {
         if (input.candidate?.kind === "website-pages" && (!input.newSystemKey || !input.newSystemName || !input.purpose)) ctx.addIssue({ code: "custom", path: ["newSystemKey"], message: "A new System needs its own key, name and purpose." });
       }),
@@ -411,7 +434,8 @@ export function buildAskTools(ctx: AskToolsContext): Record<AskToolId, Tool> {
             candidate: input.candidate,
             words: ctx.lastUserText, origin: ctx.origin, askedOnBehalf: ctx.askedOnBehalf,
           });
-          ctx.onReceipt({ kind: "possibility", toolId: "open_possibility", status: "opened", ids: [opened.id], summary: `${input.title} · Draft`, previewHref: opened.previewHref, tryHref: opened.tryHref,
+          const explain = askPossibilityExplainSchema.safeParse(input.explain).data;
+          ctx.onReceipt({ kind: "possibility", toolId: "open_possibility", status: "opened", ids: [opened.id], summary: `${input.title} · Draft`, title: input.newSystemName ?? input.title, ...(explain ? { explain } : {}), previewHref: opened.previewHref, tryHref: opened.tryHref,
             ...(opened.reviewStatus === "needs_you" ? { needsYou: { route: "owner_decides" as const, itemRef: opened.id, decideAt: `/workspace?workspaceId=${encodeURIComponent(ctx.workspaceId)}&view=needs-you` } } : {}) });
           if (input.candidate?.kind === "inquiry-follow-up-rule") return { success: true, possibilityId: opened.id, previewHref: opened.previewHref, tryHref: opened.tryHref, reviewStatus: opened.reviewStatus, status: "Draft", agentResultStatus: "drafted", message: `Prepared the exact follow-up rule and passed its isolated native rehearsal. Try shows the full wording, timing, attempts and test results. ${opened.reviewStatus === "needs_you" ? "The owner's decision is in Needs you." : "The saved alternative is waiting for Needs you synchronization."} Nothing live changed and no message was sent.` };
           return { success: true, possibilityId: opened.id, previewHref: opened.previewHref, tryHref: opened.tryHref, reviewStatus: opened.reviewStatus, status: "Draft", agentResultStatus: "drafted", message: `Prepared "${input.title}" as a working ${input.candidate?.kind === "existing-booking-page" ? "booking-page Possibility for this site's existing configured service" : "page-set Possibility"}. ${input.candidate?.kind === "existing-booking-page" ? "Try it uses configured test times; no real booking is made." : "Open the preview to navigate its pages."} ${opened.reviewStatus === "needs_you" ? "Copy is handed to Needs you for owner review." : "Copy still needs owner review; the saved draft is waiting for Needs you synchronization."} Nothing live changed.` };
@@ -441,6 +465,7 @@ export function buildAskTools(ctx: AskToolsContext): Record<AskToolId, Tool> {
 /** The status line shown while an Ask tool runs. Says Strelva's words, never "AI". */
 export function askToolLabel(toolId: string): string {
   const labels: Record<string, string> = {
+    ask_question: "Checking what I found...",
     read_system: "Reading your System...",
     read_performance: "Checking your traffic...",
     read_history: "Looking at recent changes...",

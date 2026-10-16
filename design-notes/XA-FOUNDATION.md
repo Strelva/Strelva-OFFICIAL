@@ -72,12 +72,12 @@ tabular figures. Geist Mono is no longer loaded.
 | `XaIconButton label tone="raised\|plain\|chip"` | `Xa` | OABIG | `label` is required |
 | `XaTextLink` | `Xa` | XA · R1 footer | For "See it · Undo" inside a sentence |
 | `XaStatus kind="live\|waits\|draft\|working\|down" size breathe` | `Xa` | jLAL3, H9Qdxq, Jilw8 | Shows exceptions only. Live breathes only when `breathe` is set. Waits pulses once. |
-| `XaDot`, `XaMark`, `XaKbd`, `XaInitial` | `Xa` | hb8WJ, z6OmJ | `XaInitial` is round for people and square for a business |
+| `XaDot`, `XaMark`, `XaKbd`, `XaInitial` | `Xa` | hb8WJ, z6OmJ | `XaInitial` is round for people and square for a business. One initials rule (`xaInitialOf`): a person known by a title goes by the surname (Dr. Amy Lin and Dr. Lin are both L); everyone else by the first letter |
 | `XaSystemTile kind size label`, `xaSystemKind()` | `Xa` | lSPfW … GQmKR | Ten clays live in `public/xa/system-*.webp`. A tile is never shown sad. |
 | `XaAddTile` | `Xa` | O1 "Tile add" | |
 | `XaPebbleAvatar` | `Xa` | gxqij | Appears wherever Strelva speaks |
 | `XaPebbleScene pose size bare` | `Xa` | O1 "Felt" | Poses are `resting`, `fixing`, `waving`, `adds`, `lineup`, `alone` and `website`. Changes crossfade on Base. |
-| `XaComposer value onChange onSubmit placeholder waiting scope system onAdd onVoice busy disabled shape` | `Xa` | T4ln9, LHF4o, cLOpj, JIgmC | Resting it is a bar. With a waiting item, scope or System it becomes a card. Plus and mic appear only when they do something. |
+| `XaComposer value onChange onSubmit placeholder waiting scope system onAdd onVoice busy disabled shape` | `Xa` | T4ln9, LHF4o, cLOpj, JIgmC | Resting it is a bar. With a waiting item, scope or System it becomes a card. Plus and mic appear only when they do something. `scope` takes `short` (the phone label, usually the System name), a `state` dot, and `onPick` to make the chip open a scope picker (`picking`, `pickerId` for aria). Keyboard focus in the field draws a solid 2px ring on the card. |
 | `XaWaiting` | `Xa` | LHF4o "Waiting" | Holds one item, with whoever acted |
 | `XaComposerDock` | `Xa` | | Puts the composer in the frame's composer row |
 | `XaWorking title steps state="working\|done\|failed"` | `Xa` | rYq00 | Steps are the caller's real progress events |

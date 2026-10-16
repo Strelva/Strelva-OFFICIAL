@@ -43,17 +43,21 @@ export function XaKbd({ children }: { children: ReactNode }) {
   return <kbd className={styles.kbd}>{children}</kbd>;
 }
 
-const HONORIFIC = /^(dr|mr|mrs|ms|mx|miss|prof|rev|sir|dame)\.?$/i;
-
-/** The letter a person or business goes by: "Dr. Amy Lin" is A, never D. */
-export function xaInitialOf(name: string): string {
-  const words = name.trim().split(/\s+/).filter(Boolean);
-  const word = words.find(item => !HONORIFIC.test(item)) ?? words[0] ?? "";
-  return word.charAt(0).toUpperCase() || "·";
-}
-
 /** A person or business by its initial: round for people, squared for a business or client. */
 export function XaInitial({ name, color, size = 26, shape = "square" }: { name: string; color?: string; size?: number; shape?: "square" | "round" }) {
   const initial = xaInitialOf(name);
   return <span className={styles.initial} data-shape={shape} data-default={!color || undefined} style={{ "--xa-size": `${size}px`, ...(color ? { "--xa-color": color } : null) } as CSSProperties} aria-hidden="true">{initial}</span>;
+}
+
+const HONORIFIC = /^(dr|mr|mrs|ms|mx|miss|prof|rev|sir|dame)\.?\s+/i;
+
+/**
+ * One initials rule everywhere: a person known by a title goes by the
+ * surname ("Dr. Amy Lin" and "Dr. Lin" are both L, as patients say it);
+ * everyone and everything else by the first letter ("Maya Okafor" is M).
+ */
+export function xaInitialOf(name: string): string {
+  const trimmed = name.trim();
+  const titled = HONORIFIC.test(trimmed) ? trimmed.replace(HONORIFIC, "").trim().split(/\s+/).at(-1) ?? "" : trimmed;
+  return titled.charAt(0).toUpperCase() || trimmed.charAt(0).toUpperCase() || "·";
 }
