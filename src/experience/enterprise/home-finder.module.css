@@ -1,0 +1,46 @@
+/* Home Finder (XA): the brokerage's setup page and the buyer's search. */
+.stack { display: flex; flex-direction: column; gap: 16px; }
+.row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; }
+.grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.quiet { margin: 0; color: var(--st-text-3); font-size: 14px; line-height: 20px; }
+.formLede { margin: 0; color: var(--st-text-2); font-size: 14px; line-height: 1.45; }
+.sheetText { margin: 0; color: var(--st-text-2); font-size: 15px; line-height: 1.5; }
+
+/* The buyer's page, inside the setup page's object panel. */
+.pageSub { margin: -6px 0 6px; color: var(--st-text-2); font-size: 13px; }
+.fakeSearch { display: flex; align-items: center; gap: 8px; padding: 6px 6px 6px 16px; border: 1px solid var(--st-line); border-radius: 999px; color: var(--st-faint); font-size: 15px; }
+.fakeSearch span { flex: 1; }
+.fakeSearch b { padding: 9px 16px; border-radius: 999px; background: var(--st-action); color: var(--st-on-action); font-size: 14px; font-weight: 600; }
+.pageNote { margin: 4px 0 0; color: var(--st-text-2); font-size: 14px; line-height: 1.45; }
+
+/* The buyer's search. */
+.search { display: flex; align-items: flex-end; gap: 10px; }
+.searchField { display: flex; min-width: 0; flex: 1; flex-direction: column; gap: 8px; }
+.searchField label { color: var(--st-text-body); font-size: 13px; font-weight: 500; line-height: 18px; }
+.searchField input { box-sizing: border-box; width: 100%; min-height: 52px; padding: 14px 20px; border: 1px solid var(--st-line); border-radius: 999px; background: var(--st-surface); box-shadow: var(--st-shadow-sm); color: var(--st-text); font: inherit; font-size: 16px; }
+.searchField input::placeholder { color: var(--st-faint); }
+.searchField input:focus { outline: none; border-color: var(--st-accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--st-accent) 16%, transparent); }
+.searchField input:disabled { background: var(--st-inset); color: var(--st-text-2); }
+.results { display: flex; flex-direction: column; gap: 8px; }
+.resultsHead { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 16px; margin: 0; color: var(--st-text-3); font-size: 14px; }
+.resultsHead span:first-child { color: var(--st-text); font-weight: 500; }
+.listings { margin: 0; padding: 0; list-style: none; }
+.listing { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px 24px; align-items: start; padding: 22px 0; border-top: 1px solid var(--st-line); }
+.listingMain { display: flex; min-width: 0; flex-direction: column; gap: 4px; }
+.address { margin: 0; color: var(--st-text); font-size: 19px; font-weight: 600; letter-spacing: -0.3px; line-height: 1.3; }
+.place { margin: 0; color: var(--st-text-2); font-size: 14px; }
+.facts { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 14px; margin: 6px 0 0; color: var(--st-text-body); font-size: 15px; font-variant-numeric: tabular-nums; }
+.facts b { color: var(--st-text); font-weight: 600; }
+.remarks { margin: 8px 0 0; color: var(--st-text-body); font-size: 15px; line-height: 1.5; }
+.provenance { margin: 8px 0 0; color: var(--st-text-3); font-size: 12px; line-height: 1.5; }
+.inquiry { grid-column: 1 / -1; display: flex; flex-direction: column; gap: 16px; padding: 22px 24px 24px; border-radius: var(--st-r-lg); background: var(--st-surface); box-shadow: var(--st-shadow-lg); }
+.inquiryTitle { margin: 0; color: var(--st-text); font-size: 20px; font-weight: 600; letter-spacing: -0.3px; }
+.consent { display: flex; min-height: 44px; align-items: flex-start; gap: 12px; color: var(--st-text-body); font-size: 14px; line-height: 1.45; cursor: pointer; }
+.consent input { width: 18px; height: 18px; margin-top: 1px; flex-shrink: 0; accent-color: var(--st-text); }
+
+@media (max-width: 767px) {
+  .grid { grid-template-columns: minmax(0, 1fr); }
+  .search { flex-direction: column; align-items: stretch; }
+  .listing { grid-template-columns: minmax(0, 1fr); }
+  .inquiry { padding: 18px 16px 20px; }
+}

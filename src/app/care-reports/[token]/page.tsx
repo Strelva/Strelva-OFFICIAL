@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { StEntry } from "@/components/ui/strelva/Kit";
 import { CareReportDocument } from "@/experience/care-reports/CareReportDocument";
+import { XaOutside } from "@/experience/xa-object/XaObjectPage";
 import { resolveOwnerBrand } from "@/platform/agency-brand/server";
 import { careReportReleaseSnapshotSchema } from "@/platform/care-reports/contracts";
 import { careReportShareLinksEnabled } from "@/platform/care-reports/release";
@@ -29,8 +29,8 @@ export default async function SharedCareReportPage({ params, searchParams }: { p
   const snapshot = careReportReleaseSnapshotSchema.safeParse(shared.release.snapshot);
   if (!snapshot.success) notFound();
   const brand = await resolveOwnerBrand(shared.agencyWorkspaceId);
-  return <StEntry brand={brand} width="account">
+  return <XaOutside from={brand.name} color={brand.accentColor} logoUrl={brand.logoUrl} credit meta="Shared with you by link" label={`${brand.name} Care plan report`}>
     <CareReportDocument snapshot={snapshot.data} brand={brand} releaseNumber={shared.release.number} audience="shared"
       releases={shared.releases} releaseHref={number => `/care-reports/${token}?release=${number}`} />
-  </StEntry>;
+  </XaOutside>;
 }

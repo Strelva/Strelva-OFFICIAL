@@ -2592,3 +2592,18 @@ and link controls; staff see none of the controls that change anything.
 minutes inside Responsibility and availability, each with an id made once per
 entry so a retry is recorded once. Previews: `/preview/strelva/care-report` and
 `/preview/strelva/agency-care-reports`.
+
+## XA object pages (lane xs-apps-care, October 16, 2026)
+
+`src/experience/xa-object/XaObjectPage.tsx`: lane-level composition built only from `Xa*` kit parts. Candidates for the kit once a second lane needs them.
+
+| Part | Use |
+|---|---|
+| `XaObjectPage story object wide objectFirstOnPhone` | XA-4/XA-6 split: what it is on the left, the one object (usually `XaDecision`) on the right, sticky on desktop, stacked on phone |
+| `XaOutside from color logoUrl credit meta mode width` | Paper frame for pages opened from a link (shared report, buyer search, delivery status, internal tool by link). Names who it is from, never Strelva Agency by default |
+| `XaCrumbs`, `XaBlock`, `XaNote` | Quiet path, sentence-case section label, a status sentence instead of a banner |
+| `XaFigure` | One figure that matters (E3). Never a row of them |
+| `XaChanges` | When, what, who acted (E3 "What changed") |
+| `XaSteps` | Order-page progress from recorded dates (delivery status, Request progress) |
+
+Screens using them: internal tool in use, custom internal tool (make and use), agency internal tool draft, agency website draft, Care plan report (agency, owner, shared link), Home Finder (brokerage and buyer), businesses and locations, delivery queue, one Request's delivery, website request status, contribution page. Previews: `/preview/strelva/xa/xs-apps-care/<screen>?state=…&mode=dark`; email at `/preview/strelva/xa/xs-apps-care/care-report-email`.

@@ -1,10 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { StHead, StMono, StNotice, StPage, StPill, StRow, StRows, StSection, StSkeleton, StState, StSurface } from "@/components/ui/strelva/Kit";
+import { XaHeadline, XaPage, XaSystemTile } from "@/components/ui/strelva/Xa";
 import { StandaloneApplicationShell } from "@/experience/applications/StandaloneApplicationShell";
 import { useWorkspaceRequest } from "@/experience/workspace/WorkspaceRequest";
-import styles from "@/experience/applications/standalone-application.module.css";
+import styles from "@/experience/applications/application-use.module.css";
+import { ToolClosed, ToolOpening } from "@/experience/applications/ToolStates";
+import { XaObjectPage } from "@/experience/xa-object/XaObjectPage";
 import { CUSTOM_APPLICATION_PARENT_CSP, customApplicationSandboxHtml } from "@/products/custom-applications/client";
 
 type UseState = "loading" | "ready" | "denied" | "error";
@@ -43,32 +45,31 @@ export function CustomApplicationUseExperience({ workId }: { workId: string }) {
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { void load(); }, [load]);
 
-  if (state === "loading") return <StandaloneApplicationShell><StPage><StHead title="Opening internal tool…" /><StSkeleton label="Opening internal tool" /><StSkeleton width="60%" /></StPage></StandaloneApplicationShell>;
+  if (state === "loading") return <ToolOpening />;
   if (state !== "ready" || !snapshot) {
-    return <StandaloneApplicationShell><StPage>
-      <StHead title={state === "denied" ? "This internal tool link is unavailable" : "Strelva could not open this internal tool"} />
-      <div role="alert"><StNotice tone={state === "denied" ? "need" : "critical"}>{error}</StNotice></div>
-      {state === "error" ? <div><StPill variant="soft" onClick={() => { setState("loading"); setError(""); void load(); }}>Try again</StPill></div> : null}
-    </StPage></StandaloneApplicationShell>;
+    return <ToolClosed kind={state === "denied" ? "denied" : "error"} title={state === "denied" ? "This internal tool link is unavailable" : "Strelva could not open this internal tool"} message={error}
+      onRetry={state === "error" ? () => { setState("loading"); setError(""); void load(); } : undefined} />;
   }
 
+  const until = new Date(snapshot.grant.expiresAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
   return <>
     <meta httpEquiv="Content-Security-Policy" content={CUSTOM_APPLICATION_PARENT_CSP} />
-    <StandaloneApplicationShell><StPage>
-      <StHead title={snapshot.title} meta={<><StState kind="live">Live</StState> · release <StMono>{snapshot.releaseVersion}</StMono> · internal tool</>} />
-      <StSurface pad={false}>
-        <iframe
-          title={`${snapshot.title} released internal tool`}
-          srcDoc={customApplicationSandboxHtml(snapshot.html)}
-          sandbox="allow-scripts allow-forms"
-          className={styles.applicationFrame}
-          referrerPolicy="no-referrer"
-        />
-      </StSurface>
-      <StSection title="Access and checks"><StRows>
-        <StRow title="Access expires" value={<StMono as="time" dateTime={snapshot.grant.expiresAt}>{new Date(snapshot.grant.expiresAt).toLocaleString()}</StMono>} />
-        <StRow title="Reviewed artifact" value={<StMono>{snapshot.artifactDigest}</StMono>} />
-      </StRows></StSection>
-    </StPage></StandaloneApplicationShell>
+    <StandaloneApplicationShell><XaObjectPage wide label={snapshot.title} story={<>
+      <div className={styles.toolHead}>
+        <XaSystemTile kind="form" size={48} label="Internal tool" />
+        <XaHeadline size="sm" quiet={<>Release {snapshot.releaseVersion}. Your access lasts until <time dateTime={snapshot.grant.expiresAt}>{until}</time>.</>}>{snapshot.title}</XaHeadline>
+      </div>
+      <div data-artifact-digest={snapshot.artifactDigest}>
+        <XaPage address={`${snapshot.title} · Release ${snapshot.releaseVersion}`} label={`${snapshot.title}, the released internal tool`}>
+          <iframe
+            title={`${snapshot.title} released internal tool`}
+            srcDoc={customApplicationSandboxHtml(snapshot.html)}
+            sandbox="allow-scripts allow-forms"
+            className={styles.frame}
+            referrerPolicy="no-referrer"
+          />
+        </XaPage>
+      </div>
+    </>} /></StandaloneApplicationShell>
   </>;
 }

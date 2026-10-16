@@ -1,7 +1,41 @@
-.recordsLayout { display: grid; grid-template-columns: minmax(0, 320px) minmax(0, 1fr); gap: 32px; align-items: start; }
-.recordHead { display: flex; align-items: center; justify-content: space-between; gap: 16px; color: var(--st-text-3); font-size: 13px; margin-bottom: 24px; }
-.fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; }
+/* An internal tool in use (XA). The form and the record sit in the object panel. */
+.form { display: flex; flex-direction: column; gap: 20px; }
+.fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px 16px; }
 .fields > :nth-child(n + 3) { grid-column: 1 / -1; }
-.fields dt { color: var(--st-text-3); font-size: 13px; line-height: 20px; }
-.fields dd { margin: 4px 0 0; color: var(--st-text); overflow-wrap: anywhere; font-size: 16px; line-height: 24px; }
-@media (max-width: 767px) { .recordsLayout { grid-template-columns: minmax(0, 1fr); gap: 24px; } .fields { grid-template-columns: minmax(0, 1fr); gap: 20px; } }
+.actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.actions > :first-child { flex: 1; }
+.optional { color: var(--st-text-3); font-weight: 400; }
+
+.selectField { display: flex; min-width: 0; flex-direction: column; gap: 8px; }
+.selectField label { color: var(--st-text-body); font-size: 13px; font-weight: 500; line-height: 18px; }
+.selectField select { box-sizing: border-box; width: 100%; min-height: 50px; padding: 13px 16px; border: 1px solid var(--st-line); border-radius: var(--st-r-md); background: var(--st-surface); color: var(--st-text); font: inherit; font-size: 15px; }
+.selectField select:focus-visible { outline: none; border-color: var(--st-accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--st-accent) 16%, transparent); }
+
+.choiceField { display: flex; min-width: 0; flex-direction: column; gap: 8px; margin: 0; padding: 0; border: 0; }
+.choiceField legend { margin-bottom: 8px; padding: 0; color: var(--st-text-body); font-size: 13px; font-weight: 500; }
+.choiceRow { display: flex; gap: 8px; }
+.choice { display: inline-flex; min-height: 44px; flex: 1; align-items: center; gap: 10px; padding: 0 16px; border: 1px solid var(--st-line); border-radius: var(--st-r-md); background: var(--st-surface); font-size: 15px; cursor: pointer; }
+.choice:has(input:checked) { border-color: var(--st-text); box-shadow: inset 0 0 0 1px var(--st-text); font-weight: 500; }
+.choice:has(input:focus-visible) { outline: 2px solid var(--st-accent); outline-offset: 2px; }
+.choice input { accent-color: var(--st-text); }
+
+.recordStatus { color: var(--st-text); font-size: 15px; font-weight: 500; }
+.recordFields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px 24px; margin: 0; }
+.recordFields > :nth-child(n + 3) { grid-column: 1 / -1; }
+.recordFields dt { color: var(--st-text-2); font-size: 13px; line-height: 18px; }
+.recordFields dd { margin: 4px 0 0; color: var(--st-text); font-size: 16px; line-height: 24px; overflow-wrap: anywhere; }
+
+.checks { display: inline-flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; color: var(--st-text-2); }
+.previewStack { display: flex; flex-direction: column; gap: 20px; }
+
+/* A released custom tool, framed as the page its users see. */
+.frame { display: block; width: 100%; min-height: 70dvh; border: 0; background: var(--st-surface); }
+
+@media (max-width: 767px) {
+  .fields, .recordFields { grid-template-columns: minmax(0, 1fr); }
+  .actions > :first-child { flex-basis: 100%; }
+}
+.toolHead { display: flex; align-items: flex-start; gap: 16px; }
+/* The agency's draft workspace: one calm column under the permission sentence. */
+.work { box-sizing: border-box; display: flex; max-width: 1040px; flex-direction: column; gap: 28px; margin-inline: auto; padding: 48px 48px 140px; }
+@media (max-width: 767px) { .work { gap: 22px; padding: 20px 16px 132px; } }

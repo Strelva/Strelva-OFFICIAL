@@ -1,11 +1,24 @@
-.detailColumns { display: grid; grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr); gap: 36px; align-items: start; }
-.detailStack { display: flex; min-width: 0; flex-direction: column; gap: 24px; }
-.scope { display: flex; flex-direction: column; gap: 16px; font-size: 14px; line-height: 1.6; overflow-wrap: anywhere; }
-.scope dt { color: var(--st-text-2); font-size: 13px; margin-bottom: 4px; }
-.scope dd { margin: 0; }
-@media (max-width: 767px) { .detailColumns { grid-template-columns: minmax(0, 1fr); gap: 28px; } }
+
+
+
+
+
+
 .copyBlock { display: grid; gap: 6px; margin-block: 12px; }
 .copyLabel { font-size: 13px; font-weight: 500; }
 .copyText { padding: 10px 12px; border: 1px solid var(--st-line); border-radius: var(--st-r-sm); background: var(--st-inset); font-size: 13px; line-height: 20px; overflow-wrap: anywhere; user-select: all; }
 .copyNote { color: var(--st-text-2); font-size: 13px; line-height: 20px; }
 .copyActions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 13px; }
+
+/* XA (lane xs-apps-care): forms and decisions inside the object panel. */
+.form { display: flex; flex-direction: column; gap: 16px; }
+.inline { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; }
+.lead { margin: 0; color: var(--st-text); font-size: 17px; line-height: 1.45; }
+.checks { display: flex; flex-direction: column; gap: 4px; margin: 0; padding: 0; border: 0; }
+.checks legend { margin-bottom: 6px; padding: 0; color: var(--st-text-body); font-size: 13px; font-weight: 500; }
+.check { display: flex; min-height: 44px; align-items: center; gap: 12px; color: var(--st-text-body); font-size: 15px; line-height: 1.4; cursor: pointer; }
+.check input { width: 18px; height: 18px; flex-shrink: 0; accent-color: var(--st-text); }
+.selectField { display: flex; min-width: 0; flex-direction: column; gap: 8px; }
+.selectField label { color: var(--st-text-body); font-size: 13px; font-weight: 500; line-height: 18px; }
+.selectField select { box-sizing: border-box; width: 100%; min-height: 50px; padding: 13px 16px; border: 1px solid var(--st-line); border-radius: var(--st-r-md); background: var(--st-surface); color: var(--st-text); font: inherit; font-size: 15px; }
+.title { margin: 0; color: var(--st-text); font-size: 22px; font-weight: 600; letter-spacing: -0.4px; line-height: 1.25; }

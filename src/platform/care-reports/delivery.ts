@@ -3,7 +3,7 @@ import { sendEmailWithReceipt, type SendEmailInput, type SendEmailResult } from 
 import { resolveOwnerRecipient } from "@/platform/business-record";
 import type { WorkspaceActor } from "@/platform/workspaces/types";
 import type { CareReportFacts } from "./contracts";
-import { careHeadline, careMonthLabel, careOutcomeLine } from "./model";
+import { renderCareReportMail } from "./mail";
 import { careReportEmailEnabled } from "./release";
 import { recordCareReportDelivery, reserveCareReportDelivery } from "./service";
 
@@ -68,7 +68,7 @@ export async function sendCareReportRelease(
   if (typeof staff.data === "string") return hold("owner_recipient_is_staff");
 
   const reserved = await deps.reserve(actor, input.releaseId);
-  const label = careMonthLabel(input.facts.month);
+  const mail = renderCareReportMail({ facts: input.facts, agencyName: input.facts.agency.name, businessName: input.businessName, release: input.release, link: input.link });
   let result: SendEmailResult;
   try {
     result = await deps.send({
@@ -77,15 +77,11 @@ export async function sendCareReportRelease(
       workspaceId: input.businessWorkspaceId,
       provider: { businessWorkspaceId: input.businessWorkspaceId, agencyWorkspaceId: input.agencyWorkspaceId },
       to: recipient.email,
-      subject: `${input.facts.agency.name}: ${input.businessName} · ${label} report`,
+      subject: mail.subject,
       idempotencyKey: `care-report:${input.releaseId}`,
       tags: { kind: "care_report" },
-      options: {
-        heading: `Your ${label} report`,
-        preheader: careHeadline(input.facts),
-        paragraphs: [careHeadline(input.facts), careOutcomeLine(input.facts.outcomes)],
-        button: { label: "Open the report", url: input.link },
-      },
+      html: mail.html,
+      text: mail.text,
     });
   } catch (error) {
     await deps.record(actor, input.releaseId, reserved, "unknown", null, null).catch(() => undefined);

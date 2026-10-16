@@ -1,0 +1,40 @@
+/* A Care plan report (XA). The report is a Page: white, 24 radius, the small
+   shadow; it is the one object on the owner's and the shared page. */
+.report { box-sizing: border-box; display: flex; width: 100%; flex-direction: column; gap: 32px; padding: 40px 44px 36px; border-radius: var(--st-r-xl); background: var(--st-surface); box-shadow: var(--st-shadow-sm); color: var(--st-text); }
+.report[data-flat="true"] { padding: 4px 0 0; border-radius: 0; background: none; box-shadow: none; }
+.back { margin-bottom: -8px; font-size: 14px; }
+.head { display: flex; flex-direction: column; gap: 18px; }
+.byline { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 0; font-size: 15px; line-height: 22px; }
+.bylineName { color: var(--st-text); font-weight: 600; }
+.credit { color: var(--st-text-3); }
+.logo { width: 28px; height: 28px; border-radius: 8px; object-fit: contain; }
+.note { display: flex; align-items: flex-start; gap: 12px; }
+.note p { margin: 0; padding-top: 3px; color: var(--st-text); font-size: 16px; line-height: 1.5; white-space: pre-wrap; }
+.sub { display: block; margin-top: 2px; color: var(--st-text-3); font-size: 13px; line-height: 18px; }
+.sentence { margin: 0; color: var(--st-text); font-size: 15px; line-height: 1.5; }
+.plain { display: flex; flex-direction: column; gap: 6px; margin: 0; padding: 0; list-style: none; color: var(--st-text-body); font-size: 15px; line-height: 1.45; }
+.plain > li:last-child { color: var(--st-text-3); font-size: 13px; }
+.releases { display: flex; flex-direction: column; gap: 10px; margin: 0; padding: 0; list-style: none; font-size: 15px; }
+.releases > li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; }
+.releases .sub { display: inline; margin: 0; }
+.current { color: var(--st-text); font-weight: 600; }
+.foot { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 24px; padding-top: 20px; border-top: 1px solid var(--st-line); }
+.foot > :first-child { flex: 1; min-width: 220px; }
+
+/* Owner and shared pages: one calm column, the report as the object. */
+.column { box-sizing: border-box; display: flex; width: 100%; max-width: 820px; flex-direction: column; gap: 24px; margin-inline: auto; padding: 48px 48px 140px; }
+
+/* The agency's prepare-and-share page (AG4): brief on the left, report on the right. */
+.prepare { display: flex; flex-direction: column; gap: 20px; }
+.prepareActions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.linkField { display: flex; flex-direction: column; gap: 8px; }
+.releaseLine { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 14px; }
+
+@media (max-width: 767px) {
+  .report { gap: 26px; padding: 24px 18px 22px; border-radius: 20px; }
+  .column { padding: 16px 12px 120px; }
+}
+@media print {
+  .report { padding: 0; box-shadow: none; }
+  .column { padding: 0; }
+}

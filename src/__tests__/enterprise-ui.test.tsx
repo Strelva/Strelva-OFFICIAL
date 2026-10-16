@@ -18,7 +18,7 @@ it("keeps live hierarchy data and archived command revision without inventing cl
   const request = vi.fn(async (_input: unknown, options?: RequestInit) => Response.json(options?.method === "POST" ? { ok: true } : view));
   vi.stubGlobal("fetch", request);
   const node = await render(createElement(Units, { organizationId: ORGANIZATION, businesses: [{ id: BUSINESS, name: "Clinic", role: "owner" }], canManage: true }));
-  expect(node.textContent).toContain("1 locations are unavailable");
+  expect(node.textContent).toContain("1 location is unavailable");
   expect(node.textContent).not.toContain("All live");
   await act(async () => ([...node.querySelectorAll("button")].find(button => button.textContent?.startsWith("Archive"))!).click());
   const post = request.mock.calls.find(call => call[1]?.method === "POST");

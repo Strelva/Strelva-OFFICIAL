@@ -1,8 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { StEmpty, StHead, StNotice, StPage, StPill, StSkeleton } from "@/components/ui/strelva/Kit";
+import { XaButton, XaEmpty, XaWorking } from "@/components/ui/strelva/Xa";
+import { XaNote, XaObjectPage } from "@/experience/xa-object/XaObjectPage";
 import { StandaloneApplicationShell } from "./StandaloneApplicationShell";
+import styles from "./application-use.module.css";
 import { useWorkspaceRequest } from "@/experience/workspace/WorkspaceRequest";
 import { BoundedWorkExperience } from "@/experience/operations/BoundedWorkExperience";
 import { agencyApplicationDraftGrantSchema, type AgencyApplicationDraftGrant } from "@/platform/offerings/agency-application-draft-contracts";
@@ -44,11 +46,14 @@ export function AgencyApplicationDraftExperience({ workId }: { workId: string })
   }, [request, reload, workId]);
 
   const active = now !== null && grant?.status === "active" && Number.isFinite(Date.parse(grant.expiresAt)) && Date.parse(grant.expiresAt) > now;
-  return <StandaloneApplicationShell><StPage>
-    {busy ? <><StHead title="Opening internal tool draft…" /><StSkeleton label="Checking the current draft permission" /></> : null}
-    {error ? <><div role="alert"><StNotice tone="critical">{error}</StNotice></div><div><StPill variant="soft" onClick={() => { setBusy(true); setError(""); setReload(value => value + 1); }}>Reload permission</StPill></div></> : null}
-    {!busy && !error && !active ? <StNotice tone="need">The client has not granted draft editing for this internal tool, or the grant has expired or been revoked. You can inspect the assigned work when its delivery is active, but you cannot save a draft revision.</StNotice> : null}
-    {!busy ? <BoundedWorkExperience workspaceId="assigned" workId={workId} productId="applications" standaloneApplication readOnly={!active} draftEditOnly={active} canEdit={active} sources={[]} onSaved={() => undefined} /> : null}
-    {!busy && !error && active ? <StEmpty>The client reviews and publishes changes. This access is limited to the internal tool named by the accepted delivery and assignment.</StEmpty> : null}
-  </StPage></StandaloneApplicationShell>;
+  const until = grant ? new Date(grant.expiresAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : null;
+  if (busy) return <StandaloneApplicationShell><XaObjectPage story={<XaWorking title="Opening the internal tool draft" steps={[{ id: "grant", label: "Checking the client's draft permission", state: "active" }]} />} /></StandaloneApplicationShell>;
+  return <StandaloneApplicationShell><div className={styles.work}>
+    {error ? <div role="alert"><XaEmpty pose="fixing" title="Your draft permission could not be read" job="Nothing was saved. The draft is as the client left it."
+      action={<XaButton variant="primary" size="lg" onClick={() => { setBusy(true); setError(""); setReload(value => value + 1); }}>Reload permission</XaButton>}>{error}</XaEmpty></div>
+      : active
+        ? <XaNote>You prepare; the client reviews and makes it live. Your draft editing lasts until {until} and covers only the internal tool named in the accepted work.</XaNote>
+        : <XaNote tone="waits">The client has not opened this draft to you, or the permission ended or was taken back. You can read the work; you can&apos;t save a draft.</XaNote>}
+    <BoundedWorkExperience workspaceId="assigned" workId={workId} productId="applications" standaloneApplication readOnly={!active} draftEditOnly={active} canEdit={active} sources={[]} onSaved={() => undefined} />
+  </div></StandaloneApplicationShell>;
 }

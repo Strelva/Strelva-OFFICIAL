@@ -1,9 +1,18 @@
 "use client";
-
+/**
+ * One internal tool, in use (XA, lane xs-apps-care). Story on the left: what
+ * the tool is, what you may do in it and its records. The object on the right:
+ * the record you opened, or the record you are adding or correcting, in place.
+ * Never a modal. One ink pill: "Add a record" while reading, "Submit record"
+ * while the form is open.
+ */
 import { FormEvent, useEffect, useId, useMemo, useRef, useState } from "react";
-import { StCopy, StEmpty, StField, StHead, StLabel, StMono, StNotice, StPage, StPill, StRows, StRow, StSection, StState, StSurface, StTextButton, StTextField } from "@/components/ui/strelva/Kit";
+import {
+  XaAnswers, XaButton, XaDecision, XaField, XaHeadline, XaRow, XaRows, XaStatus, XaSystemTile, XaTextLink,
+} from "@/components/ui/strelva/Xa";
+import { XaBlock, XaNote, XaObjectPage } from "@/experience/xa-object/XaObjectPage";
 import styles from "./application-use.module.css";
-import type { ApplicationUseSnapshot, ApplicationViewKind } from "@/products/applications/client";
+import type { ApplicationUseSnapshot } from "@/products/applications/client";
 
 export interface ApplicationUseDraft {
   values: Record<string, string | number | boolean>;
@@ -26,16 +35,11 @@ export interface ApplicationUseRendererProps {
   onSubmit: (draft: ApplicationUseDraft) => void;
 }
 
-function viewLabel(kind: ApplicationViewKind): string {
-  if (kind === "form") return "Submit a record";
-  if (kind === "list") return "Records";
-  if (kind === "detail") return "Record details";
-  return "Documents";
-}
-
+const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
 function displayValue(value: string | number | boolean | undefined): string {
-  if (value === undefined || value === "") return "Not provided";
+  if (value === undefined || value === "") return "Not given";
   if (typeof value === "boolean") return value ? "Yes" : "No";
+  if (typeof value === "string" && ISO_DAY.test(value)) return new Date(`${value}T00:00:00Z`).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", timeZone: "UTC" });
   return String(value);
 }
 
@@ -54,6 +58,8 @@ function fieldPlaceholder(type: string): string | undefined {
 }
 
 const LINK_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+const dateLabel = (iso: string) => new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
+const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 
 function nextIdempotencyKey(): string {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) return crypto.randomUUID();
@@ -61,16 +67,7 @@ function nextIdempotencyKey(): string {
 }
 
 export function ApplicationUseRenderer({
-  presentation,
-  recordSummaryField,
-  snapshot,
-  draft,
-  busy = false,
-  submitError,
-  submitMessage,
-  onReload,
-  onDraftChange,
-  onSubmit,
+  presentation, recordSummaryField, snapshot, draft, busy = false, submitError, submitMessage, onReload, onDraftChange, onSubmit,
 }: ApplicationUseRendererProps) {
   const instanceId = useId();
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -85,7 +82,7 @@ export function ApplicationUseRenderer({
     }
   }, [draft.editingRecordId, snapshot.records]);
   const recordViews = snapshot.views.filter(view => view.kind === "list" || view.kind === "detail" || view.kind === "document");
-  const recordsHeading = recordViews.some(view => view.kind !== "document") ? "Records" : "Documents";
+  const recordsWord = recordViews.some(view => view.kind !== "document") ? "record" : "document";
   const recordFields = useMemo(() => {
     const seen = new Set<string>();
     return recordViews.flatMap(view => view.fields).filter(field => {
@@ -125,120 +122,115 @@ export function ApplicationUseRenderer({
     onDraftChange({ values: {}, recordId: nextIdempotencyKey(), idempotencyKey: nextIdempotencyKey() });
   }
 
+  const titleField = recordFields[0]?.id ?? "";
+  const summaryField = recordSummaryField ?? recordFields[1]?.id ?? "";
+  const recordTitle = (record: ApplicationUseSnapshot["records"][number]) => record.linkLabels?.[titleField] ?? displayValue(record.values[titleField]);
+  const recordSummary = (record: ApplicationUseSnapshot["records"][number]) => record.linkLabels?.[summaryField] ?? displayValue(record.values[summaryField]);
   const selectedRecord = snapshot.records.find(record => record.id === selectedId) ?? snapshot.records[0];
-  const formOpen = presentation === "preview" || adding || editing || snapshot.records.length === 0 || recordViews.length === 0 || snapshot.access.recordRead === "none" || Boolean(submitError);
-  const Container = presentation === "preview" ? "div" : StPage;
-  return (
-    <Container>
-      {presentation === "preview" ? <StLabel as="h3">{snapshot.title}</StLabel> : <StHead title={snapshot.title} meta={<><StState kind="live">Live</StState> · release <StMono>{snapshot.releaseVersion}</StMono> · internal tool</>}
-        actions={formView && snapshot.access.recordSubmit && !formOpen ? <StPill onClick={() => setAdding(true)}>Add a record</StPill> : undefined} />}
-      {submitMessage ? <div role="status"><StNotice>{submitMessage}</StNotice></div> : null}
-      {formView && formOpen && (snapshot.access.recordSubmit || (editAllowed && editing)) ? (
-        <StSurface>
-          <StSection title={draft.editingRecordId ? "Correct a record" : viewLabel("form")}>
-            <StCopy muted>{draft.editingRecordId ? "Save a correction to the record. If someone changed it first, your correction stays here so you can review it." : "Enter the details below. Keep this tab open if you need to retry."}</StCopy>
-          <form ref={formRef} className="space-y-5" onSubmit={submit} aria-busy={busy}>
-            <div className="grid gap-5 sm:grid-cols-2">
-              {formView.fields.map(field => {
-                const value = draft.values[field.id];
-                const savedLink = (field.type === "contact" || field.type === "assigned_person") && typeof value === "string" && LINK_ID.test(value);
-                const savedLabel = savedLink ? snapshot.records.find(record => record.id === draft.editingRecordId && record.values[field.id] === value)?.linkLabels?.[field.id] : undefined;
-                if (field.type === "boolean") {
-                  return (
-                    <fieldset key={field.id} className="space-y-2">
-                      <legend className="block text-xs text-gray-muted">{field.label}{field.required ? " *" : ""}</legend>
-                      <div className="flex flex-wrap gap-2">
-                        {[true, false].map(option => (
-                          <label key={String(option)} className="inline-flex min-h-11 items-center gap-2 text-sm">
-                            <input
-                              id={`${instanceId}-app-field-${field.id}-${option ? "yes" : "no"}`}
-                              name={`${instanceId}-app-field-${field.id}`}
-                              type="radio"
-                              value={String(option)}
-                              checked={value === option}
-                              disabled={busy}
-                              onChange={() => updateValue(field.id, option)}
-                              required={field.required}
-                              className="h-4 w-4 accent-sage"
-                            />
-                            <span>{option ? "Yes" : "No"}</span>
-                          </label>
-                        ))}
-                      </div>
-                    </fieldset>
-                  );
-                }
-                if (field.type === "select") {
-                  return (
-                    <StField key={field.id} label={`${field.label}${field.required ? " *" : ""}`}>
-                      <select
-                        id={`${instanceId}-app-field-${field.id}`}
-                        name={`${instanceId}-app-field-${field.id}`}
-                        aria-label={field.label}
-                        value={value === undefined ? "" : String(value)}
-                        required={field.required}
-                        disabled={busy}
-                        onChange={event => updateValue(field.id, event.target.value)}
-                      >
-                        <option value="">Choose an option</option>
-                        {field.options?.map(option => <option key={option} value={option}>{option}</option>)}
-                      </select>
-                    </StField>
-                  );
-                }
-                return (
-                  <StTextField
-                    key={field.id}
-                    id={`${instanceId}-app-field-${field.id}`}
-                    label={`${field.label}${field.required ? " *" : ""}`}
-                    aria-label={field.label}
-                    type={fieldInputType(field.type)}
-                    placeholder={savedLink ? savedLabel ?? "Current link (unchanged)" : fieldPlaceholder(field.type)}
-                    description={savedLink ? `${savedLabel ? `Currently linked: ${savedLabel}.` : field.type === "assigned_person" ? "A staff member is already linked." : "A contact is already linked."} ${field.type === "assigned_person" ? "Enter another staff email to change it." : "Enter another email or phone to change it."}` : undefined}
-                    inputMode={field.type === "number" ? "decimal" : undefined}
-                    value={savedLink || value === undefined ? "" : String(value)}
-                    required={field.required && !savedLink}
-                    disabled={busy}
-                    onChange={event => updateValue(field.id, field.type === "number" ? (event.target.value === "" ? undefined : Number(event.target.value)) : event.target.value)}
-                  />
-                );
-              })}
-            </div>
-            {submitError ? <div id={`${instanceId}-application-submit-error`} role="alert"><StNotice tone="critical">{submitError}</StNotice></div> : null}
-            <div className="flex flex-wrap items-center gap-3">
-              <StPill type="submit" variant={presentation === "preview" ? "soft" : "primary"} busy={busy} disabled={busy} aria-describedby={submitError ? `${instanceId}-application-submit-error` : undefined}>{draft.editingRecordId ? "Save correction" : "Submit record"}</StPill>
-              {draft.editingRecordId ? <StPill type="button" variant="soft" disabled={busy} onClick={cancelEdit}>Cancel correction</StPill> : null}
-              {onReload && submitError ? <StPill type="button" variant="soft" disabled={busy} onClick={onReload}>Reload internal tool</StPill> : null}
-            </div>
-          </form>
-          </StSection>
-        </StSurface>
-      ) : null}
+  const canRead = recordViews.length > 0 && snapshot.access.recordRead !== "none";
+  const formOpen = presentation === "preview" || adding || editing || snapshot.records.length === 0 || !canRead || Boolean(submitError);
+  const formShown = Boolean(formView && formOpen && (snapshot.access.recordSubmit || (editAllowed && editing)));
+  const readOnly = snapshot.access.recordEdit === "none" && !snapshot.access.recordSubmit;
 
-      {recordViews.length > 0 && snapshot.access.recordRead !== "none" ? (
-        <div className={styles.recordsLayout}>
-          <StSection title={recordsHeading} meta={<StMono>{snapshot.records.length}</StMono>}>
-            {snapshot.records.length === 0 ? <StEmpty>There are no records to show yet.</StEmpty> : <StRows label={recordsHeading}>
-              {snapshot.records.map((record, index) => <StRow key={record.id} selected={selectedRecord?.id === record.id}
-                title={record.linkLabels?.[(recordFields[0]?.id ?? "")] ?? displayValue(record.values[(recordFields[0]?.id ?? "")])}
-                detail={record.linkLabels?.[(recordSummaryField ?? recordFields[1]?.id ?? "")] ?? displayValue(record.values[(recordSummaryField ?? recordFields[1]?.id ?? "")])}
-                onClick={() => setSelectedId(record.id)}><span className="sr-only">Record {index + 1}</span></StRow>)}
-            </StRows>}
-          </StSection>
-          {selectedRecord ? <StSurface>
-            <article aria-label={`Record ${snapshot.records.indexOf(selectedRecord) + 1}`}>
-              <div className={styles.recordHead}><span>Record details</span>
-                {formView && editAllowed && selectedRecord.revision !== undefined ? <StTextButton onClick={() => beginEdit(selectedRecord)}>Edit record</StTextButton> : null}
-              </div>
-              <dl className={styles.fields}>{recordFields.map(field => <div key={field.id}>
-                <dt>{field.label}</dt><dd>{selectedRecord.linkLabels?.[field.id] ?? displayValue(selectedRecord.values[field.id])}</dd>
-              </div>)}</dl>
-            </article>
-          </StSurface> : null}
-        </div>
-      ) : null}
-      {presentation !== "preview" ? <StSection title="Access and checks"><StRows><StRow title="Access expires" value={<StMono as="time" dateTime={snapshot.access.expiresAt}>{new Date(snapshot.access.expiresAt).toLocaleString()}</StMono>} /><StRow title="Latest checks" detail="No check result is available for this tool yet, so Strelva can’t say it’s working." end={<StState kind="draft">Not checked</StState>} /></StRows></StSection> : null}
-      {snapshot.access.recordEdit === "none" && !snapshot.access.recordSubmit ? <StNotice>You have read-only access. You can open records; the owner controls changes.</StNotice> : null}
-    </Container>
-  );
+  const form = formView && formShown ? <form ref={formRef} className={styles.form} onSubmit={submit} aria-busy={busy} aria-label={draft.editingRecordId ? "Correct a record" : "Submit a record"}>
+    <div className={styles.fields}>
+      {formView.fields.map(field => {
+        const value = draft.values[field.id];
+        const savedLink = (field.type === "contact" || field.type === "assigned_person") && typeof value === "string" && LINK_ID.test(value);
+        const savedLabel = savedLink ? snapshot.records.find(record => record.id === draft.editingRecordId && record.values[field.id] === value)?.linkLabels?.[field.id] : undefined;
+        const optional = field.required ? undefined : "Optional";
+        if (field.type === "boolean") {
+          return <fieldset key={field.id} className={styles.choiceField}>
+            <legend>{field.label}{optional ? <span className={styles.optional}> · optional</span> : null}</legend>
+            <div className={styles.choiceRow}>
+              {[true, false].map(option => <label key={String(option)} className={styles.choice}>
+                <input id={`${instanceId}-app-field-${field.id}-${option ? "yes" : "no"}`} name={`${instanceId}-app-field-${field.id}`} type="radio" value={String(option)}
+                  checked={value === option} disabled={busy} onChange={() => updateValue(field.id, option)} required={field.required} />
+                <span>{option ? "Yes" : "No"}</span>
+              </label>)}
+            </div>
+          </fieldset>;
+        }
+        if (field.type === "select") {
+          return <div key={field.id} className={styles.selectField}>
+            <label htmlFor={`${instanceId}-app-field-${field.id}`}>{field.label}{optional ? <span className={styles.optional}> · optional</span> : null}</label>
+            <select id={`${instanceId}-app-field-${field.id}`} name={`${instanceId}-app-field-${field.id}`} aria-label={field.label} value={value === undefined ? "" : String(value)}
+              required={field.required} disabled={busy} onChange={event => updateValue(field.id, event.target.value)}>
+              <option value="">Choose one</option>
+              {field.options?.map(option => <option key={option} value={option}>{option}</option>)}
+            </select>
+          </div>;
+        }
+        return <XaField key={field.id} id={`${instanceId}-app-field-${field.id}`} label={field.label} aria-label={field.label}
+          type={fieldInputType(field.type)}
+          placeholder={savedLink ? savedLabel ?? "Current link (unchanged)" : fieldPlaceholder(field.type)}
+          hint={savedLink ? `${savedLabel ? `Currently linked: ${savedLabel}.` : field.type === "assigned_person" ? "A staff member is already linked." : "A contact is already linked."} ${field.type === "assigned_person" ? "Enter another staff email to change it." : "Enter another email or phone to change it."}` : optional}
+          inputMode={field.type === "number" ? "decimal" : undefined}
+          value={savedLink || value === undefined ? "" : String(value)}
+          required={field.required && !savedLink}
+          disabled={busy}
+          onChange={event => updateValue(field.id, field.type === "number" ? (event.target.value === "" ? undefined : Number(event.target.value)) : event.target.value)} />;
+      })}
+    </div>
+    {submitError ? <div id={`${instanceId}-application-submit-error`} role="alert"><XaNote tone="down">{submitError}</XaNote></div> : null}
+    <div className={styles.actions}>
+      <XaButton type="submit" variant={presentation === "preview" ? "secondary" : "primary"} size="lg" busy={busy} disabled={busy} aria-describedby={submitError ? `${instanceId}-application-submit-error` : undefined}>{draft.editingRecordId ? "Save correction" : "Submit record"}</XaButton>
+      {draft.editingRecordId ? <XaButton type="button" variant="quiet" disabled={busy} onClick={cancelEdit}>Cancel correction</XaButton>
+        : adding && snapshot.records.length > 0 && presentation !== "preview" ? <XaButton type="button" variant="quiet" disabled={busy} onClick={() => setAdding(false)}>Not now</XaButton> : null}
+      {onReload && submitError ? <XaButton type="button" variant="secondary" disabled={busy} onClick={onReload}>Reload internal tool</XaButton> : null}
+    </div>
+  </form> : null;
+
+  const records = canRead ? (snapshot.records.length === 0
+    ? <XaNote>No {recordsWord}s yet. {formView && snapshot.access.recordSubmit ? `The first one you submit shows here.` : "They show here when someone adds one."}</XaNote>
+    : <XaRows label={recordsWord === "record" ? "Records" : "Documents"}>
+      {snapshot.records.map((record, index) => <XaRow key={record.id} current={!formShown && selectedRecord?.id === record.id}
+        title={<>{recordTitle(record)}<span className="sr-only"> · Record {index + 1}</span></>} detail={recordSummary(record)}
+        onClick={() => { setSelectedId(record.id); if (!editing) setAdding(false); }} />)}
+    </XaRows>) : null;
+
+  // The draft builder's live preview: the form and records only, one column.
+  if (presentation === "preview") {
+    return <div className={styles.previewStack}>
+      <XaHeadline as="h2" size="sm">{snapshot.title}</XaHeadline>
+      {submitMessage ? <XaNote role="status" tone="done">{submitMessage}</XaNote> : null}
+      {form}
+      {records}
+    </div>;
+  }
+
+  const detail = selectedRecord && !formShown ? <XaDecision label={`Record ${snapshot.records.indexOf(selectedRecord) + 1}`}
+    status={<span className={styles.recordStatus}>{recordTitle(selectedRecord)}</span>}
+    meta={formView && editAllowed && selectedRecord.revision !== undefined ? <XaTextLink onClick={() => beginEdit(selectedRecord)}>Edit record</XaTextLink> : undefined}
+    yes={null}>
+    <article aria-label={`Record ${snapshot.records.indexOf(selectedRecord) + 1}`}>
+      <dl className={styles.recordFields}>{recordFields.map(field => <div key={field.id}>
+        <dt>{field.label}</dt><dd>{selectedRecord.linkLabels?.[field.id] ?? displayValue(selectedRecord.values[field.id])}</dd>
+      </div>)}</dl>
+    </article>
+  </XaDecision> : null;
+
+  const object = formShown ? <XaDecision label={draft.editingRecordId ? "Correct a record" : "Submit a record"}
+    status={<span className={styles.recordStatus}>{draft.editingRecordId ? "Correcting a record" : "New record"}</span>}
+    meta={draft.editingRecordId ? "If someone changed it first, your correction stays here." : "Keep this tab open if you need to try again."} yes={null}>
+    {form}
+  </XaDecision> : detail;
+
+  const count = snapshot.records.length;
+  return <XaObjectPage label={snapshot.title}
+    story={<>
+      <XaSystemTile kind="form" size={56} label="Internal tool" />
+      <XaHeadline quiet={!canRead ? "Fill it in. Your answers go to the business." : count ? `${plural(count, recordsWord, `${recordsWord}s`)}. Open one, or add one.` : `No ${recordsWord}s yet.`}>{snapshot.title}.</XaHeadline>
+      {submitMessage ? <XaNote role="status" tone="done">{submitMessage}</XaNote> : null}
+      {formView && snapshot.access.recordSubmit && !formShown ? <div><XaButton variant="primary" size="lg" onClick={() => setAdding(true)}>Add a record</XaButton></div> : null}
+      <XaAnswers labelWidth={120} rows={[
+        ["Release", `Release ${snapshot.releaseVersion}`],
+        ["You can", readOnly ? "Read records. The owner controls changes." : snapshot.access.recordEdit === "all" ? "Add records and correct any record." : snapshot.access.recordEdit === "own" ? "Add records and correct your own." : "Add records."],
+        ["Your access", <time key="t" dateTime={snapshot.access.expiresAt}>Until {dateLabel(snapshot.access.expiresAt)}</time>],
+        ["Checks", <span key="c" className={styles.checks}><XaStatus kind="draft" size="sm">Not checked</XaStatus><span>No check has run yet, so Strelva can&apos;t say it&apos;s working.</span></span>],
+      ]} />
+      {canRead ? <XaBlock label={recordsWord === "record" ? "Records" : "Documents"} id={`${instanceId}-records`}>{records}</XaBlock> : null}
+      {readOnly ? <XaNote>You have read-only access. You can open records; the owner controls changes.</XaNote> : null}
+    </>}
+    object={object} />;
 }

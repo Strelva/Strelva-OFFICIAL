@@ -161,19 +161,19 @@ describe("CareReportEditor", () => {
     expect(button("Refresh the numbers")).toBeUndefined();
     expect(button("Email to Harbor Dental")).toBeUndefined();
     expect(button("Create a link anyone can open")).toBeUndefined();
-    expect(node.textContent).not.toContain("Hold to share");
+    expect(node.textContent).not.toContain("Share Release");
     expect(node.textContent).toContain("You can read this report.");
   });
 
   it("names the Release a writer is about to share", async () => {
     await mountEditor();
-    expect(node.textContent).toContain("Hold to share Release 3 with Harbor Dental");
+    expect(node.textContent).toContain("Share Release 3 with Harbor Dental");
     expect(node.querySelector("textarea")).not.toBeNull();
   });
 
   it("holds sharing while the note is typed but not saved", async () => {
     await mountEditor();
-    const hold = () => button("Hold to share") as HTMLButtonElement;
+    const hold = () => button("Share Release 3") as HTMLButtonElement;
     expect(hold().disabled).toBe(false);
     expect(node.textContent).not.toContain("Save the note before sharing.");
     const area = node.querySelector("textarea")!;

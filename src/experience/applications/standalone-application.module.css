@@ -1,2 +1,0 @@
-.canvas { min-height: 100dvh; background-color: var(--st-canvas); color: var(--st-text); background-image: radial-gradient(var(--st-dot) 1px, transparent 1px); background-size: 24px 24px; font-family: var(--font-workspace), system-ui, sans-serif; }
-.applicationFrame { display: block; width: 100%; min-height: 70dvh; border: 0; }

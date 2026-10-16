@@ -1,9 +1,12 @@
 "use client";
-import { useCallback, useState } from "react";
-import { StCopy, StField, StHold, StNotice, StPill, StRow, StRows, StSection, StTextButton } from "@/components/ui/strelva/Kit";
+import { useCallback, useEffect, useState } from "react";
+import { strelvaUndoWindowMs } from "@/platform/infra/motion";
+import { XaAnswers, XaButton, XaDecision, XaField, XaHeadline, XaStatus, XaTextArea, XaTextLink, XaYes, type XaYesState } from "@/components/ui/strelva/Xa";
+import { XaBlock, XaCrumbs, XaNote, XaObjectPage } from "@/experience/xa-object/XaObjectPage";
+import styles from "./care-report.module.css";
 import type { OwnerBrand } from "@/platform/infra/agency-brand";
 import { careReportAgencyViewResponseSchema, careReportAgencyViewSchema, careReportFactsSchema, type CareReportAgencyView } from "@/platform/care-reports/contracts";
-import { careDeliveryLine, careReleaseLabel, careShortDate } from "@/platform/care-reports/model";
+import { careDeliveryLine, careMonthLabel, careReleaseLabel, careShortDate } from "@/platform/care-reports/model";
 import { careReportWorkspaceUrl } from "@/platform/care-reports/share";
 import { CareReportDocument } from "./CareReportDocument";
 
@@ -31,6 +34,14 @@ export function CareReportEditor({ initial, brand, emailOn, shareLinksOn, origin
   const [copyUrl, setCopyUrl] = useState<string | null>(null);
   const [newLink, setNewLink] = useState<string | null>(null);
   const [lines, setLines] = useState<Record<number, string>>({});
+  const [sharedNumber, setSharedNumber] = useState<number | null>(null);
+  const [publishFailed, setPublishFailed] = useState(false);
+  // The "shared" pill settles after the same window as any Undo, then the next Release waits.
+  useEffect(() => {
+    if (sharedNumber === null) return;
+    const timer = window.setTimeout(() => setSharedNumber(null), strelvaUndoWindowMs);
+    return () => window.clearTimeout(timer);
+  }, [sharedNumber]);
   const { report, releases } = view;
   const business = report.businessName;
   const latest = releases[0]?.number ?? 0;
@@ -45,9 +56,11 @@ export function CareReportEditor({ initial, brand, emailOn, shareLinksOn, origin
     else setProblem("The report could not be reloaded. Reload the page.");
   }, [base, request]);
 
-  async function act(name: string, work: () => Promise<void>) {
+  async function act(name: string, work: () => Promise<boolean | void>) {
     setBusy(name); setProblem(null); setMessage(null);
-    try { await work(); } catch { setProblem("That was not confirmed. Reload the page to see the current state."); }
+    if (name === "publish") setPublishFailed(false);
+    try { if (await work() === false && name === "publish") setPublishFailed(true); }
+    catch { setProblem("That was not confirmed. Reload the page to see the current state."); if (name === "publish") setPublishFailed(true); }
     finally { setBusy(null); }
   }
   const failed = async (response: Response) => {
@@ -76,9 +89,9 @@ export function CareReportEditor({ initial, brand, emailOn, shareLinksOn, origin
   });
   const publish = () => act("publish", async () => {
     const response = await post({ action: "publish", expectedRevision: report.revision });
-    if (await failed(response)) return;
+    if (await failed(response)) return false;
     const value = await response.json() as { number: number };
-    await reload(); setMessage(`${careReleaseLabel(value.number)} shared. ${business} sees it in Recaps.`);
+    await reload(); setSharedNumber(value.number); setMessage(`${careReleaseLabel(value.number)} shared. ${business} sees it in Recaps.`);
   });
   const send = (release: number) => act(`send-${release}`, async () => {
     const response = await post({ action: "send", release });
@@ -107,53 +120,74 @@ export function CareReportEditor({ initial, brand, emailOn, shareLinksOn, origin
   const signedInLink = careReportWorkspaceUrl(origin, report.id, report.businessWorkspaceId, latest || undefined);
   const noteTooLong = note.length > NOTE_MAX;
   const noteDirty = note !== (view.report.agencyNote ?? "");
+  const next = careReleaseLabel(latest + 1);
+  const latestRelease = releases[0];
+  const yesState: XaYesState = busy === "publish" ? "going" : publishFailed ? "failed" : sharedNumber !== null ? "live" : "waiting";
+  const clientsHref = `/workspace?workspaceId=${encodeURIComponent(report.agencyWorkspaceId)}&view=clients`;
 
-  return <>
-    {facts.success
-      ? <CareReportDocument snapshot={{ ...facts.data, agencyNote: view.report.agencyNote }} brand={brand} releaseNumber={null} audience="agency"
-        back={{ label: "Clients", href: `/workspace?workspaceId=${encodeURIComponent(report.agencyWorkspaceId)}&view=clients` }} />
-      : <StNotice tone="critical">This draft can&apos;t be shown. {view.canWrite ? "Refresh the numbers to rebuild it." : "Ask an agency owner or admin to refresh the numbers."}</StNotice>}
-    <div data-print-hide className="grid gap-6">
-      {message ? <StNotice><span role="status">{message}</span></StNotice> : null}
-      {problem ? <StNotice tone="critical">{problem}</StNotice> : null}
-      {view.canWrite ? <StSection title="Prepare this report">
-        <StField label={`Note for ${business}`} hint={`${note.length} / ${NOTE_MAX}`}>
-          <textarea value={note} maxLength={NOTE_MAX + 200} rows={4} onChange={event => setNote(event.target.value)} />
-        </StField>
-        <div className="flex flex-wrap items-center gap-3">
-          <StPill variant="soft" busy={busy === "note"} disabled={busy !== null || noteTooLong} onClick={() => void saveNote()}>Save note</StPill>
-          <StPill variant="soft" busy={busy === "refresh"} disabled={busy !== null} onClick={() => void refresh()}>Refresh the numbers</StPill>
+  const story = <>
+    <XaCrumbs items={[{ label: "Clients", href: clientsHref }, { label: business }, { label: "Care plan report" }]} />
+    <XaHeadline quiet={view.canWrite ? `${next} is a draft.` : latestRelease ? `${careReleaseLabel(latestRelease.number)} is shared.` : "Nothing is shared yet."}>
+      {business}, {careMonthLabel(report.month).split(" ")[0]}.
+    </XaHeadline>
+    <XaAnswers labelWidth={110} rows={[
+      ["With " + business, latestRelease ? `${careReleaseLabel(latestRelease.number)}, shared ${careShortDate(latestRelease.publishedAt)}` : "Nothing yet. They see a report only after you share it."],
+      ["Link", shareLinksOn && view.shareLink ? `On since ${careShortDate(view.shareLink.createdAt)}` : shareLinksOn ? "Off" : "Signed-in owners only"],
+    ]} />
+    {message ? <XaNote role="status" tone="done">{message}</XaNote> : null}
+    {problem && !publishFailed ? <XaNote role="alert" tone="down">{problem}</XaNote> : null}
+    {view.canWrite ? <XaBlock label={`Note for ${business}`}>
+      <div className={styles.prepare}>
+        <XaTextArea label={<span className="sr-only">Note for {business}</span>} value={note} maxLength={NOTE_MAX + 200} rows={4} onChange={event => setNote(event.target.value)}
+          hint={`${note.length} / ${NOTE_MAX}`} error={noteTooLong ? `Keep the note under ${NOTE_MAX} characters.` : undefined} placeholder="What you did this month, in your words" />
+        <div className={styles.prepareActions}>
+          <XaButton variant="secondary" size="sm" busy={busy === "note"} disabled={busy !== null || noteTooLong || !noteDirty} onClick={() => void saveNote()}>Save note</XaButton>
+          <XaButton variant="quiet" size="sm" busy={busy === "refresh"} disabled={busy !== null} onClick={() => void refresh()}>Refresh the numbers</XaButton>
         </div>
-        {noteDirty ? <StCopy muted>Save the note before sharing.</StCopy> : null}
-        <StHold label={`Hold to share ${careReleaseLabel(latest + 1)} with ${business}`} disabled={busy !== null || !facts.success || noteDirty} onAccept={() => void publish()} />
-      </StSection> : <StNotice>You can read this report. Only an agency owner or admin can add a note or share it.</StNotice>}
-      <StSection title="Releases">
-        {releases.length ? <StRows label="Releases of this report">
-          {releases.map(release => {
-            const delivery = view.deliveries.find(item => item.releaseNumber === release.number) ?? null;
-            const line = lines[release.number] ?? careDeliveryLine(delivery ? { status: delivery.status, reason: delivery.reason, recordedAt: delivery.recordedAt } : null, emailOn);
-            return <StRow key={release.id} title={careReleaseLabel(release.number)} detail={<>Shared {careShortDate(release.publishedAt)}<br />{line}</>}
-              end={<span className="flex items-center gap-3">
-                <StTextButton href={`/workspace/care-reports/${report.id}?workspaceId=${report.agencyWorkspaceId}&release=${release.number}`}>Open</StTextButton>
-                {view.canWrite ? <StTextButton disabled={!emailOn || busy !== null} onClick={() => void send(release.number)}>Email to {business}</StTextButton> : null}
-              </span>} />;
-          })}
-        </StRows> : <StCopy muted>Nothing is shared yet. {business} sees a report only after you share a Release.</StCopy>}
-      </StSection>
-      <StSection title="Share">
-        <div className="flex flex-wrap items-center gap-3">
-          <StPill variant="soft" onClick={() => void copy(signedInLink)}>Copy link for signed-in owners</StPill>
-          {view.canWrite && shareLinksOn ? <StPill variant="soft" busy={busy === "share"} disabled={busy !== null || !releases.length} onClick={() => void share()}>Create a link anyone can open</StPill> : null}
-          {view.canWrite && shareLinksOn && view.shareLink ? <StTextButton tone="danger" disabled={busy !== null} onClick={() => void revoke()}>Turn off the link</StTextButton> : null}
-        </div>
-        {copyUrl ? <StField label="Copy this link"><input readOnly value={copyUrl} onFocus={event => event.currentTarget.select()} /></StField> : null}
-        {newLink ? <div className="grid gap-2">
-          <StField label="Link anyone can open"><input readOnly value={newLink} onFocus={event => event.currentTarget.select()} /></StField>
-          <div><StPill variant="soft" onClick={() => void copy(newLink)}>Copy link</StPill></div>
-          <StCopy muted>Anyone with this link can read this report. Turn it off any time.</StCopy>
-        </div> : shareLinksOn && view.shareLink ? <StCopy muted>A link is on since {careShortDate(view.shareLink.createdAt)}. Create a new link to copy it again; the old one stops working.</StCopy> : null}
-        {!emailOn ? <StCopy muted>{careDeliveryLine(null, false)}</StCopy> : null}
-      </StSection>
-    </div>
+      </div>
+    </XaBlock> : <XaNote>You can read this report. Only an agency owner or admin can add a note or share it.</XaNote>}
+    <XaBlock label="Releases">
+      {releases.length ? <ul className={styles.releases} aria-label="Releases of this report">
+        {releases.map(release => {
+          const delivery = view.deliveries.find(item => item.releaseNumber === release.number) ?? null;
+          const line = lines[release.number] ?? careDeliveryLine(delivery ? { status: delivery.status, reason: delivery.reason, recordedAt: delivery.recordedAt } : null, emailOn);
+          return <li key={release.id}>
+            <span className={styles.releaseLine}>
+              <XaTextLink href={`/workspace/care-reports/${report.id}?workspaceId=${report.agencyWorkspaceId}&release=${release.number}`}>{careReleaseLabel(release.number)}</XaTextLink>
+              <span className={styles.sub}>Shared {careShortDate(release.publishedAt)}</span>
+              {view.canWrite ? <XaButton variant="quiet" size="sm" disabled={!emailOn || busy !== null} busy={busy === `send-${release.number}`} onClick={() => void send(release.number)}>Email to {business}</XaButton> : null}
+            </span>
+            <span className={styles.sub}>{line}</span>
+          </li>;
+        })}
+      </ul> : <XaNote>Nothing is shared yet. {business} sees a report only after you share a Release.</XaNote>}
+    </XaBlock>
+    <XaBlock label="Share">
+      <div className={styles.prepareActions}>
+        <XaButton variant="secondary" size="sm" onClick={() => void copy(signedInLink)}>Copy link for signed-in owners</XaButton>
+        {view.canWrite && shareLinksOn ? <XaButton variant="secondary" size="sm" busy={busy === "share"} disabled={busy !== null || !releases.length} onClick={() => void share()}>Create a link anyone can open</XaButton> : null}
+        {view.canWrite && shareLinksOn && view.shareLink ? <XaButton variant="quiet" size="sm" disabled={busy !== null} onClick={() => void revoke()}>Turn off the link</XaButton> : null}
+      </div>
+      {copyUrl ? <XaField label="Copy this link" readOnly value={copyUrl} onFocus={event => event.currentTarget.select()} /> : null}
+      {newLink ? <div className={styles.linkField}>
+        <XaField label="Link anyone can open" readOnly value={newLink} onFocus={event => event.currentTarget.select()} hint="Anyone with this link can read this report. Turn it off any time." />
+        <div><XaButton variant="secondary" size="sm" onClick={() => void copy(newLink)}>Copy link</XaButton></div>
+      </div> : shareLinksOn && view.shareLink ? <XaNote>A link is on since {careShortDate(view.shareLink.createdAt)}. Create a new link to copy it again; the old one stops working.</XaNote> : null}
+      {!emailOn ? <XaNote>{careDeliveryLine(null, false)}</XaNote> : null}
+    </XaBlock>
   </>;
+
+  const object = <XaDecision label={`${next} draft`}
+    status={facts.success ? <XaStatus kind="draft">{next} draft</XaStatus> : <XaStatus kind="down">Can&apos;t be shown</XaStatus>}
+    meta={`${business} sees it in Recaps after you share`}
+    yes={view.canWrite ? <XaYes state={yesState} yesLabel={`Share ${next} with ${business}`} onYes={() => void publish()}
+      liveLabel={sharedNumber !== null ? `${careReleaseLabel(sharedNumber)} shared with ${business}` : undefined}
+      failure={problem ?? `${next} was not shared. ${business} still sees the last Release.`}
+      disabledReason={!facts.success ? "Refresh the numbers to rebuild the draft first." : noteDirty ? "Save the note before sharing." : undefined} /> : null}>
+    {facts.success
+      ? <CareReportDocument flat snapshot={{ ...facts.data, agencyNote: view.report.agencyNote }} brand={brand} releaseNumber={null} audience="agency" />
+      : <XaNote tone="down">This draft can&apos;t be shown. {view.canWrite ? "Refresh the numbers to rebuild it." : "Ask an agency owner or admin to refresh the numbers."}</XaNote>}
+  </XaDecision>;
+
+  return <XaObjectPage label={`${business} Care plan report`} story={story} object={object} wide />;
 }

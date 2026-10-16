@@ -1,6 +1,6 @@
-import styles from "@/experience/enterprise/home-finder-buyer.module.css";
-import { StHead, StPage, StSkeleton } from "@/components/ui/strelva/Kit";
+import { XaWorking } from "@/components/ui/strelva/Xa";
+import { XaOutside } from "@/experience/xa-object/XaObjectPage";
 
 export default function LoadingHomeFinder() {
-  return <main data-dashboard data-workspace-theme="linen" className={styles.paper}><StPage><StHead title="Opening Home Finder…" /><StSkeleton label="Checking access to Home Finder" /><StSkeleton width="65%" /></StPage></main>;
+  return <XaOutside from={null} meta="Home search" label="Opening Home Finder"><XaWorking title="Opening Home Finder" steps={[{ id: "entry", label: "Checking access from the brokerage website", state: "active" }]} /></XaOutside>;
 }

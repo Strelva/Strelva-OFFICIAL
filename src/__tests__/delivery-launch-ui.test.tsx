@@ -16,7 +16,8 @@ function response(body:unknown,status=200){return new Response(JSON.stringify(bo
 const transport:typeof fetch=(input,init)=>new Promise(resolve=>calls.push({url:String(input),init,resolve}));
 async function render(node:ReactNode){await act(async()=>root.render(createElement(WorkspaceRequestContext.Provider,{value:transport},node)));}
 async function resolve(index:number,body:unknown,status=200){await act(async()=>calls[index]!.resolve(response(body,status)));}
-function button(text:string){return [...container.querySelectorAll<HTMLButtonElement>("button")].find(item=>item.textContent===text || item.getAttribute("aria-label")===text)!;}
+// XA buttons may draw a keyboard hint (⌘↵) inside the pill; the name a person reads is the text without it.
+function button(text:string){return [...container.querySelectorAll<HTMLButtonElement>("button")].find(item=>item.textContent?.replace("⌘↵","")===text || item.getAttribute("aria-label")===text)!;}
 beforeEach(()=>{vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT",true);sessionStorage.clear();calls=[];container=document.createElement("div");document.body.appendChild(container);root=createRoot(container);});
 afterEach(async()=>{await act(async()=>root.unmount());container.remove();sessionStorage.clear();vi.unstubAllGlobals();});
 describe("agency and native entry interfaces",()=>{
@@ -46,11 +47,11 @@ describe("agency and native entry interfaces",()=>{
 
  it("retains and replays exactly one unconfirmed delivery decision across remounts",async()=>{
   await render(createElement(DeliveryCommitmentPanel,{requestId}));await resolve(0,inspection());
-  expect(container.textContent).toContain("Quote 42");expect(container.querySelector('dl')?.textContent).toContain("website_delivery");expect(button("Propose 24-hour delivery")).toBeUndefined();
-  await act(async()=>button("Accept scope and start 24-hour delivery").click());
-  expect(calls).toHaveLength(1);
-  await act(async()=>button("Cancel").click());
-  await act(async()=>button("Accept scope and start 24-hour delivery").dispatchEvent(new KeyboardEvent("keydown",{key:"Enter",metaKey:true,bubbles:true})));
+  expect(container.textContent).toContain("Quote 42");expect(container.querySelector('dl')?.textContent).toContain("Website delivery");expect(button("Propose 24-hour delivery")).toBeUndefined();
+  expect(button("Accept scope and start 24-hour delivery")).toBeDefined();
+  // The one yes: ⌘↵ presses it from anywhere on the screen, exactly once.
+  await act(async()=>document.dispatchEvent(new KeyboardEvent("keydown",{key:"Enter",metaKey:true,bubbles:true})));
+  expect(calls).toHaveLength(2);
   const command=JSON.parse(String(calls[1]!.init?.body));expect(command).toMatchObject({requestId,expectedRevision:3,change:{kind:"agree"}});
   await resolve(1,{error:{message:"Response lost"}},503);
   expect(container.textContent).toContain("previous command is not confirmed");

@@ -1,12 +1,14 @@
 "use client";
 
-import Link from "next/link";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
-import { StHead, StHold, StMono, StNotice, StPage, StPill, StSection, StSkeleton, StSteps, StSurface, StTextButton, type StepState } from "@/components/ui/strelva/Kit";
+import { XaAnswers, XaButton, XaButtonLink, XaDecision, XaEmpty, XaField, XaHeadline, XaStatus, XaTextArea, XaTextLink, XaWorking, XaYes } from "@/components/ui/strelva/Xa";
+import { XaBlock, XaCrumbs, XaNote, XaObjectPage, XaSteps } from "@/experience/xa-object/XaObjectPage";
+import type { DeliveryCommitment } from "@/platform/service-requests/delivery-commitment";
+
+type StepState = "done" | "active" | "pending";
 import type { ServiceRequest } from "@/platform/service-requests/types";
 import styles from "./delivery-panel.module.css";
-import { TextInput, TextArea, SelectInput } from "@/components/ui/TextInput";
-import { deliveryCommitmentStatus, deliveryCommitmentCommandSchema, deliveryReviewUrlSchema } from "@/platform/service-requests/delivery-commitment";
+import { deliveryCommitmentCommandSchema, deliveryReviewUrlSchema } from "@/platform/service-requests/delivery-commitment";
 import { serviceRequestSchema } from "@/platform/service-requests/types";
 import { useWorkspaceRequest } from "@/experience/workspace/WorkspaceRequest";
 import { CodeAgentHandoff } from "./CodeAgentHandoff";
@@ -19,6 +21,24 @@ function errorMessage(body: unknown, fallback: string): string {
 }
 function displayDate(value: string | null): string {
   return value ? new Date(value).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" }) : "Not started";
+}
+
+/** Scope ids ("website_delivery") as words a person reads ("Website delivery"). */
+export function scopeWords(scope: readonly string[]): string {
+  return scope.map(item => { const words = item.replace(/[_-]+/g, " ").trim(); return words.charAt(0).toUpperCase() + words.slice(1); }).join(", ");
+}
+
+/** Where a delivery stands, in one sentence that names whose move it is. */
+export function deliverySentence(commitment: DeliveryCommitment | null | undefined, item: Pick<ServiceRequest, "status" | "providerAcceptance">, viewer: "business" | "agency" | "either" = "either", now = Date.now()): string {
+  if (!commitment) return item.status === "draft" ? "A draft. It hasn't been asked yet." : item.status === "withdrawn" ? "Withdrawn. Its records are kept." : item.providerAcceptance.status === "declined" ? "The agency declined it." : item.providerAcceptance.status === "accepted" ? "The agency took it for review. No clock has started." : "Waiting for the agency to review it.";
+  if (commitment.status === "proposed") return viewer === "business" ? "Scope and terms wait for your yes." : "Scope and terms wait for the business to accept them.";
+  if (commitment.status === "accepted") return "Done. The business accepted the result.";
+  if (commitment.status === "cancelled") return "Cancelled. Its records are kept.";
+  if (commitment.status === "submitted") return viewer === "business" ? "Ready for you to review." : "Ready for the business to review.";
+  const late = commitment.dueAt !== null && Date.parse(commitment.dueAt) <= now;
+  if (commitment.status === "changes_requested") return late ? "Changes asked for, and the original deadline has passed." : viewer === "business" ? "You asked for changes." : "The business asked for changes.";
+  if (commitment.blocker) return late ? "Blocked, and the deadline has passed." : "Blocked. The deadline hasn't moved.";
+  return late ? "Past its deadline." : "In progress.";
 }
 
 /** Only retained dates mark completed stages; a proposed scope is never agreed work. */
@@ -128,46 +148,87 @@ export function DeliveryCommitmentPanel({ requestId, children }: { requestId: st
     } finally { mutation.current = false; if (version === generation.current || version + 1 === generation.current) setSaving(false); }
   }
 
-  if (loading) return <StPage><StHead title="Request" /><div role="status" aria-label="Loading the saved delivery and current permissions"><StSkeleton /><StSkeleton width="75%" /></div></StPage>;
-  if (!inspection || inspection.request.id !== requestId) return <StPage><StHead title="Request" /><StNotice tone="critical">{error || "This delivery is unavailable."}</StNotice>{signIn ? <Link href={`/sign-in?next=${encodeURIComponent(`/workspace/delivery/${requestId}`)}`}>Sign in to review this delivery</Link> : <StPill variant="soft" onClick={() => void load()}>Check again</StPill>}</StPage>;
+  if (loading) return <XaObjectPage story={<XaWorking title="Opening the Request" steps={[{ id: "read", label: "Reading the saved delivery and your permissions", state: "active" }]} />} />;
+  if (!inspection || inspection.request.id !== requestId) return <XaObjectPage story={<div role="alert"><XaEmpty pose="fixing" title="This Request couldn't be opened" job="Your saved Request hasn't changed."
+    action={signIn ? <XaButtonLink variant="primary" size="lg" href={`/sign-in?next=${encodeURIComponent(`/workspace/delivery/${requestId}`)}`}>Sign in to review this delivery</XaButtonLink> : <XaButton variant="primary" size="lg" onClick={() => void load()}>Check again</XaButton>}>{error || "This delivery is unavailable."}</XaEmpty></div>} />;
   const item = inspection.request;
   const commitment = item.deliveryCommitment;
   const actions = deliveryActions(inspection);
   const disabled = saving || Boolean(pending);
   const safeReviewUrl = commitment?.result && deliveryReviewUrlSchema.safeParse(commitment.result.reviewUrl).success ? commitment.result.reviewUrl : null;
-  return <StPage>
-    <StHead title={item.outcome} titleId="delivery-title"
-      crumb={{ label: "Requests", href: `/workspace?workspaceId=${encodeURIComponent(item.businessId)}&view=requests` }}
-      meta={commitment ? deliveryCommitmentStatus(commitment) : item.status === "draft" ? "Draft request. No scope or deadline agreed." : item.providerAcceptance.status === "accepted" ? "Accepted for review. Delivery has not started." : "Waiting for agency review. No scope and deadline agreed."}
-    />
-    {error ? <StNotice tone="critical">{error}</StNotice> : null}
-    {notice ? <StNotice><span role="status">{notice}</span></StNotice> : null}
-    {pending ? <StNotice tone="need"><p>A previous command is not confirmed. Retry that exact command before making another change.</p><StPill variant="soft" disabled={saving} onClick={() => void submit()}>Retry retained command</StPill></StNotice> : null}
-    {inspection.permissions.stopped ? <StNotice>New work is stopped for this business. Records remain available; only an eligible cancellation can be recorded.</StNotice> : null}
-    {!inspection.permissions.canManage && !inspection.permissions.canOperate ? <StNotice>Shared with you. You can read this request; decisions stay with the people who manage it.</StNotice> : null}
-    <div className={styles.detailColumns}>
-      <StSteps label="Request progress" steps={requestProgress(item)} />
-      <div className={styles.detailStack}>
-        <StSurface label="Request scope">
-          <dl className={styles.scope}>
-            <div><dt>{commitment ? "In" : "Asked for"}</dt><dd>{commitment?.deliveryDefinition || item.request}</dd></div>
-            <div><dt>Scope</dt><dd><StMono>{(commitment?.scope ?? item.scope).join(", ")}</StMono></dd></div>
-            {commitment ? <><div><dt>Agreed terms reference</dt><dd>{commitment.termsReference}</dd></div><div><dt>Original deadline</dt><dd><StMono>{displayDate(commitment.dueAt)}</StMono></dd></div><div><dt>Assigned person</dt><dd><StMono>{commitment.operatorId}</StMono></dd></div></> : null}
-            <div><dt>Request revision</dt><dd><StMono>{item.revision}</StMono></dd></div>
-          </dl>
-        </StSurface>
-        {commitment?.blocker ? <StNotice tone="need">{commitment.blocker.note}. The original deadline is unchanged.</StNotice> : null}
-        {commitment?.decision ? <StSection title="Latest business decision"><p>{commitment.decision.note}</p><StMono>{displayDate(commitment.decision.at)}</StMono></StSection> : null}
-        {commitment?.result ? <StSection title="Submitted website">{safeReviewUrl ? <StTextButton href={safeReviewUrl}>Open the submitted website</StTextButton> : <StNotice tone="critical">The retained review link is not safe to open.</StNotice>}<p className="break-all"><StMono>{commitment.result.repository} at {commitment.result.commitSha}</StMono></p><p className="text-sm text-gray-muted">The operator recorded desktop, mobile, and primary-action checks. This is not proof of final-domain publication.</p></StSection> : null}
-      </div>
-    </div>
+  const decides = actions.some(action => ["blocker", "accept_result", "request_changes", "cancel"].includes(action));
+  const steps = requestProgress(item).map((step, index) => ({ key: String(index), title: step.title, state: step.state as StepState, time: step.time, detail: step.detail }));
+
+  const story = <>
+    <XaCrumbs items={[{ label: "Requests", href: `/workspace?workspaceId=${encodeURIComponent(item.businessId)}&view=requests` }, { label: item.outcome }]} />
+    <XaHeadline quiet={deliverySentence(commitment, item, inspection.permissions.canManage ? "business" : inspection.permissions.canOperate ? "agency" : "either")}><span id="delivery-title">{item.outcome}</span></XaHeadline>
+    {error ? <XaNote role="alert" tone="down">{error}</XaNote> : null}
+    {notice ? <XaNote role="status" tone="done">{notice}</XaNote> : null}
+    {pending ? <div className={styles.inline}><XaNote tone="waits">A previous command is not confirmed. Retry that exact command before making another change.</XaNote><XaButton variant="secondary" size="sm" disabled={saving} onClick={() => void submit()}>Retry retained command</XaButton></div> : null}
+    {inspection.permissions.stopped ? <XaNote tone="waits">New work is stopped for this business. Records stay; only an eligible cancellation can be recorded.</XaNote> : null}
+    {!inspection.permissions.canManage && !inspection.permissions.canOperate ? <XaNote>Shared with you. You can read this Request; decisions stay with the people who manage it.</XaNote> : null}
+    <XaSteps label="Request progress" steps={steps} />
+    <XaAnswers labelWidth={150} rows={[
+      [commitment ? "Agreed work" : "Asked for", commitment?.deliveryDefinition || item.request],
+      ["Scope", scopeWords(commitment?.scope ?? item.scope)],
+      ...(commitment ? [
+        ["Agreed terms", commitment.termsReference] as const,
+        ["Original deadline", commitment.dueAt ? displayDate(commitment.dueAt) : "Set when the scope is accepted"] as const,
+        ["Assigned to", commitment.operatorId === inspection.actorId ? "You" : "A person at the agency"] as const,
+      ] : []),
+    ]} />
+    {commitment?.blocker ? <XaNote tone="waits">{commitment.blocker.note}. The original deadline is unchanged.</XaNote> : null}
+    {commitment?.decision ? <XaBlock label="Latest decision from the business"><p className={styles.copyNote}>{commitment.decision.note} · {displayDate(commitment.decision.at)}</p></XaBlock> : null}
     {inspection.codeAgent && (inspection.permissions.canOperate || inspection.permissions.canManage) ? <CodeAgentHandoff mcpUrl={inspection.codeAgent.mcpUrl} requestId={inspection.codeAgent.requestId} /> : null}
-    {actions.includes("propose") ? <form className="space-y-4" onSubmit={event => { event.preventDefault(); void submit({ kind: "propose", termsReference: terms, deliveryDefinition: definition, inputsReady: true }); }}><h2 className="text-base font-semibold">Propose the delivery</h2><TextInput label="Agreed terms reference" maxLength={500} required value={terms} disabled={disabled} onChange={event => setTerms(event.target.value)} /><TextArea label="Exact delivery definition" maxLength={1000} required value={definition} disabled={disabled} onChange={event => setDefinition(event.target.value)} /><label className="flex min-h-11 items-center gap-3"><input type="checkbox" checked={ready} disabled={disabled} onChange={event => setReady(event.target.checked)} />The required inputs are ready and I can take this delivery.</label><p className="text-sm text-gray-muted">The client must accept this exact proposal. Their acceptance starts the 24-hour clock. It does not authorize a charge or publication.</p><StPill type="submit" disabled={disabled || !ready || !terms.trim() || !definition.trim()}>Propose 24-hour delivery</StPill></form> : null}
-    {actions.includes("agree") ? <section className="space-y-3"><p>Accepting the scope and terms above starts a 24-hour delivery commitment now. Review the delivery definition before continuing.</p><StHold aria-label="Accept scope and start 24-hour delivery" label="Accept scope" disabled={disabled} onAccept={() => void submit({ kind: "agree" })} /></section> : null}
-    {actions.includes("submit") ? <form className="space-y-4" onSubmit={event => { event.preventDefault(); void submit({ kind: "submit", result: { websiteBindingId: bindingId, repository, commitSha, reviewUrl, desktopChecked: true, mobileChecked: true, primaryActionChecked: true } }); }}><h2 className="text-base font-semibold">Submit the built website</h2><SelectInput label="Client website" required value={bindingId} disabled={disabled} onChange={event => setBindingId(event.target.value)} options={[{value:"",label:"Choose an authorized website"},...inspection.permissions.websiteBindings.map(binding=>({value:binding.id,label:binding.name||binding.tenantId}))]} /><TextInput label="Repository, owner/name" required maxLength={201} value={repository} disabled={disabled} onChange={event => setRepository(event.target.value)} /><TextInput label="Full commit SHA" required maxLength={40} value={commitSha} disabled={disabled} onChange={event => setCommitSha(event.target.value)} /><TextInput label="Public HTTPS review URL" type="url" required maxLength={2048} value={reviewUrl} disabled={disabled} onChange={event => setReviewUrl(event.target.value)} /><p className="text-sm text-gray-muted">Do not enter credentials or preview-bypass tokens. Connecting a website does not authorize publishing it.</p>{[["Desktop checked", desktop, setDesktop], ["Mobile checked", mobile, setMobile], ["Primary action checked", primaryAction, setPrimaryAction]].map(([label, checked, setter]) => <label key={String(label)} className="flex min-h-11 items-center gap-3"><input type="checkbox" disabled={disabled} checked={Boolean(checked)} onChange={event => (setter as (value: boolean) => void)(event.target.checked)} />{String(label)}</label>)}<StPill type="submit" disabled={disabled || !bindingId || !desktop || !mobile || !primaryAction}>Submit for client review</StPill></form> : null}
-    {inspection.permissions.canOperate && commitment && ["running", "changes_requested"].includes(commitment.status) && !inspection.permissions.websiteBindings.length ? <p role="status">No eligible website is connected. Bind the actual client website through the existing business settings before submitting it.</p> : null}
-    {actions.some(action => ["blocker", "accept_result", "request_changes", "cancel"].includes(action)) ? <section className="space-y-4"><TextArea label="Decision or blocker note" maxLength={1000} value={note} disabled={disabled} onChange={event => setNote(event.target.value)} /><div className="flex flex-wrap gap-3">{actions.includes("blocker") ? <><StPill type="button" variant="soft" disabled={disabled || !note.trim()} onClick={() => void submit({ kind: "blocker", note })}>Record blocker</StPill>{commitment?.blocker ? <StPill type="button" variant="soft" disabled={disabled} onClick={() => void submit({ kind: "blocker", note: null })}>Clear blocker</StPill> : null}</> : null}{actions.includes("accept_result") ? <StHold aria-label="Accept delivered result" label="Accept delivered result" disabled={disabled || !note.trim()} onAccept={() => void submit({ kind: "accept_result", note })} /> : null}{actions.includes("request_changes") ? <StPill type="button" variant="soft" disabled={disabled || !note.trim()} onClick={() => void submit({ kind: "request_changes", note })}>Request changes</StPill> : null}{actions.includes("cancel") ? <StPill type="button" variant="soft" disabled={disabled || !note.trim()} onClick={() => void submit({ kind: "cancel", note })}>Cancel this delivery</StPill> : null}</div><p className="text-sm text-gray-muted">A cancellation retains records and does not delete the website, issue a refund, or change existing agreements.</p></section> : null}
-    <StPill type="button" variant="soft" disabled={saving} onClick={() => void load()}>Refresh saved state</StPill>
+    {inspection.permissions.canOperate && commitment && ["running", "changes_requested"].includes(commitment.status) && !inspection.permissions.websiteBindings.length ? <XaNote role="status" tone="waits">No eligible website is connected. Connect the client&apos;s actual website in its business settings before submitting it.</XaNote> : null}
+    <p className={styles.copyNote}><XaTextLink onClick={() => void load()}>Refresh saved state</XaTextLink></p>
     {children}
-  </StPage>;
+  </>;
+
+  const result = commitment?.result ? <XaBlock label="Submitted website">
+    {safeReviewUrl ? <p className={styles.copyNote}><XaTextLink href={safeReviewUrl}>Open the submitted website</XaTextLink></p> : <XaNote tone="down">The saved review link isn&apos;t safe to open.</XaNote>}
+    {inspection.permissions.canOperate ? <p className={styles.copyNote}>{commitment.result.repository} at {commitment.result.commitSha.slice(0, 7)}</p> : null}
+    <XaNote>The agency checked it on desktop and phone and tried its main action. This is not proof it is published on the final address.</XaNote>
+  </XaBlock> : null;
+
+  const object = actions.includes("propose") ? <XaDecision label="Propose the delivery" status={<XaStatus kind="draft">Proposal</XaStatus>} meta="The business accepts it first" yes={null}>
+    <form className={styles.form} onSubmit={event => { event.preventDefault(); void submit({ kind: "propose", termsReference: terms, deliveryDefinition: definition, inputsReady: true }); }}>
+      <XaField label="Agreed terms reference" maxLength={500} required value={terms} disabled={disabled} onChange={event => setTerms(event.target.value)} placeholder="Quote 42" />
+      <XaTextArea label="Exactly what will be delivered" maxLength={1000} required value={definition} disabled={disabled} onChange={event => setDefinition(event.target.value)} />
+      <label className={styles.check}><input type="checkbox" checked={ready} disabled={disabled} onChange={event => setReady(event.target.checked)} /><span>What I need is ready and I can take this delivery.</span></label>
+      <XaNote>The business accepts this exact proposal, and that starts the 24-hour clock. It doesn&apos;t approve a charge or publishing.</XaNote>
+      <XaButton type="submit" variant="primary" size="lg" disabled={disabled || !ready || !terms.trim() || !definition.trim()}>Propose 24-hour delivery</XaButton>
+    </form>
+  </XaDecision>
+    : actions.includes("agree") ? <XaDecision label="Accept the scope" status={<XaStatus kind="waits">Waits for you</XaStatus>} meta={commitment ? `Proposed ${displayDate(commitment.proposedAt)}` : undefined}
+      yes={<XaYes state={saving ? "going" : "waiting"} yesLabel="Accept scope and start 24-hour delivery" onYes={() => void submit({ kind: "agree" })} disabledReason={pending ? "Retry the unconfirmed command first." : undefined} />}>
+      <p className={styles.lead}>{commitment?.deliveryDefinition}</p>
+      <XaNote>Accepting starts a 24-hour delivery now, under {commitment?.termsReference}. It doesn&apos;t approve a charge or publish anything.</XaNote>
+    </XaDecision>
+      : actions.includes("submit") ? <XaDecision label="Submit the built website" status={<XaStatus kind="working">In progress</XaStatus>} meta={commitment ? `Due ${displayDate(commitment.dueAt)}` : undefined} yes={null}>
+        <form className={styles.form} onSubmit={event => { event.preventDefault(); void submit({ kind: "submit", result: { websiteBindingId: bindingId, repository, commitSha, reviewUrl, desktopChecked: true, mobileChecked: true, primaryActionChecked: true } }); }}>
+          <div className={styles.selectField}><label htmlFor="delivery-binding">Client website</label><select id="delivery-binding" required value={bindingId} disabled={disabled} onChange={event => setBindingId(event.target.value)}><option value="">Choose a website you may submit to</option>{inspection.permissions.websiteBindings.map(binding => <option key={binding.id} value={binding.id}>{binding.name || "Unnamed website"}</option>)}</select></div>
+          <XaField label="Repository, owner/name" required maxLength={201} value={repository} disabled={disabled} onChange={event => setRepository(event.target.value)} />
+          <XaField label="Full commit" required maxLength={40} value={commitSha} disabled={disabled} onChange={event => setCommitSha(event.target.value)} />
+          <XaField label="Review address (HTTPS)" type="url" required maxLength={2048} value={reviewUrl} disabled={disabled} onChange={event => setReviewUrl(event.target.value)} hint="No passwords or preview-bypass tokens. Connecting a website doesn't approve publishing it." />
+          <fieldset className={styles.checks}><legend>Checked before you submit</legend>
+            {([["Desktop checked", desktop, setDesktop], ["Mobile checked", mobile, setMobile], ["Primary action checked", primaryAction, setPrimaryAction]] as const).map(([label, checked, setter]) => <label key={label} className={styles.check}><input type="checkbox" disabled={disabled} checked={checked} onChange={event => setter(event.target.checked)} /><span>{label}</span></label>)}
+          </fieldset>
+          <XaButton type="submit" variant="primary" size="lg" disabled={disabled || !bindingId || !desktop || !mobile || !primaryAction}>Submit for client review</XaButton>
+        </form>
+      </XaDecision>
+        : decides ? <XaDecision label="Decide on the delivery" status={actions.includes("accept_result") ? <XaStatus kind="waits">Ready for your review</XaStatus> : <XaStatus kind="working">In progress</XaStatus>} meta={commitment?.dueAt ? `Original deadline ${displayDate(commitment.dueAt)}` : undefined}
+          yes={actions.includes("accept_result") ? <XaYes state={saving ? "going" : "waiting"} yesLabel="Accept delivered result" onYes={() => void submit({ kind: "accept_result", note })} disabledReason={!note.trim() ? "Write a note about the result first." : pending ? "Retry the unconfirmed command first." : undefined} /> : null}>
+          {result}
+          <XaTextArea label={actions.includes("accept_result") ? "Your note on the result" : "Blocker or decision note"} maxLength={1000} value={note} disabled={disabled} onChange={event => setNote(event.target.value)} />
+          <div className={styles.inline}>
+            {actions.includes("blocker") ? <><XaButton variant="secondary" size="sm" disabled={disabled || !note.trim()} onClick={() => void submit({ kind: "blocker", note })}>Record blocker</XaButton>{commitment?.blocker ? <XaButton variant="secondary" size="sm" disabled={disabled} onClick={() => void submit({ kind: "blocker", note: null })}>Clear blocker</XaButton> : null}</> : null}
+            {actions.includes("request_changes") ? <XaButton variant="secondary" size="sm" disabled={disabled || !note.trim()} onClick={() => void submit({ kind: "request_changes", note })}>Request changes</XaButton> : null}
+            {actions.includes("cancel") ? <XaButton variant="quiet" size="sm" disabled={disabled || !note.trim()} onClick={() => void submit({ kind: "cancel", note })}>Cancel this delivery</XaButton> : null}
+          </div>
+          <XaNote>Cancelling keeps every record. It doesn&apos;t delete the website, refund anything or change existing agreements.</XaNote>
+        </XaDecision>
+          : result ? <XaDecision label="The delivered website" status={commitment?.status === "accepted" ? <XaStatus kind="live">Accepted</XaStatus> : <XaStatus kind="waits">Ready for review</XaStatus>} yes={null}>{result}</XaDecision> : undefined;
+
+  return <XaObjectPage label={item.outcome} story={story} object={object} />;
 }

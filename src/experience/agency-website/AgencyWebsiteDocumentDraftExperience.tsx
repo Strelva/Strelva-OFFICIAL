@@ -2,11 +2,13 @@
 
 import { useEffect, useMemo, useState, type SyntheticEvent } from "react";
 import { z } from "zod";
-import { StEmpty, StHead, StMono, StNotice, StPage, StPill, StSection, StSkeleton, StTextButton, StToast } from "@/components/ui/strelva/Kit";
+import { StEmpty, StMono, StNotice, StPage, StPill, StSection, StSkeleton, StTextButton, StToast } from "@/components/ui/strelva/Kit";
 import { SelectInput, TextArea } from "@/components/ui/TextInput";
 import { agencyManagedWebsiteDraftGrantSchema, type AgencyManagedWebsiteDraftGrant } from "@/platform/offerings/agency-website-draft-contracts";
 import { AGENCY_DOCUMENT_NODE_SECTIONS, siteDocumentSchema, websiteRebuildSchema, type WebsiteRebuildRecord, type CatalogNode } from "@/products/websites/client";
 import { AgencyManagedWebsiteDraftExperience } from "./AgencyManagedWebsiteDraftExperience";
+import { XaHeadline } from "@/components/ui/strelva/Xa";
+import styles from "./agency-website.module.css";
 
 export interface AgencyDocumentState { grant: AgencyManagedWebsiteDraftGrant | null; website: WebsiteRebuildRecord | null; section: string | null; sections: string[]; previewHtml?: string; previewHref?: string; previewPages?: Record<string,string> }
 export interface AgencyDocumentPatch { op: "replace"; path: string; value: unknown }
@@ -116,8 +118,8 @@ export function AgencyWebsiteDocumentDraftExperience({ bindingId, transport = ag
     finally { setSaving(false); }
   }
   if (!loading && state && !website && !error) return <AgencyManagedWebsiteDraftExperience bindingId={bindingId} />;
-  return <main className="min-h-screen bg-surface"><StPage>
-    <StHead title="Prepare a website update" meta="Edit the sections covered by the client’s permission and save a draft for their review." />
+  return <div className={styles.document}><StPage width="wide">
+    <XaHeadline quiet="A draft, prepared by you. The client reviews it and puts it live.">Prepare a website update</XaHeadline>
     {loading ? <StSkeleton label="Checking the current website permission" width="65%" /> : null}
     {error ? <div className="grid gap-3"><StNotice tone="critical"><p className="m-0">{error}</p>{Object.keys(edits).length ? <p className="mb-0 mt-2 text-gray-muted">Your unsaved edits are preserved. Reloading replaces them with the saved document.</p> : null}</StNotice><StPill variant="soft" disabled={saving} onClick={() => setAttempt(value => value + 1)}>Reload saved document and permission</StPill></div> : null}
     {!loading && state && !state.grant ? <StEmpty>The client needs to enable draft editing before you can update this website.</StEmpty> : null}
@@ -136,5 +138,5 @@ export function AgencyWebsiteDocumentDraftExperience({ bindingId, transport = ag
     </div> : null}
     {saved ? <StToast>{saved}</StToast> : null}
     {!loading && state?.website && !candidate ? <StEmpty>This website has no candidate draft yet. The client or Strelva needs to prepare one first.</StEmpty> : null}
-  </StPage></main>;
+  </StPage></div>;
 }

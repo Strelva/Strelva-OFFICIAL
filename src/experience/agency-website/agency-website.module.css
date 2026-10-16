@@ -1,0 +1,14 @@
+/* Agency website draft (XA, AG4): fields on the left, the page as visitors would see it on the right. */
+.form { display: flex; flex-direction: column; gap: 16px; }
+.pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.advanced { color: var(--st-text-2); font-size: 14px; }
+.advanced summary { min-height: 44px; display: flex; align-items: center; cursor: pointer; }
+.advanced[open] summary { margin-bottom: 8px; }
+.quiet { margin: 0; color: var(--st-text-3); font-size: 14px; }
+.yes { display: flex; flex-direction: column; gap: 12px; }
+.tagline { margin: 0; color: var(--st-text-3); font-size: 13px; }
+.heroTitle { margin: 0; color: var(--st-text); font-size: 26px; font-weight: 600; letter-spacing: -0.6px; line-height: 1.15; }
+.cta { align-self: flex-start; margin-top: 4px; padding: 9px 17px; border: 1px solid var(--st-text); border-radius: 999px; color: var(--st-text); font-size: 14px; font-weight: 600; }
+.crumbs { box-sizing: border-box; max-width: 1184px; margin: 0 auto; padding: 24px 48px 0; }
+@media (max-width: 767px) { .pair { grid-template-columns: minmax(0, 1fr); } .crumbs { padding: 16px 16px 0; } }
+.document { width: 100%; }

@@ -88,7 +88,9 @@ describe("standalone recipient and delegated application surfaces", () => {
     expect(container.querySelector("iframe")?.getAttribute("sandbox")).toBe("allow-scripts allow-forms");
     expect(container.querySelector("iframe")?.getAttribute("referrerpolicy")).toBe("no-referrer");
     expect(document.querySelector('meta[http-equiv="Content-Security-Policy"]')?.getAttribute("content")).toBe(CUSTOM_APPLICATION_PARENT_CSP);
-    expect(container.textContent).toContain("reviewed-digest");
+    // The reviewed build stays traceable without showing an id to the person using the tool.
+    expect(container.querySelector("[data-artifact-digest]")?.getAttribute("data-artifact-digest")).toBe("reviewed-digest");
+    expect(container.textContent).not.toContain("reviewed-digest");
     expect(container.querySelector('[aria-label="Ask Strelva"]')).toBeNull();
   });
   it.each(["native", "custom", "agency"] as const)("shows %s loading and denied states without an Ask write path", async kind => {

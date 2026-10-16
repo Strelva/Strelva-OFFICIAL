@@ -43,7 +43,7 @@ it("shows the agency the snapshot that was shared when a Release is asked for", 
   expect(document).toMatchObject({ audience: "agency", releaseNumber: 1 });
   expect(propsFor(page, CareReportEditor)).toBeUndefined();
   expect((document!.releaseHref as (n: number) => string)(2)).toBe(`/workspace/care-reports/${PREVIEW_REPORT_ID}?workspaceId=${PREVIEW_AGENCY_ID}&release=2`);
-  expect(document!.back).toEqual({ label: "Report", href: `/workspace/care-reports/${PREVIEW_REPORT_ID}?workspaceId=${PREVIEW_AGENCY_ID}` });
+  expect(document!.back).toEqual({ label: "Back to the draft", href: `/workspace/care-reports/${PREVIEW_REPORT_ID}?workspaceId=${PREVIEW_AGENCY_ID}` });
 });
 
 it("falls back to the editor for a Release that was not shared", async () => {

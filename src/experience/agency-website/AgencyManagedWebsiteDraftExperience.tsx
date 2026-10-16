@@ -1,8 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { StEmpty, StHead, StMono, StNotice, StPage, StPill, StSection, StSkeleton, StSurface, StTextButton, StToast } from "@/components/ui/strelva/Kit";
-import { TextArea, TextInput } from "@/components/ui/TextInput";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { XaButton, XaDecision, XaEmpty, XaField, XaHeadline, XaPage, XaPageChange, XaStatus, XaTextArea, XaTextLink, XaWorking } from "@/components/ui/strelva/Xa";
+import { XaNote, XaObjectPage } from "@/experience/xa-object/XaObjectPage";
+import styles from "./agency-website.module.css";
 import {
   agencyManagedWebsiteDraftGrantSchema,
   agencyWebsiteDraftStateSchema,
@@ -46,7 +47,7 @@ function receiptFrom(value: unknown, section: string): DraftReceipt | null {
   };
 }
 
-export function AgencyManagedWebsiteDraftExperience({ bindingId, section = "hero" }: { bindingId: string; section?: string }) {
+export function AgencyManagedWebsiteDraftExperience({ bindingId, section = "hero", businessName, websiteAddress, request, crumbs }: { bindingId: string; section?: string; businessName?: string; websiteAddress?: string; request?: typeof fetch; crumbs?: ReactNode }) {
   const [grant, setGrant] = useState<AgencyManagedWebsiteDraftGrant | null>(null);
   const [state, setState] = useState<AgencyWebsiteDraftState | null>(null);
   const [draft, setDraft] = useState("");
@@ -61,7 +62,7 @@ export function AgencyManagedWebsiteDraftExperience({ bindingId, section = "hero
   const load = useCallback(async (signal: AbortSignal) => {
     setStatus("loading");
     setMessage("");
-    const response = await fetch(`/api/agency-website-draft-access?bindingId=${encodeURIComponent(bindingId)}&section=${encodeURIComponent(section)}`, { cache: "no-store", signal });
+    const response = await (request ?? fetch)(`/api/agency-website-draft-access?bindingId=${encodeURIComponent(bindingId)}&section=${encodeURIComponent(section)}`, { cache: "no-store", signal });
     const body = await response.json().catch(() => null) as unknown;
     if (!response.ok) throw new Error(errorMessage(body, "Managed website draft access could not be confirmed."));
     const value = body && typeof body === "object" ? body as { grant?: unknown; state?: unknown; customerWebsiteHref?: unknown } : {};
@@ -73,6 +74,7 @@ export function AgencyManagedWebsiteDraftExperience({ bindingId, section = "hero
     setCustomerWebsiteHref(typeof value.customerWebsiteHref === "string" ? value.customerWebsiteHref : null);
     setDraft(nextState ? JSON.stringify(nextState.data, null, 2) : "{}");
     setStatus("ready");
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bindingId, section]);
 
   useEffect(() => {
@@ -115,14 +117,14 @@ export function AgencyManagedWebsiteDraftExperience({ bindingId, section = "hero
     setMessage("");
     setReceipt(null);
     try {
-      const prepareResponse = await fetch("/api/agency-website-draft-access", {
+      const prepareResponse = await (request ?? fetch)("/api/agency-website-draft-access", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "prepare", assignmentId: grant.assignmentId, bindingId, section, data: parsed, expectedRevision: state.revision, expectedHash: state.dataHash }),
       });
       const prepareBody = await prepareResponse.json().catch(() => null) as unknown;
       if (!prepareResponse.ok) throw new Error(errorMessage(prepareBody, "The draft could not be prepared."));
-      const runResponse = await fetch("/api/operational-assignments", {
+      const runResponse = await (request ?? fetch)("/api/operational-assignments", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "run", assignmentId: grant.assignmentId }),
@@ -144,32 +146,50 @@ export function AgencyManagedWebsiteDraftExperience({ bindingId, section = "hero
     }
   }
 
-  return <main className="min-h-screen bg-surface">
-    <StPage>
-      <StHead title="Prepare a website update" meta={<>Edit the {section === "hero" ? "home page introduction" : section} and save a draft for the client to review.</>} />
-      {status === "loading" ? <StSkeleton label="Checking the current website permission" width="65%" /> : null}
-      {status === "error" ? <><StNotice tone="critical">{message}</StNotice><StTextButton onClick={() => setReload((value) => value + 1)}>Reload permission</StTextButton></> : null}
-      {status === "ready" && !grant ? <StEmpty>The client needs to enable draft editing before you can update this website.</StEmpty> : null}
-      {status === "ready" && grant && !active ? <StNotice tone="need">This draft permission is revoked or expired. No new preparation or execution is available. Existing website history remains with the client.</StNotice> : null}
-      {status === "ready" && grant && active && state ? <StSection title={`${section} draft`} meta={<StMono>Saved draft {state.revision}</StMono>} action={customerWebsiteHref ? <StTextButton href={customerWebsiteHref}>Open client website editor</StTextButton> : undefined}>
-        <p className="m-0 text-sm text-gray-muted">If the client changes this section, reload it before saving.</p>
-        <StSurface label="Website draft">
-          {section === "hero" ? <div className="grid gap-4">
-            <TextInput id="managed-website-hero-headline" label="Headline" value={fieldValue("headline")} onChange={(event) => updateField("headline", event.target.value)} maxLength={10_000} required disabled={saving} />
-            <TextArea id="managed-website-hero-subheadline" label="Supporting text" value={fieldValue("subheadline")} onChange={(event) => updateField("subheadline", event.target.value)} maxLength={10_000} rows={3} disabled={saving} />
-            <TextInput id="managed-website-hero-tagline" label="Tagline" value={fieldValue("tagline")} onChange={(event) => updateField("tagline", event.target.value)} maxLength={10_000} disabled={saving} />
-            <div className="grid gap-4 sm:grid-cols-2"><TextInput id="managed-website-hero-cta-text" label="Button text" value={fieldValue("ctaText")} onChange={(event) => updateField("ctaText", event.target.value)} maxLength={10_000} required disabled={saving} /><TextInput id="managed-website-hero-cta-link" label="Button link" value={fieldValue("ctaLink")} onChange={(event) => updateField("ctaLink", event.target.value)} maxLength={10_000} disabled={saving} /></div>
-          </div> : null}
-          <details className="mt-5">
-            <summary className="cursor-pointer text-sm font-medium text-warm-black">Advanced section data</summary>
-            <TextArea id="managed-website-draft-json" className="mt-3 tabular-nums text-xs" label={section === "hero" ? "Optional JSON for fields outside this editor" : "Section data"} value={draft} onChange={(event) => setDraft(event.target.value)} rows={10} spellCheck={false} helperText="Keep this data for the assigned section only. The saved result remains a draft until the client reviews and publishes it." />
-          </details>
-        </StSurface>
-        <p className="m-0 text-sm leading-relaxed text-gray-muted">The client reviews and publishes your draft. Saving here does not change the live website.</p>
-        <StPill busy={saving} disabled={!parsed} onClick={() => void prepareAndRun()}>{saving ? "Saving assigned draft…" : "Prepare and save draft"}</StPill>
-        {message ? <StNotice tone="critical">{message}</StNotice> : null}
-        {receipt ? <><StToast>Saved {receipt.section} draft{receipt.revision === null ? "" : ` Release ${receipt.revision}`}</StToast><p className="m-0 text-sm text-gray-muted">Your draft is saved and ready for the client to review.</p>{customerWebsiteHref ? <StTextButton href={customerWebsiteHref}>Review and publish in client website editor</StTextButton> : null}</> : null}
-      </StSection> : null}
-    </StPage>
-  </main>;
+  const sectionName = section === "hero" ? "the top of the home page" : `the ${section} section`;
+  const client = businessName ?? "The client";
+  const story = <>
+    {crumbs}
+    <XaHeadline quiet={`A draft, prepared by you. ${client} puts it live.`}>Prepare a website update</XaHeadline>
+    {status === "loading" ? <XaWorking title="Checking your website permission" steps={[{ id: "grant", label: `Reading what ${client} lets you prepare`, state: "active" }]} /> : null}
+    {status === "error" ? <div role="alert"><XaEmpty pose="fixing" title="Your permission couldn't be read" job="Nothing was saved to the website." secondary={<XaTextLink onClick={() => setReload((value) => value + 1)}>Reload permission</XaTextLink>}>{message}</XaEmpty></div> : null}
+    {status === "ready" && !grant ? <XaNote tone="waits">{client} needs to allow draft editing before you can update this website.</XaNote> : null}
+    {status === "ready" && grant && !active ? <XaNote tone="waits">This draft permission is revoked or expired. You can&apos;t prepare or save anything. The website&apos;s history stays with {client === "The client" ? "the client" : client}.</XaNote> : null}
+    {status === "ready" && grant && active && state ? <>
+      <XaNote>You are editing {sectionName}. Saved draft {state.revision}. If {client === "The client" ? "the client" : client} changes it, reload before saving.</XaNote>
+      {section === "hero" ? <div className={styles.form}>
+        <XaField id="managed-website-hero-headline" label="Headline" value={fieldValue("headline")} onChange={(event) => updateField("headline", event.target.value)} maxLength={10_000} required disabled={saving} />
+        <XaTextArea id="managed-website-hero-subheadline" label="Supporting text" value={fieldValue("subheadline")} onChange={(event) => updateField("subheadline", event.target.value)} maxLength={10_000} rows={3} disabled={saving} />
+        <XaField id="managed-website-hero-tagline" label="Tagline" value={fieldValue("tagline")} onChange={(event) => updateField("tagline", event.target.value)} maxLength={10_000} disabled={saving} />
+        <div className={styles.pair}>
+          <XaField id="managed-website-hero-cta-text" label="Button text" value={fieldValue("ctaText")} onChange={(event) => updateField("ctaText", event.target.value)} maxLength={10_000} required disabled={saving} />
+          <XaField id="managed-website-hero-cta-link" label="Button link" value={fieldValue("ctaLink")} onChange={(event) => updateField("ctaLink", event.target.value)} maxLength={10_000} disabled={saving} />
+        </div>
+      </div> : null}
+      <details className={styles.advanced}>
+        <summary>Section data for fields outside this editor</summary>
+        <XaTextArea id="managed-website-draft-json" label={section === "hero" ? "Section data" : "Section data"} value={draft} onChange={(event) => setDraft(event.target.value)} rows={10} spellCheck={false}
+          hint="Only the assigned section. It stays a draft until the client reviews it and puts it live." error={!parsed ? "This has to be a JSON object." : undefined} />
+      </details>
+      {customerWebsiteHref ? <p className={styles.quiet}><XaTextLink href={customerWebsiteHref}>Open the client&apos;s website editor</XaTextLink></p> : null}
+    </> : null}
+  </>;
+
+  const object = status === "ready" && grant && active && state ? <XaDecision label="The draft, as visitors would see it"
+    status={receipt ? <XaStatus kind="live">Draft saved</XaStatus> : <XaStatus kind="draft">Draft</XaStatus>} meta={websiteAddress ?? "Nothing changes until the client says yes"}
+    yes={<div className={styles.yes}>
+      {receipt ? <><XaNote role="status" tone="done">Saved {receipt.section} draft{receipt.revision === null ? "" : ` Release ${receipt.revision}`}. Your draft is ready for the client to review.</XaNote>{customerWebsiteHref ? <XaTextLink href={customerWebsiteHref}>Review and publish in client website editor</XaTextLink> : null}</> : null}
+      {message ? <XaNote role="alert" tone="down">{message}</XaNote> : null}
+      <XaButton variant="primary" size="lg" block busy={saving} disabled={!parsed} onClick={() => void prepareAndRun()}>{saving ? "Saving the draft" : "Prepare and save draft"}</XaButton>
+      <XaNote>The client reviews and publishes your draft. Saving here does not change the live website.</XaNote>
+    </div>}>
+    <XaPage address={websiteAddress ?? "Home page"} flat label="The home page with your draft">
+      {fieldValue("tagline") ? <p className={styles.tagline}>{fieldValue("tagline")}</p> : null}
+      <p className={styles.heroTitle}>{fieldValue("headline") || "Your headline"}</p>
+      {fieldValue("subheadline") ? <XaPageChange>{fieldValue("subheadline")}</XaPageChange> : null}
+      {fieldValue("ctaText") ? <span className={styles.cta}>{fieldValue("ctaText")}</span> : null}
+    </XaPage>
+  </XaDecision> : undefined;
+
+  return <XaObjectPage label="Prepare a website update" story={story} object={object} />;
 }

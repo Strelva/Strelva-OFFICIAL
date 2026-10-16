@@ -2,8 +2,7 @@ import type { Metadata } from "next";
 import { headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import { StrelvaShell } from "@/experience/app-frame/StrelvaShell";
-import { StPage } from "@/components/ui/strelva/Kit";
-import { CareReportDocument } from "@/experience/care-reports/CareReportDocument";
+import { CareReportColumn, CareReportDocument } from "@/experience/care-reports/CareReportDocument";
 import { CareReportEditor } from "@/experience/care-reports/CareReportEditor";
 import { resolveOwnerBrand } from "@/platform/agency-brand/server";
 import { careReportReleaseSnapshotSchema } from "@/platform/care-reports/contracts";
@@ -40,19 +39,17 @@ export default async function CareReportPage({ params, searchParams }: { params:
       const shared = careReportReleaseSnapshotSchema.safeParse(sharedRelease.snapshot);
       if (!shared.success) notFound();
       return <StrelvaShell title="" workspaceId={agencyId} workspaceName={brand.name} ownerBrand={brand} agencyNavigation={{ active: "clients" }}>
-        <StPage>
+        <CareReportColumn>
           <CareReportDocument snapshot={shared.data} brand={brand} releaseNumber={sharedRelease.number} audience="agency"
             releases={view.releases.map(item => ({ number: item.number, publishedAt: item.publishedAt }))}
             releaseHref={number => `/workspace/care-reports/${reportId}?workspaceId=${agencyId}&release=${number}`}
-            back={{ label: "Report", href: `/workspace/care-reports/${reportId}?workspaceId=${agencyId}` }} />
-        </StPage>
+            back={{ label: "Back to the draft", href: `/workspace/care-reports/${reportId}?workspaceId=${agencyId}` }} />
+        </CareReportColumn>
       </StrelvaShell>;
     }
     const origin = requestOrigin(await headers());
     return <StrelvaShell title="" workspaceId={view.report.agencyWorkspaceId} workspaceName={brand.name} ownerBrand={brand} agencyNavigation={{ active: "clients" }}>
-      <StPage>
-        <CareReportEditor initial={view} brand={brand} emailOn={careReportEmailEnabled()} shareLinksOn={careReportShareLinksEnabled()} origin={origin} />
-      </StPage>
+      <CareReportEditor initial={view} brand={brand} emailOn={careReportEmailEnabled()} shareLinksOn={careReportShareLinksEnabled()} origin={origin} />
     </StrelvaShell>;
   }
 
@@ -62,11 +59,11 @@ export default async function CareReportPage({ params, searchParams }: { params:
   if (!shown || !snapshot?.success) notFound();
   const businessId = view.report.businessWorkspaceId;
   return <StrelvaShell title="" workspaceId={businessId} workspaceName={view.report.businessName}>
-    <StPage>
+    <CareReportColumn>
       <CareReportDocument snapshot={snapshot.data} brand={brand} releaseNumber={shown.number} audience="owner"
         releases={view.releases.map(item => ({ number: item.number, publishedAt: item.publishedAt }))}
         releaseHref={number => `/workspace/care-reports/${reportId}?workspaceId=${businessId}&release=${number}`}
         back={{ label: "Recaps", href: `/workspace/recaps?workspaceId=${encodeURIComponent(businessId)}` }} />
-    </StPage>
+    </CareReportColumn>
   </StrelvaShell>;
 }

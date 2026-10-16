@@ -90,7 +90,7 @@ function ExperimentOptionFields({
   ];
   return (
     <fieldset className="space-y-3 rounded-lg border border-gray-border p-4">
-      <legend className="px-1 font-display text-lg text-warm-black">{labelPrefix}</legend>
+      <legend className="px-1 text-[13px] font-medium text-[color:var(--st-text-3)]">{labelPrefix}</legend>
       <input type="hidden" name={`${prefix}-id`} value={kind === "baseline" ? "baseline" : `candidate-${index ?? 0}`} readOnly />
       <div className="grid gap-3 sm:grid-cols-2">
         <TextInput
@@ -279,7 +279,7 @@ export function TrackerExperimentForm({ workId, expectedRevision, readOnly = fal
 
         <section aria-labelledby="tracker-experiment-baseline-title" className="space-y-3">
           <div>
-            <h2 id="tracker-experiment-baseline-title" className="font-display text-lg text-warm-black">Explicit baseline</h2>
+            <h2 id="tracker-experiment-baseline-title" className="text-[13px] font-medium leading-[18px] text-[color:var(--st-text-3)]">Explicit baseline</h2>
             <p className="text-sm text-gray-muted">Record the reference approach and include the human effort needed to support and maintain it.</p>
           </div>
           <ExperimentOptionFields kind="baseline" />
@@ -288,7 +288,7 @@ export function TrackerExperimentForm({ workId, expectedRevision, readOnly = fal
         <section aria-labelledby="tracker-experiment-candidates-title" className="space-y-3">
           <div className="flex flex-wrap items-baseline justify-between gap-3">
             <div>
-              <h2 id="tracker-experiment-candidates-title" className="font-display text-lg text-warm-black">Candidates</h2>
+              <h2 id="tracker-experiment-candidates-title" className="text-[13px] font-medium leading-[18px] text-[color:var(--st-text-3)]">Candidates</h2>
               <p className="text-sm text-gray-muted">Each candidate runs against the same workload. Costs left blank stay unknown.</p>
             </div>
             <div className="flex gap-2">
@@ -318,7 +318,7 @@ export function TrackerExperimentForm({ workId, expectedRevision, readOnly = fal
         </section>
 
         <section aria-labelledby="tracker-experiment-evidence-title" className="space-y-3">
-          <h2 id="tracker-experiment-evidence-title" className="font-display text-lg text-warm-black">Evidence and decision</h2>
+          <h2 id="tracker-experiment-evidence-title" className="text-[13px] font-medium leading-[18px] text-[color:var(--st-text-3)]">Evidence and decision</h2>
           <SelectInput
             name="evidenceKind"
             label="Evidence type"
